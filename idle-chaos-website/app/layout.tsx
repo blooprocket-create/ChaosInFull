@@ -31,7 +31,7 @@ export default async function RootLayout({
   <div className="fixed inset-0 -z-10 pointer-events-none bg-sway">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/40 via-black to-black" />
           <div className="absolute inset-0 mix-blend-screen opacity-20 bg-[url('/noise.png')]" />
-          {/* SVG Fog Overlay */}
+          {/* SVG Fog Overlay + filters */}
           <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
             <filter id="fogFilter">
               <feTurbulence type="fractalNoise" baseFrequency="0.004" numOctaves="3" seed="3" result="noise">
@@ -42,6 +42,18 @@ export default async function RootLayout({
               </feDisplacementMap>
             </filter>
             <defs>
+              {/* CodePen-style goo filter for CSS-driven drops */}
+              <filter id="goo">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="6 7 0 8 8  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
+                <feBlend in="SourceGraphic" in2="goo" />
+              </filter>
+              {/* Gooey filter for realistic liquid merging */}
+              <filter id="gooey">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
+                <feBlend in="SourceGraphic" in2="goo" />
+              </filter>
               <linearGradient id="fogGrad" x1="0" x2="1">
                 <stop offset="0%" stopColor="rgba(255,255,255,0.12)">
                   <animate attributeName="offset" dur="25s" values="0%;20%;0%" repeatCount="indefinite" />

@@ -1,5 +1,4 @@
 export const metadata = { title: "News • Chaos In Full" };
-import NewsTicker from "@/src/components/NewsTicker";
 
 export default function NewsPage() {
   const posts = [
@@ -12,9 +11,7 @@ export default function NewsPage() {
       <div className="pointer-events-none absolute inset-0 -z-10 opacity-10 bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.3),transparent_40%),radial-gradient(circle_at_70%_60%,rgba(239,68,68,0.25),transparent_45%)]" />
 
       <h1 className="text-3xl font-bold glitch" data-text="News">News</h1>
-      <div className="mt-2 text-xs text-gray-400">
-        <NewsTicker items={["Spooky Season approaches. Slimes are… multiplying.", "Town plaza under renovation. Watch your step.", "Rumors of a laughing shadow in the caves."]} />
-      </div>
+      {/* Ticker removed per feedback */}
 
       <div className="mt-6 grid sm:grid-cols-2 gap-4">
         {posts.map((p) => (
