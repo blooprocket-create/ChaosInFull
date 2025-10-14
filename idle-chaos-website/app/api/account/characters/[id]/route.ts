@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  const id = params.id;
+  const { id } = await params;
   if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
   const client = prisma as unknown as {
     character: { deleteMany: (args: { where: { id: string; userId: string } }) => Promise<{ count: number }> };

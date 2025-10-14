@@ -19,8 +19,8 @@ export default function DeleteCharacterButton({ id, name, onDeleted }: { id: str
       onDeleted?.();
       // fallback refresh
       if (!onDeleted) location.reload();
-    } catch (e: any) {
-      setError(e?.message || "Failed to delete");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
     }
   };
 
