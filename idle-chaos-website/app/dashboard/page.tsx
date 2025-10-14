@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 import LogoutButton from "@/src/components/LogoutButton";
+import DeleteCharacterButton from "@/src/components/DeleteCharacterButton";
 
 export default async function Dashboard() {
   const session = await getSession();
@@ -22,18 +23,11 @@ export default async function Dashboard() {
       <h1 className="text-3xl font-bold">Welcome, {user.username}</h1>
       <p className="mt-2 text-gray-400 text-sm">Gold and Premium Gold are shared across your account.</p>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          ["Level", s.level],
-          ["Class", s.class],
-          ["EXP", s.exp],
+        {[ 
           ["Gold", s.gold],
           ["Premium Gold", (s as unknown as { premiumGold?: number }).premiumGold ?? 0],
-          ["HP", s.hp],
-          ["MP", s.mp],
-          ["STR", s.strength],
-          ["AGI", s.agility],
-          ["INT", s.intellect],
-          ["LUK", s.luck],
+          ["Characters", characters.length],
+          ["Member Since", user.createdAt.toLocaleDateString?.() ?? new Date(user.createdAt).toLocaleDateString()],
         ].map(([k, v]) => (
           <div key={String(k)} className="rounded border border-white/10 bg-black/40 p-4">
             <div className="text-xs uppercase text-gray-400">{k}</div>
@@ -49,12 +43,15 @@ export default async function Dashboard() {
           <ul className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {characters.map((c: CharLite) => (
               <li key={c.id} className="rounded border border-white/10 bg-black/40 p-4">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-semibold text-white/90">{c.name}</div>
                     <div className="text-sm text-gray-400">{c.class} • Lv {c.level}</div>
                   </div>
-                  <a href={`/play?ch=${c.id}`} className="btn inline-flex items-center px-3 py-1">Play</a>
+                  <div className="flex gap-2">
+                    <a href={`/play?ch=${c.id}`} className="btn inline-flex items-center px-3 py-1">Play</a>
+                    <DeleteCharacterButton id={c.id} name={c.name} />
+                  </div>
                 </div>
                 <div className="mt-2 text-xs text-gray-400">Gender: {String((c as { gender?: string }).gender)} • Hat: {String((c as { hat?: string }).hat)}</div>
               </li>

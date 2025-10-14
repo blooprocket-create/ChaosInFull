@@ -10,6 +10,6 @@ type CharacterHUD = {
 
 const DynamicCanvas = dynamic(() => import("./GameCanvas"), { ssr: false });
 
-export default function GameCanvasClient(props: { character?: CharacterHUD }) {
+export default function GameCanvasClient(props: { character?: CharacterHUD; initialSeenWelcome?: boolean }) {
   return <DynamicCanvas {...props} />;
 }

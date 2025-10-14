@@ -14,13 +14,13 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
   if (!session) redirect("/login");
   const sp = await searchParams;
   const ch = sp?.ch;
-  let character: CharacterLite | null = null;
+  let character: (CharacterLite & { seenWelcome?: boolean }) | null = null;
   if (ch) {
     const client = prisma as unknown as {
       character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
     };
     const found = await client.character.findFirst({ where: { id: ch, userId: session.userId } });
-    character = (found as CharacterLite) ?? null;
+    character = (found as CharacterLite & { seenWelcome?: boolean }) ?? null;
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-12">
@@ -42,7 +42,7 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
             <>
               <p className="mt-2 text-gray-300">Entering as <span className="text-white/90">{character.name}</span> • {character.class} • Lv {character.level}</p>
               <div className="mt-6">
-                <GameCanvasClient character={{ id: character.id, name: character.name, class: character.class, level: character.level }} />
+                <GameCanvasClient character={{ id: character.id, name: character.name, class: character.class, level: character.level }} initialSeenWelcome={Boolean(character.seenWelcome)} />
               </div>
             </>
           )}

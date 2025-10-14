@@ -45,6 +45,7 @@ model Character {
   gender    Gender
   hat       Hat
   level     Int      @default(1)
+  seenWelcome Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([userId, name])
