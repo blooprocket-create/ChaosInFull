@@ -21,8 +21,8 @@ class TownScene extends Phaser.Scene {
   private slimePrompt!: Phaser.GameObjects.Text;
   preload() {}
   create() {
-    // Persist that we're in Town on scene load
-    window.__saveSceneNow?.();
+    // Track current scene for persistence
+    this.game.registry.set("currentScene", "Town");
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Town", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
     // Visible ground
@@ -197,8 +197,7 @@ class CaveScene extends Phaser.Scene {
   private tinNode!: Phaser.GameObjects.Image;
   private miningCooldown = 0;
   create() {
-    // Persist that we're in Cave on scene load
-    window.__saveSceneNow?.();
+    this.game.registry.set("currentScene", "Cave");
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Cave", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
     // ground
@@ -337,8 +336,7 @@ class SlimeFieldScene extends Phaser.Scene {
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
   create() {
-    // Persist that we're in Slime Field on scene load
-    window.__saveSceneNow?.();
+    this.game.registry.set("currentScene", "Slime");
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Slime Field", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5);
     this.groundRect = this.add.rectangle(center.x, this.scale.height - 40, this.scale.width * 0.9, 12, 0x0f172a).setOrigin(0.5);
@@ -505,8 +503,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   useEffect(() => {
     return () => {
       const game = gameRef.current; if (!game || !character) return;
-      const scenes = game.scene.getScenes(true);
-      const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
+  const regScene = (game.registry.get("currentScene") as string) || "Town";
+  const scenes = game.scene.getScenes(true);
+  const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : regScene;
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       // Fire-and-forget; navigation is in progress
       fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) }).catch(() => {});
@@ -521,12 +520,22 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     const save = async () => {
       const game = gameRef.current; if (!game || !character) return;
       // Determine scene
-      const scenes = game.scene.getScenes(true);
-      const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
+  const regScene = (game.registry.get("currentScene") as string) || "Town";
+  const scenes = game.scene.getScenes(true);
+  const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : regScene;
       try {
-        await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) });
+        const statePayload = JSON.stringify({ characterId: character.id, scene: active });
         const inv = (game.registry.get("inventory") as Record<string, number>) || {};
-        await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) });
+        const invPayload = JSON.stringify({ characterId: character.id, items: inv });
+        // Prefer sendBeacon for reliability on unload
+        const sent1 = ("sendBeacon" in navigator) && navigator.sendBeacon("/api/account/characters/state", new Blob([statePayload], { type: "application/json" }));
+        const sent2 = ("sendBeacon" in navigator) && navigator.sendBeacon("/api/account/characters/inventory", new Blob([invPayload], { type: "application/json" }));
+        if (!sent1) {
+          await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: statePayload, keepalive: true as any });
+        }
+        if (!sent2) {
+          await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: invPayload, keepalive: true as any });
+        }
       } catch {}
     };
     const onHide = () => { save(); };
