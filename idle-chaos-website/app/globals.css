@@ -22,3 +22,30 @@ body { background: var(--background); color: var(--foreground); }
   99% { opacity: 0.6 }
 }
 .flicker-once { animation: uiFlicker 2s ease-in-out 1; }
+
+/* Glitch text effect */
+.glitch {
+  position: relative;
+  text-shadow: 0 0 8px rgba(190,24,255,0.25);
+}
+.glitch::before, .glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  clip-path: inset(0 0 0 0);
+  opacity: 0.3;
+}
+.glitch::before { transform: translate(1px, 0); color: #ef4444; }
+.glitch::after { transform: translate(-1px, 0); color: #a855f7; }
+
+/* Blood underline utility */
+.blood-underline {
+  position: relative;
+}
+.blood-underline::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -6px; height: 2px;
+  background: linear-gradient(90deg, rgba(239,68,68,0.8), rgba(168,85,247,0.8));
+  filter: drop-shadow(0 0 6px rgba(239,68,68,0.5));
+}

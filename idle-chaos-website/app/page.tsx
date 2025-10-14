@@ -12,9 +12,12 @@ export default function Home() {
           <div className="absolute top-0 left-[-60%] w-[220%] h-full opacity-14 blur-lg animate-[fogmove2_90s_linear_infinite] bg-[radial-gradient(ellipse_at_30%_60%,rgba(255,255,255,0.05),transparent_60%),radial-gradient(ellipse_at_70%_40%,rgba(255,255,255,0.04),transparent_60%)]" />
           <div className="absolute top-0 left-[-40%] w-[180%] h-full opacity-10 blur-xl animate-[fogmove3_120s_linear_infinite] bg-[radial-gradient(ellipse_at_20%_20%,rgba(255,255,255,0.05),transparent_60%),radial-gradient(ellipse_at_80%_80%,rgba(255,255,255,0.03),transparent_60%)]" />
         </div>
+        {/* Parallax orbs */}
+        <div className="pointer-events-none absolute -top-10 right-10 size-64 rounded-full blur-3xl bg-purple-700/20" />
+        <div className="pointer-events-none absolute top-40 -left-10 size-72 rounded-full blur-3xl bg-red-700/10" />
         <div className="mx-auto max-w-6xl px-4 py-24 md:py-32 grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <h1 className="text-5xl md:text-7xl font-bold tracking-widest leading-[1.05]">Chaos In Full</h1>
+            <h1 className="text-5xl md:text-7xl font-bold tracking-widest leading-[1.05] glitch" data-text="Chaos In Full">Chaos In Full</h1>
             <p className="mt-6 text-lg text-gray-300 max-w-prose">
               A 2D platformer idle RPG where darkness has a sense of humor. Carve your path through haunted mines, gooey fields, and absurd monstrosities.
             </p>
@@ -37,7 +40,7 @@ export default function Home() {
       </section>
 
       {/* Feature cards */}
-      <section className="mx-auto max-w-6xl px-4 py-16 grid md:grid-cols-3 gap-6">
+  <section className="mx-auto max-w-6xl px-4 py-16 grid md:grid-cols-3 gap-6">
         {[{
           title: "Evolve or Else",
           text: "Beginner to twisted Warrior, Occultist Mage, or Stalker Rogue—branch into deeper horrors as you level.",
@@ -58,9 +61,49 @@ export default function Home() {
       {/* Callout */}
       <section className="mx-auto max-w-6xl px-4 py-16">
         <div className="rounded-2xl border border-purple-800/40 bg-gradient-to-br from-purple-950/40 to-black p-8 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-wide">Prepare for the Town</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-wide blood-underline inline-block">Prepare for the Town</h2>
           <p className="mt-2 text-gray-300">Workbench, Anvil, Furnace, Storage, Task Board, and NPCs—in one cozy, cursed plaza.</p>
           <div className="mt-6"><Link href="/classes" className="px-6 py-3 inline-block rounded bg-purple-600 hover:bg-purple-500 font-semibold">Explore Classes</Link></div>
+        </div>
+      </section>
+
+      {/* Events */}
+      <section className="mx-auto max-w-6xl px-4 pb-16">
+        <h2 className="text-2xl font-bold blood-underline inline-block">Events</h2>
+        <div className="mt-6 grid md:grid-cols-3 gap-4">
+          {[1,2,3].map((i)=> (
+            <div key={i} className="rounded-xl border border-white/10 bg-black/40 p-5">
+              <div className="text-xs text-gray-400">Coming Soon</div>
+              <h3 className="text-lg font-semibold mt-1">Spooky Season {i}</h3>
+              <p className="text-gray-300 text-sm mt-1">Limited-time drops, cosmetics, and a maze where the walls whisper back.</p>
+              <div className="mt-3"><Link href="/news" className="text-purple-400 hover:text-purple-300 underline">Read News</Link></div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer with socials and newsletter stub */}
+      <section className="border-t border-white/10">
+        <div className="mx-auto max-w-6xl px-4 py-10 grid md:grid-cols-3 gap-6 text-sm">
+          <div>
+            <div className="text-lg font-bold tracking-widest">CHAOS IN FULL</div>
+            <p className="text-gray-400 mt-2">Darkly humorous idle RPG. Built for the web first.</p>
+          </div>
+          <div>
+            <div className="font-semibold">Follow</div>
+            <ul className="mt-2 space-y-1 text-gray-300">
+              <li><a className="hover:text-white" href="#">Twitter/X</a></li>
+              <li><a className="hover:text-white" href="#">Discord</a></li>
+              <li><a className="hover:text-white" href="#">YouTube</a></li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-semibold">Newsletter</div>
+            <form className="mt-2 flex gap-2">
+              <input type="email" placeholder="you@domain" className="flex-1 rounded bg-black/40 border border-white/10 px-3 py-2 outline-none focus:border-purple-500" />
+              <button className="rounded bg-purple-600 hover:bg-purple-500 px-4">Join</button>
+            </form>
+          </div>
         </div>
       </section>
 

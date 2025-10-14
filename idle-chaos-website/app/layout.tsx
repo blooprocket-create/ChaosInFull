@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Cinzel, Roboto_Mono } from "next/font/google";
 import { getSession } from "@/src/lib/auth";
 import ProfileMenu from "@/src/components/ProfileMenu";
+import CursorAura from "@/src/components/CursorAura";
 import "./globals.css";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
@@ -45,6 +46,7 @@ export default async function RootLayout({
           {/* Vignette */}
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.6))]" />
         </div>
+        <CursorAura />
         <header className="sticky top-0 z-20 backdrop-blur border-b border-white/10 bg-black/50">
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold tracking-widest">CHAOS IN FULL</Link>
