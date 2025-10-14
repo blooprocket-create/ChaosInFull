@@ -86,6 +86,82 @@
 				"$eslint-stylish"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build Next.js website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Next.js dev (website)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build Next.js website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
 		}
 	]
 }

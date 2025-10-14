@@ -5,7 +5,7 @@ import * as Phaser from "phaser";
 declare global {
   interface Window {
     __saveSceneNow?: (sceneOverride?: "Town" | "Cave" | "Slime") => void;
-    __applyExpUpdate?: (payload: { type: "character" | "mining"; exp: number; level: number }) => void;
+    __applyExpUpdate?: (payload: { type: "character" | "mining" | "crafting"; exp: number; level: number }) => void;
     __openFurnace?: () => void;
   }
 }
@@ -429,18 +429,24 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [activeSceneKey, setActiveSceneKey] = useState<string>("TownScene");
   const [showStats, setShowStats] = useState(false);
   const [showFurnace, setShowFurnace] = useState(false);
-  const [furnaceQueue, setFurnaceQueue] = useState<{ recipe: "copper" | "bronze"; eta: number; startedAt: number } | null>(null);
+  const [furnaceQueue, setFurnaceQueue] = useState<{ recipe: "copper" | "bronze"; eta: number; startedAt: number; remaining: number; per: number; total: number } | null>(null);
+  const furnaceRef = useRef<typeof furnaceQueue>(null);
+  const furnaceTimerRef = useRef<number | null>(null);
+  useEffect(() => { furnaceRef.current = furnaceQueue; }, [furnaceQueue]);
   type SkillsView = { mining: { level: number; exp: number }; woodcutting: { level: number; exp: number }; fishing: { level: number; exp: number }; crafting: { level: number; exp: number } };
   type BaseView = { level: number; class: string; exp: number; gold: number; premiumGold?: number; hp: number; mp: number; strength: number; agility: number; intellect: number; luck: number };
   const [statsData, setStatsData] = useState<{ base: BaseView | null; skills: SkillsView } | null>(null);
   // EXP and level state (client HUD) with dynamic thresholds matching server
   const reqChar = useCallback((lvl: number) => Math.floor(100 * Math.pow(1.25, Math.max(0, lvl - 1))), []);
   const reqMine = useCallback((lvl: number) => Math.floor(50 * Math.pow(1.2, Math.max(0, lvl - 1))), []);
+  const reqCraft = useCallback((lvl: number) => Math.floor(50 * Math.pow(1.2, Math.max(0, lvl - 1))), []);
   const [charLevel, setCharLevel] = useState<number>(character?.level ?? 1);
   const [charExp, setCharExp] = useState<number>(initialExp ?? 0);
   const [charMax, setCharMax] = useState<number>(reqChar(character?.level ?? 1));
   const [miningExpState, setMiningExpState] = useState<number>(initialMiningExp ?? 0);
   const [miningMax, setMiningMax] = useState<number>(reqMine(initialMiningLevel ?? 1));
+  const [craftingExpState, setCraftingExpState] = useState<number>(0);
+  const [craftingMax, setCraftingMax] = useState<number>(reqCraft(1));
   const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: reqChar(character?.level ?? 1) });
 
   useEffect(() => {
@@ -462,6 +468,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     if (character) {
       gameRef.current.registry.set("characterId", character.id);
       gameRef.current.registry.set("miningLevel", initialMiningLevel ?? 1);
+      gameRef.current.registry.set("craftingLevel", 1);
     }
     // Start initial scene
     const startScene = (initialScene || "Town") as "Town" | "Cave" | "Slime";
@@ -638,14 +645,16 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
       setActiveSceneKey(active);
-      if (active === "CaveScene") {
+      if (showFurnace) {
+        setExpHud({ label: "Crafting EXP", value: craftingExpState, max: craftingMax });
+      } else if (active === "CaveScene") {
         setExpHud({ label: "Mining EXP", value: miningExpState, max: miningMax });
       } else {
         setExpHud({ label: "Character EXP", value: charExp, max: charMax });
       }
     }, 800);
     return () => clearInterval(t);
-  }, [charExp, charMax, miningExpState, miningMax]);
+  }, [charExp, charMax, miningExpState, miningMax, showFurnace, craftingExpState, craftingMax]);
 
   // Periodically persist inventory while playing
   useEffect(() => {
@@ -693,6 +702,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         setMiningExpState(exp);
         setMiningMax(reqMine(level));
         const game = gameRef.current; if (game) game.registry.set("miningLevel", level);
+      } else if (type === "crafting") {
+        setCraftingExpState(exp);
+        setCraftingMax(reqCraft(level));
+        const game = gameRef.current; if (game) game.registry.set("craftingLevel", level);
       } else {
         setCharExp(exp);
         setCharLevel(level);
@@ -705,7 +718,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       delete window.__applyExpUpdate;
       delete window.__openFurnace;
     };
-  }, [saveSceneNow, reqChar, reqMine]);
+  }, [saveSceneNow, reqChar, reqMine, reqCraft]);
 
   // Action: collect offline rewards
   const collectOffline = useCallback(async () => {
@@ -737,6 +750,101 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     setOfflineModal(null);
   }, [character, offlineModal]);
 
+  // Furnace helpers: schedule looped smelting and cancel
+  const scheduleNext = useCallback(async () => {
+    if (!character) return;
+    const q = furnaceRef.current;
+    if (!q) return;
+    // Clear any existing timer
+    if (furnaceTimerRef.current) {
+      window.clearTimeout(furnaceTimerRef.current);
+      furnaceTimerRef.current = null;
+    }
+    // Reset progress start time and keep ref in sync
+    setFurnaceQueue((curr) => {
+      if (!curr) return curr;
+      const next = { ...curr, startedAt: Date.now() };
+      furnaceRef.current = next;
+      return next;
+    });
+  const per = (furnaceRef.current?.per ?? 4000);
+  furnaceTimerRef.current = window.setTimeout(async () => {
+      const game = gameRef.current; if (!game) return;
+      const currQ = furnaceRef.current; if (!currQ) return; // canceled
+      const recipe = currQ.recipe;
+      // Output item
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      if (recipe === "copper") inv.copper_bar = (inv.copper_bar ?? 0) + 1; else inv.bronze_bar = (inv.bronze_bar ?? 0) + 1;
+      game.registry.set("inventory", inv);
+      // Persist inventory and award EXP
+      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      const expPer = recipe === "copper" ? 2 : 3;
+      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.craftingExp === "number" && typeof data.craftingLevel === "number") {
+          window.__applyExpUpdate?.({ type: "crafting", exp: data.craftingExp, level: data.craftingLevel });
+        }
+      }
+      // Update remaining and schedule next if needed
+      setFurnaceQueue((prev) => {
+        if (!prev) { furnaceRef.current = null; return null; }
+        const left = Math.max(0, prev.remaining - 1);
+        if (left === 0) {
+          furnaceRef.current = null;
+          return null;
+        } else {
+          const next = { ...prev, remaining: left };
+          furnaceRef.current = next;
+          // Schedule next tick after state update completes
+          setTimeout(() => scheduleNext(), 0);
+          return next;
+        }
+      });
+  }, per);
+  }, [character]);
+
+  const startSmelt = useCallback((recipe: "copper" | "bronze", count: number) => {
+    if (!character || !gameRef.current) return;
+    if (furnaceQueue) return; // already running
+    const game = gameRef.current;
+    // Gate bronze behind Crafting Lv 2
+    const cLevel = (game.registry.get("craftingLevel") as number) ?? 1;
+    if (recipe === "bronze" && cLevel < 2) return;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    const needCopper = recipe === "copper" ? count : count; // 1 per
+    const needTin = recipe === "bronze" ? count : 0;
+    if ((inv.copper ?? 0) < needCopper || (inv.tin ?? 0) < needTin) return;
+    // Deduct inputs up front
+    inv.copper = (inv.copper ?? 0) - needCopper;
+    if (needTin > 0) inv.tin = (inv.tin ?? 0) - needTin;
+    game.registry.set("inventory", inv);
+    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+    const perMs = recipe === "copper" ? 4000 : 6000;
+  const q = { recipe, eta: perMs, startedAt: Date.now(), remaining: count, per: perMs, total: count } as const;
+  furnaceRef.current = q as unknown as typeof furnaceQueue;
+  setFurnaceQueue(q as unknown as typeof furnaceQueue);
+  // Start the scheduled loop now that ref/state are in sync
+  scheduleNext();
+  }, [character, furnaceQueue, scheduleNext]);
+
+  const cancelSmelt = useCallback(() => {
+    // Refund remaining inputs proportionally (only for items not yet processed)
+    const q = furnaceRef.current; if (!q || !gameRef.current) { setFurnaceQueue(null); return; }
+    if (furnaceTimerRef.current) { window.clearTimeout(furnaceTimerRef.current); furnaceTimerRef.current = null; }
+    const game = gameRef.current;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    const remaining = Math.max(0, q.remaining ?? 0);
+    if (remaining > 0) {
+      // Each unit requires 1 copper (+1 tin if bronze)
+      inv.copper = (inv.copper ?? 0) + remaining;
+      if (q.recipe === "bronze") inv.tin = (inv.tin ?? 0) + remaining;
+      game.registry.set("inventory", inv);
+      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (game.registry.get("characterId") as string), items: inv }) }).catch(() => {});
+    }
+    setFurnaceQueue(null);
+  }, []);
+
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
       {character ? (
@@ -744,7 +852,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           <div className="font-semibold text-white/90">{character.name}</div>
           <div className="opacity-80">
             {character.class} • Lv {charLevel}
-            {activeSceneKey === "CaveScene" ? (
+            {showFurnace ? (
+              <> • Crafting Lv {gameRef.current?.registry.get("craftingLevel") ?? 1}</>
+            ) : activeSceneKey === "CaveScene" ? (
               <> • Mining Lv {gameRef.current?.registry.get("miningLevel") ?? (initialMiningLevel ?? 1)}</>
             ) : null}
           </div>
@@ -789,16 +899,23 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               {Object.keys(inventory).length === 0 && (
                 <div className="col-span-full text-sm text-gray-400">No items yet. Mine nodes or defeat monsters to collect items.</div>
               )}
-              {Object.entries(inventory).map(([key, count]) => (
-                <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2">
-                  <div className="flex h-full w-full items-center justify-center">
-                    <span className="select-none text-xs font-semibold tracking-wide" title={key}>
-                      {key === "copper" ? "Cu" : key === "tin" ? "Sn" : key.substring(0, 2).toUpperCase()}
-                    </span>
+              {Object.entries(inventory).map(([key, count]) => {
+                const icon = (k: string) => {
+                  if (k === "copper") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #f59e0b, #b45309)" }} />;
+                  if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
+                  if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
+                  if (k === "bronze_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #b8860b, #6b4f1d)" }} />;
+                  return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
+                };
+                return (
+                  <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2">
+                    <div className="flex h-full w-full items-center justify-center" title={key}>
+                      {icon(key)}
+                    </div>
+                    <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
                   </div>
-                  <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -815,76 +932,39 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               <div className="rounded border border-white/10 bg-black/40 p-3">
                 <div className="font-semibold text-white/90">Copper Bar</div>
                 <div className="mt-1 text-gray-300">Costs: 1x Copper Ore • Time: 4s • +2 Crafting EXP</div>
-                <button
-                  disabled={!!furnaceQueue || (inventory.copper ?? 0) < 1}
-                  className="btn mt-2 px-3 py-1 disabled:opacity-50"
-                  onClick={async () => {
-                    if (!character) return;
-                    if (furnaceQueue) return;
-                    const game = gameRef.current; if (!game) return;
-                    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
-                    if ((inv.copper ?? 0) < 1) return;
-                    inv.copper = (inv.copper ?? 0) - 1;
-                    game.registry.set("inventory", inv);
-                    setFurnaceQueue({ recipe: "copper", eta: 4000, startedAt: Date.now() });
-                    // Persist inventory quickly
-                    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
-                    // Complete after 4s
-                    setTimeout(async () => {
-                      const g = gameRef.current; if (!g) return;
-                      const inv2 = (g.registry.get("inventory") as Record<string, number>) || {};
-                      inv2.copper_bar = (inv2.copper_bar ?? 0) + 1;
-                      g.registry.set("inventory", inv2);
-                      setFurnaceQueue(null);
-                      // Persist and award crafting EXP +2
-                      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv2 }) }).catch(() => {});
-                      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: 2 }) });
-                      if (res.ok) {
-                        const data = await res.json();
-                        // We don't yet show crafting HUD; could add later
-                      }
-                    }, 4000);
-                  }}
-                >Smelt 1</button>
+                <div className="mt-2 flex gap-2">
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!furnaceQueue || (inventory.copper ?? 0) < 1} onClick={() => startSmelt("copper", 1)}>Smelt 1</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!furnaceQueue || (inventory.copper ?? 0) < 5} onClick={() => startSmelt("copper", 5)}>x5</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!furnaceQueue || (inventory.copper ?? 0) < 10} onClick={() => startSmelt("copper", 10)}>x10</button>
+                </div>
               </div>
               <div className="rounded border border-white/10 bg-black/40 p-3">
                 <div className="font-semibold text-white/90">Bronze Bar</div>
-                <div className="mt-1 text-gray-300">Costs: 1x Copper Ore, 1x Tin Ore • Time: 6s • +2 Crafting EXP</div>
-                <button
-                  disabled={!!furnaceQueue || (inventory.copper ?? 0) < 1 || (inventory.tin ?? 0) < 1}
-                  className="btn mt-2 px-3 py-1 disabled:opacity-50"
-                  onClick={async () => {
-                    if (!character) return;
-                    if (furnaceQueue) return;
-                    const game = gameRef.current; if (!game) return;
-                    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
-                    if ((inv.copper ?? 0) < 1 || (inv.tin ?? 0) < 1) return;
-                    inv.copper = (inv.copper ?? 0) - 1;
-                    inv.tin = (inv.tin ?? 0) - 1;
-                    game.registry.set("inventory", inv);
-                    setFurnaceQueue({ recipe: "bronze", eta: 6000, startedAt: Date.now() });
-                    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
-                    setTimeout(async () => {
-                      const g = gameRef.current; if (!g) return;
-                      const inv2 = (g.registry.get("inventory") as Record<string, number>) || {};
-                      inv2.bronze_bar = (inv2.bronze_bar ?? 0) + 1;
-                      g.registry.set("inventory", inv2);
-                      setFurnaceQueue(null);
-                      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv2 }) }).catch(() => {});
-                      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: 2 }) });
-                      if (res.ok) {
-                        const data = await res.json();
-                      }
-                    }, 6000);
-                  }}
-                >Smelt 1</button>
+                <div className="mt-1 text-gray-300">Costs: 1x Copper Ore, 1x Tin Ore • Time: 6s • +3 Crafting EXP</div>
+                {((gameRef.current?.registry.get("craftingLevel") as number) ?? 1) < 2 ? (
+                  <div className="mt-1 text-xs text-yellow-400">Requires Crafting Lv 2</div>
+                ) : null}
+                <div className="mt-2 flex gap-2">
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!furnaceQueue || ((gameRef.current?.registry.get("craftingLevel") as number) ?? 1) < 2 || (inventory.copper ?? 0) < 1 || (inventory.tin ?? 0) < 1} onClick={() => startSmelt("bronze", 1)}>Smelt 1</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!furnaceQueue || ((gameRef.current?.registry.get("craftingLevel") as number) ?? 1) < 2 || (inventory.copper ?? 0) < 5 || (inventory.tin ?? 0) < 5} onClick={() => startSmelt("bronze", 5)}>x5</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!furnaceQueue || ((gameRef.current?.registry.get("craftingLevel") as number) ?? 1) < 2 || (inventory.copper ?? 0) < 10 || (inventory.tin ?? 0) < 10} onClick={() => startSmelt("bronze", 10)}>x10</button>
+                </div>
               </div>
             </div>
             {furnaceQueue ? (
               <div className="mt-4 rounded border border-white/10 bg-black/40 p-3 text-sm">
-                <div>Smelting {furnaceQueue.recipe === "copper" ? "Copper Bar" : "Bronze Bar"}…</div>
+                <div className="flex items-center justify-between">
+                  <div>Smelting {furnaceQueue.recipe === "copper" ? "Copper Bar" : "Bronze Bar"}… {furnaceQueue.remaining > 1 ? `(x${furnaceQueue.remaining} left)` : null}</div>
+                  <button className="btn px-2 py-1" onClick={cancelSmelt}>Cancel</button>
+                </div>
                 <div className="mt-2 h-2 w-full rounded bg-white/10">
-                  <div className="h-2 rounded bg-orange-500" style={{ width: `${Math.min(100, ((Date.now() - furnaceQueue.startedAt) / furnaceQueue.eta) * 100)}%` }} />
+                  {(() => {
+                    const finished = (furnaceQueue.total - furnaceQueue.remaining);
+                    const elapsed = (finished * furnaceQueue.per) + (Date.now() - furnaceQueue.startedAt);
+                    const totalMs = furnaceQueue.total * furnaceQueue.per;
+                    const pct = Math.min(100, (elapsed / Math.max(1, totalMs)) * 100);
+                    return <div className="h-2 rounded bg-orange-500" style={{ width: `${pct}%` }} />;
+                  })()}
                 </div>
               </div>
             ) : null}
