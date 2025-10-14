@@ -73,6 +73,15 @@ model ItemStack {
   @@unique([characterId, itemKey])
 }
 
+model CraftQueue {
+  id           String    @id @default(cuid())
+  character    Character @relation(fields: [characterId], references: [id])
+  characterId  String    @unique
+  furnace      Json?
+  workbench    Json?
+  updatedAt    DateTime  @updatedAt
+}
+
 enum Gender {
   Male
   Female

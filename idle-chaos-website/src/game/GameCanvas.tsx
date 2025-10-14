@@ -483,6 +483,13 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [craftingExpState, setCraftingExpState] = useState<number>(0);
   const [craftingMax, setCraftingMax] = useState<number>(reqCraft(1));
   const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: reqChar(character?.level ?? 1) });
+  // Toasts
+  const [toasts, setToasts] = useState<Array<{ id: number; text: string }>>([]);
+  const pushToast = useCallback((text: string) => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((t) => [...t, { id, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+  }, []);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -705,7 +712,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         .catch(() => {});
     }, 15000);
     return () => { clearInterval(t); clearInterval(r); };
-  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, craftingExpState, craftingMax]);
+  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, craftingExpState, craftingMax, character]);
 
   // Periodically persist inventory while playing
   useEffect(() => {
@@ -754,13 +761,17 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         setMiningMax(reqMine(level));
         const game = gameRef.current; if (game) game.registry.set("miningLevel", level);
       } else if (type === "crafting") {
+        const prevLevel = (gameRef.current?.registry.get("craftingLevel") as number) ?? 1;
         setCraftingExpState(exp);
         setCraftingMax(reqCraft(level));
         const game = gameRef.current; if (game) game.registry.set("craftingLevel", level);
+        if (level > prevLevel) pushToast(`Crafting Level Up! Lv ${prevLevel} → ${level}`);
       } else {
+        const prev = charLevel;
         setCharExp(exp);
         setCharLevel(level);
         setCharMax(reqChar(level));
+        if (level > prev) pushToast(`Level Up! Lv ${prev} → ${level}`);
       }
     };
     window.__openFurnace = () => setShowFurnace(true);
@@ -771,7 +782,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       delete window.__openFurnace;
       delete window.__openWorkbench;
     };
-  }, [saveSceneNow, reqChar, reqMine, reqCraft]);
+  }, [saveSceneNow, reqChar, reqMine, reqCraft, pushToast, charLevel]);
 
   // Action: collect offline rewards
   const collectOffline = useCallback(async () => {
@@ -804,7 +815,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   }, [character, offlineModal]);
 
   // Furnace helpers: schedule looped smelting and cancel
-  const scheduleNext = useCallback(async () => {
+  const scheduleNext: () => Promise<void> = useCallback(async () => {
     if (!character) return;
     const q = furnaceRef.current;
     if (!q) return;
@@ -845,10 +856,14 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         const left = Math.max(0, prev.remaining - 1);
         if (left === 0) {
           furnaceRef.current = null;
+          // Clear persisted furnace queue
+          fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, furnace: null }) }).catch(() => {});
           return null;
         } else {
-          const next = { ...prev, remaining: left };
+          const next = { ...prev, remaining: left, startedAt: Date.now() };
           furnaceRef.current = next;
+          // Persist updated furnace queue
+          fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, furnace: next }) }).catch(() => {});
           // Schedule next tick after state update completes
           setTimeout(() => scheduleNext(), 0);
           return next;
@@ -877,6 +892,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const q = { recipe, eta: perMs, startedAt: Date.now(), remaining: count, per: perMs, total: count } as const;
   furnaceRef.current = q as unknown as typeof furnaceQueue;
   setFurnaceQueue(q as unknown as typeof furnaceQueue);
+  // Persist furnace queue start
+  fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, furnace: q }) }).catch(() => {});
   // Start the scheduled loop now that ref/state are in sync
   scheduleNext();
   }, [character, furnaceQueue, scheduleNext]);
@@ -896,14 +913,80 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (game.registry.get("characterId") as string), items: inv }) }).catch(() => {});
     }
     setFurnaceQueue(null);
-  }, []);
+    // Clear persisted furnace queue
+    const cid = (gameRef.current?.registry.get("characterId") as string) || character?.id;
+    if (cid) fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: cid, furnace: null }) }).catch(() => {});
+  }, [character?.id]);
 
-  // On mount, if a queue existed (e.g., page refresh), fast-forward based on elapsed
+  // On mount: fetch queues, fast-forward elapsed completions, and resume
   useEffect(() => {
-    // For simplicity, we don't persist queues in DB yet; we can approximate by no-op
-    // Future: persist queue state to DB; on reload, compute completions.
-    // Placeholder hook retained for forward compatibility.
-  }, []);
+    const run = async () => {
+      if (!character) return;
+      try {
+        const res = await fetch(`/api/account/characters/queue?characterId=${character.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const game = gameRef.current; if (!game) return;
+        const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+        // Helper to process completions for a queue
+        type FurnaceQ = { recipe: "copper" | "bronze"; eta: number; startedAt: number; remaining: number; per: number; total: number };
+        type WorkbenchQ = { recipe: "armor" | "dagger"; eta: number; startedAt: number; remaining: number; per: number; total: number };
+        const processQueue = async (q: FurnaceQ | WorkbenchQ | null, kind: "furnace" | "workbench") => {
+          if (!q) return;
+          const { recipe, startedAt, per, remaining, total } = q;
+          const elapsed = Date.now() - (startedAt || Date.now());
+          const done = Math.min(total, Math.floor(elapsed / Math.max(1, per)));
+          const newRemaining = Math.max(0, remaining - done);
+          // Award outputs and crafting EXP for done
+          for (let i = 0; i < done; i++) {
+            if (kind === "furnace") {
+              if (recipe === "copper") inv.copper_bar = (inv.copper_bar ?? 0) + 1; else inv.bronze_bar = (inv.bronze_bar ?? 0) + 1;
+              const expPer = recipe === "copper" ? 2 : 3;
+              await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) }).catch(() => {});
+              pushToast(`Completed ${recipe === "copper" ? "Copper Bar" : "Bronze Bar"} while offline`);
+            } else {
+              if (recipe === "armor") inv.copper_armor = (inv.copper_armor ?? 0) + 1; else inv.copper_dagger = (inv.copper_dagger ?? 0) + 1;
+              const expPer = recipe === "armor" ? 6 : 4;
+              await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) }).catch(() => {});
+              pushToast(`Completed ${recipe === "armor" ? "Copper Armor" : "Copper Dagger"} while offline`);
+            }
+          }
+          // Persist inventory after fast-forward
+          await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+          game.registry.set("inventory", inv);
+          // Resume if there is time left
+          if (newRemaining > 0) {
+            const remainderMs = Math.max(0, per - (elapsed % per));
+            if (kind === "furnace") {
+              if (recipe !== "copper" && recipe !== "bronze") { await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, furnace: null }) }).catch(() => {}); return; }
+              const newQ: FurnaceQ = { recipe, eta: per, startedAt: Date.now() - (per - remainderMs), remaining: newRemaining, per, total };
+              furnaceRef.current = newQ; setFurnaceQueue(newQ);
+              await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, furnace: newQ }) }).catch(() => {});
+              if (furnaceTimerRef.current) { clearTimeout(furnaceTimerRef.current); furnaceTimerRef.current = null; }
+              setFurnaceQueue((prev) => prev ? { ...prev, startedAt: Date.now() - (per - remainderMs) } : prev);
+              scheduleNext();
+            } else {
+              if (recipe !== "armor" && recipe !== "dagger") { await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: null }) }).catch(() => {}); return; }
+              const newQ: WorkbenchQ = { recipe, eta: per, startedAt: Date.now() - (per - remainderMs), remaining: newRemaining, per, total };
+              workRef.current = newQ; setWorkQueue(newQ);
+              await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: newQ }) }).catch(() => {});
+              if (workTimerRef.current) { clearTimeout(workTimerRef.current); workTimerRef.current = null; }
+              setWorkQueue((prev) => prev ? { ...prev, startedAt: Date.now() - (per - remainderMs) } : prev);
+              scheduleWorkNext();
+            }
+          } else {
+            // Clear persisted queue if finished
+            await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, [kind]: null }) }).catch(() => {});
+          }
+        };
+        await processQueue(data.furnace, "furnace");
+        await processQueue(data.workbench, "workbench");
+      } catch {}
+    };
+    run();
+  }, [character, pushToast, scheduleNext, scheduleWorkNext]);
+
+  
 
   // Workbench helpers: schedule looped crafting and cancel
   const scheduleWorkNext = useCallback(async () => {
@@ -941,10 +1024,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         const left = Math.max(0, prev.remaining - 1);
         if (left === 0) {
           workRef.current = null;
+          fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: null }) }).catch(() => {});
           return null;
         } else {
-          const next = { ...prev, remaining: left };
+          const next = { ...prev, remaining: left, startedAt: Date.now() };
           workRef.current = next;
+          fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: next }) }).catch(() => {});
           setTimeout(() => scheduleWorkNext(), 0);
           return next;
         }
@@ -971,6 +1056,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     const q = { recipe, eta: perMs, startedAt: Date.now(), remaining: count, per: perMs, total: count } as const;
     workRef.current = q as unknown as typeof workQueue;
     setWorkQueue(q as unknown as typeof workQueue);
+    fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: q }) }).catch(() => {});
     scheduleWorkNext();
   }, [character, workQueue, scheduleWorkNext]);
 
@@ -991,10 +1077,20 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (game.registry.get("characterId") as string), items: inv }) }).catch(() => {});
     }
     setWorkQueue(null);
-  }, []);
+    const cid = (gameRef.current?.registry.get("characterId") as string) || character?.id;
+    if (cid) fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: cid, workbench: null }) }).catch(() => {});
+  }, [character?.id]);
 
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
+      {/* Toasts */}
+      <div className="pointer-events-none absolute right-3 bottom-3 z-50 flex w-[min(320px,80vw)] flex-col gap-2">
+        {toasts.map((t) => (
+          <div key={t.id} className="animate-slide-up pointer-events-auto rounded-md border border-white/10 bg-black/80 px-3 py-2 text-xs text-gray-100 shadow-lg backdrop-blur">
+            {t.text}
+          </div>
+        ))}
+      </div>
       {character ? (
         <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/40 px-3 py-2 text-xs text-gray-200 shadow-lg ring-1 ring-white/10">
           <div className="font-semibold text-white/90">{character.name}</div>
