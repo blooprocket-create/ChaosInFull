@@ -1,0 +1,50 @@
+/* Terrifying gorgeous HTML5 site */
+:root{ --abyss:#0B0B10; --void:#3F1E4D; --toxin:#8FF25C; --haunt:#A974FF; --ember:#FF6A3D; --grave:#1F2430; --text:#EAEAF3;}
+*{box-sizing:border-box} html,body{height:100%;background:radial-gradient(1200px 600px at 70% 10%, rgba(167,116,255,0.15), transparent 70%), linear-gradient(180deg, var(--abyss), var(--void)); color:var(--text); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;}
+.container{width:min(1200px,92%); margin:0 auto}
+.site-header{position:sticky; top:0; z-index:50; background:rgba(11,11,16,.6); backdrop-filter: blur(8px); border-bottom:1px solid rgba(255,255,255,.06)}
+.site-header .container{display:flex; align-items:center; gap:18px; padding:12px 0}
+.brand img{height:42px; filter:drop-shadow(0 0 6px rgba(143,242,92,.25))}
+.nav{display:flex; gap:16px; margin-left:auto}
+.nav a{color:#cfc9ff; text-decoration:none; opacity:.8}
+.nav a:hover{opacity:1; text-shadow:0 0 8px var(--haunt)}
+.actions .btn{margin-left:8px}
+.btn{padding:10px 16px; border-radius:10px; border:1px solid transparent; cursor:pointer; transition:.2s transform, .2s box-shadow, .2s background}
+.btn.primary{background:var(--toxin); color:#0b0b0f; font-weight:800}
+.btn.primary:hover{transform:translateY(-1px); box-shadow:0 8px 24px rgba(143,242,92,.35)}
+.btn.ghost{background:transparent; color:#EAEAF3; border-color:rgba(255,255,255,.15)}
+.btn.ghost:hover{border-color:var(--haunt); box-shadow:0 0 0 3px rgba(169,116,255,.25) inset}
+.btn.play{background:linear-gradient(90deg,var(--toxin),#c5ff9f); color:#0b0b0f; font-weight:900; letter-spacing:.5px}
+.btn[disabled]{opacity:.5; cursor:not-allowed}
+.hero{position:relative; min-height:78vh; display:grid; place-items:center; text-align:center; overflow:hidden}
+.hero-bg{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.35; filter:contrast(120%) saturate(110%) blur(2px)}
+.hero-overlay{position:absolute; inset:0; background:radial-gradient(800px 400px at 50% 20%, transparent, rgba(0,0,0,.65) 70%)}
+.hero-content{position:relative; padding:100px 0}
+h1.glitch{font-family:Creepster, Inter, system-ui; font-size: clamp(48px, 8vw, 120px); line-height:0.9; color:var(--toxin); text-shadow: 0 0 16px rgba(143,242,92,.35), 0 0 3px rgba(143,242,92,.9); position:relative}
+h1.glitch::before, h1.glitch::after{content:attr(data-text); position:absolute; left:0; right:0; top:0; mix-blend-mode:screen; opacity:.7}
+h1.glitch::before{transform:translate(2px,0); color:#9affff; filter:blur(.8px)}
+h1.glitch::after{transform:translate(-2px,0); color:#ff7ab3; filter:blur(.8px)}
+.tagline{margin-top:14px; opacity:.9}
+.cta-row{display:flex; gap:12px; justify-content:center; margin:20px 0 6px}
+.hint{opacity:.7}
+.section{padding:68px 0}
+.section h2{font-family:Creepster, Inter; font-size: clamp(28px, 4vw, 52px); color:#EDE9FF; text-shadow:0 0 12px rgba(169,116,255,.25)}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:18px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:18px; box-shadow:inset 0 0 0 1px rgba(169,116,255,.08)}
+.card:hover{box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 0 0 1px rgba(143,242,92,.2)}
+.grid-classes{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px}
+.class{padding:18px; border-radius:16px; background:rgba(31,36,48,.6); border:1px solid rgba(255,255,255,.06)}
+.class h3{color:var(--toxin); text-shadow:0 0 10px rgba(143,242,92,.35)}
+.wide{width:100%; border-radius:16px; border:1px solid rgba(255,255,255,.08)}
+.site-footer{padding:30px 0; border-top:1px solid rgba(255,255,255,.06); background:rgba(11,11,16,.6); text-align:center}
+.noise{position:fixed; inset:0; pointer-events:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22140%22 height=%22140%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22 stitchTiles=%22stitch%22/></filter><rect width=%22100%%22 height=%22100%%22 filter=%22url(%23n)%22 opacity=%220.035%22/></svg>'); mix-blend-mode:overlay;}
+.modal{position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.65); backdrop-filter: blur(6px)}
+.modal.hidden{display:none}
+.dialog{width:min(480px,92%); background:rgba(31,36,48,.9); border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:20px; box-shadow:0 30px 80px rgba(0,0,0,.6); position:relative}
+.dialog h3{margin:0 0 10px; font-family:Creepster; letter-spacing:.5px}
+.dialog label{display:block; font-size:14px; margin:8px 0}
+.dialog input{width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#11131a; color:#fff}
+.dialog .close{position:absolute; margin:-8px -8px 0 0; right:20px; top:20px; font-size:28px; background:transparent; color:#fff; border:0; cursor:pointer}
+.dialog .mini-hint{opacity:.65; font-size:12px}
+.dialog .api-hint{background:#0e0f14; padding:10px; border-radius:10px; border:1px dashed rgba(255,255,255,.12); overflow:auto}
+@media (max-width:720px){ .nav{display:none} }
