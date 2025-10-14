@@ -20,13 +20,14 @@ export default function DeleteAccountClient() {
       const form = e.currentTarget as HTMLFormElement;
       const fd = new FormData(form);
       const payload = {
+        email: String(fd.get("email") || "").trim(),
         username: String(fd.get("username") || "").trim(),
         password: String(fd.get("password") || ""),
         captcha: String(fd.get("captcha") || "").trim(),
         expected,
       };
-      if (!payload.username || !payload.password || !payload.captcha) {
-        alert("Please fill all fields and solve the captcha.");
+      if (!payload.email || !payload.username || !payload.password || !payload.captcha) {
+        alert("Please fill all fields (email, username, password) and solve the captcha.");
         return;
       }
       setBusy(true);
@@ -47,7 +48,9 @@ export default function DeleteAccountClient() {
         setBusy(false);
       }
     }}>
-      <input name="username" placeholder="Confirm your username" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-red-500" />
+  <div className="text-sm text-red-200/90">To delete your account, type your email AND username, your password, and solve the captcha.</div>
+  <input name="email" type="email" placeholder="Confirm your email" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-red-500" />
+  <input name="username" placeholder="Confirm your username" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-red-500" />
       <input name="password" type="password" placeholder="Confirm your password" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-red-500" />
       <div className="flex items-center gap-2 text-sm">
         <span className="text-red-200">Captcha: What is {a} + {b}?</span>

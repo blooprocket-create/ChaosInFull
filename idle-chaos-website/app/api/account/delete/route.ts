@@ -8,14 +8,15 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { username, password, captcha, expected } = body as {
+  const { email, username, password, captcha, expected } = body as {
+    email?: string;
     username?: string;
     password?: string;
     captcha?: string;
     expected?: string;
   };
 
-  if (!username || !password || !captcha || !expected) {
+  if (!email || !username || !password || !captcha || !expected) {
     return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   }
   if (captcha !== expected) {
@@ -25,12 +26,13 @@ export async function POST(req: Request) {
   // Fetch user by session id and verify username + password
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (!user) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  // Accept either username or email (case-insensitive) for confirmation
-  const typed = String(username).trim().toLowerCase();
-  const matchesUsername = user.username.toLowerCase() === typed;
-  const matchesEmail = user.email.toLowerCase() === typed;
-  if (!matchesUsername && !matchesEmail) {
-    return NextResponse.json({ ok: false, error: "username_mismatch" }, { status: 400 });
+  // Require BOTH email and username to match (case-insensitive)
+  const typedUser = String(username).trim().toLowerCase();
+  const typedEmail = String(email).trim().toLowerCase();
+  const matchesUsername = user.username.toLowerCase() === typedUser;
+  const matchesEmail = user.email.toLowerCase() === typedEmail;
+  if (!matchesUsername || !matchesEmail) {
+    return NextResponse.json({ ok: false, error: "identity_mismatch" }, { status: 400 });
   }
 
   const ok = await verifyPassword(password, user.passwordHash);
