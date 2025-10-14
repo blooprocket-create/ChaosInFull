@@ -25,7 +25,11 @@ export async function POST(req: Request) {
   // Fetch user by session id and verify username + password
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (!user) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  if (user.username !== username) {
+  // Accept either username or email (case-insensitive) for confirmation
+  const typed = String(username).trim().toLowerCase();
+  const matchesUsername = user.username.toLowerCase() === typed;
+  const matchesEmail = user.email.toLowerCase() === typed;
+  if (!matchesUsername && !matchesEmail) {
     return NextResponse.json({ ok: false, error: "username_mismatch" }, { status: 400 });
   }
 
