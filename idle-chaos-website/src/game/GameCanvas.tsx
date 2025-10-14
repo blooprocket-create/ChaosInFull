@@ -135,13 +135,33 @@ class TownScene extends Phaser.Scene {
     this.player.setDepth(5);
     // Gravity for the player
   (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900);
-    // One-way platform collider: only collide when falling onto it from above
     this.physics.add.collider(this.player, this.upperPlatformBody, undefined, () => {
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       const falling = body.velocity.y >= 0;
       const feetY = this.player.y + (this.player.displayHeight / 2);
       const platTop = this.upperPlatformRect.y - (this.upperPlatformRect.height / 2);
       return falling && feetY <= platTop + 6;
+    });
+    // Drop-through with S key only if ground below is a distinct lower platform
+    this.input.keyboard!.on("keydown-S", () => {
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      if (!body) return;
+      const feetY = this.player.y + (this.player.displayHeight / 2);
+      const platTop = this.upperPlatformRect.y - (this.upperPlatformRect.height / 2);
+      const onPlatform = Math.abs(feetY - platTop) <= 10 && body.velocity.y === 0;
+      if (!onPlatform) return;
+      const groundTop = this.groundRect.y - (this.groundRect.height / 2);
+      // Require noticeable separation
+      if (groundTop - platTop < 40) return;
+      const active = this.physics.world.colliders.getActive();
+      const platformCollider = active.find(c => {
+        const anyC = c as { object1?: unknown; object2?: unknown };
+        return (anyC.object1 === this.player && anyC.object2 === this.upperPlatformBody) || (anyC.object2 === this.player && anyC.object1 === this.upperPlatformBody);
+      });
+      if (!platformCollider) return;
+      platformCollider.active = false;
+      body.setVelocityY(220);
+      this.time.delayedCall(350, () => { platformCollider.active = true; });
     });
     // Collider
     this.physics.add.collider(this.player, ground);
@@ -799,34 +819,23 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     })();
   }, [showStorage]);
 
-  const commitStorage = async (next: Record<string, number>) => {
-    try {
-      await fetch("/api/account/storage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: next }) });
-      setAccountStorage({ ...next });
-    } catch {}
-  };
-
   const moveItem = async (from: "inv" | "storage", key: string) => {
-    const game = gameRef.current; if (!game) return;
-    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
-    const store = { ...accountStorage };
-    if (from === "inv") {
-      if ((inv[key] ?? 0) <= 0) return;
-      inv[key] -= 1; if (inv[key] <= 0) delete inv[key];
-      store[key] = (store[key] ?? 0) + 1;
-      game.registry.set("inventory", inv);
-      setInventory({ ...inv });
-      if (character) fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
-      await commitStorage(store);
-    } else {
-      if ((store[key] ?? 0) <= 0) return;
-      store[key] -= 1; if (store[key] <= 0) delete store[key];
-      inv[key] = (inv[key] ?? 0) + 1;
-      game.registry.set("inventory", inv);
-      setInventory({ ...inv });
-      if (character) fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
-      await commitStorage(store);
-    }
+    if (!character) return;
+    try {
+      const direction = from === "inv" ? "toStorage" : "toInventory";
+      const res = await fetch("/api/account/storage/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ characterId: character.id, direction, itemKey: key })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const game = gameRef.current; if (game) {
+        game.registry.set("inventory", data.inventory || {});
+      }
+      setInventory(data.inventory || {});
+      setAccountStorage(data.storage || {});
+    } catch {}
   };
 
   // UI overlays: Welcome modal + HUD buttons

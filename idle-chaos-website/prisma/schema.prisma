@@ -16,6 +16,7 @@ model User {
   updatedAt    DateTime @updatedAt
   stats        PlayerStat?
   characters   Character[]
+  accountItemStacks AccountItemStack[]
 }
 
 model PlayerStat {
@@ -60,6 +61,7 @@ model Character {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   itemStacks ItemStack[]
+  craftQueue CraftQueue?
   @@unique([userId, name])
 }
 

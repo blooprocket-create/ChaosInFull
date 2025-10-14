@@ -5,20 +5,7 @@ import { getSession } from "@/src/lib/auth";
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  // Access via a narrowed client shape to avoid type issues if Prisma types are stale
-  type AccountItemStackClient = {
-    findMany: (args: { where: { userId: string } }) => Promise<Array<{ itemKey: string; count: number }>>;
-    deleteMany: (args: { where: { userId: string; itemKey: string } }) => Promise<unknown>;
-    upsert: (args: {
-      where: { userId_itemKey: { userId: string; itemKey: string } };
-      update: { count: number };
-      create: { userId: string; itemKey: string; count: number };
-    }) => Promise<unknown>;
-  };
-  const client = (prisma as unknown as { accountItemStack?: AccountItemStackClient });
-  if (!client.accountItemStack) {
-    return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
-  }
+  const client = prisma as unknown as { accountItemStack: { findMany: (args: { where: { userId: string } }) => Promise<Array<{ itemKey: string; count: number }>> } };
   const stacks = await client.accountItemStack.findMany({ where: { userId: session.userId } });
   const items: Record<string, number> = {};
   for (const s of stacks) items[s.itemKey] = s.count;
@@ -34,19 +21,10 @@ export async function POST(req: NextRequest) {
   const userId = session.userId;
   // Upsert each key; delete when count <= 0
   const ops: Promise<unknown>[] = [];
-  type AccountItemStackClient = {
-    findMany: (args: { where: { userId: string } }) => Promise<Array<{ itemKey: string; count: number }>>;
+  const client = prisma as unknown as { accountItemStack: {
     deleteMany: (args: { where: { userId: string; itemKey: string } }) => Promise<unknown>;
-    upsert: (args: {
-      where: { userId_itemKey: { userId: string; itemKey: string } };
-      update: { count: number };
-      create: { userId: string; itemKey: string; count: number };
-    }) => Promise<unknown>;
-  };
-  const client = (prisma as unknown as { accountItemStack?: AccountItemStackClient });
-  if (!client.accountItemStack) {
-    return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
-  }
+    upsert: (args: { where: { userId_itemKey: { userId: string; itemKey: string } }; update: { count: number }; create: { userId: string; itemKey: string; count: number } }) => Promise<unknown>;
+  } };
   for (const [key, count] of Object.entries(items)) {
     if (typeof count !== "number") continue;
     if (count <= 0) {
