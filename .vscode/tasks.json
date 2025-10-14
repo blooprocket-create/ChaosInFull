@@ -1,0 +1,30 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Move website into canonical folder",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"if (Test-Path 'c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\Idle Chaos Website Root' -and (Get-ChildItem 'c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\Idle Chaos Website Root' -Force | Measure-Object).Count -eq 0) { Move-Item 'c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\\*' 'c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\Idle Chaos Website Root' -Force; Remove-Item 'c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website' -Recurse -Force } else { Write-Output 'Target folder not empty or missing; keeping project in idle-chaos-website' }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Next.js dev (website)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run dev"
+			],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}

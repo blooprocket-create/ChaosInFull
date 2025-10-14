@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --background: #000000; --foreground: #e5e7eb; }
+}
+
+body { background: var(--background); color: var(--foreground); }
+
+@keyframes fogmove1 { from { transform: translateX(0); } to { transform: translateX(25%); } }
+@keyframes fogmove2 { from { transform: translateX(0); } to { transform: translateX(-30%); } }
+@keyframes fogmove3 { from { transform: translateX(0); } to { transform: translateX(20%); } }
+
+/* Horror UI flicker (use sparingly) */
+@keyframes uiFlicker {
+  0%, 97%, 100% { opacity: 1 }
+  98% { opacity: 0.85 }
+  99% { opacity: 0.6 }
+}
+.flicker-once { animation: uiFlicker 2s ease-in-out 1; }
