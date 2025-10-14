@@ -408,7 +408,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [inventory, setInventory] = useState<Record<string, number>>({});
   const [activeSceneKey, setActiveSceneKey] = useState<string>("TownScene");
   const [showStats, setShowStats] = useState(false);
-  const [statsData, setStatsData] = useState<{ base: any; skills: any } | null>(null);
+  type SkillsView = { mining: { level: number; exp: number }; woodcutting: { level: number; exp: number }; fishing: { level: number; exp: number }; crafting: { level: number; exp: number } };
+  type BaseView = { level: number; class: string; exp: number; gold: number; premiumGold?: number; hp: number; mp: number; strength: number; agility: number; intellect: number; luck: number };
+  const [statsData, setStatsData] = useState<{ base: BaseView | null; skills: SkillsView } | null>(null);
   // EXP and level state (client HUD) with dynamic thresholds matching server
   const reqChar = useCallback((lvl: number) => Math.floor(100 * Math.pow(1.25, Math.max(0, lvl - 1))), []);
   const reqMine = useCallback((lvl: number) => Math.floor(50 * Math.pow(1.2, Math.max(0, lvl - 1))), []);
@@ -445,8 +447,6 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       // switch scenes after boot
       setTimeout(() => gameRef.current?.scene.start(`${startScene}Scene` as string), 0);
     }
-    // Save starting scene immediately
-    window.__saveSceneNow?.();
 
     // Load initial inventory from server
     if (character) {

@@ -2,6 +2,34 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 
+type CharacterLite = {
+  id: string;
+  userId: string;
+  level: number;
+  class: string;
+  miningLevel?: number | null;
+  miningExp?: number | null;
+  woodcuttingLevel?: number | null;
+  woodcuttingExp?: number | null;
+  fishingLevel?: number | null;
+  fishingExp?: number | null;
+  craftingLevel?: number | null;
+  craftingExp?: number | null;
+};
+type PlayerStatLite = {
+  level: number;
+  class: string;
+  exp: number;
+  gold: number;
+  premiumGold?: number;
+  hp: number;
+  mp: number;
+  strength: number;
+  agility: number;
+  intellect: number;
+  luck: number;
+};
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -11,20 +39,24 @@ export async function GET(req: Request) {
 
   // Verify character ownership and fetch skill fields
   const client = prisma as unknown as {
-    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<any | null> };
-    user: { findUnique: (args: { where: { id: string }; include: { stats: true } }) => Promise<any | null> };
+    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<CharacterLite | null> };
+    user: { findUnique: (args: { where: { id: string }; include: { stats: true } }) => Promise<{ stats: PlayerStatLite | null } | null> };
   };
   const ch = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
   if (!ch) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const user = await client.user.findUnique({ where: { id: session.userId }, include: { stats: true } });
-  const s = user?.stats ?? null;
+  const s: PlayerStatLite | null = user?.stats ?? null;
   const data = {
     base: s ? {
       level: s.level,
       class: s.class,
       exp: s.exp,
       gold: s.gold,
-      premiumGold: s.premiumGold,
+      premiumGold: ((): number => {
+        const rs = s as unknown as Record<string, unknown>;
+        const v = rs["premiumGold"];
+        return typeof v === "number" ? v : 0;
+      })(),
       hp: s.hp,
       mp: s.mp,
       strength: s.strength,
