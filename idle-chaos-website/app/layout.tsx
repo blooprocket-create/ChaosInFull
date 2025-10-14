@@ -4,6 +4,7 @@ import { Cinzel, Roboto_Mono } from "next/font/google";
 import { getSession } from "@/src/lib/auth";
 import ProfileMenu from "@/src/components/ProfileMenu";
 import CursorAura from "@/src/components/CursorAura";
+import BloodLinkButton from "@/src/components/BloodLinkButton";
 import "./globals.css";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
@@ -26,22 +27,30 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={`${display.variable} ${mono.variable} antialiased bg-black text-gray-200` }>
-        <div className="fixed inset-0 -z-10 pointer-events-none">
+  <div className="fixed inset-0 -z-10 pointer-events-none bg-sway">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/40 via-black to-black" />
           <div className="absolute inset-0 mix-blend-screen opacity-20 bg-[url('/noise.png')]" />
           {/* SVG Fog Overlay */}
           <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
             <filter id="fogFilter">
-              <feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="3" seed="3" result="noise" />
-              <feDisplacementMap in="SourceGraphic" in2="noise" scale="18" xChannelSelector="R" yChannelSelector="G" />
+              <feTurbulence type="fractalNoise" baseFrequency="0.004" numOctaves="3" seed="3" result="noise">
+                <animate attributeName="baseFrequency" dur="20s" values="0.004;0.006;0.004" repeatCount="indefinite" />
+              </feTurbulence>
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G">
+                <animate attributeName="scale" dur="18s" values="18;24;18" repeatCount="indefinite" />
+              </feDisplacementMap>
             </filter>
-            <rect width="100%" height="100%" fill="url(#fogGrad)" filter="url(#fogFilter)" />
             <defs>
               <linearGradient id="fogGrad" x1="0" x2="1">
-                <stop offset="0%" stopColor="rgba(255,255,255,0.12)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0.06)" />
+                <stop offset="0%" stopColor="rgba(255,255,255,0.12)">
+                  <animate attributeName="offset" dur="25s" values="0%;20%;0%" repeatCount="indefinite" />
+                </stop>
+                <stop offset="100%" stopColor="rgba(255,255,255,0.06)">
+                  <animate attributeName="offset" dur="25s" values="100%;80%;100%" repeatCount="indefinite" />
+                </stop>
               </linearGradient>
             </defs>
+            <rect width="100%" height="100%" fill="url(#fogGrad)" filter="url(#fogFilter)" />
           </svg>
           {/* Vignette */}
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.6))]" />
@@ -57,7 +66,8 @@ export default async function RootLayout({
               <Link href="/about" className="hover:text-white">About</Link>
               {isAuthed ? (
                 <div className="flex items-center gap-4">
-                  <Link href="/play" className="rounded bg-purple-600 hover:bg-purple-500 px-3 py-1.5 font-semibold">Play Now</Link>
+                  <div className="hidden sm:block"><BloodLinkButton href="/play">Play Now</BloodLinkButton></div>
+                  <div className="sm:hidden"><Link href="/play" className="rounded bg-purple-600 hover:bg-purple-500 px-3 py-1.5 font-semibold">Play</Link></div>
                   <ProfileMenu displayName={session!.email || "C"} />
                 </div>
               ) : (
