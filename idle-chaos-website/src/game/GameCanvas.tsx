@@ -59,7 +59,14 @@ class TownScene extends Phaser.Scene {
   }
 }
 
-export default function GameCanvas() {
+type CharacterHUD = {
+  id: string;
+  name: string;
+  class: string;
+  level: number;
+};
+
+export default function GameCanvas({ character }: { character?: CharacterHUD }) {
   const ref = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
 
@@ -90,5 +97,14 @@ export default function GameCanvas() {
     };
   }, []);
 
-  return <div ref={ref} className="rounded-xl border border-white/10 overflow-hidden" />;
+  return (
+    <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
+      {character ? (
+        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/40 px-3 py-2 text-xs text-gray-200 shadow-lg ring-1 ring-white/10">
+          <div className="font-semibold text-white/90">{character.name}</div>
+          <div className="opacity-80">{character.class} • Lv {character.level}</div>
+        </div>
+      ) : null}
+    </div>
+  );
 }

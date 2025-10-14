@@ -39,13 +39,20 @@ export default function CharacterSelect() {
   async function createChar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (name.trim().length < 3 || name.trim().length > 20) {
+      setError("Name must be 3-20 chars");
+      return;
+    }
     const fd = new FormData();
     fd.set("name", name);
   fd.set("gender", gender);
   fd.set("hat", hat);
     const res = await fetch("/api/account/characters", { method: "POST", body: fd });
     const data = await res.json();
-    if (!res.ok) { setError(data.error || "Create failed"); return; }
+    if (!res.ok) {
+      setError(data.error || (res.status === 409 ? "Name already taken" : "Create failed"));
+      return;
+    }
     setName("");
     setChars(prev => [...prev, data.character]);
   }
