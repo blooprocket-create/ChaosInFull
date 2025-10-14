@@ -6,12 +6,6 @@ class TownScene extends Phaser.Scene {
   constructor() { super("TownScene"); }
   preload() {}
   create() {
-    type ParticleManagerLike = {
-      createEmitter: (
-        config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig
-      ) => Phaser.GameObjects.Particles.ParticleEmitter;
-    };
-
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Town (Placeholder)", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
     const ground = this.add.rectangle(center.x, this.scale.height - 40, this.scale.width * 0.9, 12, 0x3b0764).setOrigin(0.5, 0.5);
@@ -22,25 +16,46 @@ class TownScene extends Phaser.Scene {
     g.fillCircle(2, 2, 2);
     g.generateTexture("dot", 4, 4);
     g.destroy();
-    const particles = this.add.particles(0, 0, "dot") as unknown as ParticleManagerLike;
-    const emitter = particles.createEmitter({
-      x: { min: 0, max: this.scale.width },
-      y: { min: 0, max: this.scale.height },
-      alpha: { start: 0.15, end: 0 },
-      scale: { start: 0.6, end: 0 },
-      speedY: { min: -10, max: 10 },
-      speedX: { min: -6, max: 6 },
-      lifespan: 4000,
-      quantity: 1,
-      frequency: 120,
-      blendMode: "ADD",
-    } as Phaser.Types.GameObjects.Particles.ParticleEmitterConfig);
-    (emitter as Phaser.GameObjects.Particles.ParticleEmitter).setParticleTint(0xbe18ff);
-    this.time.addEvent({ delay: 10000, loop: true, callback: () => {
-      (emitter as Phaser.GameObjects.Particles.ParticleEmitter).setParticleTint(
-        Math.random() > 0.5 ? 0xbe18ff : 0xef4444
-      );
-    } });
+    // Replace removed particles API with lightweight ambient dots via tweens
+    const NUM_DOTS = 40;
+    const spawnArea = () => ({
+      x: Phaser.Math.Between(0, this.scale.width),
+      y: Phaser.Math.Between(0, this.scale.height),
+    });
+    const animate = (img: Phaser.GameObjects.Image) => {
+      const drift = 18;
+      const toX = Phaser.Math.Clamp(img.x + Phaser.Math.Between(-drift, drift), 0, this.scale.width);
+      const toY = Phaser.Math.Clamp(img.y + Phaser.Math.Between(-drift, drift), 0, this.scale.height);
+      const duration = Phaser.Math.Between(2200, 4800);
+      const startAlpha = 0.12 + Math.random() * 0.08;
+      this.tweens.add({
+        targets: img,
+        x: toX,
+        y: toY,
+        alpha: { from: startAlpha, to: 0 },
+        scale: { from: img.scale, to: 0 },
+        duration,
+        ease: "Sine.easeOut",
+        onComplete: () => {
+          const p = spawnArea();
+          img.setPosition(p.x, p.y);
+          img.setScale(Phaser.Math.FloatBetween(0.35, 0.8));
+          img.setAlpha(0);
+          img.setTint(Math.random() > 0.5 ? 0xbe18ff : 0xef4444);
+          // small delay before next cycle for variety
+          this.time.delayedCall(Phaser.Math.Between(100, 900), () => animate(img));
+        },
+      });
+    };
+    for (let i = 0; i < NUM_DOTS; i++) {
+      const p = spawnArea();
+      const img = this.add.image(p.x, p.y, "dot");
+      img.setBlendMode(Phaser.BlendModes.ADD);
+      img.setAlpha(0);
+      img.setScale(Phaser.Math.FloatBetween(0.35, 0.8));
+      img.setTint(Math.random() > 0.5 ? 0xbe18ff : 0xef4444);
+      this.time.delayedCall(Phaser.Math.Between(0, 2000), () => animate(img));
+    }
   }
 }
 
