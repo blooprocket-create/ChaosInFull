@@ -55,7 +55,10 @@ class TownScene extends Phaser.Scene {
     ptex.fillCircle(8, 8, 8);
     ptex.generateTexture("playerTex", 16, 16);
     ptex.destroy();
-    this.player = this.physics.add.image(center.x, center.y, "playerTex");
+  // Determine spawn
+  const spawn = (this.game.registry.get("spawn") as { from: string; portal: string | null }) || { from: "initial", portal: null };
+  const townSpawnX = spawn.from === "cave" ? this.cavePortal.x + 50 : spawn.from === "slime" ? this.slimePortal.x - 50 : center.x;
+  this.player = this.physics.add.image(townSpawnX, this.groundRect.y - 60, "playerTex");
     this.player.setTint(0x9b87f5);
     this.player.setBounce(0.1);
     this.player.setCollideWorldBounds(true);
@@ -160,8 +163,10 @@ class TownScene extends Phaser.Scene {
     this.slimePrompt.setVisible(nearSlime);
     if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
+        this.game.registry.set("spawn", { from: "cave", portal: "town" });
         this.scene.start("CaveScene");
       } else if (nearSlime && tutorialStarted) {
+        this.game.registry.set("spawn", { from: "slime", portal: "town" });
         this.scene.start("SlimeFieldScene");
       }
     }
@@ -177,6 +182,9 @@ class CaveScene extends Phaser.Scene {
   private copperCount = 0;
   private tinCount = 0;
   private hudText!: Phaser.GameObjects.Text;
+  private copperNode!: Phaser.GameObjects.Image;
+  private tinNode!: Phaser.GameObjects.Image;
+  private miningCooldown = 0;
   create() {
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Cave", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
@@ -198,7 +206,9 @@ class CaveScene extends Phaser.Scene {
     ptex.fillCircle(8, 8, 8);
     ptex.generateTexture("playerTex2", 16, 16);
     ptex.destroy();
-    this.player = this.physics.add.image(100, this.groundRect.y - 60, "playerTex2").setTint(0xf59e0b);
+  const spawn = (this.game.registry.get("spawn") as { from: string; portal: string | null }) || { from: "town", portal: "cave" };
+  const x = spawn.from === "town" ? 100 : 100;
+  this.player = this.physics.add.image(x, this.groundRect.y - 60, "playerTex2").setTint(0xf59e0b);
     (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, ground);
@@ -212,15 +222,15 @@ class CaveScene extends Phaser.Scene {
     };
     drawNode("copperNode", 0xb45309);
     drawNode("tinNode", 0x9ca3af);
-    const copper = this.add.image(center.x - 120, this.groundRect.y - 20, "copperNode");
-    const tin = this.add.image(center.x + 120, this.groundRect.y - 20, "tinNode");
-    this.add.text(copper.x, copper.y - 24, "Copper", { color: "#fbbf24", fontSize: "12px" }).setOrigin(0.5);
-    this.add.text(tin.x, tin.y - 24, "Tin", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5);
-    // AFK mining timers
-    this.time.addEvent({ delay: 2500, loop: true, callback: () => { this.copperCount += 1; this.updateHUD(); } });
-    this.time.addEvent({ delay: 3500, loop: true, callback: () => { this.tinCount += 1; this.updateHUD(); } });
+  this.copperNode = this.add.image(center.x - 120, this.groundRect.y - 20, "copperNode");
+  this.tinNode = this.add.image(center.x + 120, this.groundRect.y - 20, "tinNode");
+  this.add.text(this.copperNode.x, this.copperNode.y - 24, "Copper", { color: "#fbbf24", fontSize: "12px" }).setOrigin(0.5);
+  this.add.text(this.tinNode.x, this.tinNode.y - 24, "Tin", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5);
+  // AFK mining timers (proximity-gated)
+  this.time.addEvent({ delay: 2500, loop: true, callback: () => { if (this.isNearNode(this.copperNode)) { this.copperCount += 1; this.miningFx(this.copperNode); this.updateHUD(); } } });
+  this.time.addEvent({ delay: 3500, loop: true, callback: () => { if (this.isNearNode(this.tinNode)) { this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD(); } } });
     // HUD
-    this.hudText = this.add.text(12, 12, "", { color: "#e5e7eb", fontSize: "12px" }).setScrollFactor(0);
+  this.hudText = this.add.text(12, 12, "", { color: "#e5e7eb", fontSize: "12px" }).setScrollFactor(0);
     this.updateHUD();
     // Exit portal (left edge)
     const exit = this.add.graphics();
@@ -245,9 +255,30 @@ class CaveScene extends Phaser.Scene {
     });
     this.events.on("shutdown", () => { /* timers auto clean */ });
   }
+  private isNearNode(node: Phaser.GameObjects.Image) {
+    if (!this.player) return false;
+    const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, node.x, node.y);
+    return d < 60; // must be next to/on the node
+  }
+  private miningFx(node: Phaser.GameObjects.Image) {
+    // Player squash tween as feedback
+    this.tweens.add({ targets: this.player, scaleX: 0.9, scaleY: 1.1, yoyo: true, duration: 120, ease: "Sine.easeInOut" });
+    // Spark particles using quick tweened dots around node
+    const makeSpark = () => {
+      const img = this.add.image(node.x + Phaser.Math.Between(-6, 6), node.y + Phaser.Math.Between(-8, 0), "dot");
+      img.setTint(0xfbbf24).setAlpha(0.9).setScale(Phaser.Math.FloatBetween(0.4, 0.7));
+      this.tweens.add({ targets: img, y: img.y - 8, alpha: 0, duration: 220, ease: "Sine.easeOut", onComplete: () => img.destroy() });
+    };
+    for (let i = 0; i < 5; i++) this.time.delayedCall(i * 20, makeSpark);
+    // Add to inventory
+    const inv = (this.game.registry.get("inventory") as Record<string, number>) || {};
+    const key = node === this.copperNode ? "copper" : "tin";
+    inv[key] = (inv[key] ?? 0) + 1;
+    this.game.registry.set("inventory", inv);
+  }
   updateHUD() {
     if (!this.hudText) return;
-    this.hudText.setText(`AFK Mining Active\nCopper: ${this.copperCount}  Tin: ${this.tinCount}\nE near portal to return`);
+    this.hudText.setText(`AFK Mining (near node)\nCopper: ${this.copperCount}  Tin: ${this.tinCount}\nE near portal to return`);
   }
   update() {
     if (!this.player || !this.cursors) return;
@@ -255,6 +286,7 @@ class CaveScene extends Phaser.Scene {
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
     // Exit to Town
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
+      this.game.registry.set("spawn", { from: "cave", portal: "town" });
       this.scene.start("TownScene");
     }
   }
@@ -276,7 +308,9 @@ class SlimeFieldScene extends Phaser.Scene {
     ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
     // Player
     const ptex = this.add.graphics(); ptex.fillStyle(0xffffff, 1); ptex.fillCircle(8, 8, 8); ptex.generateTexture("playerTex3", 16, 16); ptex.destroy();
-    this.player = this.physics.add.image(100, this.groundRect.y - 60, "playerTex3").setTint(0x22c55e);
+  const spawn = (this.game.registry.get("spawn") as { from: string; portal: string | null }) || { from: "town", portal: "slime" };
+  const x = spawn.from === "town" ? 100 : 100;
+  this.player = this.physics.add.image(x, this.groundRect.y - 60, "playerTex3").setTint(0x22c55e);
     (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900); this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, ground);
     // Simple slimes (ambient placeholders)
@@ -311,6 +345,7 @@ class SlimeFieldScene extends Phaser.Scene {
     const speed = 220; let vx = 0; if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
+      this.game.registry.set("spawn", { from: "slime", portal: "town" });
       this.scene.start("TownScene");
     }
   }
@@ -328,6 +363,8 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
   const gameRef = useRef<Phaser.Game | null>(null);
   const [welcomeSeen, setWelcomeSeen] = useState<boolean>(!!initialSeenWelcome);
   const [welcomeError, setWelcomeError] = useState<string | null>(null);
+  const [openInventory, setOpenInventory] = useState(false);
+  const [inventory, setInventory] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!ref.current) return;
@@ -343,6 +380,19 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
     gameRef.current = new Phaser.Game(config);
     // Seed registry flags (e.g., tutorial gate) if needed; default false
     gameRef.current.registry.set("tutorialStarted", false);
+  gameRef.current.registry.set("spawn", { from: "initial", portal: null });
+  gameRef.current.registry.set("inventory", {} as Record<string, number>);
+
+    // Prevent page scroll on Space when game is focused
+    const el = ref.current;
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("keydown", onKeydown);
+    el.tabIndex = 0; // make container focusable
+    el.focus({ preventScroll: true });
 
     const onResize = () => {
       if (!gameRef.current) return;
@@ -353,9 +403,21 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
+      el.removeEventListener("keydown", onKeydown);
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
+  }, []);
+
+  // Poll inventory from Phaser registry into React UI
+  useEffect(() => {
+    const t = setInterval(() => {
+      const game = gameRef.current;
+      if (!game) return;
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      setInventory({ ...inv });
+    }, 800);
+    return () => clearInterval(t);
   }, []);
 
   // UI overlays: Welcome modal + HUD buttons
@@ -385,16 +447,36 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
       ) : null}
       {/* HUD Buttons */}
       <div className="pointer-events-auto absolute right-3 top-3 z-10 flex gap-2">
-        {[
-          ["Items", "Open your inventory"],
-          ["Talents", "View your talent tree"],
-          ["Codex", "Quests, Tips, AFK Info"],
-        ].map(([label, title]) => (
-          <button key={label} title={String(title)} className="btn px-3 py-1 text-sm">
-            {label}
-          </button>
-        ))}
+        <button className="btn px-3 py-1 text-sm" title="Open your inventory" onClick={() => setOpenInventory(true)}>Items</button>
+        <button className="btn px-3 py-1 text-sm" title="View your talent tree">Talents</button>
+        <button className="btn px-3 py-1 text-sm" title="Quests, Tips, AFK Info">Codex</button>
       </div>
+      {/* Inventory Modal */}
+      {openInventory && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70">
+          <div className="w-[min(680px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Inventory</h3>
+              <button className="btn px-3 py-1" onClick={() => setOpenInventory(false)}>Close</button>
+            </div>
+            <div className="mt-4 grid grid-cols-6 gap-3 sm:grid-cols-8">
+              {Object.keys(inventory).length === 0 && (
+                <div className="col-span-full text-sm text-gray-400">No items yet. Mine nodes or defeat monsters to collect items.</div>
+              )}
+              {Object.entries(inventory).map(([key, count]) => (
+                <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2">
+                  <div className="flex h-full w-full items-center justify-center">
+                    <span className="select-none text-xs font-semibold tracking-wide" title={key}>
+                      {key === "copper" ? "Cu" : key === "tin" ? "Sn" : key.substring(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Welcome Modal (first time) */}
       {!welcomeSeen && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">
