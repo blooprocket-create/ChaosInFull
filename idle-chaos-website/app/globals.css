@@ -97,3 +97,9 @@ body { background: var(--background); color: var(--foreground); }
 .nav-underline:hover::after { width: 100%; }
 
 /* (removed) Ticker for News */
+
+/* Smooth fades & scale-ins */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes scaleIn { from { transform: scale(0.96); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+.animate-fade-in { animation: fadeIn 160ms ease-out both; }
+.animate-scale-in { animation: scaleIn 180ms ease-out both; }

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export interface ClassArchetype {
   key: string;
@@ -72,8 +72,43 @@ export default function ClassesExplorer() {
   const [active, setActive] = useState<ClassArchetype>(archetypes[0]);
   const [activePathKey, setActivePathKey] = useState<string | null>(null);
   const activePath = active.paths.find(p => p.key === activePathKey) || null;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const activeIndex = useMemo(() => archetypes.findIndex(a => a.key === active.key), [active]);
+  // Keyboard navigation between archetypes and paths
+  useEffect(() => {
+    const el = containerRef.current; if (!el) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (e.key === "ArrowUp" || e.key === "w") {
+        e.preventDefault();
+        const next = (activeIndex - 1 + archetypes.length) % archetypes.length;
+        setActive(archetypes[next]); setActivePathKey(null);
+      } else if (e.key === "ArrowDown" || e.key === "s") {
+        e.preventDefault();
+        const next = (activeIndex + 1) % archetypes.length;
+        setActive(archetypes[next]); setActivePathKey(null);
+      } else if (e.key === "ArrowRight" || e.key === "d") {
+        if (!active.paths.length) return;
+        e.preventDefault();
+        const idx = Math.max(0, active.paths.findIndex(p => p.key === activePathKey));
+        const next = active.paths[(idx + 1) % active.paths.length];
+        setActivePathKey(next.key);
+      } else if (e.key === "ArrowLeft" || e.key === "a") {
+        if (!active.paths.length) return;
+        e.preventDefault();
+        const idx = Math.max(0, active.paths.findIndex(p => p.key === activePathKey));
+        const prev = active.paths[(idx - 1 + active.paths.length) % active.paths.length];
+        setActivePathKey(prev.key);
+      }
+    };
+    el.addEventListener("keydown", onKey);
+    el.tabIndex = 0;
+    el.focus({ preventScroll: true });
+    return () => el.removeEventListener("keydown", onKey);
+  }, [activeIndex, active, activePathKey]);
   return (
-    <div className="mt-8 grid lg:grid-cols-12 gap-6">
+    <div ref={containerRef} className="mt-8 grid lg:grid-cols-12 gap-6">
       <div className="lg:col-span-5 space-y-4">
         {archetypes.map(a => {
           const selected = a.key === active.key;
@@ -81,7 +116,7 @@ export default function ClassesExplorer() {
             <button
               key={a.key}
               onClick={() => { setActive(a); setActivePathKey(null); }}
-              className={`w-full text-left rounded-lg border p-4 transition-all duration-200 bg-gradient-to-br ${a.color} to-black ${selected ? 'border-violet-500 shadow-[0_0_0_1px_rgba(139,92,246,0.4)]' : 'border-white/10 hover:border-violet-400'} relative overflow-hidden`}
+              className={`w-full text-left rounded-lg border p-4 transition-all duration-300 ease-out bg-gradient-to-br ${a.color} to-black ${selected ? 'border-violet-500 ring-1 ring-violet-400/30 shadow-[0_8px_30px_rgba(139,92,246,0.08)] scale-[1.01]' : 'border-white/10 hover:border-violet-400 hover:scale-[1.01]'} relative overflow-hidden will-change-transform`}
             >
               <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-white/5" />
               <div className="flex items-center justify-between">
@@ -93,7 +128,7 @@ export default function ClassesExplorer() {
           );
         })}
       </div>
-      <div className="lg:col-span-7 rounded-xl border border-white/10 bg-black/40 p-6 flex flex-col gap-5 relative overflow-hidden">
+      <div className="lg:col-span-7 rounded-xl border border-white/10 bg-black/40 p-6 flex flex-col gap-5 relative overflow-hidden animate-scale-in">
         <div className="absolute -right-10 -top-10 size-32 rounded-full blur-2xl bg-violet-500/10" />
         <div className="flex items-start justify-between">
           <h3 className="text-xl font-semibold blood-underline inline-block">{active.name}</h3>
@@ -102,7 +137,7 @@ export default function ClassesExplorer() {
               <button
                 key={p.key}
                 onClick={() => setActivePathKey(p.key)}
-                className={`text-xs px-2 py-1 rounded border ${activePathKey === p.key ? 'bg-violet-600/30 border-violet-500' : 'bg-violet-600/10 border-violet-500/30 hover:bg-violet-600/20'}`}
+                className={`text-xs px-2 py-1 rounded border transition-colors duration-200 ${activePathKey === p.key ? 'bg-violet-600/30 border-violet-500' : 'bg-violet-600/10 border-violet-500/30 hover:bg-violet-600/20'}`}
               >Path → {p.name}</button>
             ))}
           </div>
@@ -115,7 +150,7 @@ export default function ClassesExplorer() {
               {active.starterTalents.map(t => <li key={t}>{t}</li>)}
             </ul>
           </div>
-          <div className="rounded-lg bg-black/30 border border-white/10 p-4">
+          <div className="rounded-lg bg-black/30 border border-white/10 p-4 animate-fade-in" key={activePathKey || 'none'}>
             <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Selected Path</div>
             {activePath ? (
               <div>

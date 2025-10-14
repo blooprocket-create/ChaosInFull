@@ -42,4 +42,21 @@ export const patchNotes: PatchNote[] = [
     highlights: ["Enhanced dashboard character cards", "Live AFK timer", "Skill level surfacing"],
     notes: ["Added mining/crafting/fishing/woodcutting levels display", "AFK duration derived from lastSeenAt"],
   }
+  ,{
+    date: "2025-10-14",
+    version: "0.0.6",
+    title: "Site-wide Flavor & Interactive Classes",
+    highlights: [
+      "Dark humor tone across About/Classes/News/World",
+      "Interactive Classes Explorer component",
+      "Centralized flavor constants module",
+      "Dashboard AFK microcopy & character flavor",
+      "Login/Signup playful error messaging"
+    ],
+    notes: [
+      "Zone description flavor pass",
+      "Patch Notes intro rewrite",
+      "AFK phrase variants on character cards"
+    ],
+  }
 ];

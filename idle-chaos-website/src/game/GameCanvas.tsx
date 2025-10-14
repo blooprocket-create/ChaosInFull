@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { items as shopItems } from "@/src/data/items";
 import * as Phaser from "phaser";
 
 declare global {
@@ -9,6 +10,8 @@ declare global {
     __openFurnace?: () => void;
     __openWorkbench?: () => void;
     __openStorage?: () => void;
+    __openSawmill?: () => void;
+    __openShop?: () => void;
   }
 }
 
@@ -28,6 +31,10 @@ class TownScene extends Phaser.Scene {
   private furnacePrompt!: Phaser.GameObjects.Text;
   private workbench!: Phaser.Physics.Arcade.Image;
   private workbenchPrompt!: Phaser.GameObjects.Text;
+  private sawmill!: Phaser.Physics.Arcade.Image;
+  private sawmillPrompt!: Phaser.GameObjects.Text;
+  private shopStall!: Phaser.Physics.Arcade.Image;
+  private shopPrompt!: Phaser.GameObjects.Text;
   private storageBox!: Phaser.Physics.Arcade.Image;
   private storagePrompt!: Phaser.GameObjects.Text;
   private tutorialNpc!: Phaser.GameObjects.Image;
@@ -89,6 +96,15 @@ class TownScene extends Phaser.Scene {
   wbx.generateTexture("workbenchTex", 46, 16);
   wbx.destroy();
   this.workbench = this.physics.add.staticImage(center.x - 120, this.groundRect.y - 8, "workbenchTex");
+  // Sawmill (near workbench)
+  const smg = this.add.graphics();
+  smg.fillStyle(0x8b5e34, 1);
+  smg.fillRect(0, 0, 42, 14);
+  smg.fillStyle(0x5c3d1e, 1);
+  smg.fillRect(2, 2, 38, 10);
+  smg.generateTexture("sawmillTex", 42, 14);
+  smg.destroy();
+  this.sawmill = this.physics.add.staticImage(center.x - 200, this.groundRect.y - 9, "sawmillTex");
   // Storage box on upper platform
   const sboxg = this.add.graphics();
   sboxg.fillStyle(0x8b5e34, 1);
@@ -99,6 +115,15 @@ class TownScene extends Phaser.Scene {
   sboxg.destroy();
   this.storageBox = this.physics.add.staticImage(this.upperPlatformRect.x + this.upperPlatformRect.width / 2 - 30, this.upperPlatformRect.y - 12, "storageBoxTex");
   this.storagePrompt = this.add.text(this.storageBox.x, this.storageBox.y - 28, "Press E: Storage", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  // Shop stall on upper platform
+  const shopg = this.add.graphics();
+  shopg.fillStyle(0x7c3aed, 1);
+  shopg.fillRoundedRect(0, 0, 26, 18, 3);
+  shopg.lineStyle(2, 0xf5d0fe, 1);
+  shopg.strokeRoundedRect(0, 0, 26, 18, 3);
+  shopg.generateTexture("shopStallTex", 26, 18);
+  shopg.destroy();
+  this.shopStall = this.physics.add.staticImage(this.upperPlatformRect.x, this.upperPlatformRect.y - 14, "shopStallTex");
   // Tutorial NPC on platform
   const npcG = this.add.graphics();
   npcG.fillStyle(0x60a5fa, 1);
@@ -106,18 +131,22 @@ class TownScene extends Phaser.Scene {
   npcG.generateTexture("tutorialNpcTex", 16, 16);
   npcG.destroy();
   this.tutorialNpc = this.add.image(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15, "tutorialNpcTex");
-  this.add.text(this.tutorialNpc.x, this.tutorialNpc.y - 20, "Tutorial NPC", { color: "#c7d2fe", fontSize: "10px" }).setOrigin(0.5);
+  this.add.text(this.tutorialNpc.x, this.tutorialNpc.y - 20, "Grimsley", { color: "#c7d2fe", fontSize: "10px" }).setOrigin(0.5);
   // Labels
   this.add.text(this.cavePortal.x, this.cavePortal.y - 40, "Cave", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.slimePortal.x, this.slimePortal.y - 40, "Slime Field", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.furnace.x, this.furnace.y - 36, "Furnace", { color: "#fca5a5", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.workbench.x, this.workbench.y - 28, "Workbench", { color: "#c7d2fe", fontSize: "12px" }).setOrigin(0.5);
+  this.add.text(this.sawmill.x, this.sawmill.y - 26, "Sawmill", { color: "#fde68a", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.storageBox.x, this.storageBox.y - 40, "Storage", { color: "#fde68a", fontSize: "12px" }).setOrigin(0.5);
+  this.add.text(this.shopStall.x, this.shopStall.y - 34, "Shop", { color: "#d8b4fe", fontSize: "12px" }).setOrigin(0.5);
   // Prompts
   this.cavePrompt = this.add.text(this.cavePortal.x, this.cavePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.slimePrompt = this.add.text(this.slimePortal.x, this.slimePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.furnacePrompt = this.add.text(this.furnace.x, this.furnace.y - 48, "Press E to Use", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.workbenchPrompt = this.add.text(this.workbench.x, this.workbench.y - 32, "Press E to Craft", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  this.sawmillPrompt = this.add.text(this.sawmill.x, this.sawmill.y - 30, "Press E to Cut", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  this.shopPrompt = this.add.text(this.shopStall.x, this.shopStall.y - 32, "Press E: Shop", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   // One-way platform collider will be added after player is created
     // Player texture and body
     const ptex = this.add.graphics();
@@ -189,6 +218,7 @@ class TownScene extends Phaser.Scene {
       this.slimePortal.setPosition(w - 80, this.groundRect.y - 24);
   this.furnace.setPosition(w / 2 + 120, this.groundRect.y - 14);
     this.workbench.setPosition(w / 2 - 120, this.groundRect.y - 8);
+    this.sawmill.setPosition(w / 2 - 200, this.groundRect.y - 9);
       // Reposition upper platform and contents
       this.upperPlatformRect.setPosition(w / 2 + 60, h - 110).setSize(w * 0.5, 10);
       this.upperPlatformBody.setPosition(this.upperPlatformRect.x, this.upperPlatformRect.y);
@@ -197,11 +227,14 @@ class TownScene extends Phaser.Scene {
       this.upperPlatformBody.refreshBody();
       this.storageBox.setPosition(this.upperPlatformRect.x + this.upperPlatformRect.width / 2 - 30, this.upperPlatformRect.y - 12);
       this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
+  this.shopStall.setPosition(this.upperPlatformRect.x, this.upperPlatformRect.y - 14);
+  this.shopPrompt.setPosition(this.shopStall.x, this.shopStall.y - 32);
       this.tutorialNpc.setPosition(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15);
       this.cavePrompt.setPosition(this.cavePortal.x, this.cavePortal.y - 60);
       this.slimePrompt.setPosition(this.slimePortal.x, this.slimePortal.y - 60);
   this.furnacePrompt.setPosition(this.furnace.x, this.furnace.y - 48);
     this.workbenchPrompt.setPosition(this.workbench.x, this.workbench.y - 32);
+    this.sawmillPrompt.setPosition(this.sawmill.x, this.sawmill.y - 30);
       this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
       this.physics.world.setBounds(0, 0, w, h);
     });
@@ -270,7 +303,9 @@ class TownScene extends Phaser.Scene {
   const nearSlime = dist(this.player, this.slimePortal) < 60;
   const nearFurnace = dist(this.player, this.furnace) < 60;
   const nearWorkbench = dist(this.player, this.workbench) < 60;
+  const nearSawmill = dist(this.player, this.sawmill) < 60;
   const nearStorage = dist(this.player, this.storageBox) < 60;
+  const nearShop = dist(this.player, this.shopStall) < 60;
     this.cavePrompt.setVisible(nearCave);
     // Slime portal gated by tutorialStarted flag in registry
     const tutorialStarted = !!this.game.registry.get("tutorialStarted");
@@ -278,6 +313,8 @@ class TownScene extends Phaser.Scene {
     this.slimePrompt.setVisible(nearSlime);
     this.furnacePrompt.setVisible(nearFurnace);
       this.workbenchPrompt.setVisible(nearWorkbench);
+  this.sawmillPrompt.setVisible(nearSawmill);
+      this.shopPrompt.setVisible(nearShop);
       this.storagePrompt.setVisible(nearStorage);
     if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
@@ -294,6 +331,10 @@ class TownScene extends Phaser.Scene {
         window.__openFurnace?.();
       } else if (nearWorkbench) {
         window.__openWorkbench?.();
+      } else if (nearSawmill) {
+        window.__openSawmill?.();
+      } else if (nearShop) {
+        window.__openShop?.();
       } else if (nearStorage) {
         window.__openStorage?.();
       }
@@ -529,6 +570,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [welcomeSeen, setWelcomeSeen] = useState<boolean>(!!initialSeenWelcome);
   const [welcomeError, setWelcomeError] = useState<string | null>(null);
   const [openInventory, setOpenInventory] = useState(false);
+  const [showShop, setShowShop] = useState(false);
+  const [shopQty, setShopQty] = useState(1);
   const [inventory, setInventory] = useState<Record<string, number>>({});
   const [activeSceneKey, setActiveSceneKey] = useState<string>("TownScene");
   const [showStats, setShowStats] = useState(false);
@@ -543,6 +586,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const workRef = useRef<typeof workQueue>(null);
   const workTimerRef = useRef<number | null>(null);
   useEffect(() => { workRef.current = workQueue; }, [workQueue]);
+  // Sawmill state
+  const [showSawmill, setShowSawmill] = useState(false);
+  const [sawQueue, setSawQueue] = useState<{ recipe: "plank" | "oak_plank"; eta: number; startedAt: number; remaining: number; per: number; total: number } | null>(null);
+  const sawRef = useRef<typeof sawQueue>(null);
+  const sawTimerRef = useRef<number | null>(null);
+  useEffect(() => { sawRef.current = sawQueue; }, [sawQueue]);
   type SkillsView = { mining: { level: number; exp: number }; woodcutting: { level: number; exp: number }; fishing: { level: number; exp: number }; crafting: { level: number; exp: number } };
   type BaseView = { level: number; class: string; exp: number; gold: number; premiumGold?: number; hp: number; mp: number; strength: number; agility: number; intellect: number; luck: number };
   const [statsData, setStatsData] = useState<{ base: BaseView | null; skills: SkillsView } | null>(null);
@@ -768,7 +817,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
       setActiveSceneKey(active);
-      if (showFurnace || showWorkbench) {
+      if (showFurnace || showWorkbench || showSawmill) {
         setExpHud({ label: "Crafting EXP", value: craftingExpState, max: craftingMax });
       } else if (active === "CaveScene") {
         setExpHud({ label: "Mining EXP", value: miningExpState, max: miningMax });
@@ -779,7 +828,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     // Periodically reconcile with DB as source of truth when no queues running
     const r = setInterval(() => {
       if (!character) return;
-      if (furnaceRef.current || workRef.current) return; // don't override while crafting
+  if (furnaceRef.current || workRef.current || sawRef.current) return; // don't override while crafting
       fetch(`/api/account/characters/inventory?characterId=${character.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -887,15 +936,19 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         if (level > prev) pushToast(`Level Up! Lv ${prev} → ${level}`);
       }
     };
-    window.__openFurnace = () => setShowFurnace(true);
-    window.__openWorkbench = () => setShowWorkbench(true);
-    window.__openStorage = () => setShowStorage(true);
+  window.__openFurnace = () => setShowFurnace(true);
+  window.__openWorkbench = () => setShowWorkbench(true);
+  window.__openStorage = () => setShowStorage(true);
+  window.__openSawmill = () => setShowSawmill(true);
+  window.__openShop = () => setShowShop(true);
     return () => {
       delete window.__saveSceneNow;
       delete window.__applyExpUpdate;
       delete window.__openFurnace;
       delete window.__openWorkbench;
       delete window.__openStorage;
+  delete window.__openSawmill;
+  delete window.__openShop;
     };
   }, [saveSceneNow, reqChar, reqMine, reqCraft, pushToast, charLevel]);
 
@@ -1046,7 +1099,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         // Helper to process completions for a queue
         type FurnaceQ = { recipe: "copper" | "bronze"; eta: number; startedAt: number; remaining: number; per: number; total: number };
         type WorkbenchQ = { recipe: "armor" | "dagger"; eta: number; startedAt: number; remaining: number; per: number; total: number };
-        const processQueue = async (q: FurnaceQ | WorkbenchQ | null, kind: "furnace" | "workbench") => {
+  const processQueue = async (q: FurnaceQ | WorkbenchQ | null, kind: "furnace" | "workbench") => {
           if (!q) return;
           const { recipe, startedAt, per, remaining, total } = q;
           const elapsed = Date.now() - (startedAt || Date.now());
@@ -1094,8 +1147,38 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, [kind]: null }) }).catch(() => {});
           }
         };
+        // Sawmill handler
+        type SawmillQ = { recipe: "plank" | "oak_plank"; eta: number; startedAt: number; remaining: number; per: number; total: number };
+        const processSaw = async (q: SawmillQ | null) => {
+          if (!q) return;
+          const { recipe, startedAt, per, remaining, total } = q;
+          const elapsed = Date.now() - (startedAt || Date.now());
+          const done = Math.min(total, Math.floor(elapsed / Math.max(1, per)));
+          const newRemaining = Math.max(0, remaining - done);
+          for (let i = 0; i < done; i++) {
+            if (recipe === "plank") inv.plank = (inv.plank ?? 0) + 1; else inv.oak_plank = (inv.oak_plank ?? 0) + 1;
+            const expPer = recipe === "plank" ? 1 : 2;
+            await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) }).catch(() => {});
+            pushToast(`Completed ${recipe === "plank" ? "Plank" : "Oak Plank"} while offline`);
+          }
+          await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+          game.registry.set("inventory", inv);
+          if (newRemaining > 0) {
+            const remainderMs = Math.max(0, per - (elapsed % per));
+            if (recipe !== "plank" && recipe !== "oak_plank") { await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, sawmill: null }) }).catch(() => {}); return; }
+            const newQ: SawmillQ = { recipe, eta: per, startedAt: Date.now() - (per - remainderMs), remaining: newRemaining, per, total };
+            sawRef.current = newQ; setSawQueue(newQ);
+            await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, sawmill: newQ }) }).catch(() => {});
+            if (sawTimerRef.current) { clearTimeout(sawTimerRef.current); sawTimerRef.current = null; }
+            setSawQueue((prev) => prev ? { ...prev, startedAt: Date.now() - (per - remainderMs) } : prev);
+            scheduleSawNextRef.current?.();
+          } else {
+            await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, sawmill: null }) }).catch(() => {});
+          }
+        };
         await processQueue(data.furnace, "furnace");
         await processQueue(data.workbench, "workbench");
+        await processSaw(data.sawmill);
       } catch {}
     };
     run();
@@ -1200,6 +1283,92 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     if (cid) fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: cid, workbench: null }) }).catch(() => {});
   }, [character?.id]);
 
+  // Sawmill helpers: schedule looped cutting and cancel
+  const scheduleSawNextRef = useRef<(() => Promise<void>) | null>(null);
+  const scheduleSawNext = useCallback(async () => {
+    if (!character) return;
+    const q = sawRef.current; if (!q) return;
+    if (sawTimerRef.current) { window.clearTimeout(sawTimerRef.current); sawTimerRef.current = null; }
+    setSawQueue((curr) => {
+      if (!curr) return curr;
+      const next = { ...curr, startedAt: Date.now() };
+      sawRef.current = next;
+      return next;
+    });
+    const per = (sawRef.current?.per ?? 3000);
+    sawTimerRef.current = window.setTimeout(async () => {
+      const game = gameRef.current; if (!game) return;
+      const currQ = sawRef.current; if (!currQ) return;
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      if (currQ.recipe === "plank") inv.plank = (inv.plank ?? 0) + 1; else inv.oak_plank = (inv.oak_plank ?? 0) + 1;
+      game.registry.set("inventory", inv);
+      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      const expPer = currQ.recipe === "plank" ? 1 : 2;
+      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.craftingExp === "number" && typeof data.craftingLevel === "number") {
+          window.__applyExpUpdate?.({ type: "crafting", exp: data.craftingExp, level: data.craftingLevel });
+        }
+      }
+      setSawQueue((prev) => {
+        if (!prev) { sawRef.current = null; return null; }
+        const left = Math.max(0, prev.remaining - 1);
+        if (left === 0) {
+          sawRef.current = null;
+          fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, sawmill: null }) }).catch(() => {});
+          return null;
+        } else {
+          const next = { ...prev, remaining: left, startedAt: Date.now() };
+          sawRef.current = next;
+          fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, sawmill: next }) }).catch(() => {});
+          setTimeout(() => scheduleSawNextRef.current?.(), 0);
+          return next;
+        }
+      });
+    }, per);
+  }, [character]);
+
+  useEffect(() => { scheduleSawNextRef.current = scheduleSawNext; }, [scheduleSawNext]);
+
+  const startSaw = useCallback((recipe: "plank" | "oak_plank", count: number) => {
+    if (!character || !gameRef.current) return;
+    if (sawQueue) return;
+    const game = gameRef.current;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    if (recipe === "plank") {
+      if ((inv.log ?? 0) < count) return;
+      inv.log = (inv.log ?? 0) - count;
+    } else {
+      if ((inv.oak_log ?? 0) < count) return;
+      inv.oak_log = (inv.oak_log ?? 0) - count;
+    }
+    game.registry.set("inventory", inv);
+    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+    const perMs = recipe === "plank" ? 3000 : 5000;
+    const q = { recipe, eta: perMs, startedAt: Date.now(), remaining: count, per: perMs, total: count } as const;
+    sawRef.current = q as unknown as typeof sawQueue;
+    setSawQueue(q as unknown as typeof sawQueue);
+    fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, sawmill: q }) }).catch(() => {});
+    scheduleSawNext();
+  }, [character, sawQueue, scheduleSawNext]);
+
+  const cancelSaw = useCallback(() => {
+    const q = sawRef.current; if (!q || !gameRef.current) { setSawQueue(null); return; }
+    if (sawTimerRef.current) { window.clearTimeout(sawTimerRef.current); sawTimerRef.current = null; }
+    const game = gameRef.current;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    const remaining = Math.max(0, q.remaining ?? 0);
+    if (remaining > 0) {
+      if (q.recipe === "plank") inv.log = (inv.log ?? 0) + remaining; else inv.oak_log = (inv.oak_log ?? 0) + remaining;
+      game.registry.set("inventory", inv);
+      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (game.registry.get("characterId") as string), items: inv }) }).catch(() => {});
+    }
+    setSawQueue(null);
+    const cid = (gameRef.current?.registry.get("characterId") as string) || character?.id;
+    if (cid) fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: cid, sawmill: null }) }).catch(() => {});
+  }, [character?.id]);
+
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
       {/* Toasts */}
@@ -1215,7 +1384,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           <div className="font-semibold text-white/90">{character.name}</div>
           <div className="opacity-80">
             {character.class} • Lv {charLevel}
-            {(showFurnace || showWorkbench) ? (
+            {(showFurnace || showWorkbench || showSawmill) ? (
               <> • Crafting Lv {gameRef.current?.registry.get("craftingLevel") ?? 1}</>
             ) : activeSceneKey === "CaveScene" ? (
               <> • Mining Lv {gameRef.current?.registry.get("miningLevel") ?? (initialMiningLevel ?? 1)}</>
@@ -1238,6 +1407,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         <button className="btn px-3 py-1 text-sm" title="Open your inventory" onClick={() => setOpenInventory(true)}>Items</button>
         <button className="btn px-3 py-1 text-sm" title="View your talent tree">Talents</button>
         <button className="btn px-3 py-1 text-sm" title="Quests, Tips, AFK Info">Codex</button>
+  {/* Shop is now a Town interaction, not a HUD button */}
         <button className="btn px-3 py-1 text-sm" title="View your stats and skills" onClick={async () => {
           if (!character) return;
           try {
@@ -1286,6 +1456,83 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           </div>
         </div>
       )}
+      {/* Shop Modal */}
+      {showShop && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(800px,95vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Shop</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowShop(false)}>Close</button>
+            </div>
+            <div className="mt-3 flex items-center gap-3 text-sm">
+              <span>Qty</span>
+              <button className="btn px-2" onClick={() => setShopQty(q => Math.max(1, q - 1))}>-</button>
+              <input className="w-16 rounded bg-black/40 border border-white/10 px-2 py-1 text-center" value={shopQty} onChange={(e) => setShopQty(Math.max(1, Math.min(999, parseInt(e.target.value || "1", 10) || 1)))} />
+              <button className="btn px-2" onClick={() => setShopQty(q => Math.min(999, q + 1))}>+</button>
+              <span className="text-gray-400">Drag from Shop → Inventory to buy; Inventory → Shop to sell. Each drag performs 1 per operation, repeated by Qty.</span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-6">
+              <div>
+                <div className="mb-2 text-sm text-gray-300">Inventory</div>
+                <div className="grid grid-cols-6 gap-3 sm:grid-cols-8 rounded border border-white/10 bg-black/40 p-3"
+                     onDragOver={(e) => e.preventDefault()}
+                     onDrop={async (e) => {
+                       e.preventDefault(); if (!character) return;
+                       const data = e.dataTransfer?.getData("text/plain"); if (!data) return;
+                       const { source, key } = JSON.parse(data);
+                       if (source !== "shop") return;
+                       for (let i = 0; i < shopQty; i++) {
+                         const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "buy", itemKey: key, quantity: 1 }) });
+                         if (!res.ok) break;
+                         const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
+                         inv[key] = (inv[key] ?? 0) + 1; gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
+                       }
+                     }}>
+                  {Object.entries(inventory).map(([key, count]) => (
+                    <div key={key}
+                         className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2"
+                         draggable onDragStart={(e) => e.dataTransfer?.setData("text/plain", JSON.stringify({ source: "inventory", key }))}
+                    >
+                      <div className="flex h-full w-full items-center justify-center"><span className="text-xs font-semibold">{key.substring(0,2).toUpperCase()}</span></div>
+                      <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 text-sm text-gray-300">Shop</div>
+                <div className="grid grid-cols-6 gap-3 sm:grid-cols-8 rounded border border-white/10 bg-black/40 p-3"
+                     onDragOver={(e) => e.preventDefault()}
+                     onDrop={async (e) => {
+                       e.preventDefault(); if (!character) return;
+                       const data = e.dataTransfer?.getData("text/plain"); if (!data) return;
+                       const { source, key } = JSON.parse(data);
+                       if (source !== "inventory") return;
+                       for (let i = 0; i < shopQty; i++) {
+                         if ((inventory[key] ?? 0) <= 0) break;
+                         const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "sell", itemKey: key, quantity: 1 }) });
+                         if (!res.ok) break;
+                         const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
+                         inv[key] = Math.max(0, (inv[key] ?? 0) - 1); gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
+                       }
+                     }}>
+                  {shopItems.map(it => (
+                    <div key={it.key}
+                         className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2"
+                         draggable onDragStart={(e) => e.dataTransfer?.setData("text/plain", JSON.stringify({ source: "shop", key: it.key }))}
+                         title={`${it.name} • Buy ${it.buy} • Sell ${it.sell}`}
+                    >
+                      <div className="flex h-full w-full items-center justify-center"><span className="text-[10px] font-semibold">{it.name.split(" ")[0]}</span></div>
+                      <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-emerald-300 ring-1 ring-white/10">B {it.buy}</span>
+                      <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-yellow-300 ring-1 ring-white/10">S {it.sell}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Workbench Modal */}
       {showWorkbench && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
@@ -1327,6 +1574,54 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                     const totalMs = workQueue.total * workQueue.per;
                     const pct = Math.min(100, (elapsed / Math.max(1, totalMs)) * 100);
                     return <div className="h-2 rounded bg-blue-500" style={{ width: `${pct}%` }} />;
+                  })()}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+      {/* Sawmill Modal */}
+      {showSawmill && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Sawmill</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowSawmill(false)}>Close</button>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Plank</div>
+                <div className="mt-1 text-gray-300">Costs: 1x Log • Time: 3s • +1 Crafting EXP</div>
+                <div className="mt-2 flex gap-2">
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!sawQueue || (inventory.log ?? 0) < 1} onClick={() => startSaw("plank", 1)}>Cut 1</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!sawQueue || (inventory.log ?? 0) < 5} onClick={() => startSaw("plank", 5)}>x5</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!sawQueue || (inventory.log ?? 0) < 10} onClick={() => startSaw("plank", 10)}>x10</button>
+                </div>
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Oak Plank</div>
+                <div className="mt-1 text-gray-300">Costs: 1x Oak Log • Time: 5s • +2 Crafting EXP</div>
+                <div className="mt-2 flex gap-2">
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!sawQueue || (inventory.oak_log ?? 0) < 1} onClick={() => startSaw("oak_plank", 1)}>Cut 1</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!sawQueue || (inventory.oak_log ?? 0) < 5} onClick={() => startSaw("oak_plank", 5)}>x5</button>
+                  <button className="btn px-3 py-1 disabled:opacity-50" disabled={!!sawQueue || (inventory.oak_log ?? 0) < 10} onClick={() => startSaw("oak_plank", 10)}>x10</button>
+                </div>
+              </div>
+            </div>
+            {sawQueue ? (
+              <div className="mt-4 rounded border border-white/10 bg-black/40 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <div>Cutting {sawQueue.recipe === "plank" ? "Plank" : "Oak Plank"}… {sawQueue.remaining > 1 ? `(x${sawQueue.remaining} left)` : null}</div>
+                  <button className="btn px-2 py-1" onClick={cancelSaw}>Cancel</button>
+                </div>
+                <div className="mt-2 h-2 w-full rounded bg-white/10">
+                  {(() => {
+                    const finished = (sawQueue.total - sawQueue.remaining);
+                    const elapsed = (finished * sawQueue.per) + (Date.now() - sawQueue.startedAt);
+                    const totalMs = sawQueue.total * sawQueue.per;
+                    const pct = Math.min(100, (elapsed / Math.max(1, totalMs)) * 100);
+                    return <div className="h-2 rounded bg-amber-500" style={{ width: `${pct}%` }} />;
                   })()}
                 </div>
               </div>

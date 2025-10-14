@@ -81,6 +81,7 @@ model CraftQueue {
   characterId  String    @unique
   furnace      Json?
   workbench    Json?
+  sawmill      Json?
   updatedAt    DateTime  @updatedAt
 }
 
