@@ -8,6 +8,7 @@ declare global {
     __applyExpUpdate?: (payload: { type: "character" | "mining" | "crafting"; exp: number; level: number }) => void;
     __openFurnace?: () => void;
     __openWorkbench?: () => void;
+    __openStorage?: () => void;
   }
 }
 
@@ -17,6 +18,8 @@ class TownScene extends Phaser.Scene {
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
   private groundRect!: Phaser.GameObjects.Rectangle;
+  private upperPlatformRect!: Phaser.GameObjects.Rectangle;
+  private upperPlatformBody!: Phaser.Physics.Arcade.Image;
   private cavePortal!: Phaser.Physics.Arcade.Image;
   private slimePortal!: Phaser.Physics.Arcade.Image;
   private cavePrompt!: Phaser.GameObjects.Text;
@@ -25,6 +28,9 @@ class TownScene extends Phaser.Scene {
   private furnacePrompt!: Phaser.GameObjects.Text;
   private workbench!: Phaser.Physics.Arcade.Image;
   private workbenchPrompt!: Phaser.GameObjects.Text;
+  private storageBox!: Phaser.Physics.Arcade.Image;
+  private storagePrompt!: Phaser.GameObjects.Text;
+  private tutorialNpc!: Phaser.GameObjects.Image;
   preload() {}
   create() {
     // Track current scene for persistence
@@ -44,6 +50,13 @@ class TownScene extends Phaser.Scene {
     ground.displayWidth = this.groundRect.width;
     ground.displayHeight = this.groundRect.height;
     ground.refreshBody();
+  // Upper one-way platform (smaller than ground)
+  this.upperPlatformRect = this.add.rectangle(center.x + 60, this.scale.height - 110, this.scale.width * 0.5, 10, 0x4c1d95).setOrigin(0.5, 0.5);
+  this.upperPlatformRect.setStrokeStyle(1, 0xffffff, 0.15);
+  this.upperPlatformBody = this.physics.add.staticImage(this.upperPlatformRect.x, this.upperPlatformRect.y, "groundTex");
+  this.upperPlatformBody.displayWidth = this.upperPlatformRect.width;
+  this.upperPlatformBody.displayHeight = this.upperPlatformRect.height;
+  this.upperPlatformBody.refreshBody();
   // Portal textures
   const p = this.add.graphics();
   p.fillStyle(0x1d4ed8, 0.8); // blue for cave
@@ -76,16 +89,36 @@ class TownScene extends Phaser.Scene {
   wbx.generateTexture("workbenchTex", 46, 16);
   wbx.destroy();
   this.workbench = this.physics.add.staticImage(center.x - 120, this.groundRect.y - 8, "workbenchTex");
+  // Storage box on upper platform
+  const sboxg = this.add.graphics();
+  sboxg.fillStyle(0x8b5e34, 1);
+  sboxg.fillRoundedRect(0, 0, 20, 16, 3);
+  sboxg.lineStyle(2, 0x5c3d1e, 1);
+  sboxg.strokeRoundedRect(0, 0, 20, 16, 3);
+  sboxg.generateTexture("storageBoxTex", 20, 16);
+  sboxg.destroy();
+  this.storageBox = this.physics.add.staticImage(this.upperPlatformRect.x + this.upperPlatformRect.width / 2 - 30, this.upperPlatformRect.y - 12, "storageBoxTex");
+  this.storagePrompt = this.add.text(this.storageBox.x, this.storageBox.y - 28, "Press E: Storage", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  // Tutorial NPC on platform
+  const npcG = this.add.graphics();
+  npcG.fillStyle(0x60a5fa, 1);
+  npcG.fillCircle(8, 8, 8);
+  npcG.generateTexture("tutorialNpcTex", 16, 16);
+  npcG.destroy();
+  this.tutorialNpc = this.add.image(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15, "tutorialNpcTex");
+  this.add.text(this.tutorialNpc.x, this.tutorialNpc.y - 20, "Tutorial NPC", { color: "#c7d2fe", fontSize: "10px" }).setOrigin(0.5);
   // Labels
   this.add.text(this.cavePortal.x, this.cavePortal.y - 40, "Cave", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.slimePortal.x, this.slimePortal.y - 40, "Slime Field", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.furnace.x, this.furnace.y - 36, "Furnace", { color: "#fca5a5", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.workbench.x, this.workbench.y - 28, "Workbench", { color: "#c7d2fe", fontSize: "12px" }).setOrigin(0.5);
+  this.add.text(this.storageBox.x, this.storageBox.y - 40, "Storage", { color: "#fde68a", fontSize: "12px" }).setOrigin(0.5);
   // Prompts
   this.cavePrompt = this.add.text(this.cavePortal.x, this.cavePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.slimePrompt = this.add.text(this.slimePortal.x, this.slimePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.furnacePrompt = this.add.text(this.furnace.x, this.furnace.y - 48, "Press E to Use", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.workbenchPrompt = this.add.text(this.workbench.x, this.workbench.y - 32, "Press E to Craft", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  // One-way platform collider will be added after player is created
     // Player texture and body
     const ptex = this.add.graphics();
     ptex.fillStyle(0xffffff, 1);
@@ -102,6 +135,14 @@ class TownScene extends Phaser.Scene {
     this.player.setDepth(5);
     // Gravity for the player
   (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900);
+    // One-way platform collider: only collide when falling onto it from above
+    this.physics.add.collider(this.player, this.upperPlatformBody, undefined, () => {
+      const body = this.player.body as Phaser.Physics.Arcade.Body;
+      const falling = body.velocity.y >= 0;
+      const feetY = this.player.y + (this.player.displayHeight / 2);
+      const platTop = this.upperPlatformRect.y - (this.upperPlatformRect.height / 2);
+      return falling && feetY <= platTop + 6;
+    });
     // Collider
     this.physics.add.collider(this.player, ground);
     // Input (WASD)
@@ -128,16 +169,26 @@ class TownScene extends Phaser.Scene {
       this.slimePortal.setPosition(w - 80, this.groundRect.y - 24);
   this.furnace.setPosition(w / 2 + 120, this.groundRect.y - 14);
     this.workbench.setPosition(w / 2 - 120, this.groundRect.y - 8);
+      // Reposition upper platform and contents
+      this.upperPlatformRect.setPosition(w / 2 + 60, h - 110).setSize(w * 0.5, 10);
+      this.upperPlatformBody.setPosition(this.upperPlatformRect.x, this.upperPlatformRect.y);
+      this.upperPlatformBody.displayWidth = this.upperPlatformRect.width;
+      this.upperPlatformBody.displayHeight = this.upperPlatformRect.height;
+      this.upperPlatformBody.refreshBody();
+      this.storageBox.setPosition(this.upperPlatformRect.x + this.upperPlatformRect.width / 2 - 30, this.upperPlatformRect.y - 12);
+      this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
+      this.tutorialNpc.setPosition(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15);
       this.cavePrompt.setPosition(this.cavePortal.x, this.cavePortal.y - 60);
       this.slimePrompt.setPosition(this.slimePortal.x, this.slimePortal.y - 60);
   this.furnacePrompt.setPosition(this.furnace.x, this.furnace.y - 48);
     this.workbenchPrompt.setPosition(this.workbench.x, this.workbench.y - 32);
+      this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
       this.physics.world.setBounds(0, 0, w, h);
     });
     // Ambient particles: generate a tiny dot texture
     const g = this.add.graphics();
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(2, 2, 2);
+    g.fillCircle(7, 7, 7);
     g.generateTexture("dot", 4, 4);
     g.destroy();
     // Replace removed particles API with lightweight ambient dots via tweens
@@ -199,6 +250,7 @@ class TownScene extends Phaser.Scene {
   const nearSlime = dist(this.player, this.slimePortal) < 60;
   const nearFurnace = dist(this.player, this.furnace) < 60;
   const nearWorkbench = dist(this.player, this.workbench) < 60;
+  const nearStorage = dist(this.player, this.storageBox) < 60;
     this.cavePrompt.setVisible(nearCave);
     // Slime portal gated by tutorialStarted flag in registry
     const tutorialStarted = !!this.game.registry.get("tutorialStarted");
@@ -206,6 +258,7 @@ class TownScene extends Phaser.Scene {
     this.slimePrompt.setVisible(nearSlime);
     this.furnacePrompt.setVisible(nearFurnace);
       this.workbenchPrompt.setVisible(nearWorkbench);
+      this.storagePrompt.setVisible(nearStorage);
     if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
@@ -221,6 +274,8 @@ class TownScene extends Phaser.Scene {
         window.__openFurnace?.();
       } else if (nearWorkbench) {
         window.__openWorkbench?.();
+      } else if (nearStorage) {
+        window.__openStorage?.();
       }
     }
   }
@@ -491,6 +546,11 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
   }, []);
 
+  // Storage UI state
+  const [showStorage, setShowStorage] = useState(false);
+  const [accountStorage, setAccountStorage] = useState<Record<string, number>>({});
+  const [dragItem, setDragItem] = useState<{ from: "inv" | "storage"; key: string } | null>(null);
+
   useEffect(() => {
     if (!ref.current) return;
     const config: Phaser.Types.Core.GameConfig = {
@@ -725,6 +785,50 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     return () => clearInterval(t);
   }, [character]);
 
+  // Load storage when opened
+  useEffect(() => {
+    if (!showStorage) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/account/storage");
+        if (res.ok) {
+          const data = await res.json();
+          setAccountStorage((data?.items as Record<string, number>) || {});
+        }
+      } catch {}
+    })();
+  }, [showStorage]);
+
+  const commitStorage = async (next: Record<string, number>) => {
+    try {
+      await fetch("/api/account/storage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: next }) });
+      setAccountStorage({ ...next });
+    } catch {}
+  };
+
+  const moveItem = async (from: "inv" | "storage", key: string) => {
+    const game = gameRef.current; if (!game) return;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    const store = { ...accountStorage };
+    if (from === "inv") {
+      if ((inv[key] ?? 0) <= 0) return;
+      inv[key] -= 1; if (inv[key] <= 0) delete inv[key];
+      store[key] = (store[key] ?? 0) + 1;
+      game.registry.set("inventory", inv);
+      setInventory({ ...inv });
+      if (character) fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      await commitStorage(store);
+    } else {
+      if ((store[key] ?? 0) <= 0) return;
+      store[key] -= 1; if (store[key] <= 0) delete store[key];
+      inv[key] = (inv[key] ?? 0) + 1;
+      game.registry.set("inventory", inv);
+      setInventory({ ...inv });
+      if (character) fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      await commitStorage(store);
+    }
+  };
+
   // UI overlays: Welcome modal + HUD buttons
   const markWelcomeSeen = async () => {
     if (!character) return;
@@ -776,11 +880,13 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     };
     window.__openFurnace = () => setShowFurnace(true);
     window.__openWorkbench = () => setShowWorkbench(true);
+    window.__openStorage = () => setShowStorage(true);
     return () => {
       delete window.__saveSceneNow;
       delete window.__applyExpUpdate;
       delete window.__openFurnace;
       delete window.__openWorkbench;
+      delete window.__openStorage;
     };
   }, [saveSceneNow, reqChar, reqMine, reqCraft, pushToast, charLevel]);
 
@@ -972,7 +1078,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               await fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: newQ }) }).catch(() => {});
               if (workTimerRef.current) { clearTimeout(workTimerRef.current); workTimerRef.current = null; }
               setWorkQueue((prev) => prev ? { ...prev, startedAt: Date.now() - (per - remainderMs) } : prev);
-              scheduleWorkNext();
+              scheduleWorkNextRef.current?.();
             }
           } else {
             // Clear persisted queue if finished
@@ -984,11 +1090,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       } catch {}
     };
     run();
-  }, [character, pushToast, scheduleNext, scheduleWorkNext]);
+  }, [character, pushToast, scheduleNext]);
 
   
 
   // Workbench helpers: schedule looped crafting and cancel
+  const scheduleWorkNextRef = useRef<(() => Promise<void>) | null>(null);
   const scheduleWorkNext = useCallback(async () => {
     if (!character) return;
     const q = workRef.current; if (!q) return;
@@ -1030,12 +1137,15 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           const next = { ...prev, remaining: left, startedAt: Date.now() };
           workRef.current = next;
           fetch("/api/account/characters/queue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, workbench: next }) }).catch(() => {});
-          setTimeout(() => scheduleWorkNext(), 0);
+          setTimeout(() => scheduleWorkNextRef.current?.(), 0);
           return next;
         }
       });
     }, per);
   }, [character]);
+
+  // Keep the ref pointing to the latest callback
+  useEffect(() => { scheduleWorkNextRef.current = scheduleWorkNext; }, [scheduleWorkNext]);
 
   const startWork = useCallback((recipe: "armor" | "dagger", count: number) => {
     if (!character || !gameRef.current) return;
@@ -1212,6 +1322,79 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                 </div>
               </div>
             ) : null}
+          </div>
+        </div>
+      )}
+      {/* Storage Modal */}
+      {showStorage && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(760px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Account Storage</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowStorage(false)}>Close</button>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-6">
+              <div>
+                <div className="mb-2 text-sm text-gray-300">Your Inventory</div>
+                <div className="grid grid-cols-6 gap-3 sm:grid-cols-8 rounded border border-white/10 bg-black/40 p-3"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); if (dragItem && dragItem.from === "storage") { void moveItem("storage", dragItem.key); setDragItem(null); } }}>
+                  {Object.entries(inventory).map(([key, count]) => {
+                    const icon = (k: string) => {
+                      if (k === "copper") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #f59e0b, #b45309)" }} />;
+                      if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
+                      if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
+                      if (k === "bronze_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #b8860b, #6b4f1d)" }} />;
+                      if (k === "plank") return <div className="h-5 w-8 rounded" style={{ background: "linear-gradient(135deg, #8b5e34, #5c3d1e)" }} />;
+                      if (k === "copper_armor") return <div className="h-6 w-6 rounded" style={{ background: "radial-gradient(circle at 30% 30%, #b45309, #78350f)" }} title="Copper Armor" />;
+                      if (k === "copper_dagger") return <div className="h-0 w-0 border-l-4 border-r-4 border-b-8" style={{ borderColor: "transparent transparent #b45309 transparent" }} title="Copper Dagger" />;
+                      return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
+                    };
+                    return (
+                      <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2"
+                           draggable onDragStart={() => setDragItem({ from: "inv", key })}
+                           title={`${key} (${count})`}
+                           onDoubleClick={() => void moveItem("inv", key)}>
+                        <div className="flex h-full w-full items-center justify-center">{icon(key)}</div>
+                        <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 text-sm text-gray-300">Account Storage</div>
+                <div className="grid grid-cols-6 gap-3 sm:grid-cols-8 rounded border border-white/10 bg-black/40 p-3"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); if (dragItem && dragItem.from === "inv") { void moveItem("inv", dragItem.key); setDragItem(null); } }}>
+                  {Object.entries(accountStorage).length === 0 && (
+                    <div className="col-span-full text-sm text-gray-400">No items in storage. Drag items from Inventory.</div>
+                  )}
+                  {Object.entries(accountStorage).map(([key, count]) => {
+                    const icon = (k: string) => {
+                      if (k === "copper") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #f59e0b, #b45309)" }} />;
+                      if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
+                      if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
+                      if (k === "bronze_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #b8860b, #6b4f1d)" }} />;
+                      if (k === "plank") return <div className="h-5 w-8 rounded" style={{ background: "linear-gradient(135deg, #8b5e34, #5c3d1e)" }} />;
+                      if (k === "copper_armor") return <div className="h-6 w-6 rounded" style={{ background: "radial-gradient(circle at 30% 30%, #b45309, #78350f)" }} title="Copper Armor" />;
+                      if (k === "copper_dagger") return <div className="h-0 w-0 border-l-4 border-r-4 border-b-8" style={{ borderColor: "transparent transparent #b45309 transparent" }} title="Copper Dagger" />;
+                      return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
+                    };
+                    return (
+                      <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2"
+                           draggable onDragStart={() => setDragItem({ from: "storage", key })}
+                           title={`${key} (${count})`}
+                           onDoubleClick={() => void moveItem("storage", key)}>
+                        <div className="flex h-full w-full items-center justify-center">{icon(key)}</div>
+                        <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 text-xs text-gray-400">Drag and drop items between your inventory and account storage. Double-click to move one quickly.</div>
           </div>
         </div>
       )}
