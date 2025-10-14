@@ -52,6 +52,7 @@ model Character {
   lastSeenAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  itemStacks ItemStack[]
   @@unique([userId, name])
 }
 

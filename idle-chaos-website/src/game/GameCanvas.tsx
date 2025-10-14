@@ -1,6 +1,13 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as Phaser from "phaser";
+
+declare global {
+  interface Window {
+    __saveSceneNow?: () => void;
+    __incExp?: (type: "character" | "mining", amt: number) => void;
+  }
+}
 
 class TownScene extends Phaser.Scene {
   constructor() { super("TownScene"); }
@@ -165,11 +172,11 @@ class TownScene extends Phaser.Scene {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
         // hint react layer to save scene now
-        (window as any).__saveSceneNow?.();
+  window.__saveSceneNow?.();
         this.scene.start("CaveScene");
       } else if (nearSlime && tutorialStarted) {
         this.game.registry.set("spawn", { from: "slime", portal: "town" });
-        (window as any).__saveSceneNow?.();
+  window.__saveSceneNow?.();
         this.scene.start("SlimeFieldScene");
       }
     }
@@ -236,16 +243,16 @@ class CaveScene extends Phaser.Scene {
       // Increment mining EXP and character EXP modestly
       fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 1, exp: 1 }) }).catch(() => {});
       // Notify React HUD if available
-      (window as any).__incExp?.("mining", 1);
-      (window as any).__incExp?.("character", 1);
+  window.__incExp?.("mining", 1);
+  window.__incExp?.("character", 1);
     }
   } });
   this.time.addEvent({ delay: 3500, loop: true, callback: () => {
     if (this.isNearNode(this.tinNode)) {
       this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD();
       fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 1, exp: 1 }) }).catch(() => {});
-      (window as any).__incExp?.("mining", 1);
-      (window as any).__incExp?.("character", 1);
+  window.__incExp?.("mining", 1);
+  window.__incExp?.("character", 1);
     }
   } });
     // HUD
@@ -306,7 +313,7 @@ class CaveScene extends Phaser.Scene {
     // Exit to Town
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "cave", portal: "town" });
-      (window as any).__saveSceneNow?.();
+  window.__saveSceneNow?.();
       this.scene.start("TownScene");
     }
   }
@@ -366,7 +373,7 @@ class SlimeFieldScene extends Phaser.Scene {
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
-      (window as any).__saveSceneNow?.();
+  window.__saveSceneNow?.();
       this.scene.start("TownScene");
     }
   }
@@ -465,25 +472,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     };
   }, [initialScene]);
 
-  // Expose helpers to scenes via window
-  useEffect(() => {
-    // @ts-ignore
-    (window as any).__saveSceneNow = saveSceneNow;
-    // @ts-ignore
-    (window as any).__incExp = (type: "character" | "mining", amt: number) => {
-      setExpHud((hud) => {
-        if (hud.label === "Mining EXP" && type === "mining") return { ...hud, value: hud.value + amt };
-        if (hud.label === "Character EXP" && type === "character") return { ...hud, value: hud.value + amt };
-        return hud;
-      });
-    };
-    return () => {
-      // @ts-ignore
-      delete (window as any).__saveSceneNow;
-      // @ts-ignore
-      delete (window as any).__incExp;
-    };
-  }, []);
+  // Expose helpers to scenes via window is set up after saveSceneNow definition below
 
   // Persist scene on page hide/unload
   useEffect(() => {
@@ -535,7 +524,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       document.body.appendChild(div);
       setTimeout(() => div.remove(), 2800);
     }
-  }, [offlineSince]);
+  }, [offlineSince, initialScene]);
 
   // Poll inventory from Phaser registry into React UI
   useEffect(() => {
@@ -554,7 +543,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       }
     }, 800);
     return () => clearInterval(t);
-  }, []);
+  }, [initialExp, initialMiningExp]);
 
   // Periodically persist inventory while playing
   useEffect(() => {
@@ -585,33 +574,46 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   };
 
   // Helper: immediate save of current scene to server
-  const saveSceneNow = async () => {
+  const saveSceneNow = useCallback(async () => {
     const game = gameRef.current; if (!game || !character) return;
     const scenes = game.scene.getScenes(true);
     const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
     try {
       await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) });
     } catch {}
-  };
-
-  // Monkey-patch scene transitions to call save immediately after change
-  useEffect(() => {
-    const game = gameRef.current; if (!game || !character) return;
-    const origStart = game.scene.start.bind(game.scene);
-    const patched = (key: string, data?: any) => {
-      const res = origStart(key, data);
-      // Save target scene name immediately
-      const sceneName = (key || "TownScene").replace("Scene", "");
-      fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: sceneName }) }).catch(() => {});
-      return res;
-    };
-    // @ts-ignore
-    game.scene.start = patched;
-    return () => {
-      // @ts-ignore
-      if (game.scene.start === patched) game.scene.start = origStart;
-    };
   }, [character]);
+
+  // Expose helpers to scenes via window
+  useEffect(() => {
+    window.__saveSceneNow = saveSceneNow;
+    window.__incExp = (type: "character" | "mining", amt: number) => {
+      setExpHud((hud) => {
+        if (hud.label === "Mining EXP" && type === "mining") return { ...hud, value: hud.value + amt };
+        if (hud.label === "Character EXP" && type === "character") return { ...hud, value: hud.value + amt };
+        return hud;
+      });
+    };
+    return () => {
+      delete window.__saveSceneNow;
+      delete window.__incExp;
+    };
+  }, [saveSceneNow]);
+
+  // Expose helpers to scenes via window
+  useEffect(() => {
+    window.__saveSceneNow = saveSceneNow;
+    window.__incExp = (type: "character" | "mining", amt: number) => {
+      setExpHud((hud) => {
+        if (hud.label === "Mining EXP" && type === "mining") return { ...hud, value: hud.value + amt };
+        if (hud.label === "Character EXP" && type === "character") return { ...hud, value: hud.value + amt };
+        return hud;
+      });
+    };
+    return () => {
+      delete window.__saveSceneNow;
+      delete window.__incExp;
+    };
+  }, [saveSceneNow, character]);
 
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
