@@ -3,11 +3,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ProfileMenu from "@/src/components/ProfileMenu";
 import BloodLinkButton from "@/src/components/BloodLinkButton";
+import type { SessionData } from "@/src/lib/auth";
 
-type SessionLike = { userId: string; email: string } | null;
-
-export default function NavAuth({ initial }: { initial: SessionLike }) {
-  const [session, setSession] = useState<SessionLike>(initial);
+export default function NavAuth({ initial }: { initial: SessionData | null }) {
+  const [session, setSession] = useState<SessionData | null>(initial);
 
   async function refetch() {
     try {

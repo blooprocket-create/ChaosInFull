@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
+export type SessionData = { userId: string; email: string };
+
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret-change-me");
 const COOKIE_NAME = "cif_token";
 
@@ -14,7 +16,7 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSession(payload: { userId: string; email: string }) {
+export async function createSession(payload: SessionData) {
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -35,13 +37,13 @@ export async function destroySession() {
   store.delete(COOKIE_NAME);
 }
 
-export async function getSession() {
+export async function getSession(): Promise<SessionData | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, SECRET);
-    return payload as { userId: string; email: string };
+  const { payload } = await jwtVerify(token, SECRET);
+  return payload as SessionData;
   } catch {
     return null;
   }

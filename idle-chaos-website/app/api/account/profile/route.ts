@@ -13,8 +13,10 @@ export async function POST(req: Request) {
   try {
     await prisma.user.update({ where: { id: session.userId }, data: { username } });
     return NextResponse.json({ ok: true, message: "Display name updated" });
-  } catch (e: any) {
-    if (e.code === "P2002") return NextResponse.json({ error: "Name is taken" }, { status: 400 });
+  } catch (e) {
+    if (typeof e === 'object' && e && 'code' in e && (e as { code?: string }).code === "P2002") {
+      return NextResponse.json({ error: "Name is taken" }, { status: 400 });
+    }
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

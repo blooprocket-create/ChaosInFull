@@ -15,6 +15,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   stats        PlayerStat?
+  characters   Character[]
 }
 
 model PlayerStat {
@@ -32,4 +33,31 @@ model PlayerStat {
   intellect Int      @default(1)
   luck      Int      @default(1)
   updatedAt DateTime @updatedAt
+}
+
+model Character {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  name      String
+  class     String   @default("Beginner")
+  gender    Gender
+  hat       Hat
+  level     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([userId, name])
+}
+
+enum Gender {
+  Male
+  Female
+  Nonbinary
+}
+
+enum Hat {
+  STR
+  INT
+  AGI
+  LUK
 }
