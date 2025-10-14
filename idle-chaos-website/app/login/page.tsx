@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { taglines, errors } from "@/src/data/flavor";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -18,7 +19,12 @@ export default function LoginPage() {
     });
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error || "Login failed");
+      const serverMsg = (data.error || "").toLowerCase();
+      if (serverMsg.includes("invalid") || serverMsg.includes("credential") || serverMsg.includes("password")) {
+        setError(errors.loginBadCreds);
+      } else {
+        setError(data.error || errors.authGeneric);
+      }
       return;
     }
     // Notify listeners first so nav can refetch session immediately
@@ -29,8 +35,8 @@ export default function LoginPage() {
 
   return (
     <section className="mx-auto max-w-md px-4 py-16">
-      <h1 className="text-3xl font-bold">Welcome back</h1>
-      <p className="text-gray-400 mt-2">Enter your credentials to continue.</p>
+      <h1 className="text-3xl font-bold">{taglines.loginHeader}</h1>
+      <p className="text-gray-400 mt-2 text-sm">{taglines.loginSubtitle}</p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <input value={emailOrUsername} onChange={(e)=>setId(e.target.value)} placeholder="Email or username" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500" />
         <input value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Password" type="password" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500" />

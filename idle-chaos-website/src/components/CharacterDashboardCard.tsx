@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { pick, afkPhrases } from "@/src/data/flavor";
 import { formatDuration } from "@/src/lib/time";
 import DeleteCharacterButton from "@/src/components/DeleteCharacterButton";
 
@@ -18,6 +19,7 @@ export type CharacterSummary = {
 
 export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
   const [afkDisplay, setAfkDisplay] = useState(formatDuration(c.afkMs));
+  const [afkFlavor] = useState(pick(afkPhrases));
   useEffect(() => {
     // live ticking AFK timer
     const start = Date.now() - c.afkMs;
@@ -51,6 +53,7 @@ export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
           <div className="font-semibold text-white/80">Activity</div>
           <div className="text-gray-300">Last Zone: {c.lastScene}</div>
           <div className="text-gray-300">AFK: {afkDisplay}</div>
+          <div className="text-[10px] text-gray-500 italic">{afkFlavor}</div>
         </div>
       </div>
     </div>

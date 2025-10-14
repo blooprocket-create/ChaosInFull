@@ -8,46 +8,70 @@ export default function Home() {
   return (
     <>
       <ParallaxHero />
+      <FlickerOnView />
 
-        <FlickerOnView />
-      {/* Feature cards */}
-  <section className="mx-auto max-w-6xl px-4 py-16 grid md:grid-cols-3 gap-6">
-        {[{
-          title: "Evolve or Else",
-          text: "Beginner to twisted Warrior, Occultist Mage, or Stalker Rogue—branch into deeper horrors as you level.",
-        },{
-          title: "Idle That Bites Back",
-          text: "Progress while AFK. Return to spoils, tasks, and maybe… a note from the mysterious Tutorial NPC.",
-        },{
-          title: "Click. Move. Strike.",
-          text: "Click-to-attack like MapleStory: your character slides into range and unleashes skills bound to 1–0.",
-        }].map((c)=> (
-          <div key={c.title} className="rounded-xl border border-white/10 bg-black/40 p-6">
-            <h3 className="text-xl font-semibold">{c.title}</h3>
-            <p className="mt-2 text-gray-300">{c.text}</p>
-          </div>
-        ))}
+      {/* Feature pitch */}
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            A Cheerfully Miserable Idle Action RPG
+          </h2>
+          <p className="mt-4 text-lg text-gray-300">
+            Build a dysfunctional roster of characters, abandon them in hostile maps, then return for ores, bars,
+            and existential questions. Your progress doesn’t pause—only your willingness to look at the EXP bars again.
+          </p>
+        </div>
+        <div className="mt-12 grid md:grid-cols-3 gap-6">
+          {[{
+            title: "Mutate Your Class",
+            text: "Start as a harmless Beginner and branch toward something the gods would immediately patch out if they could.",
+          },{
+            title: "AFK With Consequences",
+            text: "Log off in the Cave and come back rich. Or come back and find a mining pick lodged where hope used to be.",
+          },{
+            title: "Portals & Punchlines",
+            text: "Town, Cave, Slime Field—each a lovingly unbalanced stage for leveling, crafting, and poorly timed jumps.",
+          },{
+            title: "Crafting Grind (Refined)",
+            text: "Queue bars and gear: furnace ticks, workbench clinks. Offline fast-forward means time still hurts productively.",
+          },{
+            title: "Account Storage",
+            text: "Drop entire stacks into the abyss we call ‘shared stash’. Atomic, reliable, disappointingly organized.",
+          },{
+            title: "Skills That Escalate",
+            text: "Mining, Crafting and more climbing from ‘meh’ to ‘mildly superhuman’. Numbers go up; standards go down.",
+          }].map(card => (
+            <div key={card.title} className="rounded-xl border border-white/10 bg-black/40 p-6 hover:border-purple-500/60 transition-colors">
+              <h3 className="text-xl font-semibold text-white/90">{card.title}</h3>
+              <p className="mt-2 text-gray-300 text-sm leading-relaxed">{card.text}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Callout */}
-      <section className="mx-auto max-w-6xl px-4 py-16">
-        <div className="rounded-2xl border border-purple-800/40 bg-gradient-to-br from-purple-950/40 to-black p-8 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-wide blood-underline inline-block">Prepare for the Town</h2>
-          <p className="mt-2 text-gray-300">Workbench, Anvil, Furnace, Storage, Task Board, and NPCs—in one cozy, cursed plaza.</p>
-          <div className="mt-6"><BloodLinkButton href="/classes">Explore Classes</BloodLinkButton></div>
+      <section className="mx-auto max-w-6xl px-4 py-12">
+        <div className="rounded-2xl border border-purple-800/40 bg-gradient-to-br from-purple-950/40 to-black p-8 text-center relative overflow-hidden">
+          <div className="absolute -right-10 -top-10 size-40 rounded-full blur-3xl bg-purple-700/10" />
+          <h2 className="text-2xl md:text-3xl font-bold tracking-wide blood-underline inline-block">Town: Your Questionable Sanctuary</h2>
+          <p className="mt-3 text-gray-300 max-w-2xl mx-auto text-sm md:text-base">
+            Craft gear, stash loot, poke the Tutorial NPC (he’s still buffering a name), and decide which portal looks least fatal today.
+            Everything you build here fuels your next ill-advised expedition.
+          </p>
+          <div className="mt-6"><BloodLinkButton href="/classes">View Classes Before They Nerf Themselves</BloodLinkButton></div>
         </div>
       </section>
 
       {/* Events */}
       <section className="mx-auto max-w-6xl px-4 pb-16">
-        <h2 className="text-2xl font-bold blood-underline inline-block">Events</h2>
+        <h2 className="text-2xl font-bold blood-underline inline-block">Events & Unrest</h2>
         <div className="mt-6 grid md:grid-cols-3 gap-4">
           <div className="md:col-span-2"><EventsCarousel /></div>
           <div className="rounded-xl border border-white/10 bg-black/40 p-5">
             <div className="text-xs text-gray-400">Spotlight</div>
             <h3 className="text-lg font-semibold mt-1">Patch Notes</h3>
-            <p className="text-gray-300 text-sm mt-1">Read the latest changes and behind-the-scenes notes.</p>
-            <div className="mt-3"><Link href="/news" className="text-purple-400 hover:text-purple-300 underline">Read News</Link></div>
+            <p className="text-gray-300 text-sm mt-1">Fresh features, accidental balance decisions, and ritual apologies.</p>
+            <div className="mt-3"><Link href="/news" className="text-purple-400 hover:text-purple-300 underline">Witness Updates</Link></div>
           </div>
         </div>
       </section>
@@ -57,7 +81,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 py-10 grid md:grid-cols-3 gap-6 text-sm">
           <div>
             <div className="text-lg font-bold tracking-widest">CHAOS IN FULL</div>
-            <p className="text-gray-400 mt-2">Darkly humorous idle RPG. Built for the web first.</p>
+            <p className="text-gray-400 mt-2">An earnest attempt to automate your obsession. Crafted in TypeScript, seasoned with regret.</p>
           </div>
           <div>
             <div className="font-semibold">Follow</div>
@@ -73,6 +97,7 @@ export default function Home() {
               <input type="email" placeholder="you@domain" className="flex-1 rounded bg-black/40 border border-white/10 px-3 py-2 outline-none focus:border-purple-500" />
               <button className="rounded bg-purple-600 hover:bg-purple-500 px-4">Join</button>
             </form>
+            <p className="mt-2 text-[11px] text-gray-500">No spam. Just ethically questionable design updates.</p>
           </div>
         </div>
       </section>

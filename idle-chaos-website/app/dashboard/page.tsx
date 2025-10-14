@@ -4,6 +4,7 @@ import { prisma } from "@/src/lib/prisma";
 import LogoutButton from "@/src/components/LogoutButton";
 import DeleteCharacterButton from "@/src/components/DeleteCharacterButton";
 import CharacterDashboardCard, { CharacterSummary } from "@/src/components/CharacterDashboardCard";
+import { taglines } from "@/src/data/flavor";
 
 export default async function Dashboard() {
   const session = await getSession();
@@ -17,8 +18,8 @@ export default async function Dashboard() {
   const s = user.stats!;
   return (
     <section className="mx-auto max-w-5xl px-4 py-12">
-      <h1 className="text-3xl font-bold">Welcome, {user.username}</h1>
-      <p className="mt-2 text-gray-400 text-sm">Gold and Premium Gold are shared across your account.</p>
+  <h1 className="text-3xl font-bold">{taglines.dashboardHeader}</h1>
+  <p className="mt-2 text-gray-400 text-sm">{taglines.dashboardSubtitle}</p>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[ 
           ["Gold", s.gold],
@@ -35,7 +36,7 @@ export default async function Dashboard() {
       <div className="mt-10">
         <h2 className="text-2xl font-semibold">Your Characters</h2>
         {characters.length === 0 ? (
-          <p className="mt-2 text-gray-400">No characters yet. Create one on the <a className="underline" href="/play">Play</a> page.</p>
+          <p className="mt-2 text-gray-400">{taglines.charactersEmpty}</p>
         ) : (
           <ul className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {characters.map((c) => (

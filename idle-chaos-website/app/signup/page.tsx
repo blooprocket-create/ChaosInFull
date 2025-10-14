@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { taglines, errors } from "@/src/data/flavor";
 import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
@@ -19,7 +20,12 @@ export default function SignupPage() {
     });
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error || "Signup failed");
+      const serverMsg = (data.error || "").toLowerCase();
+      if (serverMsg.includes("taken") || serverMsg.includes("exists") || serverMsg.includes("duplicate")) {
+        setError(errors.signupTaken);
+      } else {
+        setError(data.error || errors.authGeneric);
+      }
       return;
     }
   window.dispatchEvent(new Event("auth:changed"));
@@ -29,8 +35,8 @@ export default function SignupPage() {
 
   return (
     <section className="mx-auto max-w-md px-4 py-16">
-      <h1 className="text-3xl font-bold">Join the Chaos</h1>
-      <p className="text-gray-400 mt-2">Create your account to begin.</p>
+      <h1 className="text-3xl font-bold">{taglines.signupHeader}</h1>
+      <p className="text-gray-400 mt-2 text-sm">{taglines.signupSubtitle}</p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="Email" type="email" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500" />
         <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder="Username" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500" />

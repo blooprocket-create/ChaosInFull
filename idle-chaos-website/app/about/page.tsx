@@ -7,8 +7,8 @@ export default function AboutPage() {
 
       <header className="mb-8">
         <h1 className="text-3xl font-bold glitch" data-text="About">About</h1>
-        <p className="mt-2 text-gray-300 max-w-3xl">
-          Chaos In Full is a solo passion project: a darkly humorous 2D platformer idle RPG inspired by MapleStory, IdleOn, and RuneScape. The goal is a cozy, cursed world that plays smoothly in a browser and can later ship to stores.
+        <p className="mt-2 text-gray-300 max-w-3xl text-sm md:text-base">
+          Chaos In Full is one stubborn human attempting to weaponize nostalgia. It borrows the dopamine scaffolding of classic MMOs and stitches it to an idle loop that keeps progressing while you pretend you’ve moved on. Cute zones, questionable NPC advice, and numbers that climb politely until they suddenly don’t.
         </p>
       </header>
 
@@ -16,39 +16,40 @@ export default function AboutPage() {
         <div className="rounded-xl border border-white/10 bg-gradient-to-br from-purple-900/20 to-black p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-1" style={{ boxShadow:"0 10px 30px rgba(0,0,0,0.3)" }}>
           <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-white/5" />
           <h3 className="font-semibold blood-underline inline-block">Vision</h3>
-          <p className="text-gray-300 text-sm mt-2">A living website and idle game that feels haunted but welcoming—animated, reactive, and always hinting at something lurking just off-screen.</p>
+          <p className="text-gray-300 text-sm mt-2">A living browser-native RPG that behaves like a haunted productivity app: lightweight, reactive, and mildly concerned about how long you’ve been mining copper.</p>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-gradient-to-br from-red-900/20 to-black p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-1" style={{ boxShadow:"0 10px 30px rgba(0,0,0,0.3)" }}>
           <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-white/5" />
           <h3 className="font-semibold blood-underline inline-block">Gameplay</h3>
-          <p className="text-gray-300 text-sm mt-2">2D platforming with idle progression. Explore zones, craft, and build classes that branch into eccentric specialties. Minimal grind, maximal vibes.</p>
+          <p className="text-gray-300 text-sm mt-2">Platform, craft, wander off. Return to neatly counted gains and an EXP bar that progressed without asking how your day went. Branch classes into increasingly unhinged specializations.</p>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-gradient-to-br from-emerald-900/20 to-black p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-1" style={{ boxShadow:"0 10px 30px rgba(0,0,0,0.3)" }}>
           <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-white/5" />
           <h3 className="font-semibold blood-underline inline-block">Roadmap</h3>
           <ul className="mt-2 text-gray-300 text-sm list-disc pl-5 space-y-1">
-            <li>Playable Town and basic combat loop</li>
-            <li>Account stats sync to site dashboard</li>
-            <li>World zones, events, and class advancements</li>
+            <li>Town polish + tutorial NPC finally learns a name</li>
+            <li>Combat loop graduates from polite taps to expressive overkill</li>
+            <li>More zones with resource guilt and seasonal map anomalies</li>
+            <li>Class advancement trees that look like tax evasion flowcharts</li>
           </ul>
         </div>
       </div>
 
       <div className="mt-10 grid md:grid-cols-2 gap-5">
         <div className="rounded-xl border border-white/10 bg-black/40 p-6">
-          <h2 className="text-xl font-semibold blood-underline inline-block">Tech Stack</h2>
+          <h2 className="text-xl font-semibold blood-underline inline-block">Tech Stack (Why It Loads Fast)</h2>
           <ul className="mt-3 text-gray-300 text-sm list-disc pl-5 space-y-1">
-            <li>Next.js 15 (App Router) + TypeScript + Tailwind</li>
-            <li>Prisma ORM (SQLite dev, Postgres prod)</li>
-            <li>Auth with bcrypt + JWT (jose), httpOnly cookie session</li>
-            <li>Phaser for the playable Town under <span className="text-white/90">/play</span></li>
+            <li>Next.js 15 + TypeScript + Tailwind: readable, themable, occasionally refactored at 2am</li>
+            <li>Prisma ORM: schema first, fewer “why is this null” moments</li>
+            <li>JWT cookie auth: secure enough not to embarrass us publicly</li>
+            <li>Phaser: the stage where gravity therapy happens under <span className="text-white/90">/play</span></li>
           </ul>
         </div>
         <div className="rounded-xl border border-white/10 bg-black/40 p-6">
           <h2 className="text-xl font-semibold blood-underline inline-block">Credits</h2>
-          <p className="text-gray-300 text-sm mt-2">Built by one very stubborn human. Thanks to the communities behind Next.js, Tailwind, Prisma, and Phaser for the tools that make this possible.</p>
+          <p className="text-gray-300 text-sm mt-2">Made by a solo dev mainlining patch notes. Thanks to open source maintainers for the tools—and for not breaking everything this week.</p>
         </div>
       </div>
     </section>

@@ -20,7 +20,7 @@ export const zones: ZoneDefinition[] = [
   {
     key: "town",
     name: "Town",
-    description: "Central refuge: crafting, storage, tutorial guidance.",
+  description: "Central refuge: crafting, storage, tutorial guidance, mild existential onboarding.",
     features: ["Workbench", "Furnace", "Account Storage", "Tutorial NPC (name TBD)", "Portals to Cave & Slime Field (when unlocked)"],
     mobs: [],
     resources: [],
@@ -29,7 +29,7 @@ export const zones: ZoneDefinition[] = [
   {
     key: "cave",
     name: "Cave",
-    description: "Ore-rich darkness. Echoes carry more than sound.",
+  description: "Ore-rich darkness. Echoes occasionally file complaints about ergonomics.",
     features: ["Passive mining (AFK)", "Copper Node", "Tin Node"],
     mobs: [],
     resources: ["Copper Ore", "Tin Ore"],
@@ -38,7 +38,7 @@ export const zones: ZoneDefinition[] = [
   {
     key: "slime",
     name: "Slime Field",
-    description: "Viscous clearing of low-tier monsters.",
+  description: "Viscous clearing where low-tier monsters debate unionizing and still get farmed.",
     features: ["Intro combat area"],
     mobs: [{ name: "Green Slime", hp: null, damage: null, spawnRatePerMin: null, maxConcurrent: null }],
     resources: [],
