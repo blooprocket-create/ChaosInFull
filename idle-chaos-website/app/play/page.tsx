@@ -6,7 +6,7 @@ import { prisma } from "@/src/lib/prisma";
 
 export const metadata = { title: "Play • Chaos In Full" };
 export const dynamic = "force-dynamic";
-type CharacterLite = { id: string; userId: string; name: string; class: string; level: number };
+type CharacterLite = { id: string; userId: string; name: string; class: string; level: number; exp?: number; miningExp?: number };
 
 
 export default async function PlayPage({ searchParams }: { searchParams: Promise<{ ch?: string }> }) {
@@ -14,13 +14,13 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
   if (!session) redirect("/login");
   const sp = await searchParams;
   const ch = sp?.ch;
-  let character: (CharacterLite & { seenWelcome?: boolean }) | null = null;
+  let character: (CharacterLite & { seenWelcome?: boolean; lastScene?: string; lastSeenAt?: string }) | null = null;
   if (ch) {
     const client = prisma as unknown as {
       character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
     };
     const found = await client.character.findFirst({ where: { id: ch, userId: session.userId } });
-    character = (found as CharacterLite & { seenWelcome?: boolean }) ?? null;
+    character = (found as CharacterLite & { seenWelcome?: boolean; lastScene?: string; lastSeenAt?: string }) ?? null;
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-12">
@@ -42,7 +42,14 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
             <>
               <p className="mt-2 text-gray-300">Entering as <span className="text-white/90">{character.name}</span> • {character.class} • Lv {character.level}</p>
               <div className="mt-6">
-                <GameCanvasClient character={{ id: character.id, name: character.name, class: character.class, level: character.level }} initialSeenWelcome={Boolean(character.seenWelcome)} />
+                <GameCanvasClient
+                  character={{ id: character.id, name: character.name, class: character.class, level: character.level }}
+                  initialSeenWelcome={Boolean(character.seenWelcome)}
+                  initialScene={(character.lastScene as string) || "Town"}
+                  offlineSince={character.lastSeenAt ? new Date(character.lastSeenAt).toISOString() : undefined}
+                  initialExp={character.exp ?? 0}
+                  initialMiningExp={character.miningExp ?? 0}
+                />
               </div>
             </>
           )}

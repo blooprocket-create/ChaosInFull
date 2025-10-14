@@ -152,7 +152,7 @@ class TownScene extends Phaser.Scene {
     if (this.cursors.W.isDown && onFloor) {
       this.player.setVelocityY(-420);
     }
-    // Portal checks
+  // Portal checks
     const dist = (a: Phaser.GameObjects.Image, b: Phaser.GameObjects.Image | Phaser.Physics.Arcade.Image) => Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
     const nearCave = dist(this.player, this.cavePortal) < 60;
     const nearSlime = dist(this.player, this.slimePortal) < 60;
@@ -164,9 +164,12 @@ class TownScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
+        // hint react layer to save scene now
+        (window as any).__saveSceneNow?.();
         this.scene.start("CaveScene");
       } else if (nearSlime && tutorialStarted) {
         this.game.registry.set("spawn", { from: "slime", portal: "town" });
+        (window as any).__saveSceneNow?.();
         this.scene.start("SlimeFieldScene");
       }
     }
@@ -227,8 +230,24 @@ class CaveScene extends Phaser.Scene {
   this.add.text(this.copperNode.x, this.copperNode.y - 24, "Copper", { color: "#fbbf24", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.tinNode.x, this.tinNode.y - 24, "Tin", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5);
   // AFK mining timers (proximity-gated)
-  this.time.addEvent({ delay: 2500, loop: true, callback: () => { if (this.isNearNode(this.copperNode)) { this.copperCount += 1; this.miningFx(this.copperNode); this.updateHUD(); } } });
-  this.time.addEvent({ delay: 3500, loop: true, callback: () => { if (this.isNearNode(this.tinNode)) { this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD(); } } });
+  this.time.addEvent({ delay: 2500, loop: true, callback: () => {
+    if (this.isNearNode(this.copperNode)) {
+      this.copperCount += 1; this.miningFx(this.copperNode); this.updateHUD();
+      // Increment mining EXP and character EXP modestly
+      fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 1, exp: 1 }) }).catch(() => {});
+      // Notify React HUD if available
+      (window as any).__incExp?.("mining", 1);
+      (window as any).__incExp?.("character", 1);
+    }
+  } });
+  this.time.addEvent({ delay: 3500, loop: true, callback: () => {
+    if (this.isNearNode(this.tinNode)) {
+      this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD();
+      fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 1, exp: 1 }) }).catch(() => {});
+      (window as any).__incExp?.("mining", 1);
+      (window as any).__incExp?.("character", 1);
+    }
+  } });
     // HUD
   this.hudText = this.add.text(12, 12, "", { color: "#e5e7eb", fontSize: "12px" }).setScrollFactor(0);
     this.updateHUD();
@@ -287,6 +306,7 @@ class CaveScene extends Phaser.Scene {
     // Exit to Town
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "cave", portal: "town" });
+      (window as any).__saveSceneNow?.();
       this.scene.start("TownScene");
     }
   }
@@ -346,6 +366,7 @@ class SlimeFieldScene extends Phaser.Scene {
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
+      (window as any).__saveSceneNow?.();
       this.scene.start("TownScene");
     }
   }
@@ -358,13 +379,14 @@ type CharacterHUD = {
   level: number;
 };
 
-export default function GameCanvas({ character, initialSeenWelcome }: { character?: CharacterHUD; initialSeenWelcome?: boolean }) {
+export default function GameCanvas({ character, initialSeenWelcome, initialScene, offlineSince, initialExp, initialMiningExp }: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const [welcomeSeen, setWelcomeSeen] = useState<boolean>(!!initialSeenWelcome);
   const [welcomeError, setWelcomeError] = useState<string | null>(null);
   const [openInventory, setOpenInventory] = useState(false);
   const [inventory, setInventory] = useState<Record<string, number>>({});
+  const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: 100 });
 
   useEffect(() => {
     if (!ref.current) return;
@@ -380,8 +402,26 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
     gameRef.current = new Phaser.Game(config);
     // Seed registry flags (e.g., tutorial gate) if needed; default false
     gameRef.current.registry.set("tutorialStarted", false);
-  gameRef.current.registry.set("spawn", { from: "initial", portal: null });
+    gameRef.current.registry.set("spawn", { from: "initial", portal: null });
   gameRef.current.registry.set("inventory", {} as Record<string, number>);
+    if (character) gameRef.current.registry.set("characterId", character.id);
+    // Start initial scene
+    const startScene = (initialScene || "Town") as string;
+    if (startScene !== "Town") {
+      // switch scenes after boot
+      setTimeout(() => gameRef.current?.scene.start(`${startScene}Scene` as string), 0);
+    }
+
+    // Load initial inventory from server
+    if (character) {
+      fetch(`/api/account/characters/inventory?characterId=${character.id}`)
+        .then((res) => res.ok ? res.json() : Promise.reject())
+        .then((data) => {
+          const items = (data?.items as Record<string, number>) || {};
+          gameRef.current?.registry.set("inventory", items);
+        })
+        .catch(() => {});
+    }
 
     // Prevent page scroll on Space when game is focused
     const el = ref.current;
@@ -390,7 +430,22 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
         e.preventDefault();
       }
     };
+    const onWindowKeydown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+      }
+      if (e.key === "i" || e.key === "I") {
+        // don't toggle when typing in inputs
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName?.toLowerCase();
+        if (tag !== "input" && tag !== "textarea") {
+          e.preventDefault();
+          setOpenInventory((v) => !v);
+        }
+      }
+    };
     el.addEventListener("keydown", onKeydown);
+    window.addEventListener("keydown", onWindowKeydown, { passive: false });
     el.tabIndex = 0; // make container focusable
     el.focus({ preventScroll: true });
 
@@ -404,10 +459,83 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
     return () => {
       window.removeEventListener("resize", onResize);
       el.removeEventListener("keydown", onKeydown);
+      window.removeEventListener("keydown", onWindowKeydown as EventListener);
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
+  }, [initialScene]);
+
+  // Expose helpers to scenes via window
+  useEffect(() => {
+    // @ts-ignore
+    (window as any).__saveSceneNow = saveSceneNow;
+    // @ts-ignore
+    (window as any).__incExp = (type: "character" | "mining", amt: number) => {
+      setExpHud((hud) => {
+        if (hud.label === "Mining EXP" && type === "mining") return { ...hud, value: hud.value + amt };
+        if (hud.label === "Character EXP" && type === "character") return { ...hud, value: hud.value + amt };
+        return hud;
+      });
+    };
+    return () => {
+      // @ts-ignore
+      delete (window as any).__saveSceneNow;
+      // @ts-ignore
+      delete (window as any).__incExp;
+    };
   }, []);
+
+  // Persist scene on page hide/unload
+  useEffect(() => {
+    const save = async () => {
+      const game = gameRef.current; if (!game || !character) return;
+      // Determine scene
+      const scenes = game.scene.getScenes(true);
+      const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
+      try {
+        await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) });
+        const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+        await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) });
+      } catch {}
+    };
+    const onHide = () => { save(); };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("beforeunload", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("beforeunload", onHide);
+    };
+  }, [character]);
+
+  // Show offline yield if returning from Cave
+  useEffect(() => {
+    if (!offlineSince) return;
+    if ((initialScene || "Town").toLowerCase() !== "cave") return;
+    const since = new Date(offlineSince).getTime();
+    const now = Date.now();
+    const seconds = Math.max(0, Math.floor((now - since) / 1000));
+    // Simple offline mining estimate if last scene was Cave
+    // 1 copper per 2.5s, 1 tin per 3.5s (approx), clamped minimal
+    const copper = Math.floor(seconds / 2.5);
+    const tin = Math.floor(seconds / 3.5);
+    if (copper > 0 || tin > 0) {
+      // credit to inventory and show a toast
+      const game = gameRef.current; if (game) {
+        const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+        if (copper > 0) inv.copper = (inv.copper ?? 0) + copper;
+        if (tin > 0) inv.tin = (inv.tin ?? 0) + tin;
+        game.registry.set("inventory", inv);
+      }
+      // Temporary toast using alert-like div
+      const div = document.createElement("div");
+      div.textContent = `While away: +${copper} Copper, +${tin} Tin`;
+      div.className = "fixed left-1/2 top-6 z-[200] -translate-x-1/2 rounded bg-black/80 px-3 py-2 text-xs text-gray-100 ring-1 ring-white/10";
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 2800);
+    }
+  }, [offlineSince]);
 
   // Poll inventory from Phaser registry into React UI
   useEffect(() => {
@@ -416,9 +544,28 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
       if (!game) return;
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       setInventory({ ...inv });
+      // Also update contextual EXP HUD based on active scene
+      const scenes = game.scene.getScenes(true);
+      const active = scenes.length ? scenes[0].scene.key : "TownScene";
+      if (active === "CaveScene") {
+        setExpHud((hud) => ({ label: "Mining EXP", value: hud.label === "Mining EXP" ? hud.value : (initialMiningExp ?? 0), max: 100 }));
+      } else {
+        setExpHud((hud) => ({ label: "Character EXP", value: hud.label === "Character EXP" ? hud.value : (initialExp ?? 0), max: 100 }));
+      }
     }, 800);
     return () => clearInterval(t);
   }, []);
+
+  // Periodically persist inventory while playing
+  useEffect(() => {
+    if (!character) return;
+    const t = setInterval(() => {
+      const game = gameRef.current; if (!game) return;
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+    }, 7000);
+    return () => clearInterval(t);
+  }, [character]);
 
   // UI overlays: Welcome modal + HUD buttons
   const markWelcomeSeen = async () => {
@@ -437,12 +584,51 @@ export default function GameCanvas({ character, initialSeenWelcome }: { characte
     }
   };
 
+  // Helper: immediate save of current scene to server
+  const saveSceneNow = async () => {
+    const game = gameRef.current; if (!game || !character) return;
+    const scenes = game.scene.getScenes(true);
+    const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
+    try {
+      await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) });
+    } catch {}
+  };
+
+  // Monkey-patch scene transitions to call save immediately after change
+  useEffect(() => {
+    const game = gameRef.current; if (!game || !character) return;
+    const origStart = game.scene.start.bind(game.scene);
+    const patched = (key: string, data?: any) => {
+      const res = origStart(key, data);
+      // Save target scene name immediately
+      const sceneName = (key || "TownScene").replace("Scene", "");
+      fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: sceneName }) }).catch(() => {});
+      return res;
+    };
+    // @ts-ignore
+    game.scene.start = patched;
+    return () => {
+      // @ts-ignore
+      if (game.scene.start === patched) game.scene.start = origStart;
+    };
+  }, [character]);
+
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
       {character ? (
         <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/40 px-3 py-2 text-xs text-gray-200 shadow-lg ring-1 ring-white/10">
           <div className="font-semibold text-white/90">{character.name}</div>
           <div className="opacity-80">{character.class} • Lv {character.level}</div>
+          {/* Contextual EXP bar */}
+          <div className="mt-2 w-56">
+            <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
+              <span>{expHud.label}</span>
+              <span>{expHud.value} / {expHud.max}</span>
+            </div>
+            <div className="h-2 w-full rounded bg-white/10">
+              <div className="h-2 rounded bg-violet-500" style={{ width: `${Math.min(100, (expHud.value / expHud.max) * 100)}%` }} />
+            </div>
+          </div>
         </div>
       ) : null}
       {/* HUD Buttons */}
