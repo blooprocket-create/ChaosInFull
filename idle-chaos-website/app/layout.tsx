@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Cinzel, Roboto_Mono } from "next/font/google";
 import { getSession } from "@/src/lib/auth";
 import ProfileMenu from "@/src/components/ProfileMenu";
+import AudioToggle from "@/src/components/AudioToggle";
+import PlayBubble from "@/src/components/PlayBubble";
 import CursorAura from "@/src/components/CursorAura";
 import BloodLinkButton from "@/src/components/BloodLinkButton";
 import "./globals.css";
@@ -60,10 +62,11 @@ export default async function RootLayout({
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold tracking-widest">CHAOS IN FULL</Link>
             <div className="flex gap-6 text-sm items-center">
-              <Link href="/news" className="hover:text-white">News</Link>
-              <Link href="/classes" className="hover:text-white">Classes</Link>
-              <Link href="/world" className="hover:text-white">World</Link>
-              <Link href="/about" className="hover:text-white">About</Link>
+              <Link href="/news" className="hover:text-white nav-underline">News</Link>
+              <Link href="/classes" className="hover:text-white nav-underline">Classes</Link>
+              <Link href="/world" className="hover:text-white nav-underline">World</Link>
+              <Link href="/about" className="hover:text-white nav-underline">About</Link>
+              <div className="hidden sm:block"><AudioToggle /></div>
               {isAuthed ? (
                 <div className="flex items-center gap-4">
                   <div className="hidden sm:block"><BloodLinkButton href="/play">Play Now</BloodLinkButton></div>
@@ -79,7 +82,8 @@ export default async function RootLayout({
             </div>
           </nav>
         </header>
-        <main className="min-h-[calc(100vh-64px)]">{children}</main>
+  <main className="min-h-[calc(100vh-64px)]">{children}</main>
+  {isAuthed ? <PlayBubble /> : null}
         <footer className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
           © {new Date().getFullYear()} Chaos In Full
         </footer>
