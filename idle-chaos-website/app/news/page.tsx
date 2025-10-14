@@ -5,6 +5,7 @@ export default function NewsPage() {
     { title: "Website MVP is live", date: "2025-10-14", excerpt: "Create accounts, sign in, and view stats. Game client coming soon." },
     { title: "Town zone planning", date: "2025-10-15", excerpt: "Workbench, Anvil, Furnace, Storage, Task Board, and tutorial NPC flows." },
   ];
+  const { patchNotes } = require("@/src/data/patchNotes");
   return (
     <section className="relative mx-auto max-w-5xl px-4 py-12">
       {/* ambience */}
@@ -23,6 +24,34 @@ export default function NewsPage() {
             <p className="text-gray-300">{p.excerpt}</p>
           </article>
         ))}
+      </div>
+
+      <div className="mt-12">
+        <h2 className="text-2xl font-semibold glitch" data-text="Patch Notes">Patch Notes</h2>
+        <p className="mt-2 text-sm text-gray-400">Recent development milestones and gameplay feature additions.</p>
+        <div className="mt-6 space-y-6">
+          {patchNotes.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((pn: any) => (
+            <div key={pn.version} className="rounded-lg border border-white/10 bg-black/35 p-5 relative overflow-hidden">
+              <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-violet-500/10" />
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs font-mono tracking-wide rounded bg-violet-600/20 px-2 py-1 text-violet-300 border border-violet-500/30">v{pn.version}</span>
+                <span className="text-xs text-gray-400">{pn.date}</span>
+                <span className="text-sm font-semibold text-white/90">{pn.title}</span>
+              </div>
+              <ul className="mt-3 list-disc pl-5 text-sm text-gray-200 space-y-1">
+                {pn.highlights.map((h: string) => <li key={h}>{h}</li>)}
+              </ul>
+              {pn.notes && (
+                <details className="mt-3 text-xs text-gray-300">
+                  <summary className="cursor-pointer text-gray-400 hover:text-gray-200">More details</summary>
+                  <ul className="mt-2 list-disc pl-5 space-y-1">
+                    {pn.notes.map((n: string) => <li key={n}>{n}</li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

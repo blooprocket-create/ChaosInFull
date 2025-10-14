@@ -3,21 +3,18 @@ import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 import LogoutButton from "@/src/components/LogoutButton";
 import DeleteCharacterButton from "@/src/components/DeleteCharacterButton";
+import CharacterDashboardCard, { CharacterSummary } from "@/src/components/CharacterDashboardCard";
 
 export default async function Dashboard() {
   const session = await getSession();
   if (!session) redirect("/login");
-  const client = prisma as unknown as {
-    character: { findMany: (args: { where: { userId: string }; orderBy?: { createdAt: "asc" | "desc" } }) => Promise<unknown[]> };
-  };
-  const [user, chars] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.userId }, include: { stats: true } }),
-    client.character.findMany({ where: { userId: session.userId }, orderBy: { createdAt: "asc" } }),
-  ]);
+  const user = await prisma.user.findUnique({ where: { id: session.userId }, include: { stats: true } });
   if (!user) redirect("/login");
+  // Fetch characters via direct prisma (defensive cast) including skill levels & scene fields
+  const charsRaw = await (prisma as unknown as { character: { findMany: (args: { where: { userId: string }; orderBy: { createdAt: "asc" | "desc" } }) => Promise<Array<{ id: string; name: string; class: string; level: number; miningLevel: number; woodcuttingLevel: number; craftingLevel: number; fishingLevel: number; lastScene: string; lastSeenAt: Date }> > } }).character.findMany({ where: { userId: session.userId }, orderBy: { createdAt: "asc" } });
+  const now = Date.now();
+  const characters: CharacterSummary[] = charsRaw.map(c => ({ ...c, afkMs: Math.max(0, now - new Date(c.lastSeenAt).getTime()) }));
   const s = user.stats!;
-  type CharLite = { id: string; name: string; class: string; level: number; gender?: string; hat?: string };
-  const characters = (chars as unknown as CharLite[]) ?? [];
   return (
     <section className="mx-auto max-w-5xl px-4 py-12">
       <h1 className="text-3xl font-bold">Welcome, {user.username}</h1>
@@ -41,19 +38,9 @@ export default async function Dashboard() {
           <p className="mt-2 text-gray-400">No characters yet. Create one on the <a className="underline" href="/play">Play</a> page.</p>
         ) : (
           <ul className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {characters.map((c: CharLite) => (
-              <li key={c.id} className="rounded border border-white/10 bg-black/40 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-semibold text-white/90">{c.name}</div>
-                    <div className="text-sm text-gray-400">{c.class} • Lv {c.level}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <a href={`/play?ch=${c.id}`} className="btn inline-flex items-center px-3 py-1">Play</a>
-                    <DeleteCharacterButton id={c.id} name={c.name} />
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-gray-400">Gender: {String((c as { gender?: string }).gender)} • Hat: {String((c as { hat?: string }).hat)}</div>
+            {characters.map((c) => (
+              <li key={c.id}>
+                <CharacterDashboardCard c={c} />
               </li>
             ))}
           </ul>
