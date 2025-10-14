@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
+import DeleteAccountClient from "@/src/components/DeleteAccountClient";
 
 export const metadata = { title: "Account Settings • Chaos In Full" };
 
@@ -31,72 +32,8 @@ export default async function AccountPage() {
       <div className="mt-12 rounded-lg border border-red-500/30 bg-red-500/5 p-5">
         <h2 className="text-xl font-semibold text-red-300">Delete Account</h2>
         <p className="text-sm text-red-200/80 mt-1">This permanently deletes your user, characters, items, storage, and stats. There is no undo.</p>
-        <form className="mt-4 grid gap-3" id="delete-form" data-delete>
-          <input name="username" placeholder="Confirm your username" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-red-500" />
-          <input name="password" type="password" placeholder="Confirm your password" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-red-500" />
-          <div className="flex items-center gap-2 text-sm">
-            <span id="captcha-q" className="text-red-200"/>
-          </div>
-          <input name="captcha" placeholder="Answer" className="w-40 rounded bg-black/40 border border-white/10 px-3 py-2 outline-none focus:border-red-500" />
-          <button className="btn border-red-500/50 hover:border-red-500 text-red-200">Delete my account</button>
-        </form>
+        <DeleteAccountClient />
       </div>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-          document.querySelectorAll('form[data-enhance]').forEach(form => {
-            form.addEventListener('submit', async (e) => {
-              e.preventDefault();
-              const btn = form.querySelector('button');
-              btn?.setAttribute('disabled','');
-              try {
-                const res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Request failed');
-                window.dispatchEvent(new Event('auth:changed'));
-                alert(data.message || 'Saved');
-              } catch (err) {
-                alert(err.message || 'Something went wrong');
-              } finally {
-                btn?.removeAttribute('disabled');
-              }
-            })
-          })
-          // Delete account handler with simple captcha
-          const df = document.querySelector('#delete-form');
-          if (df) {
-            const qEl = document.querySelector('#captcha-q');
-            const a = Math.floor(Math.random()*9)+1, b = Math.floor(Math.random()*9)+1;
-            qEl && (qEl.textContent = 'Captcha: What is ' + a + ' + ' + b + '?');
-            const expected = a + b;
-            df.addEventListener('submit', async (e) => {
-              e.preventDefault();
-              const btn = df.querySelector('button');
-              btn?.setAttribute('disabled','');
-              try {
-                const fd = new FormData(df);
-                const body = {
-                  username: fd.get('username'),
-                  password: fd.get('password'),
-                  captcha: String(fd.get('captcha')||'').trim(),
-                  expected: expected.toString(),
-                };
-                const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Request failed');
-                alert('Account deleted. Bye forever.');
-                window.location.href = '/';
-              } catch (err) {
-                alert((err && err.message) ? err.message : 'Could not delete account');
-              } finally {
-                btn?.removeAttribute('disabled');
-              }
-            });
-          }
-        `,
-        }}
-      />
     </section>
   );
 }

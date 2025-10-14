@@ -8,6 +8,24 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-10-14",
+    version: "0.0.7",
+    title: "Town Shop, Sawmill, and Account Controls",
+    highlights: [
+      "Shop is now a Town interactable on the upper platform (not a HUD button)",
+      "Sawmill crafting: Logs → Planks and Oak Logs → Oak Planks with offline fast-forward",
+      "Delete Account flow (username + password + captcha) with full cascade delete",
+      "Classes page polish: keyboard navigation and animated panels",
+      "Tutorial NPC finally has a name: Grimsley",
+    ],
+    notes: [
+      "Shop modal opens when you press E near the stall",
+      "Sawmill awards crafting EXP per output and resumes after reload",
+      "Storage and inventory reconciliation guard while queues run",
+      "Minor UI smoothing on Cards and modals",
+    ],
+  },
+  {
     date: "2025-10-10",
     version: "0.0.1",
     title: "Initial Backend & Auth",
