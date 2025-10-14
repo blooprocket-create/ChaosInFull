@@ -26,6 +26,7 @@ model PlayerStat {
   class     String   @default("Beginner")
   exp       Int      @default(0)
   gold      Int      @default(0)
+  premiumGold Int    @default(0)
   hp        Int      @default(100)
   mp        Int      @default(50)
   strength  Int      @default(1)

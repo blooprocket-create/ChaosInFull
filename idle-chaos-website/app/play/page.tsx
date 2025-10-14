@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
-import GameCanvas from "@/src/game/GameCanvas";
+import GameCanvasClient from "@/src/game/GameCanvasClient";
 import CharacterSelect from "@/src/components/CharacterSelect";
 import { prisma } from "@/src/lib/prisma";
 
 export const metadata = { title: "Play • Chaos In Full" };
 export const dynamic = "force-dynamic";
 type CharacterLite = { id: string; userId: string; name: string; class: string; level: number };
+
 
 export default async function PlayPage({ searchParams }: { searchParams: Promise<{ ch?: string }> }) {
   const session = await getSession();
@@ -41,7 +42,7 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
             <>
               <p className="mt-2 text-gray-300">Entering as <span className="text-white/90">{character.name}</span> • {character.class} • Lv {character.level}</p>
               <div className="mt-6">
-                <GameCanvas character={{ id: character.id, name: character.name, class: character.class, level: character.level }} />
+                <GameCanvasClient character={{ id: character.id, name: character.name, class: character.class, level: character.level }} />
               </div>
             </>
           )}
