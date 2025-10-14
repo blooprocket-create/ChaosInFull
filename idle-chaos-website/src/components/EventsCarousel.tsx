@@ -29,7 +29,8 @@ function formatCountdown(iso: string) {
 
 export default function EventsCarousel() {
   const [i, setI] = useState(0);
-  const tick = useTicker(1000);
+  // Trigger a re-render every second so the countdown stays live
+  useTicker(1000);
   const ev = useMemo(() => EVENTS[i], [i]);
 
   useEffect(() => { const t = setInterval(() => setI((v)=>(v+1)%EVENTS.length), 6000); return () => clearInterval(t); }, []);

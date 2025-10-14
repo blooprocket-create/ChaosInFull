@@ -6,8 +6,14 @@ class TownScene extends Phaser.Scene {
   constructor() { super("TownScene"); }
   preload() {}
   create() {
+    type ParticleManagerLike = {
+      createEmitter: (
+        config: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig
+      ) => Phaser.GameObjects.Particles.ParticleEmitter;
+    };
+
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
-    const text = this.add.text(center.x, 40, "Town (Placeholder)", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
+    this.add.text(center.x, 40, "Town (Placeholder)", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
     const ground = this.add.rectangle(center.x, this.scale.height - 40, this.scale.width * 0.9, 12, 0x3b0764).setOrigin(0.5, 0.5);
     ground.setStrokeStyle(1, 0xffffff, 0.2);
     // Ambient particles: generate a tiny dot texture
@@ -16,8 +22,8 @@ class TownScene extends Phaser.Scene {
     g.fillCircle(2, 2, 2);
     g.generateTexture("dot", 4, 4);
     g.destroy();
-  const particles = (this.add.particles as any)("dot");
-  const emitter = (particles.createEmitter as any)({
+    const particles = this.add.particles(0, 0, "dot") as unknown as ParticleManagerLike;
+    const emitter = particles.createEmitter({
       x: { min: 0, max: this.scale.width },
       y: { min: 0, max: this.scale.height },
       alpha: { start: 0.15, end: 0 },
@@ -27,11 +33,13 @@ class TownScene extends Phaser.Scene {
       lifespan: 4000,
       quantity: 1,
       frequency: 120,
-      tint: 0xbe18ff,
       blendMode: "ADD",
-    });
+    } as Phaser.Types.GameObjects.Particles.ParticleEmitterConfig);
+    (emitter as Phaser.GameObjects.Particles.ParticleEmitter).setParticleTint(0xbe18ff);
     this.time.addEvent({ delay: 10000, loop: true, callback: () => {
-      (emitter as any)?.setTint(Math.random() > 0.5 ? 0xbe18ff : 0xef4444);
+      (emitter as Phaser.GameObjects.Particles.ParticleEmitter).setParticleTint(
+        Math.random() > 0.5 ? 0xbe18ff : 0xef4444
+      );
     } });
   }
 }

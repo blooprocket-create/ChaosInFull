@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
-import dynamic from "next/dynamic";
-const GameCanvas = dynamic(() => import("@/src/game/GameCanvas"), { ssr: false });
+import GameCanvas from "@/src/game/GameCanvas";
 
 export const metadata = { title: "Play • Chaos In Full" };
 export default async function PlayPage() {
