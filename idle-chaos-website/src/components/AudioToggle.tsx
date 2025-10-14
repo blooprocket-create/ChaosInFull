@@ -9,20 +9,32 @@ function createToneCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = new AC();
   const gain = ctx.createGain();
-  gain.gain.value = 0.06;
+  gain.gain.value = 0.1; // slightly louder so it's audible
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 1200; // soften highs
+  lp.connect(gain);
   gain.connect(ctx.destination);
+  // Base tone + slight detune for beating
   const osc = ctx.createOscillator();
   osc.type = "sine";
   osc.frequency.value = 138; // eerie base tone
+  const osc2 = ctx.createOscillator();
+  osc2.type = "sine";
+  osc2.frequency.value = 136; // slight beat frequency
+  // Slow LFO for subtle movement
   const lfo = ctx.createOscillator();
   lfo.type = "sine";
-  lfo.frequency.value = 0.09;
+  lfo.frequency.value = 0.1;
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 18;
+  lfoGain.gain.value = 20;
   lfo.connect(lfoGain);
   lfoGain.connect(osc.frequency);
-  osc.connect(gain);
+  lfoGain.connect(osc2.frequency);
+  osc.connect(lp);
+  osc2.connect(lp);
   osc.start();
+  osc2.start();
   lfo.start();
   return { ctx, gain };
 }
@@ -39,7 +51,11 @@ export default function AudioToggle() {
   useEffect(() => {
     if (on) {
       if (!audioRef.current) audioRef.current = createToneCtx();
-      audioRef.current.gain.gain.setTargetAtTime(0.06, audioRef.current.ctx.currentTime, 0.3);
+      // Ensure audio context is running (required in some browsers)
+      if (audioRef.current.ctx.state !== "running") {
+        void audioRef.current.ctx.resume();
+      }
+      audioRef.current.gain.gain.setTargetAtTime(0.1, audioRef.current.ctx.currentTime, 0.25);
       localStorage.setItem("cif_audio_on", "1");
     } else if (audioRef.current) {
       audioRef.current.gain.gain.setTargetAtTime(0.0, audioRef.current.ctx.currentTime, 0.2);

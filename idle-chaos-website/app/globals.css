@@ -131,6 +131,7 @@ body { background: var(--background); color: var(--foreground); }
 
 /* Floating CTA */
 @keyframes float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(-2deg) } 50% { transform: translateY(-4px) rotate(2deg) } }
 
 /* Nav underline hover */
 .nav-underline { position: relative; }

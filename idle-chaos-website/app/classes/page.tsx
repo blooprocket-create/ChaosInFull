@@ -21,6 +21,8 @@ export default function ClassesPage() {
                className={`group rounded-xl border border-white/10 bg-gradient-to-br ${c.color} to-black p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-1`}
                style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.3)" }}>
             <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-white/5 group-hover:bg-white/10 transition-colors" />
+            {/* bobbing icon */}
+            <div className="absolute right-3 top-3 size-6 rounded-full bg-white/10 border border-white/20 animate-[bob_2.2s_ease-in-out_infinite]" />
             <h3 className="font-semibold blood-underline inline-block">{c.name}</h3>
             <p className="text-gray-300 text-sm mt-1">{c.blurb}</p>
             <div className="absolute left-0 right-0 bottom-0 h-1 bg-white/5">
