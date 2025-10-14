@@ -42,18 +42,6 @@ export default async function RootLayout({
               </feDisplacementMap>
             </filter>
             <defs>
-              {/* CodePen-style goo filter for CSS-driven drops */}
-              <filter id="goo">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-                <feColorMatrix in="blur" mode="matrix" values="6 7 0 8 8  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-                <feBlend in="SourceGraphic" in2="goo" />
-              </filter>
-              {/* Gooey filter for realistic liquid merging */}
-              <filter id="gooey">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-                <feBlend in="SourceGraphic" in2="goo" />
-              </filter>
               <linearGradient id="fogGrad" x1="0" x2="1">
                 <stop offset="0%" stopColor="rgba(255,255,255,0.12)">
                   <animate attributeName="offset" dur="25s" values="0%;20%;0%" repeatCount="indefinite" />
@@ -80,7 +68,7 @@ export default async function RootLayout({
               <div className="hidden sm:block"><AudioToggle /></div>
               {isAuthed ? (
                 <div className="flex items-center gap-4">
-                  <div className="hidden sm:block"><BloodLinkButton href="/play">Play Now</BloodLinkButton></div>
+                  <div className="hidden sm:block"><BloodLinkButton href="/play" className="btn">Play Now</BloodLinkButton></div>
                   <div className="sm:hidden"><Link href="/play" className="rounded bg-purple-600 hover:bg-purple-500 px-3 py-1.5 font-semibold">Play</Link></div>
                   <ProfileMenu displayName={session!.email || "C"} />
                 </div>

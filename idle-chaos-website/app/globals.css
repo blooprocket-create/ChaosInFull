@@ -50,18 +50,17 @@ body { background: var(--background); color: var(--foreground); }
   filter: drop-shadow(0 0 6px rgba(239,68,68,0.5));
 }
 
-/* Animated dripping blood button */
-.btn-blood {
+/* Minimal button styling */
+.btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0.75rem 1.25rem; border-radius: 0.5rem;
   color: #fff; font-weight: 800; letter-spacing: 0.03em;
-  background: #7f1d1d; /* matte blood base */
-  border: 1px solid rgba(127,29,29,0.9);
-  box-shadow: 0 0 22px rgba(127,29,29,0.35);
-  overflow: visible; /* allow drips below */
+  background: #111827; /* slate-900 */
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 0 18px rgba(0,0,0,0.35), inset 0 0 12px rgba(0,0,0,0.5);
 }
-.btn-blood:hover { filter: brightness(1.03); }
+.btn:hover { filter: brightness(1.05); }
 
 
 /* Heartbeat pulse */
@@ -71,40 +70,14 @@ body { background: var(--background); color: var(--foreground); }
   10% { box-shadow: 0 0 28px rgba(239,68,68,0.35), inset 0 0 14px rgba(0,0,0,0.6); transform: scale(1.02); }
 }
 
-/* Bleed-through shadow for heartbeat mode */
-.btn-blood.heartbeat::after {
+/* Subtle ground glow for heartbeat */
+.btn.heartbeat::after {
   content: ""; position: absolute; left: -8px; right: -8px; bottom: -10px; height: 18px;
-  background: radial-gradient(ellipse at center, rgba(127,29,29,0.35), transparent 60%);
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.12), transparent 60%);
   filter: blur(6px);
-  animation: bleedPulse 1.8s ease-in-out infinite;
 }
-@keyframes bleedPulse { 0%, 20%, 100% { opacity: 0.6 } 10% { opacity: 0.95 } }
 
-/* Remove cursor change and trails: hover still brightens */
-.btn-blood:hover { filter: brightness(1.03); }
-
-/* CodePen-style falling drops under the button label text */
-.btn-blood { --dripMax: 72px; }
-.btn-blood .label { position: relative; display: inline-block; }
-.btn-blood .label .drops {
-  position: absolute; left: 0; right: 0; top: calc(100% - 2px); height: var(--dripMax); pointer-events: none;
-  color: #7f1d1d; filter: url(#goo);
-}
-.btn-blood .label .drop {
-  position: absolute; top: 0; width: .55rem; height: .55rem; background: currentColor;
-  border-radius: 0 100% 100% 100%; transform: rotate(45deg);
-  animation: dropFall var(--dur, 2.2s) var(--ease, cubic-bezier(0.4,0,1,1)) var(--delay, 0s) infinite both;
-  animation-play-state: paused; /* hover-only by default */
-}
-.btn-blood:hover .label .drop { animation-play-state: running; }
-
-@keyframes dropFall {
-  0% { transform: translateY(0) scaleX(.85) rotate(45deg); }
-  60% { transform: translateY(calc(var(--fall, 56px) * 0.45)) scaleX(.85) rotate(45deg); }
-  100% { transform: translateY(var(--fall, 56px)) scaleX(.85) rotate(45deg); }
-}
-/* trailPop no longer used; retained in case of future reuse */
-@keyframes trailPop { 0% { transform: scale(0.3); opacity: 0 } 30% { opacity: 1 } 100% { transform: translateY(6px) scale(1); opacity: 0 } }
+/* Removed blood drip styles */
 
 /* Heavier ambience: slow panning fog + background sway */
 @keyframes bgSway { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
