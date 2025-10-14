@@ -7,6 +7,7 @@ declare global {
     __saveSceneNow?: (sceneOverride?: "Town" | "Cave" | "Slime") => void;
     __applyExpUpdate?: (payload: { type: "character" | "mining" | "crafting"; exp: number; level: number }) => void;
     __openFurnace?: () => void;
+    __openWorkbench?: () => void;
   }
 }
 
@@ -22,6 +23,8 @@ class TownScene extends Phaser.Scene {
   private slimePrompt!: Phaser.GameObjects.Text;
   private furnace!: Phaser.Physics.Arcade.Image;
   private furnacePrompt!: Phaser.GameObjects.Text;
+  private workbench!: Phaser.Physics.Arcade.Image;
+  private workbenchPrompt!: Phaser.GameObjects.Text;
   preload() {}
   create() {
     // Track current scene for persistence
@@ -64,14 +67,25 @@ class TownScene extends Phaser.Scene {
   f.generateTexture("furnaceTex", 36, 28);
   f.destroy();
   this.furnace = this.physics.add.staticImage(center.x + 120, this.groundRect.y - 14, "furnaceTex");
+  // Workbench (center-left)
+  const wbx = this.add.graphics();
+  wbx.fillStyle(0x374151, 1);
+  wbx.fillRoundedRect(0, 0, 46, 16, 4);
+  wbx.fillStyle(0x9ca3af, 1);
+  wbx.fillRect(6, 2, 34, 4);
+  wbx.generateTexture("workbenchTex", 46, 16);
+  wbx.destroy();
+  this.workbench = this.physics.add.staticImage(center.x - 120, this.groundRect.y - 8, "workbenchTex");
   // Labels
   this.add.text(this.cavePortal.x, this.cavePortal.y - 40, "Cave", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.slimePortal.x, this.slimePortal.y - 40, "Slime Field", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.furnace.x, this.furnace.y - 36, "Furnace", { color: "#fca5a5", fontSize: "12px" }).setOrigin(0.5);
+  this.add.text(this.workbench.x, this.workbench.y - 28, "Workbench", { color: "#c7d2fe", fontSize: "12px" }).setOrigin(0.5);
   // Prompts
   this.cavePrompt = this.add.text(this.cavePortal.x, this.cavePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.slimePrompt = this.add.text(this.slimePortal.x, this.slimePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.furnacePrompt = this.add.text(this.furnace.x, this.furnace.y - 48, "Press E to Use", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  this.workbenchPrompt = this.add.text(this.workbench.x, this.workbench.y - 32, "Press E to Craft", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
     // Player texture and body
     const ptex = this.add.graphics();
     ptex.fillStyle(0xffffff, 1);
@@ -113,9 +127,11 @@ class TownScene extends Phaser.Scene {
       this.cavePortal.setPosition(80, this.groundRect.y - 24);
       this.slimePortal.setPosition(w - 80, this.groundRect.y - 24);
   this.furnace.setPosition(w / 2 + 120, this.groundRect.y - 14);
+    this.workbench.setPosition(w / 2 - 120, this.groundRect.y - 8);
       this.cavePrompt.setPosition(this.cavePortal.x, this.cavePortal.y - 60);
       this.slimePrompt.setPosition(this.slimePortal.x, this.slimePortal.y - 60);
   this.furnacePrompt.setPosition(this.furnace.x, this.furnace.y - 48);
+    this.workbenchPrompt.setPosition(this.workbench.x, this.workbench.y - 32);
       this.physics.world.setBounds(0, 0, w, h);
     });
     // Ambient particles: generate a tiny dot texture
@@ -182,12 +198,14 @@ class TownScene extends Phaser.Scene {
   const nearCave = dist(this.player, this.cavePortal) < 60;
   const nearSlime = dist(this.player, this.slimePortal) < 60;
   const nearFurnace = dist(this.player, this.furnace) < 60;
+  const nearWorkbench = dist(this.player, this.workbench) < 60;
     this.cavePrompt.setVisible(nearCave);
     // Slime portal gated by tutorialStarted flag in registry
     const tutorialStarted = !!this.game.registry.get("tutorialStarted");
     this.slimePrompt.setText(tutorialStarted ? "Press E to Enter" : "Portal sealed—begin Tutorial");
     this.slimePrompt.setVisible(nearSlime);
     this.furnacePrompt.setVisible(nearFurnace);
+      this.workbenchPrompt.setVisible(nearWorkbench);
     if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
@@ -201,6 +219,8 @@ class TownScene extends Phaser.Scene {
       } else if (nearFurnace) {
         // Open furnace modal via React
         window.__openFurnace?.();
+      } else if (nearWorkbench) {
+        window.__openWorkbench?.();
       }
     }
   }
@@ -334,6 +354,15 @@ class CaveScene extends Phaser.Scene {
     const key = node === this.copperNode ? "copper" : "tin";
     inv[key] = (inv[key] ?? 0) + 1;
     this.game.registry.set("inventory", inv);
+    // Persist inventory immediately to avoid loss
+    const cid = (this.game.registry.get("characterId") as string) || "";
+    if (cid) {
+      fetch("/api/account/characters/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ characterId: cid, items: inv })
+      }).catch(() => {});
+    }
   }
   // Removed dev HUD text
   updateHUD() {}
@@ -433,6 +462,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const furnaceRef = useRef<typeof furnaceQueue>(null);
   const furnaceTimerRef = useRef<number | null>(null);
   useEffect(() => { furnaceRef.current = furnaceQueue; }, [furnaceQueue]);
+  // Workbench state
+  const [showWorkbench, setShowWorkbench] = useState(false);
+  const [workQueue, setWorkQueue] = useState<{ recipe: "armor" | "dagger"; eta: number; startedAt: number; remaining: number; per: number; total: number } | null>(null);
+  const workRef = useRef<typeof workQueue>(null);
+  const workTimerRef = useRef<number | null>(null);
+  useEffect(() => { workRef.current = workQueue; }, [workQueue]);
   type SkillsView = { mining: { level: number; exp: number }; woodcutting: { level: number; exp: number }; fishing: { level: number; exp: number }; crafting: { level: number; exp: number } };
   type BaseView = { level: number; class: string; exp: number; gold: number; premiumGold?: number; hp: number; mp: number; strength: number; agility: number; intellect: number; luck: number };
   const [statsData, setStatsData] = useState<{ base: BaseView | null; skills: SkillsView } | null>(null);
@@ -464,7 +499,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     // Seed registry flags (e.g., tutorial gate) if needed; default false
     gameRef.current.registry.set("tutorialStarted", false);
     gameRef.current.registry.set("spawn", { from: "initial", portal: null });
-  gameRef.current.registry.set("inventory", {} as Record<string, number>);
+  // Do not pre-initialize inventory to {} to avoid overwriting server state; we'll hydrate from GET below
     if (character) {
       gameRef.current.registry.set("characterId", character.id);
       gameRef.current.registry.set("miningLevel", initialMiningLevel ?? 1);
@@ -489,6 +524,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         .then((res) => res.ok ? res.json() : Promise.reject())
         .then((data) => {
           const items = (data?.items as Record<string, number>) || {};
+          // Set from DB; treat DB as source of truth
           gameRef.current?.registry.set("inventory", items);
         })
         .catch(() => {});
@@ -645,7 +681,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
       setActiveSceneKey(active);
-      if (showFurnace) {
+      if (showFurnace || showWorkbench) {
         setExpHud({ label: "Crafting EXP", value: craftingExpState, max: craftingMax });
       } else if (active === "CaveScene") {
         setExpHud({ label: "Mining EXP", value: miningExpState, max: miningMax });
@@ -653,8 +689,23 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         setExpHud({ label: "Character EXP", value: charExp, max: charMax });
       }
     }, 800);
-    return () => clearInterval(t);
-  }, [charExp, charMax, miningExpState, miningMax, showFurnace, craftingExpState, craftingMax]);
+    // Periodically reconcile with DB as source of truth when no queues running
+    const r = setInterval(() => {
+      if (!character) return;
+      if (furnaceRef.current || workRef.current) return; // don't override while crafting
+      fetch(`/api/account/characters/inventory?characterId=${character.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!data) return;
+          const items = (data.items as Record<string, number>) || {};
+          const g = gameRef.current; if (!g) return;
+          g.registry.set("inventory", items);
+          setInventory({ ...items });
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => { clearInterval(t); clearInterval(r); };
+  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, craftingExpState, craftingMax]);
 
   // Periodically persist inventory while playing
   useEffect(() => {
@@ -713,10 +764,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       }
     };
     window.__openFurnace = () => setShowFurnace(true);
+    window.__openWorkbench = () => setShowWorkbench(true);
     return () => {
       delete window.__saveSceneNow;
       delete window.__applyExpUpdate;
       delete window.__openFurnace;
+      delete window.__openWorkbench;
     };
   }, [saveSceneNow, reqChar, reqMine, reqCraft]);
 
@@ -845,6 +898,101 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     setFurnaceQueue(null);
   }, []);
 
+  // On mount, if a queue existed (e.g., page refresh), fast-forward based on elapsed
+  useEffect(() => {
+    // For simplicity, we don't persist queues in DB yet; we can approximate by no-op
+    // Future: persist queue state to DB; on reload, compute completions.
+    // Placeholder hook retained for forward compatibility.
+  }, []);
+
+  // Workbench helpers: schedule looped crafting and cancel
+  const scheduleWorkNext = useCallback(async () => {
+    if (!character) return;
+    const q = workRef.current; if (!q) return;
+    if (workTimerRef.current) { window.clearTimeout(workTimerRef.current); workTimerRef.current = null; }
+    // Reset start time for progress and keep ref sync
+    setWorkQueue((curr) => {
+      if (!curr) return curr;
+      const next = { ...curr, startedAt: Date.now() };
+      workRef.current = next;
+      return next;
+    });
+    const per = (workRef.current?.per ?? 10000);
+    workTimerRef.current = window.setTimeout(async () => {
+      const game = gameRef.current; if (!game) return;
+      const currQ = workRef.current; if (!currQ) return;
+      // Produce output
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      if (currQ.recipe === "armor") inv.copper_armor = (inv.copper_armor ?? 0) + 1; else inv.copper_dagger = (inv.copper_dagger ?? 0) + 1;
+      game.registry.set("inventory", inv);
+      // Persist and award crafting EXP
+      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      const expPer = currQ.recipe === "armor" ? 6 : 4;
+      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.craftingExp === "number" && typeof data.craftingLevel === "number") {
+          window.__applyExpUpdate?.({ type: "crafting", exp: data.craftingExp, level: data.craftingLevel });
+        }
+      }
+      // Decrement and continue or clear
+      setWorkQueue((prev) => {
+        if (!prev) { workRef.current = null; return null; }
+        const left = Math.max(0, prev.remaining - 1);
+        if (left === 0) {
+          workRef.current = null;
+          return null;
+        } else {
+          const next = { ...prev, remaining: left };
+          workRef.current = next;
+          setTimeout(() => scheduleWorkNext(), 0);
+          return next;
+        }
+      });
+    }, per);
+  }, [character]);
+
+  const startWork = useCallback((recipe: "armor" | "dagger", count: number) => {
+    if (!character || !gameRef.current) return;
+    if (workQueue) return;
+    const game = gameRef.current;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    if (recipe === "armor") {
+      if ((inv.copper_bar ?? 0) < 3 * count) return;
+      inv.copper_bar = (inv.copper_bar ?? 0) - (3 * count);
+    } else {
+      if ((inv.copper_bar ?? 0) < 1 * count || (inv.plank ?? 0) < 1 * count) return;
+      inv.copper_bar = (inv.copper_bar ?? 0) - (1 * count);
+      inv.plank = (inv.plank ?? 0) - (1 * count);
+    }
+    game.registry.set("inventory", inv);
+    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+    const perMs = recipe === "armor" ? 10000 : 7000;
+    const q = { recipe, eta: perMs, startedAt: Date.now(), remaining: count, per: perMs, total: count } as const;
+    workRef.current = q as unknown as typeof workQueue;
+    setWorkQueue(q as unknown as typeof workQueue);
+    scheduleWorkNext();
+  }, [character, workQueue, scheduleWorkNext]);
+
+  const cancelWork = useCallback(() => {
+    const q = workRef.current; if (!q || !gameRef.current) { setWorkQueue(null); return; }
+    if (workTimerRef.current) { window.clearTimeout(workTimerRef.current); workTimerRef.current = null; }
+    const game = gameRef.current;
+    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+    const remaining = Math.max(0, q.remaining ?? 0);
+    if (remaining > 0) {
+      if (q.recipe === "armor") {
+        inv.copper_bar = (inv.copper_bar ?? 0) + (3 * remaining);
+      } else {
+        inv.copper_bar = (inv.copper_bar ?? 0) + (1 * remaining);
+        inv.plank = (inv.plank ?? 0) + (1 * remaining);
+      }
+      game.registry.set("inventory", inv);
+      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (game.registry.get("characterId") as string), items: inv }) }).catch(() => {});
+    }
+    setWorkQueue(null);
+  }, []);
+
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
       {character ? (
@@ -852,7 +1000,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           <div className="font-semibold text-white/90">{character.name}</div>
           <div className="opacity-80">
             {character.class} • Lv {charLevel}
-            {showFurnace ? (
+            {(showFurnace || showWorkbench) ? (
               <> • Crafting Lv {gameRef.current?.registry.get("craftingLevel") ?? 1}</>
             ) : activeSceneKey === "CaveScene" ? (
               <> • Mining Lv {gameRef.current?.registry.get("miningLevel") ?? (initialMiningLevel ?? 1)}</>
@@ -905,6 +1053,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                   if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
                   if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
                   if (k === "bronze_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #b8860b, #6b4f1d)" }} />;
+                  if (k === "plank") return <div className="h-5 w-8 rounded" style={{ background: "linear-gradient(135deg, #8b5e34, #5c3d1e)" }} />;
+                  if (k === "copper_armor") return <div className="h-6 w-6 rounded" style={{ background: "radial-gradient(circle at 30% 30%, #b45309, #78350f)" }} title="Copper Armor" />;
+                  if (k === "copper_dagger") return <div className="h-0 w-0 border-l-4 border-r-4 border-b-8" style={{ borderColor: "transparent transparent #b45309 transparent" }} title="Copper Dagger" />;
                   return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
                 };
                 return (
@@ -917,6 +1068,54 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+      {/* Workbench Modal */}
+      {showWorkbench && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(560px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Workbench</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowWorkbench(false)}>Close</button>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Copper Armor</div>
+                <div className="mt-1 text-gray-300">Costs: 3x Copper Bar • Time: 10s • +6 Crafting EXP</div>
+                <button
+                  className="btn mt-2 px-3 py-1 disabled:opacity-50"
+                  disabled={!!workQueue || (inventory.copper_bar ?? 0) < 3}
+                  onClick={() => startWork("armor", 1)}
+                >Craft 1</button>
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Copper Dagger</div>
+                <div className="mt-1 text-gray-300">Costs: 1x Copper Bar, 1x Plank • Time: 7s • +4 Crafting EXP</div>
+                <button
+                  className="btn mt-2 px-3 py-1 disabled:opacity-50"
+                  disabled={!!workQueue || (inventory.copper_bar ?? 0) < 1 || (inventory.plank ?? 0) < 1}
+                  onClick={() => startWork("dagger", 1)}
+                >Craft 1</button>
+              </div>
+            </div>
+            {workQueue ? (
+              <div className="mt-4 rounded border border-white/10 bg-black/40 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <div>Crafting {workQueue.recipe === "armor" ? "Copper Armor" : "Copper Dagger"}…</div>
+                  <button className="btn px-2 py-1" onClick={() => cancelWork()}>Cancel</button>
+                </div>
+                <div className="mt-2 h-2 w-full rounded bg-white/10">
+                  {(() => {
+                    const finished = (workQueue.total - workQueue.remaining);
+                    const elapsed = (finished * workQueue.per) + (Date.now() - workQueue.startedAt);
+                    const totalMs = workQueue.total * workQueue.per;
+                    const pct = Math.min(100, (elapsed / Math.max(1, totalMs)) * 100);
+                    return <div className="h-2 rounded bg-blue-500" style={{ width: `${pct}%` }} />;
+                  })()}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
