@@ -1,4 +1,4 @@
-import { patchNotes, PatchNote } from "@/src/data/patchNotes";
+import { patchNotes } from "@/src/data/patchNotes";
 export const metadata = { title: "News • Chaos In Full" };
 
 export default function NewsPage() {

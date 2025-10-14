@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 import LogoutButton from "@/src/components/LogoutButton";
-import DeleteCharacterButton from "@/src/components/DeleteCharacterButton";
 import CharacterDashboardCard, { CharacterSummary } from "@/src/components/CharacterDashboardCard";
 import { taglines } from "@/src/data/flavor";
 

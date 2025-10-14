@@ -3,7 +3,7 @@ import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 
 // Returns summary of all characters for the logged in user including skill levels and last scene/AFK duration basis
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const client = prisma as unknown as {
