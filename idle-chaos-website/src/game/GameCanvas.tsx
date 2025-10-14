@@ -21,6 +21,8 @@ class TownScene extends Phaser.Scene {
   private slimePrompt!: Phaser.GameObjects.Text;
   preload() {}
   create() {
+    // Persist that we're in Town on scene load
+    window.__saveSceneNow?.();
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Town", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
     // Visible ground
@@ -191,11 +193,12 @@ class CaveScene extends Phaser.Scene {
   private eKey!: Phaser.Input.Keyboard.Key;
   private copperCount = 0;
   private tinCount = 0;
-  private hudText!: Phaser.GameObjects.Text;
   private copperNode!: Phaser.GameObjects.Image;
   private tinNode!: Phaser.GameObjects.Image;
   private miningCooldown = 0;
   create() {
+    // Persist that we're in Cave on scene load
+    window.__saveSceneNow?.();
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Cave", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5, 0.5);
     // ground
@@ -268,9 +271,6 @@ class CaveScene extends Phaser.Scene {
         .catch(() => {});
     }
   } });
-    // HUD
-  this.hudText = this.add.text(12, 12, "", { color: "#e5e7eb", fontSize: "12px" }).setScrollFactor(0);
-    this.updateHUD();
     // Exit portal (left edge)
     const exit = this.add.graphics();
     exit.fillStyle(0x1d4ed8, 0.8);
@@ -315,10 +315,8 @@ class CaveScene extends Phaser.Scene {
     inv[key] = (inv[key] ?? 0) + 1;
     this.game.registry.set("inventory", inv);
   }
-  updateHUD() {
-    if (!this.hudText) return;
-    this.hudText.setText(`AFK Mining (near node)\nCopper: ${this.copperCount}  Tin: ${this.tinCount}\nE near portal to return`);
-  }
+  // Removed dev HUD text
+  updateHUD() {}
   update() {
     if (!this.player || !this.cursors) return;
     const speed = 220; let vx = 0; if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
@@ -339,6 +337,8 @@ class SlimeFieldScene extends Phaser.Scene {
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
   create() {
+    // Persist that we're in Slime Field on scene load
+    window.__saveSceneNow?.();
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
     this.add.text(center.x, 40, "Slime Field", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5);
     this.groundRect = this.add.rectangle(center.x, this.scale.height - 40, this.scale.width * 0.9, 12, 0x0f172a).setOrigin(0.5);
@@ -406,13 +406,15 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [welcomeError, setWelcomeError] = useState<string | null>(null);
   const [openInventory, setOpenInventory] = useState(false);
   const [inventory, setInventory] = useState<Record<string, number>>({});
+  const [activeSceneKey, setActiveSceneKey] = useState<string>("TownScene");
+  const [showStats, setShowStats] = useState(false);
+  const [statsData, setStatsData] = useState<{ base: any; skills: any } | null>(null);
   // EXP and level state (client HUD) with dynamic thresholds matching server
   const reqChar = useCallback((lvl: number) => Math.floor(100 * Math.pow(1.25, Math.max(0, lvl - 1))), []);
   const reqMine = useCallback((lvl: number) => Math.floor(50 * Math.pow(1.2, Math.max(0, lvl - 1))), []);
   const [charLevel, setCharLevel] = useState<number>(character?.level ?? 1);
   const [charExp, setCharExp] = useState<number>(initialExp ?? 0);
   const [charMax, setCharMax] = useState<number>(reqChar(character?.level ?? 1));
-  const [miningLevelState, setMiningLevelState] = useState<number>(initialMiningLevel ?? 1);
   const [miningExpState, setMiningExpState] = useState<number>(initialMiningExp ?? 0);
   const [miningMax, setMiningMax] = useState<number>(reqMine(initialMiningLevel ?? 1));
   const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: reqChar(character?.level ?? 1) });
@@ -443,6 +445,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       // switch scenes after boot
       setTimeout(() => gameRef.current?.scene.start(`${startScene}Scene` as string), 0);
     }
+    // Save starting scene immediately
+    window.__saveSceneNow?.();
 
     // Load initial inventory from server
     if (character) {
@@ -495,7 +499,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
-  }, [initialScene]);
+  }, [initialScene, character, initialMiningLevel]);
 
   // Save immediately on unmount as a fallback for client-side navigation
   useEffect(() => {
@@ -561,6 +565,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       // Update HUD based on active scene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
+      setActiveSceneKey(active);
       if (active === "CaveScene") {
         setExpHud({ label: "Mining EXP", value: miningExpState, max: miningMax });
       } else {
@@ -614,18 +619,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     window.__applyExpUpdate = ({ type, exp, level }) => {
       if (type === "mining") {
         setMiningExpState(exp);
-        setMiningLevelState((old) => {
-          const updated = level;
-          setMiningMax(reqMine(updated));
-          // push to registry so scenes can gate by mining level immediately
-          const game = gameRef.current; if (game) game.registry.set("miningLevel", updated);
-          return updated;
-        });
+        setMiningMax(reqMine(level));
+        const game = gameRef.current; if (game) game.registry.set("miningLevel", level);
       } else {
         setCharExp(exp);
-        setCharLevel((_) => {
-          const updated = level; setCharMax(reqChar(updated)); return updated;
-        });
+        setCharLevel(level);
+        setCharMax(reqChar(level));
       }
     };
     return () => {
@@ -669,7 +668,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       {character ? (
         <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/40 px-3 py-2 text-xs text-gray-200 shadow-lg ring-1 ring-white/10">
           <div className="font-semibold text-white/90">{character.name}</div>
-          <div className="opacity-80">{character.class} • Lv {charLevel}</div>
+          <div className="opacity-80">
+            {character.class} • Lv {charLevel}
+            {activeSceneKey === "CaveScene" ? (
+              <> • Mining Lv {gameRef.current?.registry.get("miningLevel") ?? (initialMiningLevel ?? 1)}</>
+            ) : null}
+          </div>
           {/* Contextual EXP bar */}
           <div className="mt-2 w-56">
             <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
@@ -687,6 +691,17 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         <button className="btn px-3 py-1 text-sm" title="Open your inventory" onClick={() => setOpenInventory(true)}>Items</button>
         <button className="btn px-3 py-1 text-sm" title="View your talent tree">Talents</button>
         <button className="btn px-3 py-1 text-sm" title="Quests, Tips, AFK Info">Codex</button>
+        <button className="btn px-3 py-1 text-sm" title="View your stats and skills" onClick={async () => {
+          if (!character) return;
+          try {
+            const res = await fetch(`/api/account/stats?characterId=${character.id}`);
+            if (res.ok) {
+              const data = await res.json();
+              setStatsData({ base: data.base, skills: data.skills });
+              setShowStats(true);
+            }
+          } catch {}
+        }}>Stats</button>
       </div>
       {/* Inventory Modal */}
       {openInventory && (
@@ -759,6 +774,47 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn px-3 py-1" onClick={() => setOfflineModal(null)}>Dismiss</button>
               <button className="btn px-3 py-1" onClick={collectOffline}>Collect</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Modal */}
+      {showStats && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(560px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Stats & Skills</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowStats(false)}>Close</button>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Base</div>
+                {statsData?.base ? (
+                  <ul className="mt-2 space-y-1 text-gray-300">
+                    <li>Level: {statsData.base.level}</li>
+                    <li>Class: {statsData.base.class}</li>
+                    <li>HP: {statsData.base.hp} • MP: {statsData.base.mp}</li>
+                    <li>STR: {statsData.base.strength} • INT: {statsData.base.intellect}</li>
+                    <li>AGI: {statsData.base.agility} • LUK: {statsData.base.luck}</li>
+                    <li>Gold: {statsData.base.gold} • Premium: {statsData.base.premiumGold}</li>
+                  </ul>
+                ) : <div className="mt-2 text-gray-400">No base stats</div>}
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Skills</div>
+                {statsData?.skills ? (
+                  <ul className="mt-2 space-y-1 text-gray-300">
+                    <li>Mining: Lv {statsData.skills.mining.level} ({statsData.skills.mining.exp} EXP)</li>
+                    <li>Woodcutting: Lv {statsData.skills.woodcutting.level} ({statsData.skills.woodcutting.exp} EXP)</li>
+                    <li>Fishing: Lv {statsData.skills.fishing.level} ({statsData.skills.fishing.exp} EXP)</li>
+                    <li>Crafting: Lv {statsData.skills.crafting.level} ({statsData.skills.crafting.exp} EXP)</li>
+                  </ul>
+                ) : <div className="mt-2 text-gray-400">No skills yet</div>}
+              </div>
+            </div>
+            <div className="mt-4 text-xs text-gray-400">
+              Damage scales with your main stat by class (Beginner = LUK, Horror = STR, Occult = INT, Shade = AGI) and weapon damage (1 if none equipped).
             </div>
           </div>
         </div>
