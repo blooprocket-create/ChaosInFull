@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cinzel, Roboto_Mono } from "next/font/google";
 import { getSession } from "@/src/lib/auth";
-import ProfileMenu from "@/src/components/ProfileMenu";
 import AudioToggle from "@/src/components/AudioToggle";
 import CursorAura from "@/src/components/CursorAura";
-import BloodLinkButton from "@/src/components/BloodLinkButton";
+import NavAuth from "@/src/components/NavAuth";
 import "./globals.css";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
@@ -24,7 +23,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
-  const isAuthed = !!session;
   return (
     <html lang="en">
       <body className={`${display.variable} ${mono.variable} antialiased bg-black text-gray-200` }>
@@ -66,18 +64,8 @@ export default async function RootLayout({
               <Link href="/world" className="hover:text-white nav-underline">World</Link>
               <Link href="/about" className="hover:text-white nav-underline">About</Link>
               <div className="hidden sm:block"><AudioToggle /></div>
-              {isAuthed ? (
-                <div className="flex items-center gap-4">
-                  <div className="hidden sm:block"><BloodLinkButton href="/play" className="btn">Play Now</BloodLinkButton></div>
-                  <div className="sm:hidden"><Link href="/play" className="rounded bg-purple-600 hover:bg-purple-500 px-3 py-1.5 font-semibold">Play</Link></div>
-                  <ProfileMenu displayName={session!.email || "C"} />
-                </div>
-              ) : (
-                <>
-                  <Link href="/login" className="hover:text-white">Login</Link>
-                  <Link href="/signup" className="rounded border border-white/20 hover:border-white/40 px-3 py-1.5">Sign Up</Link>
-                </>
-              )}
+              <NavAuth initial={session as any}
+              />
             </div>
           </nav>
         </header>

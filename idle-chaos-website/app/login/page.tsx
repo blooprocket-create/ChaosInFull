@@ -21,7 +21,9 @@ export default function LoginPage() {
       setError(data.error || "Login failed");
       return;
     }
-  router.refresh();
+    // Notify listeners first so nav can refetch session immediately
+    window.dispatchEvent(new Event("auth:changed"));
+    router.refresh();
   router.push("/dashboard");
   }
 

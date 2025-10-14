@@ -10,6 +10,7 @@ export default function ProfileMenu({ displayName }: { displayName: string }) {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    window.dispatchEvent(new Event("auth:changed"));
     router.refresh();
     router.push("/");
   }
@@ -41,6 +42,7 @@ export default function ProfileMenu({ displayName }: { displayName: string }) {
           </div>
           <a href="/play" className="block px-3 py-2 text-sm hover:bg-white/5">Play Now</a>
           <a href="/dashboard" className="block px-3 py-2 text-sm hover:bg-white/5">Dashboard</a>
+            <a href="/account" className="block px-3 py-2 text-sm hover:bg-white/5">Account Settings</a>
           <button onClick={logout} className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-white/5">Log out</button>
         </div>
       )}
