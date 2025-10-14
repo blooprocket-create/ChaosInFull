@@ -4,8 +4,9 @@ import * as Phaser from "phaser";
 
 declare global {
   interface Window {
-    __saveSceneNow?: () => void;
+    __saveSceneNow?: (sceneOverride?: "Town" | "Cave" | "Slime") => void;
     __applyExpUpdate?: (payload: { type: "character" | "mining"; exp: number; level: number }) => void;
+    __openFurnace?: () => void;
   }
 }
 
@@ -19,6 +20,8 @@ class TownScene extends Phaser.Scene {
   private slimePortal!: Phaser.Physics.Arcade.Image;
   private cavePrompt!: Phaser.GameObjects.Text;
   private slimePrompt!: Phaser.GameObjects.Text;
+  private furnace!: Phaser.Physics.Arcade.Image;
+  private furnacePrompt!: Phaser.GameObjects.Text;
   preload() {}
   create() {
     // Track current scene for persistence
@@ -52,12 +55,23 @@ class TownScene extends Phaser.Scene {
   this.cavePortal = this.physics.add.staticImage(80, this.groundRect.y - 24, "portalBlue");
   // Slime Field portal (right)
   this.slimePortal = this.physics.add.staticImage(this.scale.width - 80, this.groundRect.y - 24, "portalGreen");
+  // Furnace (center-right)
+  const f = this.add.graphics();
+  f.fillStyle(0x9a3412, 1);
+  f.fillRoundedRect(0, 0, 36, 28, 6);
+  f.fillStyle(0xf97316, 1);
+  f.fillCircle(28, 20, 6);
+  f.generateTexture("furnaceTex", 36, 28);
+  f.destroy();
+  this.furnace = this.physics.add.staticImage(center.x + 120, this.groundRect.y - 14, "furnaceTex");
   // Labels
   this.add.text(this.cavePortal.x, this.cavePortal.y - 40, "Cave", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.slimePortal.x, this.slimePortal.y - 40, "Slime Field", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
+  this.add.text(this.furnace.x, this.furnace.y - 36, "Furnace", { color: "#fca5a5", fontSize: "12px" }).setOrigin(0.5);
   // Prompts
   this.cavePrompt = this.add.text(this.cavePortal.x, this.cavePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   this.slimePrompt = this.add.text(this.slimePortal.x, this.slimePortal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+  this.furnacePrompt = this.add.text(this.furnace.x, this.furnace.y - 48, "Press E to Use", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
     // Player texture and body
     const ptex = this.add.graphics();
     ptex.fillStyle(0xffffff, 1);
@@ -98,8 +112,10 @@ class TownScene extends Phaser.Scene {
       // move portals to edges
       this.cavePortal.setPosition(80, this.groundRect.y - 24);
       this.slimePortal.setPosition(w - 80, this.groundRect.y - 24);
+  this.furnace.setPosition(w / 2 + 120, this.groundRect.y - 14);
       this.cavePrompt.setPosition(this.cavePortal.x, this.cavePortal.y - 60);
       this.slimePrompt.setPosition(this.slimePortal.x, this.slimePortal.y - 60);
+  this.furnacePrompt.setPosition(this.furnace.x, this.furnace.y - 48);
       this.physics.world.setBounds(0, 0, w, h);
     });
     // Ambient particles: generate a tiny dot texture
@@ -163,23 +179,28 @@ class TownScene extends Phaser.Scene {
     }
   // Portal checks
     const dist = (a: Phaser.GameObjects.Image, b: Phaser.GameObjects.Image | Phaser.Physics.Arcade.Image) => Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
-    const nearCave = dist(this.player, this.cavePortal) < 60;
-    const nearSlime = dist(this.player, this.slimePortal) < 60;
+  const nearCave = dist(this.player, this.cavePortal) < 60;
+  const nearSlime = dist(this.player, this.slimePortal) < 60;
+  const nearFurnace = dist(this.player, this.furnace) < 60;
     this.cavePrompt.setVisible(nearCave);
     // Slime portal gated by tutorialStarted flag in registry
     const tutorialStarted = !!this.game.registry.get("tutorialStarted");
     this.slimePrompt.setText(tutorialStarted ? "Press E to Enter" : "Portal sealed—begin Tutorial");
     this.slimePrompt.setVisible(nearSlime);
+    this.furnacePrompt.setVisible(nearFurnace);
     if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
-        // hint react layer to save scene now
-  window.__saveSceneNow?.();
+        // Save destination scene immediately before transition
+        window.__saveSceneNow?.("Cave");
         this.scene.start("CaveScene");
       } else if (nearSlime && tutorialStarted) {
         this.game.registry.set("spawn", { from: "slime", portal: "town" });
-  window.__saveSceneNow?.();
+        window.__saveSceneNow?.("Slime");
         this.scene.start("SlimeFieldScene");
+      } else if (nearFurnace) {
+        // Open furnace modal via React
+        window.__openFurnace?.();
       }
     }
   }
@@ -323,7 +344,8 @@ class CaveScene extends Phaser.Scene {
     // Exit to Town
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "cave", portal: "town" });
-  window.__saveSceneNow?.();
+      // Save destination (Town) before transitioning back
+      window.__saveSceneNow?.("Town");
       this.scene.start("TownScene");
     }
   }
@@ -384,7 +406,7 @@ class SlimeFieldScene extends Phaser.Scene {
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
-  window.__saveSceneNow?.();
+      window.__saveSceneNow?.("Town");
       this.scene.start("TownScene");
     }
   }
@@ -406,6 +428,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [inventory, setInventory] = useState<Record<string, number>>({});
   const [activeSceneKey, setActiveSceneKey] = useState<string>("TownScene");
   const [showStats, setShowStats] = useState(false);
+  const [showFurnace, setShowFurnace] = useState(false);
+  const [furnaceQueue, setFurnaceQueue] = useState<{ recipe: "copper" | "bronze"; eta: number; startedAt: number } | null>(null);
   type SkillsView = { mining: { level: number; exp: number }; woodcutting: { level: number; exp: number }; fishing: { level: number; exp: number }; crafting: { level: number; exp: number } };
   type BaseView = { level: number; class: string; exp: number; gold: number; premiumGold?: number; hp: number; mp: number; strength: number; agility: number; intellect: number; luck: number };
   const [statsData, setStatsData] = useState<{ base: BaseView | null; skills: SkillsView } | null>(null);
@@ -440,10 +464,16 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       gameRef.current.registry.set("miningLevel", initialMiningLevel ?? 1);
     }
     // Start initial scene
-    const startScene = (initialScene || "Town") as string;
+    const startScene = (initialScene || "Town") as "Town" | "Cave" | "Slime";
     if (startScene !== "Town") {
-      // switch scenes after boot
-      setTimeout(() => gameRef.current?.scene.start(`${startScene}Scene` as string), 0);
+      // Switch scenes after boot; ensure TownScene doesn't steal focus by stopping it first
+      setTimeout(() => {
+        const game = gameRef.current; if (!game) return;
+        if (game.scene.isActive("TownScene")) {
+          game.scene.stop("TownScene");
+        }
+        game.scene.start(`${startScene}Scene`);
+      }, 0);
     }
 
     // Load initial inventory from server
@@ -490,10 +520,38 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       gameRef.current.scale.resize(w, h);
     };
     window.addEventListener("resize", onResize);
+    // Capture internal link clicks to persist scene and inventory before navigation
+    const onDocClick = (e: MouseEvent) => {
+      if (!character) return;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a");
+      if (!anchor) return;
+      const href = (anchor as HTMLAnchorElement).getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      // Ignore new tab or modified clicks
+      if ((anchor as HTMLAnchorElement).target || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      // Only handle same-origin internal routes
+      if (!href.startsWith("/")) return;
+      const game = gameRef.current; if (!game) return;
+      const regScene = (game.registry.get("currentScene") as string) || "Town";
+      const scenes = game.scene.getScenes(true);
+      const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : regScene;
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      if ("sendBeacon" in navigator) {
+        navigator.sendBeacon("/api/account/characters/state", new Blob([JSON.stringify({ characterId: character.id, scene: active })], { type: "application/json" }));
+        navigator.sendBeacon("/api/account/characters/inventory", new Blob([JSON.stringify({ characterId: character.id, items: inv })], { type: "application/json" }));
+      } else {
+        // Best-effort fallback without blocking navigation
+        fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) }).catch(() => {});
+        fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      }
+    };
+    document.addEventListener("click", onDocClick, true);
     return () => {
       window.removeEventListener("resize", onResize);
       el.removeEventListener("keydown", onKeydown);
       window.removeEventListener("keydown", onWindowKeydown as EventListener);
+      document.removeEventListener("click", onDocClick, true);
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
@@ -618,10 +676,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   };
 
   // Helper: immediate save of current scene to server
-  const saveSceneNow = useCallback(async () => {
+  const saveSceneNow = useCallback(async (sceneOverride?: "Town" | "Cave" | "Slime") => {
     const game = gameRef.current; if (!game || !character) return;
     const scenes = game.scene.getScenes(true);
-    const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
+    const active = (sceneOverride ?? (scenes.length ? (scenes[0].scene.key.replace("Scene", "") as "Town" | "Cave" | "Slime") : "Town"));
     try {
       await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) });
     } catch {}
@@ -641,9 +699,11 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         setCharMax(reqChar(level));
       }
     };
+    window.__openFurnace = () => setShowFurnace(true);
     return () => {
       delete window.__saveSceneNow;
       delete window.__applyExpUpdate;
+      delete window.__openFurnace;
     };
   }, [saveSceneNow, reqChar, reqMine]);
 
@@ -740,6 +800,94 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+      {/* Furnace Modal */}
+      {showFurnace && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Furnace</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowFurnace(false)}>Close</button>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Copper Bar</div>
+                <div className="mt-1 text-gray-300">Costs: 1x Copper Ore • Time: 4s • +2 Crafting EXP</div>
+                <button
+                  disabled={!!furnaceQueue || (inventory.copper ?? 0) < 1}
+                  className="btn mt-2 px-3 py-1 disabled:opacity-50"
+                  onClick={async () => {
+                    if (!character) return;
+                    if (furnaceQueue) return;
+                    const game = gameRef.current; if (!game) return;
+                    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+                    if ((inv.copper ?? 0) < 1) return;
+                    inv.copper = (inv.copper ?? 0) - 1;
+                    game.registry.set("inventory", inv);
+                    setFurnaceQueue({ recipe: "copper", eta: 4000, startedAt: Date.now() });
+                    // Persist inventory quickly
+                    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+                    // Complete after 4s
+                    setTimeout(async () => {
+                      const g = gameRef.current; if (!g) return;
+                      const inv2 = (g.registry.get("inventory") as Record<string, number>) || {};
+                      inv2.copper_bar = (inv2.copper_bar ?? 0) + 1;
+                      g.registry.set("inventory", inv2);
+                      setFurnaceQueue(null);
+                      // Persist and award crafting EXP +2
+                      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv2 }) }).catch(() => {});
+                      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: 2 }) });
+                      if (res.ok) {
+                        const data = await res.json();
+                        // We don't yet show crafting HUD; could add later
+                      }
+                    }, 4000);
+                  }}
+                >Smelt 1</button>
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="font-semibold text-white/90">Bronze Bar</div>
+                <div className="mt-1 text-gray-300">Costs: 1x Copper Ore, 1x Tin Ore • Time: 6s • +2 Crafting EXP</div>
+                <button
+                  disabled={!!furnaceQueue || (inventory.copper ?? 0) < 1 || (inventory.tin ?? 0) < 1}
+                  className="btn mt-2 px-3 py-1 disabled:opacity-50"
+                  onClick={async () => {
+                    if (!character) return;
+                    if (furnaceQueue) return;
+                    const game = gameRef.current; if (!game) return;
+                    const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+                    if ((inv.copper ?? 0) < 1 || (inv.tin ?? 0) < 1) return;
+                    inv.copper = (inv.copper ?? 0) - 1;
+                    inv.tin = (inv.tin ?? 0) - 1;
+                    game.registry.set("inventory", inv);
+                    setFurnaceQueue({ recipe: "bronze", eta: 6000, startedAt: Date.now() });
+                    fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+                    setTimeout(async () => {
+                      const g = gameRef.current; if (!g) return;
+                      const inv2 = (g.registry.get("inventory") as Record<string, number>) || {};
+                      inv2.bronze_bar = (inv2.bronze_bar ?? 0) + 1;
+                      g.registry.set("inventory", inv2);
+                      setFurnaceQueue(null);
+                      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv2 }) }).catch(() => {});
+                      const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: 2 }) });
+                      if (res.ok) {
+                        const data = await res.json();
+                      }
+                    }, 6000);
+                  }}
+                >Smelt 1</button>
+              </div>
+            </div>
+            {furnaceQueue ? (
+              <div className="mt-4 rounded border border-white/10 bg-black/40 p-3 text-sm">
+                <div>Smelting {furnaceQueue.recipe === "copper" ? "Copper Bar" : "Bronze Bar"}…</div>
+                <div className="mt-2 h-2 w-full rounded bg-white/10">
+                  <div className="h-2 rounded bg-orange-500" style={{ width: `${Math.min(100, ((Date.now() - furnaceQueue.startedAt) / furnaceQueue.eta) * 100)}%` }} />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
