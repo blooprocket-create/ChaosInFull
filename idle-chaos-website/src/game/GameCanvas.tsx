@@ -12,6 +12,12 @@ declare global {
     __openStorage?: () => void;
     __openSawmill?: () => void;
     __openShop?: () => void;
+    __closeFurnace?: () => void;
+    __closeWorkbench?: () => void;
+    __closeStorage?: () => void;
+    __closeSawmill?: () => void;
+    __closeShop?: () => void;
+    __spawnOverhead?: (text: string, opts?: { wave?: boolean; color?: string }) => void;
   }
 }
 
@@ -38,6 +44,7 @@ class TownScene extends Phaser.Scene {
   private storageBox!: Phaser.Physics.Arcade.Image;
   private storagePrompt!: Phaser.GameObjects.Text;
   private tutorialNpc!: Phaser.GameObjects.Image;
+  private nameTag!: Phaser.GameObjects.Text;
   preload() {}
   create() {
     // Track current scene for persistence
@@ -194,7 +201,10 @@ class TownScene extends Phaser.Scene {
     });
     // Collider
     this.physics.add.collider(this.player, ground);
-    // Input (WASD)
+  // Create name tag above player
+  const cname = String(this.game.registry.get("characterName") || "You");
+  this.nameTag = this.add.text(this.player.x, this.player.y - 24, cname, { color: "#e5e7eb", fontSize: "11px" }).setOrigin(0.5).setDepth(10);
+  // Input (WASD)
     this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as {
       W: Phaser.Input.Keyboard.Key;
       A: Phaser.Input.Keyboard.Key;
@@ -316,7 +326,15 @@ class TownScene extends Phaser.Scene {
   this.sawmillPrompt.setVisible(nearSawmill);
       this.shopPrompt.setVisible(nearShop);
       this.storagePrompt.setVisible(nearStorage);
-    if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+  // Keep name tag positioned
+  if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
+  // Auto-close modals if you leave range
+  if (!nearFurnace) window.__closeFurnace?.();
+  if (!nearWorkbench) window.__closeWorkbench?.();
+  if (!nearSawmill) window.__closeSawmill?.();
+  if (!nearStorage) window.__closeStorage?.();
+  if (!nearShop) window.__closeShop?.();
+  if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
         // Save destination scene immediately before transition
@@ -348,6 +366,7 @@ class CaveScene extends Phaser.Scene {
   private groundRect!: Phaser.GameObjects.Rectangle;
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
+  private nameTag!: Phaser.GameObjects.Text;
   private copperCount = 0;
   private tinCount = 0;
   private copperNode!: Phaser.GameObjects.Image;
@@ -381,6 +400,8 @@ class CaveScene extends Phaser.Scene {
     (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900);
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, ground);
+    const cname = String(this.game.registry.get("characterName") || "You");
+    this.nameTag = this.add.text(this.player.x, this.player.y - 24, cname, { color: "#e5e7eb", fontSize: "11px" }).setOrigin(0.5).setDepth(10);
     // Nodes
     const drawNode = (key: string, color: number) => {
       const gr = this.add.graphics();
@@ -448,6 +469,18 @@ class CaveScene extends Phaser.Scene {
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
     });
+    // Overhead chat spawner
+    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
+      const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
+      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
+      let tween: Phaser.Tweens.Tween | null = null;
+      if (opts?.wave) tween = this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.time.delayedCall(2800, () => {
+        if (tween) tween.stop();
+        follow.remove();
+        this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
+      });
+    };
     this.events.on("shutdown", () => { /* timers auto clean */ });
   }
   private isNearNode(node: Phaser.GameObjects.Image) {
@@ -486,6 +519,7 @@ class CaveScene extends Phaser.Scene {
     if (!this.player || !this.cursors) return;
     const speed = 220; let vx = 0; if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
+    if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
     // Exit to Town
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "cave", portal: "town" });
@@ -502,6 +536,7 @@ class SlimeFieldScene extends Phaser.Scene {
   private groundRect!: Phaser.GameObjects.Rectangle;
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
+  private nameTag!: Phaser.GameObjects.Text;
   create() {
     this.game.registry.set("currentScene", "Slime");
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
@@ -518,6 +553,8 @@ class SlimeFieldScene extends Phaser.Scene {
   this.player = this.physics.add.image(x, this.groundRect.y - 60, "playerTex3").setTint(0x22c55e);
     (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900); this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, ground);
+    const cname = String(this.game.registry.get("characterName") || "You");
+    this.nameTag = this.add.text(this.player.x, this.player.y - 24, cname, { color: "#e5e7eb", fontSize: "11px" }).setOrigin(0.5).setDepth(10);
     // Simple slimes (ambient placeholders)
     const slimeTex = this.add.graphics(); slimeTex.fillStyle(0x22c55e, 1); slimeTex.fillCircle(6, 6, 6); slimeTex.generateTexture("slimeTex", 12, 12); slimeTex.destroy();
     const spawnSlime = (x: number) => {
@@ -549,6 +586,7 @@ class SlimeFieldScene extends Phaser.Scene {
     if (!this.player || !this.cursors) return;
     const speed = 220; let vx = 0; if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
     const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
+    if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
     if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
       window.__saveSceneNow?.("Town");
@@ -619,6 +657,11 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [showStorage, setShowStorage] = useState(false);
   const [accountStorage, setAccountStorage] = useState<Record<string, number>>({});
   const [dragItem, setDragItem] = useState<{ from: "inv" | "storage"; key: string } | null>(null);
+  // Currency and chat
+  const [gold, setGold] = useState<number>(0);
+  const [premiumGold, setPremiumGold] = useState<number>(0);
+  const [chatInput, setChatInput] = useState<string>("");
+  const [chatMessages, setChatMessages] = useState<Array<{ id: number; text: string }>>([]);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -638,6 +681,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   // Do not pre-initialize inventory to {} to avoid overwriting server state; we'll hydrate from GET below
     if (character) {
       gameRef.current.registry.set("characterId", character.id);
+      gameRef.current.registry.set("characterName", character.name);
       gameRef.current.registry.set("miningLevel", initialMiningLevel ?? 1);
       gameRef.current.registry.set("craftingLevel", 1);
     }
@@ -941,6 +985,11 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   window.__openStorage = () => setShowStorage(true);
   window.__openSawmill = () => setShowSawmill(true);
   window.__openShop = () => setShowShop(true);
+  window.__closeFurnace = () => setShowFurnace(false);
+  window.__closeWorkbench = () => setShowWorkbench(false);
+  window.__closeStorage = () => setShowStorage(false);
+  window.__closeSawmill = () => setShowSawmill(false);
+  window.__closeShop = () => setShowShop(false);
     return () => {
       delete window.__saveSceneNow;
       delete window.__applyExpUpdate;
@@ -949,6 +998,11 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       delete window.__openStorage;
   delete window.__openSawmill;
   delete window.__openShop;
+      delete window.__closeFurnace;
+      delete window.__closeWorkbench;
+      delete window.__closeStorage;
+      delete window.__closeSawmill;
+      delete window.__closeShop;
     };
   }, [saveSceneNow, reqChar, reqMine, reqCraft, pushToast, charLevel]);
 
@@ -1399,6 +1453,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             <div className="h-2 w-full rounded bg-white/10">
               <div className="h-2 rounded bg-violet-500" style={{ width: `${Math.min(100, (expHud.value / expHud.max) * 100)}%` }} />
             </div>
+            <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-300">
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Gold: <span className="text-yellow-300 font-semibold">{gold}</span></span>
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Premium: <span className="text-emerald-300 font-semibold">{premiumGold}</span></span>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1427,6 +1485,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Inventory</h3>
               <button className="btn px-3 py-1" onClick={() => setOpenInventory(false)}>Close</button>
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-xs text-gray-300">
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Gold: <span className="text-yellow-300 font-semibold">{gold}</span></span>
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Premium: <span className="text-emerald-300 font-semibold">{premiumGold}</span></span>
             </div>
             <div className="mt-4 grid grid-cols-6 gap-3 sm:grid-cols-8">
               {Object.keys(inventory).length === 0 && (
@@ -1464,6 +1526,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               <h3 className="text-lg font-semibold text-white">Shop</h3>
               <button className="btn px-3 py-1" onClick={() => setShowShop(false)}>Close</button>
             </div>
+            <div className="mt-1 flex items-center gap-3 text-xs text-gray-300">
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Gold: <span className="text-yellow-300 font-semibold">{gold}</span></span>
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Premium: <span className="text-emerald-300 font-semibold">{premiumGold}</span></span>
+            </div>
             <div className="mt-3 flex items-center gap-3 text-sm">
               <span>Qty</span>
               <button className="btn px-2" onClick={() => setShopQty(q => Math.max(1, q - 1))}>-</button>
@@ -1484,6 +1550,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                        for (let i = 0; i < shopQty; i++) {
                          const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "buy", itemKey: key, quantity: 1 }) });
                          if (!res.ok) break;
+                         const payload = await res.json().catch(() => null);
+                         if (payload && typeof payload.gold === "number") setGold(payload.gold);
                          const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
                          inv[key] = (inv[key] ?? 0) + 1; gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
                        }
@@ -1512,6 +1580,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                          if ((inventory[key] ?? 0) <= 0) break;
                          const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "sell", itemKey: key, quantity: 1 }) });
                          if (!res.ok) break;
+                         const payload = await res.json().catch(() => null);
+                         if (payload && typeof payload.gold === "number") setGold(payload.gold);
                          const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
                          inv[key] = Math.max(0, (inv[key] ?? 0) - 1); gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
                        }
@@ -1637,6 +1707,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               <h3 className="text-lg font-semibold text-white">Account Storage</h3>
               <button className="btn px-3 py-1" onClick={() => setShowStorage(false)}>Close</button>
             </div>
+            <div className="mt-2 flex items-center gap-3 text-xs text-gray-300">
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Gold: <span className="text-yellow-300 font-semibold">{gold}</span></span>
+              <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Premium: <span className="text-emerald-300 font-semibold">{premiumGold}</span></span>
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-6">
               <div>
                 <div className="mb-2 text-sm text-gray-300">Your Inventory</div>
@@ -1753,6 +1827,62 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           </div>
         </div>
       )}
+      {/* Chat Panel */}
+      <div className="pointer-events-auto absolute left-3 bottom-3 z-10 w-[min(420px,80vw)]">
+        <div className="rounded-md border border-white/10 bg-black/40 backdrop-blur">
+          <div className="max-h-40 overflow-y-auto p-2 text-xs text-gray-200 space-y-1">
+            {chatMessages.map((m) => (
+              <div key={m.id} className="leading-tight">{m.text}</div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 border-t border-white/10 p-2">
+            <input
+              className="flex-1 rounded bg-black/50 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-white/20"
+              placeholder=":wave: Hello there"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && chatInput.trim().length > 0) {
+                  const raw = chatInput.trim();
+                  const parts = raw.split(/\s+/);
+                  let wave = false; let color: string | undefined;
+                  while (parts.length && /^:.+:$/.test(parts[0])) {
+                    const tag = parts.shift()!.toLowerCase();
+                    if (tag === ":wave:") wave = true;
+                    if (tag === ":blue:") color = "#60a5fa";
+                  }
+                  const text = parts.join(" ");
+                  if (text.length > 0) {
+                    setChatMessages((curr) => [...curr, { id: Date.now() + Math.floor(Math.random()*1000), text: raw }]);
+                    window.__spawnOverhead?.(text, { wave, color });
+                  }
+                  setChatInput("");
+                }
+              }}
+            />
+            <button
+              className="btn px-2 py-1 text-xs"
+              onClick={() => {
+                const raw = chatInput.trim();
+                if (!raw) return;
+                const parts = raw.split(/\s+/);
+                let wave = false; let color: string | undefined;
+                while (parts.length && /^:.+:$/.test(parts[0])) {
+                  const tag = parts.shift()!.toLowerCase();
+                  if (tag === ":wave:") wave = true;
+                  if (tag === ":blue:") color = "#60a5fa";
+                }
+                const text = parts.join(" ");
+                if (text.length > 0) {
+                  setChatMessages((curr) => [...curr, { id: Date.now() + Math.floor(Math.random()*1000), text: raw }]);
+                  window.__spawnOverhead?.(text, { wave, color });
+                }
+                setChatInput("");
+              }}
+            >Say</button>
+          </div>
+        </div>
+      </div>
       {/* Welcome Modal (first time) */}
       {!welcomeSeen && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">
