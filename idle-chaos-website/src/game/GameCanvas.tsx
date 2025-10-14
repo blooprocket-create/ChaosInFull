@@ -531,10 +531,15 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         const sent1 = ("sendBeacon" in navigator) && navigator.sendBeacon("/api/account/characters/state", new Blob([statePayload], { type: "application/json" }));
         const sent2 = ("sendBeacon" in navigator) && navigator.sendBeacon("/api/account/characters/inventory", new Blob([invPayload], { type: "application/json" }));
         if (!sent1) {
-          await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: statePayload, keepalive: true as any });
+          const init: RequestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: statePayload };
+          // keepalive is supported in browsers for unload; TS lib may not include it in RequestInit in some targets
+          (init as unknown as { keepalive?: boolean }).keepalive = true;
+          await fetch("/api/account/characters/state", init);
         }
         if (!sent2) {
-          await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: invPayload, keepalive: true as any });
+          const init: RequestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: invPayload };
+          (init as unknown as { keepalive?: boolean }).keepalive = true;
+          await fetch("/api/account/characters/inventory", init);
         }
       } catch {}
     };
