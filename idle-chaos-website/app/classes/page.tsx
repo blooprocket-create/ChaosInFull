@@ -5,21 +5,33 @@ const classes = [
   { name: "Mage (Occultist)", blurb: "Arcane scholar who reads the wrong books on purpose.", color: "from-purple-900/40" },
   { name: "Rogue (Stalker)", blurb: "Blink and you’ll… still get stabbed. Fast, precise, unnerving.", color: "from-emerald-900/40" },
 ];
+
 export default function ClassesPage() {
   return (
-    <section className="mx-auto max-w-6xl px-4 py-12">
-      <h1 className="text-3xl font-bold">Classes</h1>
+    <section className="relative mx-auto max-w-6xl px-4 py-12">
+      {/* Spooky overlay */}
+      <div className="pointer-events-none absolute inset-0 -z-10 opacity-10 bg-[radial-gradient(circle_at_20%_10%,rgba(168,85,247,0.3),transparent_40%),radial-gradient(circle_at_80%_30%,rgba(239,68,68,0.25),transparent_45%)]" />
+
+      <h1 className="text-3xl font-bold glitch" data-text="Classes">Classes</h1>
       <p className="mt-2 text-gray-300">Evolve down branching paths. Unlock active skills, passives, and very questionable fashion choices.</p>
-      <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {classes.map((c)=> (
-          <div key={c.name} className={`rounded-xl border border-white/10 bg-gradient-to-br ${c.color} to-black p-5`}>
-            <h3 className="font-semibold">{c.name}</h3>
+          <div key={c.name}
+               className={`group rounded-xl border border-white/10 bg-gradient-to-br ${c.color} to-black p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-1`}
+               style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.3)" }}>
+            <div className="absolute -right-6 -top-6 size-24 rounded-full blur-2xl bg-white/5 group-hover:bg-white/10 transition-colors" />
+            <h3 className="font-semibold blood-underline inline-block">{c.name}</h3>
             <p className="text-gray-300 text-sm mt-1">{c.blurb}</p>
+            <div className="absolute left-0 right-0 bottom-0 h-1 bg-white/5">
+              <div className="h-full w-0 group-hover:w-full transition-[width] duration-500 bg-gradient-to-r from-purple-600 to-red-500" />
+            </div>
           </div>
         ))}
       </div>
+
       <div className="mt-10 rounded-xl border border-white/10 bg-black/40 p-6">
-        <h2 className="text-xl font-semibold">Evolution Tree</h2>
+        <h2 className="text-xl font-semibold blood-underline inline-block">Evolution Tree</h2>
         <p className="text-gray-300 mt-2">Progression mirrors MapleStory branching: multiple job advancements per base class, each unlocking new active skills (bind to 1–0) and passives via a talent tree.</p>
       </div>
     </section>

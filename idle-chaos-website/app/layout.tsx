@@ -4,7 +4,6 @@ import { Cinzel, Roboto_Mono } from "next/font/google";
 import { getSession } from "@/src/lib/auth";
 import ProfileMenu from "@/src/components/ProfileMenu";
 import AudioToggle from "@/src/components/AudioToggle";
-import PlayBubble from "@/src/components/PlayBubble";
 import CursorAura from "@/src/components/CursorAura";
 import BloodLinkButton from "@/src/components/BloodLinkButton";
 import "./globals.css";
@@ -83,7 +82,6 @@ export default async function RootLayout({
           </nav>
         </header>
   <main className="min-h-[calc(100vh-64px)]">{children}</main>
-  {isAuthed ? <PlayBubble /> : null}
         <footer className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
           © {new Date().getFullYear()} Chaos In Full
         </footer>
