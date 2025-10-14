@@ -47,6 +47,7 @@ model Character {
   level     Int      @default(1)
   exp       Int      @default(0)
   miningExp Int      @default(0)
+  miningLevel Int    @default(1)
   seenWelcome Boolean @default(false)
   lastScene  String   @default("Town")
   lastSeenAt DateTime @default(now())

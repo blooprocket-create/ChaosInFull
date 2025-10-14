@@ -14,24 +14,64 @@ export async function POST(req: Request) {
 
   // Clamp deltas to avoid abuse per request
   const clamp = (n: number) => Math.max(0, Math.min(50000, Math.floor(n)));
-  const expDelta = typeof exp === "number" ? clamp(exp) : undefined;
-  const miningDelta = typeof miningExp === "number" ? clamp(miningExp) : undefined;
+  const expDelta = typeof exp === "number" ? clamp(exp) : 0;
+  const miningDelta = typeof miningExp === "number" ? clamp(miningExp) : 0;
 
-  // Ownership guard and update
+  // Fetch character with ownership check
+  // Cast prisma to avoid any local typing hiccups with generated client in this environment
   const client = prisma as unknown as {
     character: {
-      updateMany: (args: {
-        where: { id: string; userId: string };
-        data: { exp?: { increment: number }; miningExp?: { increment: number } };
-      }) => Promise<{ count: number }>;
+      findFirst: (args: { where: { id: string; userId: string } }) => Promise<{
+        id: string;
+        userId: string;
+        level: number;
+        exp: number;
+        miningExp: number;
+        miningLevel?: number | null;
+      } | null>;
+      update: (args: { where: { id: string }; data: { exp: number; level: number; miningExp: number; miningLevel: number } }) => Promise<void>;
     };
   };
+  const ch = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  if (!ch) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
 
-  const data: { exp?: { increment: number }; miningExp?: { increment: number } } = {};
-  if (typeof expDelta === "number") data.exp = { increment: expDelta };
-  if (typeof miningDelta === "number") data.miningExp = { increment: miningDelta };
+  // Geometric growth thresholds
+  const charReq = (lvl: number) => Math.floor(100 * Math.pow(1.25, Math.max(0, lvl - 1)));
+  const mineReq = (lvl: number) => Math.floor(50 * Math.pow(1.2, Math.max(0, lvl - 1)));
 
-  const res = await client.character.updateMany({ where: { id: characterId, userId: session.userId }, data });
-  if (res.count === 0) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  // XP rate multipliers that scale faster at high levels
+  const charMult = 1 + Math.pow(Math.max(1, ch.level) - 1, 1.2) / 30; // grows with level
+  const mineMult = 1 + Math.pow(Math.max(1, ch.miningLevel ?? 1) - 1, 1.2) / 25; // grows with miningLevel
+
+  let newCharExp = ch.exp + Math.floor(expDelta * charMult);
+  let newMineExp = ch.miningExp + Math.floor(miningDelta * mineMult);
+  let newLevel = ch.level;
+  let newMiningLevel = ch.miningLevel ?? 1;
+
+  // Apply character level-ups
+  let charReqNeeded = charReq(newLevel);
+  // Support overflow into multiple levels
+  while (newCharExp >= charReqNeeded) {
+    newCharExp -= charReqNeeded;
+    newLevel += 1;
+    charReqNeeded = charReq(newLevel);
+    // hard cap to avoid runaway
+    if (newLevel > 999) { newCharExp = 0; break; }
+  }
+
+  // Apply mining level-ups
+  let mineReqNeeded = mineReq(newMiningLevel);
+  while (newMineExp >= mineReqNeeded) {
+    newMineExp -= mineReqNeeded;
+    newMiningLevel += 1;
+    mineReqNeeded = mineReq(newMiningLevel);
+    if (newMiningLevel > 999) { newMineExp = 0; break; }
+  }
+
+  await client.character.update({
+    where: { id: ch.id },
+    data: { exp: newCharExp, level: newLevel, miningExp: newMineExp, miningLevel: newMiningLevel },
+  });
+
+  return NextResponse.json({ ok: true, level: newLevel, exp: newCharExp, miningLevel: newMiningLevel, miningExp: newMineExp });
 }

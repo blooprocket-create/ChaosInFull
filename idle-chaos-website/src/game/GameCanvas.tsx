@@ -5,7 +5,7 @@ import * as Phaser from "phaser";
 declare global {
   interface Window {
     __saveSceneNow?: () => void;
-    __incExp?: (type: "character" | "mining", amt: number) => void;
+    __applyExpUpdate?: (payload: { type: "character" | "mining"; exp: number; level: number }) => void;
   }
 }
 
@@ -238,21 +238,34 @@ class CaveScene extends Phaser.Scene {
   this.add.text(this.tinNode.x, this.tinNode.y - 24, "Tin", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5);
   // AFK mining timers (proximity-gated)
   this.time.addEvent({ delay: 2500, loop: true, callback: () => {
-    if (this.isNearNode(this.copperNode)) {
+    const miningLevel = (this.game.registry.get("miningLevel") as number) ?? 1;
+    if (miningLevel >= 1 && this.isNearNode(this.copperNode)) {
       this.copperCount += 1; this.miningFx(this.copperNode); this.updateHUD();
-      // Increment mining EXP and character EXP modestly
-      fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 1, exp: 1 }) }).catch(() => {});
-      // Notify React HUD if available
-  window.__incExp?.("mining", 1);
-  window.__incExp?.("character", 1);
+      // Award +3 mining EXP per ore
+      fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 3 }) })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (!data) return;
+          if (typeof data.miningExp === "number" && typeof data.miningLevel === "number") {
+            window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel });
+          }
+        })
+        .catch(() => {});
     }
   } });
   this.time.addEvent({ delay: 3500, loop: true, callback: () => {
-    if (this.isNearNode(this.tinNode)) {
+    const miningLevel = (this.game.registry.get("miningLevel") as number) ?? 1;
+    if (miningLevel >= 1 && this.isNearNode(this.tinNode)) {
       this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD();
-      fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 1, exp: 1 }) }).catch(() => {});
-  window.__incExp?.("mining", 1);
-  window.__incExp?.("character", 1);
+      fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 3 }) })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (!data) return;
+          if (typeof data.miningExp === "number" && typeof data.miningLevel === "number") {
+            window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel });
+          }
+        })
+        .catch(() => {});
     }
   } });
     // HUD
@@ -386,14 +399,23 @@ type CharacterHUD = {
   level: number;
 };
 
-export default function GameCanvas({ character, initialSeenWelcome, initialScene, offlineSince, initialExp, initialMiningExp }: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number }) {
+export default function GameCanvas({ character, initialSeenWelcome, initialScene, offlineSince, initialExp, initialMiningExp, initialMiningLevel }: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number; initialMiningLevel?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const [welcomeSeen, setWelcomeSeen] = useState<boolean>(!!initialSeenWelcome);
   const [welcomeError, setWelcomeError] = useState<string | null>(null);
   const [openInventory, setOpenInventory] = useState(false);
   const [inventory, setInventory] = useState<Record<string, number>>({});
-  const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: 100 });
+  // EXP and level state (client HUD) with dynamic thresholds matching server
+  const reqChar = useCallback((lvl: number) => Math.floor(100 * Math.pow(1.25, Math.max(0, lvl - 1))), []);
+  const reqMine = useCallback((lvl: number) => Math.floor(50 * Math.pow(1.2, Math.max(0, lvl - 1))), []);
+  const [charLevel, setCharLevel] = useState<number>(character?.level ?? 1);
+  const [charExp, setCharExp] = useState<number>(initialExp ?? 0);
+  const [charMax, setCharMax] = useState<number>(reqChar(character?.level ?? 1));
+  const [miningLevelState, setMiningLevelState] = useState<number>(initialMiningLevel ?? 1);
+  const [miningExpState, setMiningExpState] = useState<number>(initialMiningExp ?? 0);
+  const [miningMax, setMiningMax] = useState<number>(reqMine(initialMiningLevel ?? 1));
+  const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: reqChar(character?.level ?? 1) });
 
   useEffect(() => {
     if (!ref.current) return;
@@ -406,12 +428,15 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       physics: { default: "arcade", arcade: { debug: false } },
       scene: [TownScene, CaveScene, SlimeFieldScene],
     };
-    gameRef.current = new Phaser.Game(config);
+  gameRef.current = new Phaser.Game(config);
     // Seed registry flags (e.g., tutorial gate) if needed; default false
     gameRef.current.registry.set("tutorialStarted", false);
     gameRef.current.registry.set("spawn", { from: "initial", portal: null });
   gameRef.current.registry.set("inventory", {} as Record<string, number>);
-    if (character) gameRef.current.registry.set("characterId", character.id);
+    if (character) {
+      gameRef.current.registry.set("characterId", character.id);
+      gameRef.current.registry.set("miningLevel", initialMiningLevel ?? 1);
+    }
     // Start initial scene
     const startScene = (initialScene || "Town") as string;
     if (startScene !== "Town") {
@@ -472,6 +497,19 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     };
   }, [initialScene]);
 
+  // Save immediately on unmount as a fallback for client-side navigation
+  useEffect(() => {
+    return () => {
+      const game = gameRef.current; if (!game || !character) return;
+      const scenes = game.scene.getScenes(true);
+      const active = scenes.length ? scenes[0].scene.key.replace("Scene", "") : "Town";
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      // Fire-and-forget; navigation is in progress
+      fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) }).catch(() => {});
+      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+    };
+  }, [character]);
+
   // Expose helpers to scenes via window is set up after saveSceneNow definition below
 
   // Persist scene on page hide/unload
@@ -498,31 +536,18 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     };
   }, [character]);
 
-  // Show offline yield if returning from Cave
+  // Offline gains modal state
+  const [offlineModal, setOfflineModal] = useState<{ open: boolean; copper: number; tin: number } | null>(null);
   useEffect(() => {
     if (!offlineSince) return;
     if ((initialScene || "Town").toLowerCase() !== "cave") return;
     const since = new Date(offlineSince).getTime();
     const now = Date.now();
     const seconds = Math.max(0, Math.floor((now - since) / 1000));
-    // Simple offline mining estimate if last scene was Cave
-    // 1 copper per 2.5s, 1 tin per 3.5s (approx), clamped minimal
     const copper = Math.floor(seconds / 2.5);
     const tin = Math.floor(seconds / 3.5);
     if (copper > 0 || tin > 0) {
-      // credit to inventory and show a toast
-      const game = gameRef.current; if (game) {
-        const inv = (game.registry.get("inventory") as Record<string, number>) || {};
-        if (copper > 0) inv.copper = (inv.copper ?? 0) + copper;
-        if (tin > 0) inv.tin = (inv.tin ?? 0) + tin;
-        game.registry.set("inventory", inv);
-      }
-      // Temporary toast using alert-like div
-      const div = document.createElement("div");
-      div.textContent = `While away: +${copper} Copper, +${tin} Tin`;
-      div.className = "fixed left-1/2 top-6 z-[200] -translate-x-1/2 rounded bg-black/80 px-3 py-2 text-xs text-gray-100 ring-1 ring-white/10";
-      document.body.appendChild(div);
-      setTimeout(() => div.remove(), 2800);
+      setOfflineModal({ open: true, copper, tin });
     }
   }, [offlineSince, initialScene]);
 
@@ -533,17 +558,17 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       if (!game) return;
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       setInventory({ ...inv });
-      // Also update contextual EXP HUD based on active scene
+      // Update HUD based on active scene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
       if (active === "CaveScene") {
-        setExpHud((hud) => ({ label: "Mining EXP", value: hud.label === "Mining EXP" ? hud.value : (initialMiningExp ?? 0), max: 100 }));
+        setExpHud({ label: "Mining EXP", value: miningExpState, max: miningMax });
       } else {
-        setExpHud((hud) => ({ label: "Character EXP", value: hud.label === "Character EXP" ? hud.value : (initialExp ?? 0), max: 100 }));
+        setExpHud({ label: "Character EXP", value: charExp, max: charMax });
       }
     }, 800);
     return () => clearInterval(t);
-  }, [initialExp, initialMiningExp]);
+  }, [charExp, charMax, miningExpState, miningMax]);
 
   // Periodically persist inventory while playing
   useEffect(() => {
@@ -586,41 +611,65 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   // Expose helpers to scenes via window
   useEffect(() => {
     window.__saveSceneNow = saveSceneNow;
-    window.__incExp = (type: "character" | "mining", amt: number) => {
-      setExpHud((hud) => {
-        if (hud.label === "Mining EXP" && type === "mining") return { ...hud, value: hud.value + amt };
-        if (hud.label === "Character EXP" && type === "character") return { ...hud, value: hud.value + amt };
-        return hud;
-      });
+    window.__applyExpUpdate = ({ type, exp, level }) => {
+      if (type === "mining") {
+        setMiningExpState(exp);
+        setMiningLevelState((old) => {
+          const updated = level;
+          setMiningMax(reqMine(updated));
+          // push to registry so scenes can gate by mining level immediately
+          const game = gameRef.current; if (game) game.registry.set("miningLevel", updated);
+          return updated;
+        });
+      } else {
+        setCharExp(exp);
+        setCharLevel((_) => {
+          const updated = level; setCharMax(reqChar(updated)); return updated;
+        });
+      }
     };
     return () => {
       delete window.__saveSceneNow;
-      delete window.__incExp;
+      delete window.__applyExpUpdate;
     };
-  }, [saveSceneNow]);
+  }, [saveSceneNow, reqChar, reqMine]);
 
-  // Expose helpers to scenes via window
-  useEffect(() => {
-    window.__saveSceneNow = saveSceneNow;
-    window.__incExp = (type: "character" | "mining", amt: number) => {
-      setExpHud((hud) => {
-        if (hud.label === "Mining EXP" && type === "mining") return { ...hud, value: hud.value + amt };
-        if (hud.label === "Character EXP" && type === "character") return { ...hud, value: hud.value + amt };
-        return hud;
-      });
-    };
-    return () => {
-      delete window.__saveSceneNow;
-      delete window.__incExp;
-    };
-  }, [saveSceneNow, character]);
+  // Action: collect offline rewards
+  const collectOffline = useCallback(async () => {
+    if (!character || !offlineModal) return;
+    const { copper, tin } = offlineModal;
+    // Update registry inventory first for instant UI
+    const game = gameRef.current;
+    if (game) {
+      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
+      if (copper > 0) inv.copper = (inv.copper ?? 0) + copper;
+      if (tin > 0) inv.tin = (inv.tin ?? 0) + tin;
+      game.registry.set("inventory", inv);
+    }
+    try {
+      // Persist inventory
+      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: (gameRef.current?.registry.get("inventory") as Record<string, number>) || {} }) });
+      // Award mining EXP: 3 per ore
+      const miningExpDelta = (copper + tin) * 3;
+      if (miningExpDelta > 0) {
+        const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, miningExp: miningExpDelta }) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") {
+            window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel });
+          }
+        }
+      }
+    } catch {}
+    setOfflineModal(null);
+  }, [character, offlineModal]);
 
   return (
     <div ref={ref} className="relative rounded-xl border border-white/10 overflow-hidden">
       {character ? (
         <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/40 px-3 py-2 text-xs text-gray-200 shadow-lg ring-1 ring-white/10">
           <div className="font-semibold text-white/90">{character.name}</div>
-          <div className="opacity-80">{character.class} • Lv {character.level}</div>
+          <div className="opacity-80">{character.class} • Lv {charLevel}</div>
           {/* Contextual EXP bar */}
           <div className="mt-2 w-56">
             <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
@@ -685,6 +734,31 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               >
                 I Understand
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offline Gains Modal */}
+      {offlineModal?.open && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <h3 className="text-lg font-semibold text-white">While you were away…</h3>
+            <p className="mt-1 text-sm text-gray-300">Your character remained in the Cave and gathered resources passively.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="text-gray-300">Copper Ore</div>
+                <div className="mt-1 text-white text-xl font-semibold">+{offlineModal.copper}</div>
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="text-gray-300">Tin Ore</div>
+                <div className="mt-1 text-white text-xl font-semibold">+{offlineModal.tin}</div>
+              </div>
+            </div>
+            <div className="mt-3 text-xs text-gray-400">Mining EXP will be awarded (+3 EXP per ore). Level-ups apply automatically.</div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn px-3 py-1" onClick={() => setOfflineModal(null)}>Dismiss</button>
+              <button className="btn px-3 py-1" onClick={collectOffline}>Collect</button>
             </div>
           </div>
         </div>

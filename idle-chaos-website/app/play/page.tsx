@@ -6,7 +6,7 @@ import { prisma } from "@/src/lib/prisma";
 
 export const metadata = { title: "Play • Chaos In Full" };
 export const dynamic = "force-dynamic";
-type CharacterLite = { id: string; userId: string; name: string; class: string; level: number; exp?: number; miningExp?: number };
+type CharacterLite = { id: string; userId: string; name: string; class: string; level: number; exp?: number; miningExp?: number; miningLevel?: number };
 
 
 export default async function PlayPage({ searchParams }: { searchParams: Promise<{ ch?: string }> }) {
@@ -49,6 +49,7 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
                   offlineSince={character.lastSeenAt ? new Date(character.lastSeenAt).toISOString() : undefined}
                   initialExp={character.exp ?? 0}
                   initialMiningExp={character.miningExp ?? 0}
+                  initialMiningLevel={character.miningLevel ?? 1}
                 />
               </div>
             </>
