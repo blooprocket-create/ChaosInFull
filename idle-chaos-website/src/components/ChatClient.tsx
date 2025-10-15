@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 declare global {
-  interface Window { __spawnOverhead?: (text: string, opts?: { wave?: boolean; color?: string }) => void; __setTyping?: (v: boolean) => void; }
+  interface Window { __spawnOverhead?: (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => void; __setTyping?: (v: boolean) => void; __focusGame?: () => void; }
 }
 
 export default function ChatClient({ characterId, scene }: { characterId: string; scene: string }) {
@@ -14,24 +14,27 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   const seenIds = useRef<Set<string>>(new Set());
   const pollInFlight = useRef(false);
   const sendingRef = useRef(false);
+  const [cooldown, setCooldown] = useState<number>(0);
+  const cooldownTimer = useRef<number | null>(null);
 
-  // Parse tags like :wave:, :blue:, :red:, :green:, :shake:, :rainbow:
+  // Parse tags like :wave:, :blue:, :red:, :green:, :shake:, :rainbow:, :ripple:
   const parseTags = useCallback((raw: string) => {
     const parts = raw.trim().split(/\s+/);
-    let wave = false, shake = false;
+    let wave = false, shake = false, ripple = false;
     let color: string | undefined; let rainbow = false;
     while (parts.length && /^:.+:$/.test(parts[0])) {
       const tag = parts.shift()!.toLowerCase();
       if (tag === ":wave:") wave = true;
       if (tag === ":shake:") shake = true;
       if (tag === ":rainbow:") rainbow = true;
+      if (tag === ":ripple:") ripple = true;
       if (tag === ":blue:") color = "#60a5fa";
       if (tag === ":red:") color = "#ef4444";
       if (tag === ":green:") color = "#22c55e";
       if (tag === ":yellow:") color = "#f59e0b";
       if (tag === ":purple:") color = "#a78bfa";
     }
-    return { text: parts.join(" "), wave, shake, color, rainbow };
+    return { text: parts.join(" "), wave, shake, ripple, color, rainbow };
   }, []);
 
   const poll = useCallback(async () => {
@@ -85,19 +88,37 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   }, []);
 
   const send = useCallback(async () => {
-    if (sendingRef.current) return;
+  if (sendingRef.current || cooldown > 0) return;
     const raw = input.trim(); if (!raw) return;
     sendingRef.current = true;
     const parsed = parseTags(raw);
     if (!parsed.text) { setInput(""); return; }
     try {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, text: raw, scene }) });
-      if (res.ok) {
+  if (res.ok) {
         // show overhead locally
         const color = parsed.rainbow ? undefined : parsed.color;
-        window.__spawnOverhead?.(parsed.text, { wave: parsed.wave || parsed.shake, color });
+        window.__spawnOverhead?.(parsed.text, { wave: parsed.wave, shake: parsed.shake, ripple: parsed.ripple, rainbow: parsed.rainbow, color });
         setInput("");
         void poll();
+        // Immediately put focus back to the game; user presses '/' to chat again
+        window.__setTyping?.(false);
+        window.__focusGame?.();
+      } else if (res.status === 429) {
+        const data = await res.json().catch(() => null) as { retryAfter?: number } | null;
+        const secs = Math.max(1, Number(data?.retryAfter ?? 3));
+        setCooldown(secs);
+        if (cooldownTimer.current) window.clearInterval(cooldownTimer.current);
+        cooldownTimer.current = window.setInterval(() => {
+          setCooldown((c) => {
+            if (c <= 1) {
+              if (cooldownTimer.current) { window.clearInterval(cooldownTimer.current); cooldownTimer.current = null; }
+              return 0;
+            }
+            return c - 1;
+          });
+          return 0;
+        }, 1000);
       }
     } catch {}
     finally {
@@ -122,10 +143,11 @@ export default function ChatClient({ characterId, scene }: { characterId: string
           onBlur={() => { window.__setTyping?.(false); }}
           onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter" && !e.repeat) { e.preventDefault(); send(); } }}
           onKeyUp={(e) => { e.stopPropagation(); }}
+          disabled={cooldown > 0}
         />
-        <button className="btn px-2 py-1 text-xs" onClick={() => send()}>Say</button>
+        <button className="btn px-2 py-1 text-xs disabled:opacity-50" onClick={() => send()} disabled={cooldown > 0}>{cooldown > 0 ? `Wait ${cooldown}s` : "Say"}</button>
       </div>
-      <div className="px-2 pb-2 text-[10px] text-gray-400">Tags: :wave: :shake: :red: :green: :blue: :yellow: :purple: :rainbow:</div>
+      <div className="px-2 pb-2 text-[10px] text-gray-400">Tags: :wave: :shake: :ripple: :red: :green: :blue: :yellow: :purple: :rainbow:</div>
     </div>
   );
 }

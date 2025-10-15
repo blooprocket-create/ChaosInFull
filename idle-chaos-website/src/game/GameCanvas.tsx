@@ -17,8 +17,9 @@ declare global {
     __closeStorage?: () => void;
     __closeSawmill?: () => void;
     __closeShop?: () => void;
-    __spawnOverhead?: (text: string, opts?: { wave?: boolean; color?: string }) => void;
+    __spawnOverhead?: (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => void;
     __setTyping?: (v: boolean) => void;
+    __focusGame?: () => void;
     __isTyping?: boolean;
   }
 }
@@ -300,13 +301,31 @@ class TownScene extends Phaser.Scene {
       this.time.delayedCall(Phaser.Math.Between(0, 2000), () => animate(img));
     }
     // Overhead chat spawner for Town
-    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
+    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
       const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
       const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
-      let tween: Phaser.Tweens.Tween | null = null;
-      if (opts?.wave) tween = this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      const tweens: Phaser.Tweens.Tween[] = [];
+      // wave (vertical bob)
+      if (opts?.wave) tweens.push(this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      // shake (horizontal jitter)
+      if (opts?.shake) tweens.push(this.tweens.add({ targets: t, x: t.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      // ripple (scale pulse)
+      if (opts?.ripple) tweens.push(this.tweens.add({ targets: t, scale: 1.12, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      // rainbow (color cycle)
+      let colorTimer: Phaser.Time.TimerEvent | null = null;
+      if (opts?.rainbow) {
+        let hue = 0;
+        colorTimer = this.time.addEvent({ delay: 80, loop: true, callback: () => {
+          hue = (hue + 12) % 360;
+          // Convert HSL to hex CSS color
+          const c = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color;
+          const hex = `#${c.toString(16).padStart(6, "0")}`;
+          t.setColor(hex);
+        }});
+      }
       this.time.delayedCall(2800, () => {
-        if (tween) tween.stop();
+        tweens.forEach(tr => tr.stop());
+        if (colorTimer) colorTimer.remove(false);
         follow.remove();
         this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
       });
@@ -499,13 +518,26 @@ class CaveScene extends Phaser.Scene {
     };
     this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner
-    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
+    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
       const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
       const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
-      let tween: Phaser.Tweens.Tween | null = null;
-      if (opts?.wave) tween = this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      const tweens: Phaser.Tweens.Tween[] = [];
+      if (opts?.wave) tweens.push(this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      if (opts?.shake) tweens.push(this.tweens.add({ targets: t, x: t.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      if (opts?.ripple) tweens.push(this.tweens.add({ targets: t, scale: 1.12, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      let colorTimer: Phaser.Time.TimerEvent | null = null;
+      if (opts?.rainbow) {
+        let hue = 0;
+        colorTimer = this.time.addEvent({ delay: 80, loop: true, callback: () => {
+          hue = (hue + 12) % 360;
+          const c = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color;
+          const hex = `#${c.toString(16).padStart(6, "0")}`;
+          t.setColor(hex);
+        }});
+      }
       this.time.delayedCall(2800, () => {
-        if (tween) tween.stop();
+        tweens.forEach(tr => tr.stop());
+        if (colorTimer) colorTimer.remove(false);
         follow.remove();
         this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
       });
@@ -623,13 +655,26 @@ class SlimeFieldScene extends Phaser.Scene {
     };
     this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner for Slime scene
-    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
+    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
       const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
       const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
-      let tween: Phaser.Tweens.Tween | null = null;
-      if (opts?.wave) tween = this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      const tweens: Phaser.Tweens.Tween[] = [];
+      if (opts?.wave) tweens.push(this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      if (opts?.shake) tweens.push(this.tweens.add({ targets: t, x: t.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      if (opts?.ripple) tweens.push(this.tweens.add({ targets: t, scale: 1.12, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      let colorTimer: Phaser.Time.TimerEvent | null = null;
+      if (opts?.rainbow) {
+        let hue = 0;
+        colorTimer = this.time.addEvent({ delay: 80, loop: true, callback: () => {
+          hue = (hue + 12) % 360;
+          const c = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color;
+          const hex = `#${c.toString(16).padStart(6, "0")}`;
+          t.setColor(hex);
+        }});
+      }
       this.time.delayedCall(2800, () => {
-        if (tween) tween.stop();
+        tweens.forEach(tr => tr.stop());
+        if (colorTimer) colorTimer.remove(false);
         follow.remove();
         this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
       });
@@ -1059,6 +1104,16 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   window.__openStorage = () => setShowStorage(true);
   window.__openSawmill = () => setShowSawmill(true);
   window.__openShop = () => setShowShop(true);
+  window.__focusGame = () => {
+    const el = ref.current; if (!el) return;
+    // Re-enable keyboard and focus container
+    const game = gameRef.current;
+    if (game) {
+      const scenes = game.scene.getScenes(true);
+      for (const s of scenes) if (s.input?.keyboard) s.input.keyboard.enabled = true;
+    }
+    el.focus({ preventScroll: true });
+  };
   window.__setTyping = (v: boolean) => {
     typingRef.current = v;
     window.__isTyping = v;
@@ -1087,6 +1142,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   delete window.__openSawmill;
   delete window.__openShop;
       delete window.__setTyping;
+      delete window.__focusGame;
       delete window.__closeFurnace;
       delete window.__closeWorkbench;
       delete window.__closeStorage;
