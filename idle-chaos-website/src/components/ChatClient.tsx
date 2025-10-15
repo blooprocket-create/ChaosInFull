@@ -17,24 +17,53 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   const [cooldown, setCooldown] = useState<number>(0);
   const cooldownTimer = useRef<number | null>(null);
 
-  // Parse tags like :wave:, :blue:, :red:, :green:, :shake:, :rainbow:, :ripple:
+  // Parse leading effect tags and inline color/effect segments
   const parseTags = useCallback((raw: string) => {
     const parts = raw.trim().split(/\s+/);
-    let wave = false, shake = false, ripple = false;
-    let color: string | undefined; let rainbow = false;
+    let wave = false, shake = false, ripple = false, rainbow = false;
+    let color: string | undefined;
     while (parts.length && /^:.+:$/.test(parts[0])) {
       const tag = parts.shift()!.toLowerCase();
       if (tag === ":wave:") wave = true;
       if (tag === ":shake:") shake = true;
-      if (tag === ":rainbow:") rainbow = true;
       if (tag === ":ripple:") ripple = true;
+      if (tag === ":rainbow:") rainbow = true;
       if (tag === ":blue:") color = "#60a5fa";
       if (tag === ":red:") color = "#ef4444";
       if (tag === ":green:") color = "#22c55e";
       if (tag === ":yellow:") color = "#f59e0b";
       if (tag === ":purple:") color = "#a78bfa";
     }
-    return { text: parts.join(" "), wave, shake, ripple, color, rainbow };
+    const text = parts.join(" ");
+    return { text, wave, shake, ripple, rainbow, color };
+  }, []);
+
+  // Split a message into styled segments for inline tags like :red: Red :green: mixed :blue: blue
+  const parseInlineSegments = useCallback((text: string) => {
+    const tokens = text.split(/(\s+)/); // preserve spaces tokens
+    let current: { color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean } = {};
+    const segs: Array<{ text: string; color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean }> = [];
+    const pushSeg = (t: string) => { if (t) segs.push({ text: t, ...current }); };
+    const setColor = (tag: string) => {
+      if (tag === ":red:") current.color = "#ef4444";
+      else if (tag === ":green:") current.color = "#22c55e";
+      else if (tag === ":blue:") current.color = "#60a5fa";
+      else if (tag === ":yellow:") current.color = "#f59e0b";
+      else if (tag === ":purple:") current.color = "#a78bfa";
+    };
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i];
+      if (/^:.+:$/.test(tok)) {
+        const lower = tok.toLowerCase();
+        if ([":red:", ":green:", ":blue:", ":yellow:", ":purple:"].includes(lower)) { setColor(lower); continue; }
+        if (lower === ":wave:") { current.wave = true; continue; }
+        if (lower === ":shake:") { current.shake = true; continue; }
+        if (lower === ":ripple:") { current.ripple = true; continue; }
+        if (lower === ":rainbow:") { current.rainbow = true; continue; }
+      }
+      pushSeg(tok);
+    }
+    return segs;
   }, []);
 
   const poll = useCallback(async () => {
@@ -127,16 +156,54 @@ export default function ChatClient({ characterId, scene }: { characterId: string
     }
   }, [characterId, input, parseTags, poll, scene]);
 
+  const renderSegment = (seg: { text: string; color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean }, key: string) => {
+    const baseStyle: React.CSSProperties = { color: seg.color };
+    const classNames: string[] = [];
+    if (seg.rainbow) classNames.push("chat-rainbow");
+    if (seg.shake) classNames.push("chat-shake");
+    // Break segment into characters for wave/ripple
+    if (seg.wave || seg.ripple) {
+      const chars = Array.from(seg.text);
+      return (
+        <span key={key} style={baseStyle} className={classNames.join(" ")}> 
+          {chars.map((ch, i) => (
+            <span key={i} style={{"--i": i} as React.CSSProperties} className={(seg.wave ? "chat-wave-char " : "") + (seg.ripple ? "chat-ripple-char" : "")}>{ch}</span>
+          ))}
+        </span>
+      );
+    }
+    return <span key={key} style={baseStyle} className={classNames.join(" ")}>{seg.text}</span>;
+  };
+
   return (
     <div className="rounded-md border border-white/10 bg-black/40 backdrop-blur">
       <div ref={boxRef} className="max-h-48 overflow-y-auto p-2 text-xs text-gray-200 space-y-1">
-        {messages.map(m => <div key={m.id} className="leading-tight">{m.text}</div>)}
+        {messages.map(m => {
+          // For display, process inline tags; leading tags will apply to the whole line initially
+          const leading = parseTags(m.text);
+          const segs = parseInlineSegments(leading.text);
+          if (segs.length === 0) segs.push({ text: leading.text, color: leading.color, wave: leading.wave, ripple: leading.ripple, shake: leading.shake, rainbow: leading.rainbow });
+          // If leading tags had color/effects, apply them to any segment that didn't specify
+          const enriched = segs.map(s => ({
+            text: s.text,
+            color: s.color ?? leading.color,
+            wave: s.wave ?? leading.wave,
+            ripple: s.ripple ?? leading.ripple,
+            shake: s.shake ?? leading.shake,
+            rainbow: s.rainbow ?? leading.rainbow,
+          }));
+          return (
+            <div key={m.id} className="leading-tight">
+              {enriched.map((seg, i) => renderSegment(seg, `${m.id}-${i}`))}
+            </div>
+          );
+        })}
       </div>
       <div className="flex items-center gap-2 border-t border-white/10 p-2">
         <input
           id="chat-input"
           className="flex-1 rounded bg-black/50 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-white/20"
-          placeholder=":wave: :red: :shake: Hello there"
+          placeholder=":wave: :ripple: :red: Red :green: mixed with :blue: blue"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onFocus={() => { window.__setTyping?.(true); }}

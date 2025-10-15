@@ -9,6 +9,22 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-10-14",
+    version: "0.0.8",
+    title: "Chat Possession, Rainbow Whispers, and Shiny Things",
+    highlights: [
+      "Global chat added with a dedicated chat box and overhead messages",
+      "Chat effects: :wave:, :shake:, :ripple:, :rainbow:, plus inline :red::green::blue::yellow::purple: coloring",
+      "Gold and Premium now flaunt themselves in the HUD, Shop, Inventory, and Storage",
+    ],
+    notes: [
+      "Press '/' to commune with the void (type), Enter to cast your words, then you're tossed back to reality",
+      "Overhead messages ripple and wave one letter at a time—like your sanity",
+      "Inline color tags paint words exactly as you demand, mortal",
+      "We rate limit chat (3 msgs/5s), because demons despise spam",
+    ],
+  },
+  {
+    date: "2025-10-14",
     version: "0.0.7",
     title: "Town Shop, Sawmill, and Account Controls",
     highlights: [

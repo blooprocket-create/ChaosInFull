@@ -302,32 +302,67 @@ class TownScene extends Phaser.Scene {
     }
     // Overhead chat spawner for Town
     window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
-      const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
-      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
+      // Parse inline color tags (e.g., :red:, :green:, :blue:, :yellow:, :purple:)
+      const tokens = text.split(/(\s+)/);
+      let currentColor = opts?.color || "#e5e7eb";
+      const segs: Array<{ text: string; color: string }> = [];
+      const applyColor = (tag: string) => {
+        if (tag === ":red:") currentColor = "#ef4444";
+        else if (tag === ":green:") currentColor = "#22c55e";
+        else if (tag === ":blue:") currentColor = "#60a5fa";
+        else if (tag === ":yellow:") currentColor = "#f59e0b";
+        else if (tag === ":purple:") currentColor = "#a78bfa";
+      };
+      for (const tok of tokens) {
+        if (/^:.+:$/.test(tok)) { applyColor(tok.toLowerCase()); continue; }
+        if (tok) segs.push({ text: tok, color: currentColor });
+      }
+      // Build per-character sprites and center over player
+      const container = this.add.container(0, 0).setDepth(15);
+      const charTexts: Phaser.GameObjects.Text[] = [];
+      let xOff = 0;
+      for (const seg of segs) {
+        for (const ch of seg.text.split("")) {
+          const t = this.add.text(xOff, 0, ch, { color: seg.color, fontSize: "12px" }).setOrigin(0, 0.5);
+          container.add(t);
+          charTexts.push(t);
+          xOff += t.width;
+        }
+      }
+      const totalWidth = xOff;
+      container.setSize(totalWidth, 16).setPosition(this.player.x - totalWidth / 2, this.player.y - 36);
+      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => container.setPosition(this.player.x - totalWidth / 2, this.player.y - 36) });
       const tweens: Phaser.Tweens.Tween[] = [];
-      // wave (vertical bob)
-      if (opts?.wave) tweens.push(this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      // shake (horizontal jitter)
-      if (opts?.shake) tweens.push(this.tweens.add({ targets: t, x: t.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      // ripple (scale pulse)
-      if (opts?.ripple) tweens.push(this.tweens.add({ targets: t, scale: 1.12, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      // rainbow (color cycle)
+      // Staggered wave/ripple per char
+      if (opts?.wave) {
+        charTexts.forEach((t, i) => {
+          tweens.push(this.tweens.add({ targets: t, y: { from: -3, to: 3 }, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 }));
+        });
+      }
+      if (opts?.ripple) {
+        charTexts.forEach((t, i) => {
+          tweens.push(this.tweens.add({ targets: t, scale: { from: 1, to: 1.12 }, duration: 560, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 }));
+        });
+      }
+      if (opts?.shake) {
+        tweens.push(this.tweens.add({ targets: container, x: container.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      }
+      // Rainbow per whole string for performance (overrides per-char colors temporarily)
       let colorTimer: Phaser.Time.TimerEvent | null = null;
       if (opts?.rainbow) {
         let hue = 0;
         colorTimer = this.time.addEvent({ delay: 80, loop: true, callback: () => {
           hue = (hue + 12) % 360;
-          // Convert HSL to hex CSS color
-          const c = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color;
-          const hex = `#${c.toString(16).padStart(6, "0")}`;
-          t.setColor(hex);
+          const hex = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color.toString(16).padStart(6, "0");
+          const col = `#${hex}`;
+          charTexts.forEach(t => t.setColor(col));
         }});
       }
       this.time.delayedCall(2800, () => {
         tweens.forEach(tr => tr.stop());
         if (colorTimer) colorTimer.remove(false);
         follow.remove();
-        this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
+        this.tweens.add({ targets: container, alpha: 0, duration: 350, onComplete: () => container.destroy(true) });
       });
     };
     // Clean up listeners when scene shuts down
@@ -519,27 +554,52 @@ class CaveScene extends Phaser.Scene {
     this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner
     window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
-      const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
-      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
+      const tokens = text.split(/(\s+)/);
+      let currentColor = opts?.color || "#e5e7eb";
+      const segs: Array<{ text: string; color: string }> = [];
+      const applyColor = (tag: string) => {
+        if (tag === ":red:") currentColor = "#ef4444";
+        else if (tag === ":green:") currentColor = "#22c55e";
+        else if (tag === ":blue:") currentColor = "#60a5fa";
+        else if (tag === ":yellow:") currentColor = "#f59e0b";
+        else if (tag === ":purple:") currentColor = "#a78bfa";
+      };
+      for (const tok of tokens) {
+        if (/^:.+:$/.test(tok)) { applyColor(tok.toLowerCase()); continue; }
+        if (tok) segs.push({ text: tok, color: currentColor });
+      }
+      const container = this.add.container(0, 0).setDepth(15);
+      const charTexts: Phaser.GameObjects.Text[] = [];
+      let xOff = 0;
+      for (const seg of segs) {
+        for (const ch of seg.text.split("")) {
+          const t = this.add.text(xOff, 0, ch, { color: seg.color, fontSize: "12px" }).setOrigin(0, 0.5);
+          container.add(t);
+          charTexts.push(t);
+          xOff += t.width;
+        }
+      }
+      const totalWidth = xOff;
+      container.setSize(totalWidth, 16).setPosition(this.player.x - totalWidth / 2, this.player.y - 36);
+      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => container.setPosition(this.player.x - totalWidth / 2, this.player.y - 36) });
       const tweens: Phaser.Tweens.Tween[] = [];
-      if (opts?.wave) tweens.push(this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      if (opts?.shake) tweens.push(this.tweens.add({ targets: t, x: t.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      if (opts?.ripple) tweens.push(this.tweens.add({ targets: t, scale: 1.12, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      if (opts?.wave) charTexts.forEach((t, i) => tweens.push(this.tweens.add({ targets: t, y: { from: -3, to: 3 }, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
+      if (opts?.ripple) charTexts.forEach((t, i) => tweens.push(this.tweens.add({ targets: t, scale: { from: 1, to: 1.12 }, duration: 560, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
+      if (opts?.shake) tweens.push(this.tweens.add({ targets: container, x: container.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
       let colorTimer: Phaser.Time.TimerEvent | null = null;
       if (opts?.rainbow) {
         let hue = 0;
         colorTimer = this.time.addEvent({ delay: 80, loop: true, callback: () => {
           hue = (hue + 12) % 360;
-          const c = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color;
-          const hex = `#${c.toString(16).padStart(6, "0")}`;
-          t.setColor(hex);
+          const col = `#${Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color.toString(16).padStart(6, "0")}`;
+          charTexts.forEach(t => t.setColor(col));
         }});
       }
       this.time.delayedCall(2800, () => {
         tweens.forEach(tr => tr.stop());
         if (colorTimer) colorTimer.remove(false);
         follow.remove();
-        this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
+        this.tweens.add({ targets: container, alpha: 0, duration: 350, onComplete: () => container.destroy(true) });
       });
     };
     this.events.on("shutdown", () => {
@@ -656,27 +716,52 @@ class SlimeFieldScene extends Phaser.Scene {
     this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner for Slime scene
     window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
-      const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
-      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
+      const tokens = text.split(/(\s+)/);
+      let currentColor = opts?.color || "#e5e7eb";
+      const segs: Array<{ text: string; color: string }> = [];
+      const applyColor = (tag: string) => {
+        if (tag === ":red:") currentColor = "#ef4444";
+        else if (tag === ":green:") currentColor = "#22c55e";
+        else if (tag === ":blue:") currentColor = "#60a5fa";
+        else if (tag === ":yellow:") currentColor = "#f59e0b";
+        else if (tag === ":purple:") currentColor = "#a78bfa";
+      };
+      for (const tok of tokens) {
+        if (/^:.+:$/.test(tok)) { applyColor(tok.toLowerCase()); continue; }
+        if (tok) segs.push({ text: tok, color: currentColor });
+      }
+      const container = this.add.container(0, 0).setDepth(15);
+      const charTexts: Phaser.GameObjects.Text[] = [];
+      let xOff = 0;
+      for (const seg of segs) {
+        for (const ch of seg.text.split("")) {
+          const t = this.add.text(xOff, 0, ch, { color: seg.color, fontSize: "12px" }).setOrigin(0, 0.5);
+          container.add(t);
+          charTexts.push(t);
+          xOff += t.width;
+        }
+      }
+      const totalWidth = xOff;
+      container.setSize(totalWidth, 16).setPosition(this.player.x - totalWidth / 2, this.player.y - 36);
+      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => container.setPosition(this.player.x - totalWidth / 2, this.player.y - 36) });
       const tweens: Phaser.Tweens.Tween[] = [];
-      if (opts?.wave) tweens.push(this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      if (opts?.shake) tweens.push(this.tweens.add({ targets: t, x: t.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-      if (opts?.ripple) tweens.push(this.tweens.add({ targets: t, scale: 1.12, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+      if (opts?.wave) charTexts.forEach((t, i) => tweens.push(this.tweens.add({ targets: t, y: { from: -3, to: 3 }, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
+      if (opts?.ripple) charTexts.forEach((t, i) => tweens.push(this.tweens.add({ targets: t, scale: { from: 1, to: 1.12 }, duration: 560, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
+      if (opts?.shake) tweens.push(this.tweens.add({ targets: container, x: container.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
       let colorTimer: Phaser.Time.TimerEvent | null = null;
       if (opts?.rainbow) {
         let hue = 0;
         colorTimer = this.time.addEvent({ delay: 80, loop: true, callback: () => {
           hue = (hue + 12) % 360;
-          const c = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color;
-          const hex = `#${c.toString(16).padStart(6, "0")}`;
-          t.setColor(hex);
+          const col = `#${Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color.toString(16).padStart(6, "0")}`;
+          charTexts.forEach(t => t.setColor(col));
         }});
       }
       this.time.delayedCall(2800, () => {
         tweens.forEach(tr => tr.stop());
         if (colorTimer) colorTimer.remove(false);
         follow.remove();
-        this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
+        this.tweens.add({ targets: container, alpha: 0, duration: 350, onComplete: () => container.destroy(true) });
       });
     };
     this.events.on("shutdown", () => {
