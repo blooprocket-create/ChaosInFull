@@ -18,6 +18,8 @@ declare global {
     __closeSawmill?: () => void;
     __closeShop?: () => void;
     __spawnOverhead?: (text: string, opts?: { wave?: boolean; color?: string }) => void;
+    __setTyping?: (v: boolean) => void;
+    __isTyping?: boolean;
   }
 }
 
@@ -180,6 +182,9 @@ class TownScene extends Phaser.Scene {
     });
     // Drop-through with S key only if ground below is a distinct lower platform
     this.input.keyboard!.on("keydown-S", () => {
+      const w = window as unknown as { __isTyping?: boolean };
+      const isTyping = (w.__isTyping ?? false);
+      if (isTyping) return;
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       if (!body) return;
       const feetY = this.player.y + (this.player.displayHeight / 2);
@@ -294,18 +299,36 @@ class TownScene extends Phaser.Scene {
       img.setTint(Math.random() > 0.5 ? 0xbe18ff : 0xef4444);
       this.time.delayedCall(Phaser.Math.Between(0, 2000), () => animate(img));
     }
+    // Overhead chat spawner for Town
+    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
+      const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
+      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
+      let tween: Phaser.Tweens.Tween | null = null;
+      if (opts?.wave) tween = this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.time.delayedCall(2800, () => {
+        if (tween) tween.stop();
+        follow.remove();
+        this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
+      });
+    };
   }
   update() {
     if (!this.player || !this.cursors) return;
+  const w = window as unknown as { __isTyping?: boolean };
+  const typing = (w.__isTyping ?? false);
     const speed = 220;
     let vx = 0;
-    if (this.cursors.A.isDown) vx -= speed;
-    if (this.cursors.D.isDown) vx += speed;
-    this.player.setVelocityX(vx);
-    // Jump with W when on floor
-    const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down;
-    if (this.cursors.W.isDown && onFloor) {
-      this.player.setVelocityY(-420);
+    if (!typing) {
+      if (this.cursors.A.isDown) vx -= speed;
+      if (this.cursors.D.isDown) vx += speed;
+      this.player.setVelocityX(vx);
+      // Jump with W when on floor
+      const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down;
+      if (this.cursors.W.isDown && onFloor) {
+        this.player.setVelocityY(-420);
+      }
+    } else {
+      this.player.setVelocityX(0);
     }
   // Portal checks
     const dist = (a: Phaser.GameObjects.Image, b: Phaser.GameObjects.Image | Phaser.Physics.Arcade.Image) => Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
@@ -334,7 +357,7 @@ class TownScene extends Phaser.Scene {
   if (!nearSawmill) window.__closeSawmill?.();
   if (!nearStorage) window.__closeStorage?.();
   if (!nearShop) window.__closeShop?.();
-  if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+  if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
         // Save destination scene immediately before transition
@@ -517,11 +540,18 @@ class CaveScene extends Phaser.Scene {
   updateHUD() {}
   update() {
     if (!this.player || !this.cursors) return;
-    const speed = 220; let vx = 0; if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
-    const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
+  const w = window as unknown as { __isTyping?: boolean };
+  const typing = (w.__isTyping ?? false);
+    const speed = 220; let vx = 0;
+    if (!typing) {
+      if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
+      const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
+    } else {
+      this.player.setVelocityX(0);
+    }
     if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
     // Exit to Town
-    if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
+    if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "cave", portal: "town" });
       // Save destination (Town) before transitioning back
       window.__saveSceneNow?.("Town");
@@ -581,13 +611,32 @@ class SlimeFieldScene extends Phaser.Scene {
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
     });
+    // Overhead chat spawner for Slime scene
+    window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
+      const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
+      const follow = this.time.addEvent({ delay: 50, loop: true, callback: () => t.setPosition(this.player.x, this.player.y - 36) });
+      let tween: Phaser.Tweens.Tween | null = null;
+      if (opts?.wave) tween = this.tweens.add({ targets: t, y: t.y - 6, duration: 350, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.time.delayedCall(2800, () => {
+        if (tween) tween.stop();
+        follow.remove();
+        this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
+      });
+    };
   }
   update() {
     if (!this.player || !this.cursors) return;
-    const speed = 220; let vx = 0; if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
-    const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
+  const w = window as unknown as { __isTyping?: boolean };
+  const typing = (w.__isTyping ?? false);
+    const speed = 220; let vx = 0;
+    if (!typing) {
+      if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
+      const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
+    } else {
+      this.player.setVelocityX(0);
+    }
     if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
-    if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
+    if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
       window.__saveSceneNow?.("Town");
       this.scene.start("TownScene");
@@ -657,11 +706,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [showStorage, setShowStorage] = useState(false);
   const [accountStorage, setAccountStorage] = useState<Record<string, number>>({});
   const [dragItem, setDragItem] = useState<{ from: "inv" | "storage"; key: string } | null>(null);
-  // Currency and chat
+  const typingRef = useRef<boolean>(false);
+  // Currency
   const [gold, setGold] = useState<number>(0);
   const [premiumGold, setPremiumGold] = useState<number>(0);
-  const [chatInput, setChatInput] = useState<string>("");
-  const [chatMessages, setChatMessages] = useState<Array<{ id: number; text: string }>>([]);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -718,6 +766,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       }
     };
     const onWindowKeydown = (e: KeyboardEvent) => {
+      if (typingRef.current) return;
       if (e.code === "Space") {
         e.preventDefault();
       }
@@ -770,6 +819,18 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       }
     };
     document.addEventListener("click", onDocClick, true);
+    // Hydrate currency immediately
+    (async () => {
+      try {
+        if (!character) return;
+        const res = await fetch(`/api/account/stats?characterId=${character.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data?.base?.gold === "number") setGold(data.base.gold);
+          if (typeof data?.base?.premiumGold === "number") setPremiumGold(data.base.premiumGold);
+        }
+      } catch {}
+    })();
     return () => {
       window.removeEventListener("resize", onResize);
       el.removeEventListener("keydown", onKeydown);
@@ -985,6 +1046,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   window.__openStorage = () => setShowStorage(true);
   window.__openSawmill = () => setShowSawmill(true);
   window.__openShop = () => setShowShop(true);
+  window.__setTyping = (v: boolean) => { typingRef.current = v; (window as unknown as { __isTyping?: boolean }).__isTyping = v; };
   window.__closeFurnace = () => setShowFurnace(false);
   window.__closeWorkbench = () => setShowWorkbench(false);
   window.__closeStorage = () => setShowStorage(false);
@@ -998,6 +1060,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       delete window.__openStorage;
   delete window.__openSawmill;
   delete window.__openShop;
+      delete window.__setTyping;
       delete window.__closeFurnace;
       delete window.__closeWorkbench;
       delete window.__closeStorage;
@@ -1473,6 +1536,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             if (res.ok) {
               const data = await res.json();
               setStatsData({ base: data.base, skills: data.skills });
+              if (typeof data?.base?.gold === "number") setGold(data.base.gold);
+              if (typeof data?.base?.premiumGold === "number") setPremiumGold(data.base.premiumGold);
               setShowStats(true);
             }
           } catch {}
@@ -1827,62 +1892,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           </div>
         </div>
       )}
-      {/* Chat Panel */}
-      <div className="pointer-events-auto absolute left-3 bottom-3 z-10 w-[min(420px,80vw)]">
-        <div className="rounded-md border border-white/10 bg-black/40 backdrop-blur">
-          <div className="max-h-40 overflow-y-auto p-2 text-xs text-gray-200 space-y-1">
-            {chatMessages.map((m) => (
-              <div key={m.id} className="leading-tight">{m.text}</div>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 border-t border-white/10 p-2">
-            <input
-              className="flex-1 rounded bg-black/50 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-white/20"
-              placeholder=":wave: Hello there"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && chatInput.trim().length > 0) {
-                  const raw = chatInput.trim();
-                  const parts = raw.split(/\s+/);
-                  let wave = false; let color: string | undefined;
-                  while (parts.length && /^:.+:$/.test(parts[0])) {
-                    const tag = parts.shift()!.toLowerCase();
-                    if (tag === ":wave:") wave = true;
-                    if (tag === ":blue:") color = "#60a5fa";
-                  }
-                  const text = parts.join(" ");
-                  if (text.length > 0) {
-                    setChatMessages((curr) => [...curr, { id: Date.now() + Math.floor(Math.random()*1000), text: raw }]);
-                    window.__spawnOverhead?.(text, { wave, color });
-                  }
-                  setChatInput("");
-                }
-              }}
-            />
-            <button
-              className="btn px-2 py-1 text-xs"
-              onClick={() => {
-                const raw = chatInput.trim();
-                if (!raw) return;
-                const parts = raw.split(/\s+/);
-                let wave = false; let color: string | undefined;
-                while (parts.length && /^:.+:$/.test(parts[0])) {
-                  const tag = parts.shift()!.toLowerCase();
-                  if (tag === ":wave:") wave = true;
-                  if (tag === ":blue:") color = "#60a5fa";
-                }
-                const text = parts.join(" ");
-                if (text.length > 0) {
-                  setChatMessages((curr) => [...curr, { id: Date.now() + Math.floor(Math.random()*1000), text: raw }]);
-                  window.__spawnOverhead?.(text, { wave, color });
-                }
-                setChatInput("");
-              }}
-            >Say</button>
-          </div>
-        </div>
-      </div>
+      {/* Chat moved to dedicated ChatClient under the canvas */}
       {/* Welcome Modal (first time) */}
       {!welcomeSeen && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">

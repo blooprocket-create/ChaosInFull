@@ -3,6 +3,7 @@ import { getSession } from "@/src/lib/auth";
 import GameCanvasClient from "@/src/game/GameCanvasClient";
 import CharacterSelect from "@/src/components/CharacterSelect";
 import { prisma } from "@/src/lib/prisma";
+import ChatClient from "@/src/components/ChatClient";
 
 export const metadata = { title: "Play • Chaos In Full" };
 export const dynamic = "force-dynamic";
@@ -51,6 +52,10 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
                   initialMiningExp={character.miningExp ?? 0}
                   initialMiningLevel={character.miningLevel ?? 1}
                 />
+              </div>
+              <div className="mt-4">
+                {/* Decoupled chat panel below the game */}
+                <ChatClient characterId={character.id} scene={(character.lastScene as string) || "Town"} />
               </div>
             </>
           )}

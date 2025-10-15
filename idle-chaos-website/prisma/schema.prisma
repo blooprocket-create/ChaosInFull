@@ -17,6 +17,7 @@ model User {
   stats        PlayerStat?
   characters   Character[]
   accountItemStacks AccountItemStack[]
+  chatMessages ChatMessage[]
 }
 
 model PlayerStat {
@@ -62,6 +63,7 @@ model Character {
   updatedAt DateTime @updatedAt
   itemStacks ItemStack[]
   craftQueue CraftQueue?
+  chatMessages ChatMessage[]
   @@unique([userId, name])
 }
 
@@ -93,6 +95,18 @@ model AccountItemStack {
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
   @@unique([userId, itemKey])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  character Character? @relation(fields: [characterId], references: [id])
+  characterId String?
+  text      String
+  createdAt DateTime @default(now())
+  // Optional zone/scene for scoping later
+  scene     String   @default("Town")
 }
 
 enum Gender {
