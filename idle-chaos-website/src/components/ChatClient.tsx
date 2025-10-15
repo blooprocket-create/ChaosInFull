@@ -11,6 +11,9 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   // focus state not kept beyond gating
   const lastTsRef = useRef<string>(new Date(Date.now() - 60_000).toISOString());
   const boxRef = useRef<HTMLDivElement>(null);
+  const seenIds = useRef<Set<string>>(new Set());
+  const pollInFlight = useRef(false);
+  const sendingRef = useRef(false);
 
   // Parse tags like :wave:, :blue:, :red:, :green:, :shake:, :rainbow:
   const parseTags = useCallback((raw: string) => {
@@ -32,16 +35,27 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   }, []);
 
   const poll = useCallback(async () => {
+    if (pollInFlight.current) return;
+    pollInFlight.current = true;
     try {
       const res = await fetch(`/api/chat?since=${encodeURIComponent(lastTsRef.current)}&scene=${encodeURIComponent(scene)}`);
       if (!res.ok) return;
-  const data = await res.json();
-  const msgs = (data?.messages as Array<{ id: string; text: string; createdAt: string; characterId?: string | null }>) || [];
+      const data = await res.json();
+      const msgs = (data?.messages as Array<{ id: string; text: string; createdAt: string; characterId?: string | null }>) || [];
       if (msgs.length > 0) {
-        setMessages((curr) => [...curr, ...msgs]);
+        // dedupe by id and append
+        const newOnes: typeof msgs = [];
+        for (const m of msgs) {
+          if (!seenIds.current.has(m.id)) {
+            seenIds.current.add(m.id);
+            newOnes.push(m);
+          }
+        }
+        if (newOnes.length) setMessages((curr) => [...curr, ...newOnes]);
         lastTsRef.current = msgs[msgs.length - 1].createdAt;
       }
     } catch {}
+    finally { pollInFlight.current = false; }
   }, [scene]);
 
   useEffect(() => {
@@ -49,10 +63,13 @@ export default function ChatClient({ characterId, scene }: { characterId: string
     return () => clearInterval(id);
   }, [poll]);
 
+  // Auto-scroll to bottom if user is already near the bottom; otherwise preserve scroll position
   useEffect(() => {
-    // autoscroll
     const el = boxRef.current; if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (nearBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages.length]);
 
   // Focus shortcuts: '/' focuses, Escape blurs
@@ -68,7 +85,9 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   }, []);
 
   const send = useCallback(async () => {
+    if (sendingRef.current) return;
     const raw = input.trim(); if (!raw) return;
+    sendingRef.current = true;
     const parsed = parseTags(raw);
     if (!parsed.text) { setInput(""); return; }
     try {
@@ -81,6 +100,10 @@ export default function ChatClient({ characterId, scene }: { characterId: string
         void poll();
       }
     } catch {}
+    finally {
+      // brief unlock so rapid-enter doesn't double-send
+      setTimeout(() => { sendingRef.current = false; }, 100);
+    }
   }, [characterId, input, parseTags, poll, scene]);
 
   return (
@@ -97,7 +120,8 @@ export default function ChatClient({ characterId, scene }: { characterId: string
           onChange={(e) => setInput(e.target.value)}
           onFocus={() => { window.__setTyping?.(true); }}
           onBlur={() => { window.__setTyping?.(false); }}
-          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+          onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter" && !e.repeat) { e.preventDefault(); send(); } }}
+          onKeyUp={(e) => { e.stopPropagation(); }}
         />
         <button className="btn px-2 py-1 text-xs" onClick={() => send()}>Say</button>
       </div>

@@ -25,9 +25,11 @@ declare global {
 
 class TownScene extends Phaser.Scene {
   constructor() { super("TownScene"); }
+  private onResizeHandler?: (gameSize: Phaser.Structs.Size) => void;
   private player!: Phaser.Physics.Arcade.Image;
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
+  private platformCollider?: Phaser.Physics.Arcade.Collider;
   private groundRect!: Phaser.GameObjects.Rectangle;
   private upperPlatformRect!: Phaser.GameObjects.Rectangle;
   private upperPlatformBody!: Phaser.Physics.Arcade.Image;
@@ -173,7 +175,7 @@ class TownScene extends Phaser.Scene {
     this.player.setDepth(5);
     // Gravity for the player
   (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900);
-    this.physics.add.collider(this.player, this.upperPlatformBody, undefined, () => {
+    this.platformCollider = this.physics.add.collider(this.player, this.upperPlatformBody, undefined, () => {
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       const falling = body.velocity.y >= 0;
       const feetY = this.player.y + (this.player.displayHeight / 2);
@@ -182,8 +184,7 @@ class TownScene extends Phaser.Scene {
     });
     // Drop-through with S key only if ground below is a distinct lower platform
     this.input.keyboard!.on("keydown-S", () => {
-      const w = window as unknown as { __isTyping?: boolean };
-      const isTyping = (w.__isTyping ?? false);
+      const isTyping = !!window.__isTyping;
       if (isTyping) return;
       const body = this.player.body as Phaser.Physics.Arcade.Body;
       if (!body) return;
@@ -194,11 +195,7 @@ class TownScene extends Phaser.Scene {
       const groundTop = this.groundRect.y - (this.groundRect.height / 2);
       // Require noticeable separation
       if (groundTop - platTop < 40) return;
-      const active = this.physics.world.colliders.getActive();
-      const platformCollider = active.find(c => {
-        const anyC = c as { object1?: unknown; object2?: unknown };
-        return (anyC.object1 === this.player && anyC.object2 === this.upperPlatformBody) || (anyC.object2 === this.player && anyC.object1 === this.upperPlatformBody);
-      });
+      const platformCollider = this.platformCollider;
       if (!platformCollider) return;
       platformCollider.active = false;
       body.setVelocityY(220);
@@ -219,10 +216,12 @@ class TownScene extends Phaser.Scene {
     this.eKey = this.input.keyboard!.addKey("E", true, true);
     // World bounds
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
-    this.scale.on("resize", (gameSize: Phaser.Structs.Size) => {
+    // Cache resize handler so we can remove it on shutdown to avoid callbacks after scene stop
+    this.onResizeHandler = (gameSize: Phaser.Structs.Size) => {
       // reposition ground and refresh body on resize
       const w = gameSize.width;
       const h = gameSize.height;
+      if (!this.groundRect || !ground) return;
       this.groundRect.setPosition(w / 2, h - 40).setSize(w * 0.9, 12);
       ground.setPosition(this.groundRect.x, this.groundRect.y);
       ground.displayWidth = this.groundRect.width;
@@ -252,7 +251,8 @@ class TownScene extends Phaser.Scene {
     this.sawmillPrompt.setPosition(this.sawmill.x, this.sawmill.y - 30);
       this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
       this.physics.world.setBounds(0, 0, w, h);
-    });
+    };
+    this.scale.on("resize", this.onResizeHandler);
     // Ambient particles: generate a tiny dot texture
     const g = this.add.graphics();
     g.fillStyle(0xffffff, 1);
@@ -311,11 +311,14 @@ class TownScene extends Phaser.Scene {
         this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
       });
     };
+    // Clean up listeners when scene shuts down
+    this.events.on("shutdown", () => {
+      if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
+    });
   }
   update() {
     if (!this.player || !this.cursors) return;
-  const w = window as unknown as { __isTyping?: boolean };
-  const typing = (w.__isTyping ?? false);
+  const typing = !!window.__isTyping;
     const speed = 220;
     let vx = 0;
     if (!typing) {
@@ -385,6 +388,7 @@ class TownScene extends Phaser.Scene {
 
 class CaveScene extends Phaser.Scene {
   constructor() { super("CaveScene"); }
+  private onResizeHandler?: (gameSize: Phaser.Structs.Size) => void;
   private player!: Phaser.Physics.Arcade.Image;
   private groundRect!: Phaser.GameObjects.Rectangle;
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
@@ -484,14 +488,16 @@ class CaveScene extends Phaser.Scene {
     this.eKey = this.input.keyboard!.addKey("E", true, true);
     // Resize handling
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
-    this.scale.on("resize", (gameSize: Phaser.Structs.Size) => {
+    this.onResizeHandler = (gameSize: Phaser.Structs.Size) => {
       const w = gameSize.width; const h = gameSize.height;
+      if (!this.groundRect || !ground) return;
       this.groundRect.setPosition(w / 2, h - 40).setSize(w * 0.9, 12);
       ground.setPosition(this.groundRect.x, this.groundRect.y);
       ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
-    });
+    };
+    this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner
     window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
       const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
@@ -504,7 +510,10 @@ class CaveScene extends Phaser.Scene {
         this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
       });
     };
-    this.events.on("shutdown", () => { /* timers auto clean */ });
+    this.events.on("shutdown", () => {
+      if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
+      // timers auto clean
+    });
   }
   private isNearNode(node: Phaser.GameObjects.Image) {
     if (!this.player) return false;
@@ -540,8 +549,7 @@ class CaveScene extends Phaser.Scene {
   updateHUD() {}
   update() {
     if (!this.player || !this.cursors) return;
-  const w = window as unknown as { __isTyping?: boolean };
-  const typing = (w.__isTyping ?? false);
+  const typing = !!window.__isTyping;
     const speed = 220; let vx = 0;
     if (!typing) {
       if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
@@ -562,6 +570,7 @@ class CaveScene extends Phaser.Scene {
 
 class SlimeFieldScene extends Phaser.Scene {
   constructor() { super("SlimeFieldScene"); }
+  private onResizeHandler?: (gameSize: Phaser.Structs.Size) => void;
   private player!: Phaser.Physics.Arcade.Image;
   private groundRect!: Phaser.GameObjects.Rectangle;
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
@@ -603,14 +612,16 @@ class SlimeFieldScene extends Phaser.Scene {
     this.eKey = this.input.keyboard!.addKey("E", true, true);
     // Resize
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
-    this.scale.on("resize", (gameSize: Phaser.Structs.Size) => {
+    this.onResizeHandler = (gameSize: Phaser.Structs.Size) => {
       const w = gameSize.width; const h = gameSize.height;
+      if (!this.groundRect || !ground) return;
       this.groundRect.setPosition(w / 2, h - 40).setSize(w * 0.9, 12);
       ground.setPosition(this.groundRect.x, this.groundRect.y);
       ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
-    });
+    };
+    this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner for Slime scene
     window.__spawnOverhead = (text: string, opts?: { wave?: boolean; color?: string }) => {
       const t = this.add.text(this.player.x, this.player.y - 36, text, { color: opts?.color || "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setDepth(15);
@@ -623,11 +634,13 @@ class SlimeFieldScene extends Phaser.Scene {
         this.tweens.add({ targets: t, alpha: 0, duration: 350, onComplete: () => t.destroy() });
       });
     };
+    this.events.on("shutdown", () => {
+      if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
+    });
   }
   update() {
     if (!this.player || !this.cursors) return;
-  const w = window as unknown as { __isTyping?: boolean };
-  const typing = (w.__isTyping ?? false);
+  const typing = !!window.__isTyping;
     const speed = 220; let vx = 0;
     if (!typing) {
       if (this.cursors.A.isDown) vx -= speed; if (this.cursors.D.isDown) vx += speed; this.player.setVelocityX(vx);
@@ -1046,7 +1059,20 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   window.__openStorage = () => setShowStorage(true);
   window.__openSawmill = () => setShowSawmill(true);
   window.__openShop = () => setShowShop(true);
-  window.__setTyping = (v: boolean) => { typingRef.current = v; (window as unknown as { __isTyping?: boolean }).__isTyping = v; };
+  window.__setTyping = (v: boolean) => {
+    typingRef.current = v;
+    window.__isTyping = v;
+    // Also disable Phaser keyboard when typing, re-enable when not typing
+    const game = gameRef.current;
+    if (game) {
+      const scenes = game.scene.getScenes(true);
+      for (const s of scenes) {
+        if (s.input && s.input.keyboard) {
+          s.input.keyboard.enabled = !v;
+        }
+      }
+    }
+  };
   window.__closeFurnace = () => setShowFurnace(false);
   window.__closeWorkbench = () => setShowWorkbench(false);
   window.__closeStorage = () => setShowStorage(false);
