@@ -41,7 +41,7 @@ export default function ChatClient({ characterId, scene }: { characterId: string
   // Split a message into styled segments for inline tags like :red: Red :green: mixed :blue: blue
   const parseInlineSegments = useCallback((text: string) => {
     const tokens = text.split(/(\s+)/); // preserve spaces tokens
-    let current: { color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean } = {};
+    const current: { color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean } = {};
     const segs: Array<{ text: string; color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean }> = [];
     const pushSeg = (t: string) => { if (t) segs.push({ text: t, ...current }); };
     const setColor = (tag: string) => {
@@ -154,7 +154,7 @@ export default function ChatClient({ characterId, scene }: { characterId: string
       // brief unlock so rapid-enter doesn't double-send
       setTimeout(() => { sendingRef.current = false; }, 100);
     }
-  }, [characterId, input, parseTags, poll, scene]);
+  }, [characterId, input, parseTags, poll, scene, cooldown]);
 
   const renderSegment = (seg: { text: string; color?: string; wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean }, key: string) => {
     const baseStyle: React.CSSProperties = { color: seg.color };
