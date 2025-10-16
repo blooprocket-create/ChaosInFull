@@ -183,8 +183,8 @@ model ItemDef {
   rarity      String  @default("common")
   stackable   Boolean @default(true)
   maxStack    Int     @default(999)
-  buy         Int     @default(0)
-  sell        Int     @default(0)
+  buy         BigInt  @default(0)
+  sell        BigInt  @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   drops       DropEntry[]

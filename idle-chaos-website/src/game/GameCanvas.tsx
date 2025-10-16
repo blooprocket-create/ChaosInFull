@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useInventorySync } from "@/src/game/hooks/useInventorySync";
 import { items as shopItems } from "@/src/data/items";
 import * as Phaser from "phaser";
+import InventoryGrid from "@/src/game/ui/InventoryGrid";
+import SplitStackModal from "@/src/game/ui/SplitStackModal";
 import createGame, { CharacterHUD as CharacterHUDType } from "./createGame";
 
 type CharacterHUD = CharacterHUDType;
@@ -68,12 +70,28 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [showStorage, setShowStorage] = useState(false);
   const [accountStorage, setAccountStorage] = useState<Record<string, number>>({});
   const [dragItem, setDragItem] = useState<{ from: "inv" | "storage"; key: string } | null>(null);
+  const [splitModal, setSplitModal] = useState<{ open: boolean; key: string; max: number; target: "storage" | "shop" | "inv" } | null>(null);
   const typingRef = useRef<boolean>(false);
   // Currency
   const [gold, setGold] = useState<number>(0);
   const [showQuests, setShowQuests] = useState(false);
   const [quests, setQuests] = useState<Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }>>([]);
   const [premiumGold, setPremiumGold] = useState<number>(0);
+  // Inventory sort/filter (view-only)
+  const [invSort, setInvSort] = useState<"name" | "qty">("name");
+  const [invFilter, setInvFilter] = useState<"all" | "materials" | "weapons" | "misc">("all");
+  const orderedKeys = useMemo(() => {
+    const keys = Object.keys(inventory);
+    const catOf = (k: string): "materials" | "weapons" | "misc" => {
+      const s = k.toLowerCase();
+      if (s.includes("armor") || s.includes("dagger") || s.includes("sword") || s.includes("bow")) return "weapons";
+      if (s.includes("copper") || s.includes("tin") || s.includes("bronze") || s.includes("log") || s.includes("plank") || s.includes("bar")) return "materials";
+      return "misc";
+    };
+    const filtered = invFilter === "all" ? keys : keys.filter((k) => catOf(k) === invFilter);
+    const sorted = [...filtered].sort((a, b) => invSort === "qty" ? ((inventory[b] ?? 0) - (inventory[a] ?? 0)) : a.localeCompare(b));
+    return sorted;
+  }, [inventory, invSort, invFilter]);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -157,7 +175,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       } else {
         // Best-effort fallback without blocking navigation
         fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) }).catch(() => {});
-        fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+        {
+          const clean: Record<string, number> = {}; for (const [k,v] of Object.entries(inv)) if ((v ?? 0) > 0) clean[k] = v;
+          fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: clean }) }).catch(() => {});
+        }
       }
     };
     document.addEventListener("click", onDocClick, true);
@@ -233,7 +254,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       // Fire-and-forget; navigation is in progress
       fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) }).catch(() => {});
-      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+      {
+        const clean: Record<string, number> = {}; for (const [k,v] of Object.entries(inv)) if ((v ?? 0) > 0) clean[k] = v;
+        fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: clean }) }).catch(() => {});
+      }
     };
   }, [character]);
 
@@ -380,14 +404,14 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     })();
   }, [showStorage]);
 
-  const moveItem = async (from: "inv" | "storage", key: string) => {
+  const moveItem = async (from: "inv" | "storage", key: string, count?: number) => {
     if (!character) return;
     try {
       const direction = from === "inv" ? "toStorage" : "toInventory";
       const res = await fetch("/api/account/storage/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ characterId: character.id, direction, itemKey: key })
+        body: JSON.stringify({ characterId: character.id, direction, itemKey: key, count })
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -1036,12 +1060,27 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Gold: <span className="text-yellow-300 font-semibold">{gold}</span></span>
               <span className="rounded bg-black/30 px-2 py-0.5 ring-1 ring-white/10">Premium: <span className="text-emerald-300 font-semibold">{premiumGold}</span></span>
             </div>
-            <div className="mt-4 grid grid-cols-6 gap-3 sm:grid-cols-8">
-              {Object.keys(inventory).length === 0 && (
-                <div className="col-span-full text-sm text-gray-400">No items yet. Mine nodes or defeat monsters to collect items.</div>
-              )}
-              {Object.entries(inventory).map(([key, count]) => {
-                const icon = (k: string) => {
+            <div className="mt-4">
+              {/* Sort/Filter controls for inventory view */}
+              <div className="mb-2 flex items-center gap-3 text-xs text-gray-300">
+                <div className="flex items-center gap-1">
+                  <span>Sort:</span>
+                  <button className={`btn px-2 py-0.5 ${invSort==='name'?'ring-emerald-500/30':''}`} onClick={()=>setInvSort('name')}>Name</button>
+                  <button className={`btn px-2 py-0.5 ${invSort==='qty'?'ring-emerald-500/30':''}`} onClick={()=>setInvSort('qty')}>Qty</button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Filter:</span>
+                  <button className={`btn px-2 py-0.5 ${invFilter==='all'?'ring-emerald-500/30':''}`} onClick={()=>setInvFilter('all')}>All</button>
+                  <button className={`btn px-2 py-0.5 ${invFilter==='materials'?'ring-emerald-500/30':''}`} onClick={()=>setInvFilter('materials')}>Materials</button>
+                  <button className={`btn px-2 py-0.5 ${invFilter==='weapons'?'ring-emerald-500/30':''}`} onClick={()=>setInvFilter('weapons')}>Weapons</button>
+                  <button className={`btn px-2 py-0.5 ${invFilter==='misc'?'ring-emerald-500/30':''}`} onClick={()=>setInvFilter('misc')}>Misc</button>
+                </div>
+              </div>
+              <InventoryGrid
+                items={inventory}
+                slots={48}
+                orderedKeys={orderedKeys}
+                renderIcon={(k) => {
                   if (k === "copper") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #f59e0b, #b45309)" }} />;
                   if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
                   if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
@@ -1050,16 +1089,13 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                   if (k === "copper_armor") return <div className="h-6 w-6 rounded" style={{ background: "radial-gradient(circle at 30% 30%, #b45309, #78350f)" }} title="Copper Armor" />;
                   if (k === "copper_dagger") return <div className="h-0 w-0 border-l-4 border-r-4 border-b-8" style={{ borderColor: "transparent transparent #b45309 transparent" }} title="Copper Dagger" />;
                   return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
-                };
-                return (
-                  <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2">
-                    <div className="flex h-full w-full items-center justify-center" title={key}>
-                      {icon(key)}
-                    </div>
-                    <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
-                  </div>
-                );
-              })}
+                }}
+                onCardContextMenu={(key, count) => setSplitModal({ open: true, key, max: count, target: "storage" })}
+                titleFor={(key, count) => `${key} (${count})`}
+              />
+              {Object.keys(inventory).length === 0 && (
+                <div className="mt-2 text-sm text-gray-400">No items yet. Mine nodes or defeat monsters to collect items.</div>
+              )}
             </div>
           </div>
         </div>
@@ -1165,14 +1201,14 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                        const data = e.dataTransfer?.getData("text/plain"); if (!data) return;
                        const { source, key } = JSON.parse(data);
                        if (source !== "shop") return;
-                       for (let i = 0; i < shopQty; i++) {
-                         const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "buy", itemKey: key, quantity: 1 }) });
-                         if (!res.ok) break;
-                         const payload = await res.json().catch(() => null);
-                         if (payload && typeof payload.gold === "number") setGold(payload.gold);
-                         const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
-                         inv[key] = (inv[key] ?? 0) + 1; gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
-                       }
+                       const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "buy", itemKey: key, quantity: shopQty }) });
+                       if (!res.ok) return;
+                       const payload = await res.json().catch(() => null);
+                       if (payload && typeof payload.gold === "number") setGold(payload.gold);
+                       const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
+                       const added = Math.max(1, Number(payload?.qty || shopQty));
+                       inv[key] = (inv[key] ?? 0) + added; gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
+                       pushToast(`Purchased ${added} ${key}${added>1?"s":""}${typeof payload?.gold === 'number' ? ` (${payload.gold} gold left)` : ""}`);
                      }}>
                   {Object.entries(inventory).map(([key, count]) => (
                     <div key={key}
@@ -1194,15 +1230,17 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                        const data = e.dataTransfer?.getData("text/plain"); if (!data) return;
                        const { source, key } = JSON.parse(data);
                        if (source !== "inventory") return;
-                       for (let i = 0; i < shopQty; i++) {
-                         if ((inventory[key] ?? 0) <= 0) break;
-                         const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "sell", itemKey: key, quantity: 1 }) });
-                         if (!res.ok) break;
-                         const payload = await res.json().catch(() => null);
-                         if (payload && typeof payload.gold === "number") setGold(payload.gold);
-                         const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
-                         inv[key] = Math.max(0, (inv[key] ?? 0) - 1); gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
-                       }
+                       const reqQty = Math.min(shopQty, inventory[key] ?? 0);
+                       if (reqQty <= 0) return;
+                       const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, action: "sell", itemKey: key, quantity: reqQty }) });
+                       if (!res.ok) return;
+                       const payload = await res.json().catch(() => null);
+                       if (payload && typeof payload.gold === "number") setGold(payload.gold);
+                       const inv = (gameRef.current?.registry.get("inventory") as Record<string, number>) || {};
+                       const sold = Math.max(1, Number(payload?.qty || reqQty));
+                       inv[key] = Math.max(0, (inv[key] ?? 0) - sold); if (inv[key] <= 0) delete inv[key];
+                       gameRef.current?.registry.set("inventory", inv); setInventory({ ...inv });
+                       pushToast(`Sold ${sold} ${key}${sold>1?"s":""}${typeof payload?.gold === 'number' ? ` (${payload.gold} gold now)` : ""}`);
                      }}>
                   {shopItems.map(it => (
                     <div key={it.key}
@@ -1332,31 +1370,40 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             <div className="mt-4 grid grid-cols-2 gap-6">
               <div>
                 <div className="mb-2 text-sm text-gray-300">Your Inventory</div>
-                <div className="grid grid-cols-6 gap-3 sm:grid-cols-8 rounded border border-white/10 bg-black/40 p-3"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => { e.preventDefault(); if (dragItem && dragItem.from === "storage") { void moveItem("storage", dragItem.key); setDragItem(null); } }}>
-                  {Object.entries(inventory).map(([key, count]) => {
-                    const icon = (k: string) => {
-                      if (k === "copper") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #f59e0b, #b45309)" }} />;
-                      if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
-                      if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
-                      if (k === "bronze_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #b8860b, #6b4f1d)" }} />;
-                      if (k === "plank") return <div className="h-5 w-8 rounded" style={{ background: "linear-gradient(135deg, #8b5e34, #5c3d1e)" }} />;
-                      if (k === "copper_armor") return <div className="h-6 w-6 rounded" style={{ background: "radial-gradient(circle at 30% 30%, #b45309, #78350f)" }} title="Copper Armor" />;
-                      if (k === "copper_dagger") return <div className="h-0 w-0 border-l-4 border-r-4 border-b-8" style={{ borderColor: "transparent transparent #b45309 transparent" }} title="Copper Dagger" />;
-                      return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
-                    };
-                    return (
-                      <div key={key} className="relative aspect-square rounded-lg border border-white/10 bg-gradient-to-br from-gray-900 to-black/60 p-2"
-                           draggable onDragStart={() => setDragItem({ from: "inv", key })}
-                           title={`${key} (${count})`}
-                           onDoubleClick={() => void moveItem("inv", key)}>
-                        <div className="flex h-full w-full items-center justify-center">{icon(key)}</div>
-                        <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white/90 ring-1 ring-white/10">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <InventoryGrid
+                  items={inventory}
+                  onContainerDragOver={(e) => e.preventDefault()}
+                  onContainerDrop={(e) => { e.preventDefault(); if (dragItem && dragItem.from === "storage") { void moveItem("storage", dragItem.key); setDragItem(null); } }}
+                  onCardDragStart={(key) => setDragItem({ from: "inv", key })}
+                  onCardDoubleClick={(key) => void moveItem("inv", key)}
+                  onCardContextMenu={(key, count) => setSplitModal({ open: true, key, max: count, target: "storage" })}
+                  renderIcon={(k) => {
+                    if (k === "copper") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #f59e0b, #b45309)" }} />;
+                    if (k === "tin") return <div className="h-6 w-6 rounded-full" style={{ background: "radial-gradient(circle at 30% 30%, #e5e7eb, #6b7280)" }} />;
+                    if (k === "copper_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #f59e0b, #b45309)" }} />;
+                    if (k === "bronze_bar") return <div className="h-4 w-8 rounded" style={{ background: "linear-gradient(135deg, #b8860b, #6b4f1d)" }} />;
+                    if (k === "plank") return <div className="h-5 w-8 rounded" style={{ background: "linear-gradient(135deg, #8b5e34, #5c3d1e)" }} />;
+                    if (k === "copper_armor") return <div className="h-6 w-6 rounded" style={{ background: "radial-gradient(circle at 30% 30%, #b45309, #78350f)" }} title="Copper Armor" />;
+                    if (k === "copper_dagger") return <div className="h-0 w-0 border-l-4 border-r-4 border-b-8" style={{ borderColor: "transparent transparent #b45309 transparent" }} title="Copper Dagger" />;
+                    return <span className="select-none text-xs font-semibold" title={k}>{k.substring(0,2).toUpperCase()}</span>;
+                  }}
+                />
+      {/* Split stack modal for partial moves (inventory -> storage for now) */}
+      {!readonly && splitModal?.open && (
+        <SplitStackModal
+          open={splitModal.open}
+          title={`Move to ${splitModal.target === 'storage' ? 'Storage' : splitModal.target === 'shop' ? 'Shop' : 'Inventory'}`}
+          max={splitModal.max}
+          onClose={() => setSplitModal(null)}
+          onConfirm={(qty) => {
+            if (!splitModal) return;
+            if (splitModal.target === 'storage') {
+              void moveItem('inv', splitModal.key, qty);
+            }
+            setSplitModal(null);
+          }}
+        />
+      )}
               </div>
               <div>
                 <div className="mb-2 text-sm text-gray-300">Account Storage</div>

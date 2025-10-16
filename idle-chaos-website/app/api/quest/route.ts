@@ -14,7 +14,7 @@ const client = prisma as unknown as {
     upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string }>; create: { id: string; name: string } }) => Promise<{ id: string; name: string }>;
   };
   itemDef: {
-    upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string; description?: string; sell?: number }> ; create: { id: string; name: string; description?: string; sell?: number } }) => Promise<void>;
+    upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string; description?: string; sell?: bigint }> ; create: { id: string; name: string; description?: string; sell?: bigint } }) => Promise<void>;
   };
   quest: {
     findUnique: (args: { where: { id: string }; include?: { rewardItems?: boolean } }) => Promise<(QuestRow & { rewardItems?: Array<{ itemId: string; qty: number }> }) | null>;
@@ -56,7 +56,7 @@ async function ensureTutorialQuest() {
     { id: "plank", name: "Plank", sell: 4 },
   ];
   for (const it of requiredItems) {
-    await client.itemDef.upsert({ where: { id: it.id }, update: {}, create: { id: it.id, name: it.name, sell: it.sell } });
+    await client.itemDef.upsert({ where: { id: it.id }, update: {}, create: { id: it.id, name: it.name, sell: BigInt(it.sell ?? 0) } });
   }
   // Seed tutorial quest with DB-driven rewards and next quest link
   const q = await client.quest.upsert({
@@ -90,7 +90,7 @@ async function ensureTutorialQuest() {
 
 async function ensureCraftDaggerQuest() {
   // Ensure dagger reward item exists for downstream quest progression
-  await client.itemDef.upsert({ where: { id: "copper_dagger" }, update: {}, create: { id: "copper_dagger", name: "Copper Dagger", sell: 16 } });
+  await client.itemDef.upsert({ where: { id: "copper_dagger" }, update: {}, create: { id: "copper_dagger", name: "Copper Dagger", sell: BigInt(16) } });
   await client.quest.upsert({
     where: { id: CRAFT_DAGGER_QUEST_ID },
     update: { name: "Can you craft?", description: "Craft one copper dagger at the workbench.", rewardCraftingExp: 150, rewardExp: 150, requiresQuestId: TUTORIAL_QUEST_ID, minLevel: 1 },

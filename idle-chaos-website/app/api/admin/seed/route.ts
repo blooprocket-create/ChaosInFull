@@ -3,7 +3,7 @@ import { getSession } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 
 type PrismaLoose = {
-  itemDef: { upsert: (args: { where: { id: string }; update: Partial<{ name: string; description: string; sell: number; buy: number }>; create: { id: string; name: string; description: string; sell: number; buy: number } }) => Promise<void> };
+  itemDef: { upsert: (args: { where: { id: string }; update: Partial<{ name: string; description: string; sell: bigint; buy: bigint }>; create: { id: string; name: string; description: string; sell: bigint; buy: bigint } }) => Promise<void> };
   npcDef: { upsert: (args: { where: { id: string }; update: Partial<{ name: string }>; create: { id: string; name: string } }) => Promise<void> };
   quest: { upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; description: string; objectiveType: string; objectiveTarget: string; objectiveCount: number; giverNpcId?: string | null; nextQuestId?: string | null; minLevel?: number; requiresQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number } }) => Promise<void> };
   questRewardItem: { findFirst: (args: { where: { questId: string; itemId: string } }) => Promise<{ id: string } | null>; create: (args: { data: { questId: string; itemId: string; qty: number } }) => Promise<void> };
@@ -46,7 +46,7 @@ export async function POST() {
   try { await (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState.deleteMany({}); } catch {}
   // Items
   for (const it of ITEMS) {
-    await client.itemDef.upsert({ where: { id: it.id }, update: { name: it.name, description: it.description ?? "", sell: it.sell, buy: it.buy ?? 0 }, create: { id: it.id, name: it.name, description: it.description ?? "", sell: it.sell, buy: it.buy ?? 0 } });
+    await client.itemDef.upsert({ where: { id: it.id }, update: { name: it.name, description: it.description ?? "", sell: BigInt(it.sell), buy: BigInt(it.buy ?? 0) }, create: { id: it.id, name: it.name, description: it.description ?? "", sell: BigInt(it.sell), buy: BigInt(it.buy ?? 0) } });
   }
   // NPCs
   await client.npcDef.upsert({ where: { id: "grimsley" }, update: { name: "Grimsley" }, create: { id: "grimsley", name: "Grimsley" } });

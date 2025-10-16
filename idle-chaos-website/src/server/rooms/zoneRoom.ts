@@ -17,7 +17,7 @@ type PrismaLoose = {
     upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; templateId: string } }) => Promise<void>;
   };
   itemDef: {
-    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sell: number; description: string } }) => Promise<void>;
+    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sell: bigint; description: string } }) => Promise<void>;
   };
   dropEntry: {
     findMany: (args: { where: { dropTableId: string; itemId: string } }) => Promise<Array<{ id: string }>>;
@@ -157,7 +157,7 @@ class ZoneRoom {
   await client.zoneDef.upsert({ where: { id: this.zone }, update: {}, create: { id: this.zone, name: `${this.zone} Zone`, sceneKey: this.zone } });
   await client.enemyTemplate.upsert({ where: { id: "slime" }, update: {}, create: { id: "slime", name: "Slime", level: 1, baseHp: 30, expBase: 5, goldMin: 1, goldMax: 3 } });
   await client.dropTable.upsert({ where: { id: "slime_default" }, update: {}, create: { id: "slime_default", templateId: "slime" } });
-  await client.itemDef.upsert({ where: { id: "slime_goop" }, update: {}, create: { id: "slime_goop", name: "Slime Goop", sell: 1, description: "Jiggly residue" } });
+  await client.itemDef.upsert({ where: { id: "slime_goop" }, update: {}, create: { id: "slime_goop", name: "Slime Goop", sell: BigInt(1), description: "Jiggly residue" } });
       // Ensure an entry exists (id is cuid, skip if exists)
       const entries = await client.dropEntry.findMany({ where: { dropTableId: "slime_default", itemId: "slime_goop" } });
       if (!entries.length) {

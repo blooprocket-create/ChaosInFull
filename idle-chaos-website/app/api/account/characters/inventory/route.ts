@@ -20,11 +20,16 @@ export async function POST(req: Request) {
   const entries = Object.entries(items);
   for (const [itemKey, count] of entries) {
     const safe = Math.max(0, Math.floor(count));
-    await client.itemStack.upsert({
-      where: { characterId_itemKey: { characterId, itemKey } },
-      update: { count: safe },
-      create: { characterId, itemKey, count: safe },
-    });
+    if (safe <= 0) {
+      // Delete stack when zero to keep DB clean
+      await (prisma as any).itemStack.delete({ where: { characterId_itemKey: { characterId, itemKey } } }).catch(() => {});
+    } else {
+      await client.itemStack.upsert({
+        where: { characterId_itemKey: { characterId, itemKey } },
+        update: { count: safe },
+        create: { characterId, itemKey, count: safe },
+      });
+    }
   }
   return NextResponse.json({ ok: true });
 }
@@ -43,6 +48,8 @@ export async function GET(req: Request) {
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const rows = await client.itemStack.findMany({ where: { characterId } });
   const items: Record<string, number> = {};
-  for (const r of rows) items[r.itemKey] = r.count;
+  for (const r of rows) {
+    if (r.count > 0) items[r.itemKey] = r.count;
+  }
   return NextResponse.json({ ok: true, items });
 }
