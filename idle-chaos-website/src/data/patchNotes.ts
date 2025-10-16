@@ -8,6 +8,23 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-10-16",
+    version: "0.0.9",
+    title: "Combat Awakens, Quests Begin, and Grimsley Lives",
+    highlights: [
+      "Real-time combat arrives in the Slime Field with basic attacks, health bars, and live snapshots",
+      "Auto-battle toggle for effortless goo-farming and steady EXP",
+      "Quest system foundation: accept, track, and complete tasks for rewards",
+      "Grimsley now actually talks, guides, and silently judges your choices",
+    ],
+    notes: [
+      "Join/leave combat seamlessly; the server keeps your phase sane",
+      "Tutorial flow wired into quests—Grimsley points, you click, the world approves",
+      "EXP and loot are tallied server-side; inventory stays in sync",
+      "Under the hood: scenes extracted and network calls centralized for smoother updates",
+    ],
+  },
+  {
     date: "2025-10-14",
     version: "0.0.8",
     title: "Chat Possession, Rainbow Whispers, and Shiny Things",
