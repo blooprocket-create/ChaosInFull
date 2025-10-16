@@ -12,6 +12,7 @@ model User {
   email        String   @unique
   username     String   @unique
   passwordHash String
+  isAdmin      Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   stats        PlayerStat?
@@ -279,4 +280,16 @@ model AfkCombatState {
   pendingLoot   Json?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// Admin-managed Patch Notes
+model PatchNote {
+  id         String   @id @default(cuid())
+  date       DateTime
+  version    String
+  title      String
+  highlights Json     // string[]
+  notes      Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

@@ -9,6 +9,23 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-10-16",
+    version: "0.0.10",
+    title: "New Zone: Slime Meadow + Portal UX Pass",
+    highlights: [
+      "Slime Meadow added: a brighter, multi-spawn, AFK-friendly extension of the Slime ecosystem",
+      "Unified E-to-enter portals across zones with proximity prompts (no more portal clicking)",
+      "Slime visuals and labels updated: Epic Slimes are purple, Big Slimes are larger; names show with level",
+      "World page updated with Slime Meadow and concrete Slime Field/Meadow mob stats",
+    ],
+    notes: [
+      "Removed stray Town portal from Slime Meadow; back portal now behaves like other zones",
+      "Portals show a \"Press E to Enter\" prompt when you're close enough (tunable radius)",
+      "Slime Field → Slime Meadow and return transitions preserve your scene state",
+      "Minor polish: consistent mob name formatting and prompt placement on resize",
+    ],
+  },
+  {
+    date: "2025-10-15",
     version: "0.0.9",
     title: "Combat Awakens, Quests Begin, and Grimsley Lives",
     highlights: [

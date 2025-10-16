@@ -40,9 +40,24 @@ export const zones: ZoneDefinition[] = [
     name: "Slime Field",
   description: "Viscous clearing where low-tier monsters debate unionizing and still get farmed.",
     features: ["Intro combat area"],
-    mobs: [{ name: "Green Slime", hp: null, damage: null, spawnRatePerMin: null, maxConcurrent: null }],
+    mobs: [
+      { name: "Green Slime", hp: 30, damage: null, spawnRatePerMin: 50, maxConcurrent: 6 },
+    ],
     resources: [],
-    connections: ["town"],
+    connections: ["town", "slime-meadow"],
+  },
+  {
+    key: "slime-meadow",
+    name: "Slime Meadow",
+    description: "Brighter, rolling meadow of slimes. Multi-spawn, AFK-friendly pacing, and the occasional chonk or epic jelly.",
+    features: ["Multi-spawn waves", "AFK combat friendly", "Portal back to Slime Field"],
+    mobs: [
+      { name: "Green Slime", hp: 30, damage: null, spawnRatePerMin: 50, maxConcurrent: 6 },
+      { name: "Big Slime", hp: 60, damage: null, spawnRatePerMin: 25, maxConcurrent: 2 },
+      { name: "Epic Slime", hp: 120, damage: null, spawnRatePerMin: 10, maxConcurrent: 1 },
+    ],
+    resources: [],
+    connections: ["slime"],
   },
 ];
 

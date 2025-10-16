@@ -17,9 +17,12 @@ export async function POST(req: Request) {
   const snap = room.snapshot(characterId);
   // If AFK was previously on, refresh startedAt to now when rejoining
   try {
-    const state = await (prisma as any).afkCombatState.findUnique?.({ where: { characterId } });
+    type AfkState = { auto: boolean } | null;
+    type AfkDelegate = { findUnique: (args: { where: { characterId: string } }) => Promise<AfkState>; update: (args: { where: { characterId: string }; data: { startedAt: Date } }) => Promise<void> };
+    const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
+    const state = await afk.findUnique({ where: { characterId } });
     if (state?.auto) {
-      await (prisma as any).afkCombatState.update({ where: { characterId }, data: { startedAt: new Date() } });
+      await afk.update({ where: { characterId }, data: { startedAt: new Date() } });
     }
   } catch {}
   return NextResponse.json({ ok: true, phaseId: ps.phaseId, snapshot: snap });

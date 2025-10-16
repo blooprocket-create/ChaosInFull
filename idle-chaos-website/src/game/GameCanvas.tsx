@@ -77,7 +77,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
 
   useEffect(() => {
     if (!ref.current) return;
-  const start: "Town" | "Cave" | "Slime" | "Slime Meadow" = (initialScene === "Town" || initialScene === "Cave" || initialScene === "Slime" || initialScene === "Slime Meadow") ? (initialScene as any) : "Town";
+  const start: "Town" | "Cave" | "Slime" | "Slime Meadow" = (initialScene === "Town" || initialScene === "Cave" || initialScene === "Slime" || initialScene === "Slime Meadow") ? (initialScene as "Town" | "Cave" | "Slime" | "Slime Meadow") : "Town";
   gameRef.current = createGame({ parent: ref.current, character, initialScene: start, initialMiningLevel: initialMiningLevel ?? 1 });
 
     // Load initial inventory from server
@@ -143,7 +143,13 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const low = regScene.toLowerCase();
   const normalized = low === "slime" ? "Slime" : low === "slime meadow" ? "Slime Meadow" : low === "cave" ? "Cave" : low === "town" ? "Town" : null;
     const scenes = game.scene.getScenes(true);
-    const active = (normalized ?? (scenes.length ? (scenes[0].scene.key.replace("Scene", "") as "Town" | "Cave" | "Slime") : "Town"));
+    // Fallback mapping from scene keys to canonical names
+    const fallbackKey = scenes.length ? scenes[0].scene.key : "TownScene";
+    const fallbackName: "Town" | "Cave" | "Slime" | "Slime Meadow" =
+      fallbackKey === "SlimeMeadowScene" ? "Slime Meadow" :
+      fallbackKey === "SlimeScene" ? "Slime" :
+      fallbackKey === "CaveScene" ? "Cave" : "Town";
+    const active: "Town" | "Cave" | "Slime" | "Slime Meadow" = normalized ?? fallbackName;
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       if ("sendBeacon" in navigator) {
         navigator.sendBeacon("/api/account/characters/state", new Blob([JSON.stringify({ characterId: character.id, scene: active })], { type: "application/json" }));
@@ -214,7 +220,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const low = regScene.toLowerCase();
   const normalized = low === "slime" ? "Slime" : low === "slime meadow" ? "Slime Meadow" : low === "cave" ? "Cave" : low === "town" ? "Town" : null;
     const scenes = game.scene.getScenes(true);
-    const active = (normalized ?? (scenes.length ? (scenes[0].scene.key.replace("Scene", "") as "Town" | "Cave" | "Slime") : "Town"));
+    const fallbackKey = scenes.length ? scenes[0].scene.key : "TownScene";
+    const fallbackName: "Town" | "Cave" | "Slime" | "Slime Meadow" =
+      fallbackKey === "SlimeMeadowScene" ? "Slime Meadow" :
+      fallbackKey === "SlimeScene" ? "Slime" :
+      fallbackKey === "CaveScene" ? "Cave" : "Town";
+    const active: "Town" | "Cave" | "Slime" | "Slime Meadow" = normalized ?? fallbackName;
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       // Fire-and-forget; navigation is in progress
       fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) }).catch(() => {});
@@ -245,7 +256,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const low = regScene.toLowerCase();
   const normalized = low === "slime" ? "Slime" : low === "slime meadow" ? "Slime Meadow" : low === "cave" ? "Cave" : low === "town" ? "Town" : null;
     const scenes = game.scene.getScenes(true);
-    const active = (normalized ?? (scenes.length ? (scenes[0].scene.key.replace("Scene", "") as "Town" | "Cave" | "Slime") : "Town"));
+    const fallbackKey = scenes.length ? scenes[0].scene.key : "TownScene";
+    const fallbackName: "Town" | "Cave" | "Slime" | "Slime Meadow" =
+      fallbackKey === "SlimeMeadowScene" ? "Slime Meadow" :
+      fallbackKey === "SlimeScene" ? "Slime" :
+      fallbackKey === "CaveScene" ? "Cave" : "Town";
+    const active: "Town" | "Cave" | "Slime" | "Slime Meadow" = normalized ?? fallbackName;
       try {
         const statePayload = JSON.stringify({ characterId: character.id, scene: active });
         const inv = (game.registry.get("inventory") as Record<string, number>) || {};
@@ -401,9 +417,14 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     const game = gameRef.current; if (!game || !character) return;
     const regScene = (game.registry.get("currentScene") as string | undefined) ?? "";
     const low = regScene.toLowerCase();
-    const normalized = low === "slime" || low === "slime meadow" ? "Slime" : low === "cave" ? "Cave" : low === "town" ? "Town" : null;
+    const normalized = low === "slime" ? "Slime" : low === "slime meadow" ? "Slime Meadow" : low === "cave" ? "Cave" : low === "town" ? "Town" : null;
     const scenes = game.scene.getScenes(true);
-    const active = (sceneOverride ?? normalized) ?? (scenes.length ? (scenes[0].scene.key.replace("Scene", "") as "Town" | "Cave" | "Slime") : "Town");
+    const fallbackKey = scenes.length ? scenes[0].scene.key : "TownScene";
+    const fallbackName: "Town" | "Cave" | "Slime" | "Slime Meadow" =
+      fallbackKey === "SlimeMeadowScene" ? "Slime Meadow" :
+      fallbackKey === "SlimeScene" ? "Slime" :
+      fallbackKey === "CaveScene" ? "Cave" : "Town";
+    const active: "Town" | "Cave" | "Slime" | "Slime Meadow" = (sceneOverride ?? normalized) ?? fallbackName;
     try {
       await fetch("/api/account/characters/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, scene: active }) });
     } catch {}

@@ -36,12 +36,14 @@ const ENEMIES: Array<{ id: string; name: string; level: number; baseHp: number; 
   { id: "boss_slime", name: "Boss Slime", level: 10, baseHp: 500, expBase: 100, goldMin: 15, goldMax: 30 },
 ];
 
+type AfkDelegate = { deleteMany: (args?: { where?: { characterId?: string } }) => Promise<void> };
+
 export async function POST() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   const client = prisma as unknown as PrismaLoose;
   // Reset AFK combat state for clean local seeds
-  try { await (prisma as any).afkCombatState.deleteMany({}); } catch {}
+  try { await (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState.deleteMany({}); } catch {}
   // Items
   for (const it of ITEMS) {
     await client.itemDef.upsert({ where: { id: it.id }, update: { name: it.name, description: it.description ?? "", sell: it.sell, buy: it.buy ?? 0 }, create: { id: it.id, name: it.name, description: it.description ?? "", sell: it.sell, buy: it.buy ?? 0 } });

@@ -1,12 +1,36 @@
 import Link from "next/link";
+import { patchNotes as staticNotes } from "@/src/data/patchNotes";
+import { prisma } from "@/src/lib/prisma";
 import BloodLinkButton from "@/src/components/BloodLinkButton";
 import FlickerOnView from "@/src/components/FlickerOnView";
 import EventsCarousel from "@/src/components/EventsCarousel";
 import ParallaxHero from "@/src/components/ParallaxHero";
 
-export default function Home() {
+export default async function Home() {
+  let latest = staticNotes[0];
+  try {
+    const client = prisma as unknown as { patchNote: { findMany: (args: { take: number; orderBy: Array<{ date?: "asc" | "desc"; version?: "asc" | "desc" }> }) => Promise<Array<{ date: string | Date; version: string; title: string }> > } };
+    const rows = await client.patchNote.findMany({ take: 1, orderBy: [{ date: "desc" }, { version: "desc" }] });
+    if (rows.length) { latest = { date: (typeof rows[0].date === 'string' ? rows[0].date : new Date(rows[0].date).toISOString().slice(0,10)), version: rows[0].version, title: rows[0].title, highlights: [], notes: [] }; }
+  } catch {}
   return (
     <>
+      {/* Latest Patch banner */}
+      {(() => { return latest ? (
+        <div className="bg-gradient-to-r from-emerald-900/40 to-black border-b border-emerald-700/30">
+          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-emerald-600/30 border border-emerald-500/40 text-emerald-300">v{latest.version}</span>
+              <span className="text-gray-200">{latest.title}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href="/news" className="text-emerald-300 hover:text-emerald-200 underline">Read</Link>
+              <Link href="/world" className="text-emerald-300 hover:text-emerald-200 underline">Explore</Link>
+            </div>
+          </div>
+        </div>
+      ) : null; })()}
+
       <ParallaxHero />
       <FlickerOnView />
 
@@ -30,7 +54,7 @@ export default function Home() {
             text: "Log off in the Cave and come back rich. Or come back and find a mining pick lodged where hope used to be.",
           },{
             title: "Portals & Punchlines",
-            text: "Town, Cave, Slime Field—each a lovingly unbalanced stage for leveling, crafting, and poorly timed jumps.",
+            text: "Town, Cave, Slime Field, and the new Slime Meadow—each a lovingly unbalanced stage for leveling, crafting, and poorly timed jumps.",
           },{
             title: "Crafting Grind (Refined)",
             text: "Queue bars and gear: furnace ticks, workbench clinks. Offline fast-forward means time still hurts productively.",
@@ -67,10 +91,10 @@ export default function Home() {
         <h2 className="text-2xl font-bold blood-underline inline-block">Events & Unrest</h2>
         <div className="mt-6 grid md:grid-cols-3 gap-4">
           <div className="md:col-span-2"><EventsCarousel /></div>
-          <div className="rounded-xl border border-white/10 bg-black/40 p-5">
+            <div className="rounded-xl border border-white/10 bg-black/40 p-5">
             <div className="text-xs text-gray-400">Spotlight</div>
             <h3 className="text-lg font-semibold mt-1">Patch Notes</h3>
-            <p className="text-gray-300 text-sm mt-1">Fresh features, accidental balance decisions, and ritual apologies.</p>
+            <p className="text-gray-300 text-sm mt-1">{latest?.title || "Fresh features, accidental balance decisions, and ritual apologies."}</p>
             <div className="mt-3"><Link href="/news" className="text-purple-400 hover:text-purple-300 underline">Witness Updates</Link></div>
           </div>
         </div>

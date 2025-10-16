@@ -16,6 +16,10 @@ export async function POST(req: Request) {
 
   const room = getZoneRoom(zone);
   room.leave(characterId);
-  try { await (prisma as any).afkCombatState.update({ where: { characterId }, data: { lastSnapshot: new Date(), auto: false } }); } catch {}
+  try {
+    type AfkDelegate = { update: (args: { where: { characterId: string }; data: { lastSnapshot: Date; auto: boolean } }) => Promise<void> };
+    const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
+    await afk.update({ where: { characterId }, data: { lastSnapshot: new Date(), auto: false } });
+  } catch {}
   return NextResponse.json({ ok: true });
 }

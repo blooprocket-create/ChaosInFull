@@ -213,21 +213,31 @@ class ZoneRoom {
   }
 
   private ensureSpawnsForPhase(phase: Phase) {
-    // Drip spawns until budget met
     if (phase.mobs.size >= phase.budget) return;
-    const cfg = this.spawnCfg.find(c => c.phaseType === phase.type) || this.spawnCfg[0];
-    const tpl = cfg ? this.templates.get(cfg.templateId) : undefined;
-    const need = (cfg?.budget ?? 6) - phase.mobs.size;
-    for (let i = 0; i < need; i++) {
-      const id = this.uid("mob");
-      const hp = tpl?.baseHp ?? 30;
-      const lvl = tpl?.level ?? 1;
-      const slots = cfg?.slots ?? [100,180,260,340,420];
-      const slot = (phase.mobs.size + i) % Math.max(1, slots.length);
-      const x = slots[slot];
-      const mob: Mob = { id, templateId: tpl?.id || "slime", hp, maxHp: hp, level: lvl, pos: { x, y: 0 } };
-      phase.mobs.set(id, mob);
-      phase.contrib.set(id, new Map());
+    const matching = this.spawnCfg.filter(c => c.phaseType === phase.type);
+    const configs = matching.length ? matching : this.spawnCfg;
+    for (const cfg of configs) {
+      if (!cfg) continue;
+      const tpl = this.templates.get(cfg.templateId);
+      const budget = cfg.budget ?? 0;
+      if (budget <= 0) continue;
+      const existing = Array.from(phase.mobs.values()).filter(m => m.templateId === cfg.templateId).length;
+      let remainingForTemplate = Math.max(0, budget - existing);
+      let spawnOffset = 0;
+      while (remainingForTemplate > 0 && phase.mobs.size < phase.budget) {
+        const id = this.uid("mob");
+        const hp = tpl?.baseHp ?? 30;
+        const lvl = tpl?.level ?? 1;
+        const slots = cfg.slots ?? [100, 180, 260, 340, 420];
+        const slotIndex = (existing + spawnOffset) % Math.max(1, slots.length);
+        const x = slots[slotIndex];
+        const mob: Mob = { id, templateId: tpl?.id || cfg.templateId, hp, maxHp: hp, level: lvl, pos: { x, y: 0 } };
+        phase.mobs.set(id, mob);
+        phase.contrib.set(id, new Map());
+        remainingForTemplate -= 1;
+        spawnOffset += 1;
+      }
+      if (phase.mobs.size >= phase.budget) break;
     }
   }
 

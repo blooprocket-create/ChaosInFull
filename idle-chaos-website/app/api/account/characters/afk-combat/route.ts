@@ -9,6 +9,12 @@ import { assertCharacterOwner } from "@/src/lib/ownership";
 // - Per-kill base EXP: derived from level 1 slime via EnemyTemplate.expBase
 // - Gold per kill: 1-3 average ~2
 // - Loot: ensure slime_goop drop with weight similar to live combat
+type AfkCombatState = { characterId: string; zone: string | null; auto: boolean; lastSnapshot: Date | null; startedAt: Date | null };
+type AfkDelegate = {
+  findUnique: (args: { where: { characterId: string } }) => Promise<AfkCombatState | null>;
+  update: (args: { where: { characterId: string }; data: Partial<Pick<AfkCombatState, "zone" | "auto" | "lastSnapshot" | "startedAt">> }) => Promise<void>;
+};
+
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -18,7 +24,8 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
 
   // Load AFK state
-  const state = await (prisma as any).afkCombatState.findUnique?.({ where: { characterId } });
+  const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
+  const state = await afk.findUnique({ where: { characterId } });
   if (!state || !state.zone) return NextResponse.json({ ok: false, error: "not_afk" }, { status: 404 });
 
   const now = new Date();
@@ -28,7 +35,7 @@ export async function POST(req: Request) {
   // Only award if auto was on
   if (!state.auto) {
     // Stamp snapshot for next time and return nothing
-    await (prisma as any).afkCombatState.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
+    await afk.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
     return NextResponse.json({ ok: true, kills: 0, exp: 0, gold: 0, loot: [] });
   }
 
@@ -56,9 +63,10 @@ export async function POST(req: Request) {
   // Load zone spawn composition and enemy templates
   const zoneId = String(state.zone);
   const spawns = await prisma.spawnConfig.findMany({ where: { zoneId: zoneId } }).catch(() => []);
-  const tpls = await prisma.enemyTemplate.findMany({}).catch(() => [] as any[]);
-  const byId = new Map<string, { baseHp: number; expBase: number; goldMin: number; goldMax: number }>();
-  for (const t of tpls) byId.set((t as any).id, { baseHp: (t as any).baseHp, expBase: (t as any).expBase, goldMin: (t as any).goldMin, goldMax: (t as any).goldMax });
+  type EnemyTpl = { id: string; baseHp: number; expBase: number; goldMin: number; goldMax: number };
+  const tpls: EnemyTpl[] = await prisma.enemyTemplate.findMany({ select: { id: true, baseHp: true, expBase: true, goldMin: true, goldMax: true } }).catch(() => [] as EnemyTpl[]);
+  const byId = new Map<string, EnemyTpl>();
+  for (const t of tpls) byId.set(t.id, t);
   // Derive a simple weighted kill rate: budget approximates concurrent targets; we assume constant uptime
   // Time to kill for a template: baseHp / dps; kills per second for that template: budget / ttk
   type Part = { templateId: string; budget: number };
@@ -118,7 +126,7 @@ export async function POST(req: Request) {
   }
 
   // Update snapshot
-  await (prisma as any).afkCombatState.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
+  await afk.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
 
   // Return applied rewards
   return NextResponse.json({ ok: true, zone: zoneId, kills, exp: expTotal, gold: goldTotal, loot: goop > 0 ? [{ itemId: "slime_goop", qty: goop }] : [] });

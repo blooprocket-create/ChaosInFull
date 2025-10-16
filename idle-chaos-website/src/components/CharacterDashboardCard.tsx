@@ -19,7 +19,8 @@ export type CharacterSummary = {
 
 export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
   const [afkDisplay, setAfkDisplay] = useState(formatDuration(c.afkMs));
-  const [afkFlavor] = useState(pick(afkPhrases));
+  // Avoid SSR/client mismatch by selecting flavor on client after mount
+  const [afkFlavor, setAfkFlavor] = useState<string>("");
   useEffect(() => {
     // live ticking AFK timer
     const start = Date.now() - c.afkMs;
@@ -29,6 +30,9 @@ export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
     }, 1000);
     return () => clearInterval(t);
   }, [c.afkMs]);
+  useEffect(() => {
+    setAfkFlavor(pick(afkPhrases));
+  }, []);
   return (
     <div className="rounded border border-white/10 bg-black/40 p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">

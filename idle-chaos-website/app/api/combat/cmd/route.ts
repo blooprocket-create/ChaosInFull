@@ -4,6 +4,11 @@ import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
 import { prisma } from "@/src/lib/prisma";
 import { assertCharacterOwner } from "@/src/lib/ownership";
 
+type AfkState = { characterId: string; zone: string | null; auto: boolean; lastSnapshot: Date | null; startedAt: Date | null };
+type AfkDelegate = {
+  upsert: (args: { where: { characterId: string }; update: Partial<Pick<AfkState, "zone" | "auto" | "lastSnapshot" | "startedAt">>; create: AfkState }) => Promise<void>;
+};
+
 function getAbsoluteBase(req: Request) {
   // Prefer NEXT_PUBLIC_BASE_URL if absolute, else origin header, else http://localhost fallback
   const env = process.env.NEXT_PUBLIC_BASE_URL;
@@ -54,7 +59,8 @@ export async function POST(req: Request) {
       const now = new Date();
       const zoneId = zone;
       // Upsert per-character AFK row
-      await (prisma as any).afkCombatState.upsert({
+      const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
+      await afk.upsert({
         where: { characterId: characterId },
         update: { auto: on, zone: zoneId, ...(on ? { startedAt: now } : { lastSnapshot: now }) },
         create: { characterId: characterId, zone: zoneId, auto: on, startedAt: now, lastSnapshot: now },

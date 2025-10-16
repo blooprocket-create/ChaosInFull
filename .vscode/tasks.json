@@ -517,6 +517,20 @@
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Prisma Migrate (push) with generate",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx prisma generate; npx prisma db push"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

@@ -1,7 +1,17 @@
-import { patchNotes } from "@/src/data/patchNotes";
+import { patchNotes as staticNotes } from "@/src/data/patchNotes";
+import { prisma } from "@/src/lib/prisma";
 export const metadata = { title: "News • Chaos In Full" };
 
-export default function NewsPage() {
+export default async function NewsPage() {
+  // Load patch notes from DB; if empty/unavailable, fallback to static
+  let patchNotes = staticNotes;
+  try {
+    const client = prisma as unknown as { patchNote: { findMany: (args: { orderBy: Array<{ date?: "asc" | "desc"; version?: "asc" | "desc" }> }) => Promise<Array<{ date: string | Date; version: string; title: string; highlights: string[]; notes?: string[] }> > } };
+    const rows = await client.patchNote.findMany({ orderBy: [{ date: "desc" }, { version: "desc" }] });
+    if (Array.isArray(rows) && rows.length) {
+      patchNotes = rows.map(r => ({ date: (typeof r.date === 'string' ? r.date : new Date(r.date).toISOString().slice(0,10)), version: r.version, title: r.title, highlights: r.highlights, notes: r.notes }));
+    }
+  } catch {}
   const posts = [
     { title: "Somewhat Playable Build Deployed", date: "2025-10-14", excerpt: "You can move, mine, craft queues, and pretend this is stable. Expect polite desyncs." },
     { title: "Website MVP is live", date: "2025-10-14", excerpt: "Accounts, login, dashboard stats. UI now judges your AFK duration." },
