@@ -5,6 +5,8 @@ import BloodLinkButton from "@/src/components/BloodLinkButton";
 import FlickerOnView from "@/src/components/FlickerOnView";
 import EventsCarousel from "@/src/components/EventsCarousel";
 import ParallaxHero from "@/src/components/ParallaxHero";
+import JsonLd from "@/src/components/JsonLd";
+export const metadata = { title: "Chaos In Full • Idle RPG", description: "A darkly humorous idle RPG in your browser.", openGraph: { title: "Chaos In Full", description: "A darkly humorous idle RPG", images: ["/og/home.png"] } };
 
 export default async function Home() {
   let latest = staticNotes[0];
@@ -15,6 +17,15 @@ export default async function Home() {
   } catch {}
   return (
     <>
+      <JsonLd data={{
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        name: "Chaos In Full",
+        url: "https://chaos-in-full.vercel.app/",
+        operatingSystem: "Web",
+        applicationCategory: "Game",
+        genre: ["Idle", "Action", "RPG"],
+      }} />
       {/* Latest Patch banner */}
       {(() => { return latest ? (
         <div className="bg-gradient-to-r from-emerald-900/40 to-black border-b border-emerald-700/30">

@@ -29,8 +29,10 @@ export default function SignupPage() {
       return;
     }
   window.dispatchEvent(new Event("auth:changed"));
+  window.dispatchEvent(new CustomEvent("telemetry:event", { detail: { name: "signup_success" } }));
   router.refresh();
-  router.push("/dashboard");
+  // After signup, funnel to character creation immediately
+  router.push("/play");
   }
 
   return (

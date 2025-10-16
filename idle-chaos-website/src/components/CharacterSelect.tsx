@@ -48,6 +48,11 @@ export default function CharacterSelect() {
     if (!res.ok) { setError(data.error || "Create failed"); return; }
     setName("");
     setChars(prev => [...prev, data.character]);
+    // Auto-enter the world with the new character
+    if (data?.character?.id) {
+      window.dispatchEvent(new CustomEvent("telemetry:event", { detail: { name: "character_created" } }));
+      router.push(`/play?ch=${encodeURIComponent(data.character.id)}`);
+    }
   }
 
   if (loading) return <div className="mt-6 text-sm text-gray-400">Loading characters…</div>;

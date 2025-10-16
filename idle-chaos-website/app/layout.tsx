@@ -7,6 +7,8 @@ import CursorAura from "@/src/components/CursorAura";
 import NavAuth from "@/src/components/NavAuth";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import StatusChip from "@/src/components/StatusChip";
+import "@/src/lib/telemetry";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
 const mono = Roboto_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400","700"] });
@@ -71,7 +73,10 @@ export default async function RootLayout({
         </header>
   <main className="min-h-[calc(100vh-64px)]">{children}</main>
         <footer className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} Chaos In Full
+          <div className="mx-auto max-w-6xl px-4 flex items-center justify-between gap-3">
+            <div title="v0.0.11">© {new Date().getFullYear()} Chaos In Full</div>
+            <StatusChip />
+          </div>
         </footer>
         <Analytics />
       </body>

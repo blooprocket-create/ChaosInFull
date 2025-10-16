@@ -68,6 +68,8 @@ export default function AudioToggle() {
       onClick={() => setOn((v) => !v)}
       className={`rounded px-3 py-1.5 text-xs font-semibold border ${on ? "border-purple-400 text-white" : "border-white/20 text-gray-300 hover:border-white/40"}`}
       aria-pressed={on}
+      aria-label={on ? "Turn ambience audio off" : "Turn ambience audio on"}
+      title={on ? "Ambience on" : "Ambience off"}
     >
       {on ? "Ambience: On" : "Ambience: Off"}
     </button>

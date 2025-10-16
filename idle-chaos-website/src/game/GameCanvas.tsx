@@ -489,11 +489,11 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         if (level > prev) pushToast(`Level Up! Lv ${prev} → ${level}`);
       }
     };
-  window.__openFurnace = () => setShowFurnace(true);
-  window.__openWorkbench = () => setShowWorkbench(true);
-  window.__openStorage = () => setShowStorage(true);
-  window.__openSawmill = () => setShowSawmill(true);
-  window.__openShop = () => setShowShop(true);
+  window.__openFurnace = () => { if (!welcomeSeen) { pushToast("Grimsley: Come see me in Town before using the furnace."); return; } setShowFurnace(true); };
+  window.__openWorkbench = () => { if (!welcomeSeen) { pushToast("Grimsley: Let's talk first—I'll teach you the workbench."); return; } setShowWorkbench(true); };
+  window.__openStorage = () => { if (!welcomeSeen) { pushToast("Grimsley: Storage unlocks after our quick chat in Town."); return; } setShowStorage(true); };
+  window.__openSawmill = () => { if (!welcomeSeen) { pushToast("Grimsley: Finish the intro in Town to use the sawmill."); return; } setShowSawmill(true); };
+  window.__openShop = () => { if (!welcomeSeen) { pushToast("Grimsley: Do the quick intro first; the shopkeeper is shy."); return; } setShowShop(true); };
   window.__focusGame = () => {
     const el = ref.current; if (!el) return;
     // Re-enable keyboard and focus container
@@ -539,7 +539,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       delete window.__closeSawmill;
       delete window.__closeShop;
     };
-  }, [saveSceneNow, reqChar, reqMine, reqCraft, pushToast, charLevel]);
+  }, [saveSceneNow, reqChar, reqMine, reqCraft, pushToast, charLevel, welcomeSeen]);
 
   // Action: collect offline rewards
   const collectOffline = useCallback(async () => {
@@ -598,7 +598,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       if (recipe === "copper") inv.copper_bar = (inv.copper_bar ?? 0) + 1; else inv.bronze_bar = (inv.bronze_bar ?? 0) + 1;
       game.registry.set("inventory", inv);
       // Persist inventory and award EXP
-      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+  await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
+  // Telemetry: first craft
+  window.dispatchEvent(new CustomEvent("telemetry:event", { detail: { name: "craft_complete", props: { recipe } } }));
       const expPer = recipe === "copper" ? 2 : 3;
       const res = await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) });
       if (res.ok) {
@@ -700,6 +702,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
               if (recipe === "copper") inv.copper_bar = (inv.copper_bar ?? 0) + 1; else inv.bronze_bar = (inv.bronze_bar ?? 0) + 1;
               const expPer = recipe === "copper" ? 2 : 3;
               await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) }).catch(() => {});
+              window.dispatchEvent(new CustomEvent("telemetry:event", { detail: { name: "craft_complete", props: { recipe } } }));
               pushToast(`Completed ${recipe === "copper" ? "Copper Bar" : "Bronze Bar"} while offline`);
             } else {
               if (recipe === "armor") inv.copper_armor = (inv.copper_armor ?? 0) + 1; else inv.copper_dagger = (inv.copper_dagger ?? 0) + 1;
@@ -748,6 +751,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             if (recipe === "plank") inv.plank = (inv.plank ?? 0) + 1; else inv.oak_plank = (inv.oak_plank ?? 0) + 1;
             const expPer = recipe === "plank" ? 1 : 2;
             await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, craftingExp: expPer }) }).catch(() => {});
+            window.dispatchEvent(new CustomEvent("telemetry:event", { detail: { name: "craft_complete", props: { recipe } } }));
             pushToast(`Completed ${recipe === "plank" ? "Plank" : "Oak Plank"} while offline`);
           }
           await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});

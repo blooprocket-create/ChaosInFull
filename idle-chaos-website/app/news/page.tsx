@@ -1,6 +1,6 @@
 import { patchNotes as staticNotes } from "@/src/data/patchNotes";
 import { prisma } from "@/src/lib/prisma";
-export const metadata = { title: "News • Chaos In Full" };
+export const metadata = { title: "News • Chaos In Full", description: "Development dispatches and patch notes.", openGraph: { title: "Chaos In Full News", images: ["/og/news.png"] } };
 
 export default async function NewsPage() {
   // Load patch notes from DB; merge with static notes (dedupe by version)

@@ -1,4 +1,4 @@
-export const metadata = { title: "World • Chaos In Full" };
+export const metadata = { title: "World • Chaos In Full", description: "Survey the embryonic map and zones.", openGraph: { title: "Chaos In Full World", images: ["/og/world.png"] } };
 import WorldExplorer from "@/src/components/WorldExplorer";
 
 export default function WorldPage() {

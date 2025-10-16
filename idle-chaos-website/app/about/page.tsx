@@ -1,4 +1,4 @@
-export const metadata = { title: "About • Chaos In Full" };
+export const metadata = { title: "About • Chaos In Full", description: "Tech, roadmap, and the questionable vision behind Chaos In Full.", openGraph: { title: "About Chaos In Full", images: ["/og/about.png"] } };
 export default function AboutPage() {
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-12">

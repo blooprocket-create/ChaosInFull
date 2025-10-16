@@ -1,4 +1,4 @@
-export const metadata = { title: "Classes • Chaos In Full" };
+export const metadata = { title: "Classes • Chaos In Full", description: "Explore archetypes and future mutations.", openGraph: { title: "Chaos In Full Classes", images: ["/og/classes.png"] } };
 import ClassesExplorer from "@/src/components/ClassesExplorer";
 
 export default function ClassesPage() {
