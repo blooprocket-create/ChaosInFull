@@ -86,6 +86,21 @@ class ZoneRoom {
     return phase;
   }
 
+  private detachFromCurrentPhase(charId: string) {
+    const ps = this.players.get(charId);
+    if (!ps) return;
+    const oldPhaseId = ps.phaseId;
+    if (!oldPhaseId) return;
+    const oldPhase = this.phases.get(oldPhaseId);
+    if (!oldPhase) return;
+    // Remove the member from the previous phase
+    oldPhase.members.delete(charId);
+    // If the previous phase is now empty, drop it to avoid leaking unreachable phases
+    if (oldPhase.members.size === 0) {
+      this.phases.delete(oldPhaseId);
+    }
+  }
+
   join(charId: string) {
     // Lazy-load content once
     if (!this.contentLoaded) {
@@ -142,6 +157,10 @@ class ZoneRoom {
     this.phases.set(phaseId, partyPhase);
     const p: Party = { id: partyId, leaderId, members: new Set([leaderId]), phaseId };
     this.parties.set(partyId, p);
+    // Detach from any existing phase (commonly a personal phase created on join)
+    if (leader.phaseId !== phaseId) {
+      this.detachFromCurrentPhase(leaderId);
+    }
     leader.phaseId = phaseId;
     return { partyId, phaseId };
   }
@@ -150,6 +169,10 @@ class ZoneRoom {
     const party = this.parties.get(partyId); if (!party) throw new Error("party_not_found");
     party.members.add(charId);
     const member = this.players.get(charId) || this.join(charId);
+    // Remove the member from any existing phase before transitioning them into the party phase
+    if (member.phaseId !== party.phaseId) {
+      this.detachFromCurrentPhase(charId);
+    }
     member.phaseId = party.phaseId;
     const phase = this.phases.get(party.phaseId)!; phase.members.add(charId);
     // Slightly raise budget with size

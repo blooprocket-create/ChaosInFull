@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { ensureGroundTexture, ensurePortalTexture, ensureCircleTexture, setupOverheadSpawner, updateNameTag, isTyping } from "./common";
+import api from "../services/api";
 
 export class TownScene extends Phaser.Scene {
   constructor() { super("TownScene"); }
@@ -128,7 +129,7 @@ export class TownScene extends Phaser.Scene {
     this.nameTag = this.add.text(this.player.x, this.player.y - 24, cname, { color: "#e5e7eb", fontSize: "11px" }).setOrigin(0.5).setDepth(10);
 
     // Input
-    this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as any;
+  this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
     this.eKey = this.input.keyboard!.addKey("E", true, true);
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
 
@@ -168,10 +169,9 @@ export class TownScene extends Phaser.Scene {
       try {
         const cid = String(this.game.registry.get("characterId") || "");
         if (!cid) return;
-        const res = await fetch(`/api/quest?characterId=${encodeURIComponent(cid)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const cqs = (data?.characterQuests as Array<{ questId: string; status: string }> | undefined) || [];
+        const data = await api.fetchQuests(cid).catch(() => null);
+        if (!data) return;
+        const cqs = (data.characterQuests as Array<{ questId: string; status: string }> | undefined) || [];
         const has = cqs.find(q => q.questId === "tutorial_kill_slimes_5" && (q.status === "ACTIVE" || q.status === "COMPLETED"));
         if (has) this.game.registry.set("tutorialStarted", true);
         const tut = cqs.find(q => q.questId === "tutorial_kill_slimes_5");
@@ -238,66 +238,68 @@ export class TownScene extends Phaser.Scene {
     this.sawmillPrompt.setVisible(nearSawmill);
     this.shopPrompt.setVisible(nearShop);
     this.storagePrompt.setVisible(nearStorage);
-    const tPrompt = this.children.getAll().find((obj): obj is Phaser.GameObjects.Text => (obj as any).text !== undefined && (obj as Phaser.GameObjects.Text).text === "Press E to Talk");
+    const tPrompt = this.children.getAll().find((obj): obj is Phaser.GameObjects.Text => {
+      const t = obj as Phaser.GameObjects.Text;
+      return typeof (t as unknown as { text?: string }).text === "string" && t.text === "Press E to Talk";
+    });
     if (tPrompt) tPrompt.setVisible(nearTutor);
     updateNameTag(this.nameTag, this.player);
 
     // Auto-close modals when leaving range
-    if (!nearFurnace) (window as any).__closeFurnace?.();
-    if (!nearWorkbench) (window as any).__closeWorkbench?.();
-    if (!nearSawmill) (window as any).__closeSawmill?.();
-    if (!nearStorage) (window as any).__closeStorage?.();
-    if (!nearShop) (window as any).__closeShop?.();
+  if (!nearFurnace) window.__closeFurnace?.();
+  if (!nearWorkbench) window.__closeWorkbench?.();
+  if (!nearSawmill) window.__closeSawmill?.();
+  if (!nearStorage) window.__closeStorage?.();
+  if (!nearShop) window.__closeShop?.();
 
     if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey)) {
       if (nearCave) {
         this.game.registry.set("spawn", { from: "cave", portal: "town" });
-        (window as any).__saveSceneNow?.("Cave");
+  window.__saveSceneNow?.("Cave");
         this.scene.start("CaveScene");
       } else if (nearSlime && tutorialStarted) {
         this.game.registry.set("spawn", { from: "slime", portal: "town" });
-        (window as any).__saveSceneNow?.("Slime");
+  window.__saveSceneNow?.("Slime");
         this.scene.start("SlimeFieldScene");
       } else if (nearTutor) {
         const started = !!this.game.registry.get("tutorialStarted");
         const cid = String(this.game.registry.get("characterId") || "");
         if (!started) {
-          (window as any).__spawnOverhead?.(":purple: Grimsley: The portal laughs at cowards. Pop 5 slimes.", { wave: true });
-          if (cid) { fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "accept", characterId: cid }) }).then(res => { if (res.ok) this.game.registry.set("tutorialStarted", true); }).catch(()=>{}); }
+          window.__spawnOverhead?.(":purple: Grimsley: The portal laughs at cowards. Pop 5 slimes.", { wave: true });
+          if (cid) { api.questAccept(cid).then(res => { if (res.ok) this.game.registry.set("tutorialStarted", true); }).catch(()=>{}); }
         } else {
           (async () => {
             try {
-              const res = await fetch(`/api/quest?characterId=${encodeURIComponent(cid)}`);
-              const data = await res.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string }> }));
-              const list: Array<{ questId: string; status: string }> = Array.isArray(data.characterQuests) ? data.characterQuests : [];
+              type CQ = { questId: string; status: string };
+              const data = (await api.fetchQuests(cid).catch(() => ({ characterQuests: [] as CQ[] }))) as { characterQuests: CQ[] };
+              const list: CQ[] = Array.isArray(data.characterQuests) ? data.characterQuests : [];
               const tut = list.find(q=>q.questId === "tutorial_kill_slimes_5");
               if (tut?.status === "COMPLETED") {
-                const hand = await fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", characterId: cid, questId: "tutorial_kill_slimes_5" }) });
+                const hand = await api.questComplete(cid, "tutorial_kill_slimes_5");
                 const payload = await hand.json().catch(()=>({}));
-                if (payload?.rewards?.gold) (window as any).__spawnOverhead?.(":yellow: +500 gold", { ripple: true });
-                if (payload?.rewards?.exp) (window as any).__spawnOverhead?.(":green: +250 XP", { wave: true });
-                const res2 = await fetch(`/api/quest?characterId=${encodeURIComponent(cid)}`);
-                const data2 = await res2.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string }> }));
-                const list2: Array<{ questId: string; status: string }> = Array.isArray(data2.characterQuests) ? data2.characterQuests : [];
+                if (payload?.rewards?.gold) window.__spawnOverhead?.(":yellow: +500 gold", { ripple: true });
+                if (payload?.rewards?.exp) window.__spawnOverhead?.(":green: +250 XP", { wave: true });
+                const data2 = (await api.fetchQuests(cid).catch(() => ({ characterQuests: [] as CQ[] }))) as { characterQuests: CQ[] };
+                const list2: CQ[] = Array.isArray(data2.characterQuests) ? data2.characterQuests : [];
                 const tut2 = list2.find(q=>q.questId === "tutorial_kill_slimes_5");
                 if (tut2?.status === "COMPLETED") this.tutorIcon.setVisible(true).setColor("#86efac").setText("?");
-                (window as any).__spawnOverhead?.(":blue: Grimsley: The portal should stop laughing now.");
+                window.__spawnOverhead?.(":blue: Grimsley: The portal should stop laughing now.");
               } else {
-                (window as any).__spawnOverhead?.(":blue: Grimsley: Goo awaits.");
+                window.__spawnOverhead?.(":blue: Grimsley: Goo awaits.");
               }
-            } catch { (window as any).__spawnOverhead?.(":blue: Grimsley: Goo awaits."); }
+            } catch { window.__spawnOverhead?.(":blue: Grimsley: Goo awaits."); }
           })();
         }
       } else if (nearFurnace) {
-        (window as any).__openFurnace?.();
+  window.__openFurnace?.();
       } else if (nearWorkbench) {
-        (window as any).__openWorkbench?.();
+  window.__openWorkbench?.();
       } else if (nearSawmill) {
-        (window as any).__openSawmill?.();
+  window.__openSawmill?.();
       } else if (nearShop) {
-        (window as any).__openShop?.();
+  window.__openShop?.();
       } else if (nearStorage) {
-        (window as any).__openStorage?.();
+  window.__openStorage?.();
       }
     }
   }

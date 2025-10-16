@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping } from "./common";
+import api from "../services/api";
 
 export class CaveScene extends Phaser.Scene {
   constructor() { super("CaveScene"); }
@@ -55,9 +56,9 @@ export class CaveScene extends Phaser.Scene {
       const miningLevel = (this.game.registry.get("miningLevel") as number) ?? 1;
       if (miningLevel >= 1 && this.isNearNode(this.copperNode)) {
         this.copperCount += 1; this.miningFx(this.copperNode); this.updateHUD();
-        fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 3 }) })
+        api.addExp((this.game.registry.get("characterId") as string), { miningExp: 3 })
           .then((res) => res.ok ? res.json() : null)
-          .then((data) => { if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") (window as any).__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel }); })
+          .then((data) => { if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel }); })
           .catch(() => {});
       }
     }});
@@ -65,9 +66,9 @@ export class CaveScene extends Phaser.Scene {
       const miningLevel = (this.game.registry.get("miningLevel") as number) ?? 1;
       if (miningLevel >= 1 && this.isNearNode(this.tinNode)) {
         this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD();
-        fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: (this.game.registry.get("characterId") as string), miningExp: 3 }) })
+        api.addExp((this.game.registry.get("characterId") as string), { miningExp: 3 })
           .then((res) => res.ok ? res.json() : null)
-          .then((data) => { if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") (window as any).__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel }); })
+          .then((data) => { if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel }); })
           .catch(() => {});
       }
     }});
@@ -78,7 +79,7 @@ export class CaveScene extends Phaser.Scene {
     this.add.text(exitPortal.x, exitPortal.y - 38, "To Town", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
 
     // Input
-    this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as any;
+  this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
     this.eKey = this.input.keyboard!.addKey("E", true, true);
 
     // Resize handling
@@ -119,8 +120,8 @@ export class CaveScene extends Phaser.Scene {
     const key = node === this.copperNode ? "copper" : "tin";
     inv[key] = (inv[key] ?? 0) + 1;
     this.game.registry.set("inventory", inv);
-    const cid = (this.game.registry.get("characterId") as string) || "";
-    if (cid) { fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: cid, items: inv }) }).catch(() => {}); }
+  const cid = (this.game.registry.get("characterId") as string) || "";
+  if (cid) { api.setInventory(cid, inv).catch(() => {}); }
   }
 
   // HUD placeholder
@@ -137,7 +138,7 @@ export class CaveScene extends Phaser.Scene {
     updateNameTag(this.nameTag, this.player);
     if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       this.game.registry.set("spawn", { from: "cave", portal: "town" });
-      (window as any).__saveSceneNow?.("Town");
+  window.__saveSceneNow?.("Town");
       this.scene.start("TownScene");
     }
   }

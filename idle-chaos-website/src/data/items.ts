@@ -17,6 +17,7 @@ export const items: ItemDef[] = [
   { key: "oak_plank", name: "Oak Plank", buy: 14, sell: 7, category: "plank" },
   { key: "copper_dagger", name: "Copper Dagger", buy: 30, sell: 16, category: "weapon" },
   { key: "copper_armor", name: "Copper Armor", buy: 42, sell: 24, category: "armor" },
+  { key: "slime_goop", name: "Slime Goop", buy: 10, sell: 5, category: "misc" },
 ];
 
 export const itemByKey = Object.fromEntries(items.map(i => [i.key, i] as const)) as Record<string, ItemDef>;

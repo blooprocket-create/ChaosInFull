@@ -98,7 +98,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
 
   useEffect(() => {
     if (!ref.current) return;
-    gameRef.current = createGame({ parent: ref.current, character, initialScene: (initialScene as any) ?? "Town", initialMiningLevel: initialMiningLevel ?? 1 });
+  const start: "Town" | "Cave" | "Slime" = (initialScene === "Town" || initialScene === "Cave" || initialScene === "Slime") ? initialScene : "Town";
+  gameRef.current = createGame({ parent: ref.current, character, initialScene: start, initialMiningLevel: initialMiningLevel ?? 1 });
 
     // Load initial inventory from server
     if (character) {

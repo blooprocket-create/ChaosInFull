@@ -78,13 +78,13 @@ export class SlimeFieldScene extends Phaser.Scene {
     const exitPortal = this.physics.add.staticImage(60, this.groundRect.y - 22, "portalExit2");
     this.add.text(exitPortal.x, exitPortal.y - 38, "To Town", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
 
-    this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as any;
+  this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
     this.eKey = this.input.keyboard!.addKey("E", true, true);
 
     this.input.on("pointerdown", () => {
       if (this.input.keyboard) this.input.keyboard.enabled = true;
-      (window as any).__setTyping?.(false);
-      (window as any).__focusGame?.();
+  window.__setTyping?.(false);
+  window.__focusGame?.();
     });
 
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
@@ -140,8 +140,9 @@ export class SlimeFieldScene extends Phaser.Scene {
     const barBg = this.add.rectangle(-22, -16, 44, 4, 0x111827).setOrigin(0, 0.5).setAlpha(0.9);
     const bar = this.add.rectangle(-22, -16, 44, 4, 0xef4444).setOrigin(0, 0.5);
     const label = this.add.text(0, -28, `Slime Lv ${level}`, { color: "#9ca3af", fontSize: "10px" }).setOrigin(0.5, 0.5);
-    cont = this.add.container(0, 0, [sprite, barBg, bar, label]).setDepth(5) as (Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number });
-    (cont as any).__bar = bar; (cont as any).__barFull = 44;
+  type MobContainer = Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
+  cont = this.add.container(0, 0, [sprite, barBg, bar, label]).setDepth(5) as MobContainer;
+  (cont as MobContainer).__bar = bar; (cont as MobContainer).__barFull = 44;
     this.mobContainers.set(id, cont);
     return cont;
   }
@@ -154,7 +155,8 @@ export class SlimeFieldScene extends Phaser.Scene {
       const cont = this.ensureMobContainer(m.id, m.level);
       const pos = positions.get(m.id)!; cont.setPosition(pos.x, pos.y);
       const ratio = Math.max(0, Math.min(1, m.hp / (m.maxHp || 1)));
-      const bar: Phaser.GameObjects.Rectangle = (cont as any).__bar!; const full: number = (cont as any).__barFull!;
+  const mc = cont as Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
+  const bar: Phaser.GameObjects.Rectangle = mc.__bar!; const full: number = mc.__barFull!;
       bar.width = full * ratio;
     }
   }
@@ -180,7 +182,7 @@ export class SlimeFieldScene extends Phaser.Scene {
         const mobId = data?.result?.mobId as string | undefined;
         const cont = mobId ? this.mobContainers.get(mobId) : undefined;
         if (cont) {
-          const bar: Phaser.GameObjects.Rectangle | undefined = (cont as any).__bar;
+          const bar: Phaser.GameObjects.Rectangle | undefined = (cont as (Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle })).__bar;
           if (bar) { bar.setFillStyle(0xfca5a5); this.time.delayedCall(120, () => bar.setFillStyle(0xef4444)); }
           const spawnSpark = () => {
             const img = this.add.image(cont.x, cont.y, "sDot");
@@ -192,19 +194,19 @@ export class SlimeFieldScene extends Phaser.Scene {
           for (let i = 0; i < 12; i++) this.time.delayedCall(i * 8, () => spawnSpark());
         }
       }
-      if (Array.isArray((data as any)?.rewards) && (data as any).rewards.length) {
+  if (Array.isArray(data?.rewards) && data.rewards.length) {
         const cid = String(this.game.registry.get("characterId") || "");
         if (cid) {
           fetch(`/api/account/stats?characterId=${encodeURIComponent(cid)}`).then(res => res.ok ? res.json() : null).then(data2 => {
             if (!data2) return; const base = data2.base as { exp: number; level: number } | undefined;
-            if (base) (window as any).__applyExpUpdate?.({ type: "character", exp: base.exp, level: base.level });
+            if (base) window.__applyExpUpdate?.({ type: "character", exp: base.exp, level: base.level });
           }).catch(()=>{});
         }
       }
-      const loot: Array<{ itemId: string; qty: number }> = Array.isArray((data as any)?.loot) ? (data as any).loot : [];
+  const loot: Array<{ itemId: string; qty: number }> = Array.isArray(data?.loot) ? (data.loot as Array<{ itemId: string; qty: number }>) : [];
       if (loot.length) {
         const inv = (this.game.registry.get("inventory") as Record<string, number>) || {};
-        for (const drop of loot) { inv[drop.itemId] = (inv[drop.itemId] ?? 0) + Math.max(1, drop.qty); const name = this.formatItem(drop.itemId); (window as any).__spawnOverhead?.(`:yellow: +${drop.qty} ${name}`, { ripple: true }); }
+  for (const drop of loot) { inv[drop.itemId] = (inv[drop.itemId] ?? 0) + Math.max(1, drop.qty); const name = this.formatItem(drop.itemId); window.__spawnOverhead?.(`:yellow: +${drop.qty} ${name}`, { ripple: true }); }
         this.game.registry.set("inventory", inv);
       }
       const q = this.game.registry.get("questDirtyCount") as number | undefined;
@@ -215,7 +217,7 @@ export class SlimeFieldScene extends Phaser.Scene {
   private async toggleAuto(characterId: string) {
     try {
       const v = !this.auto; this.auto = v; await api.toggleAuto("Slime", characterId, v);
-      (window as any).__spawnOverhead?.(v ? ":green: Auto ON" : ":red: Auto OFF", { ripple: true });
+  window.__spawnOverhead?.(v ? ":green: Auto ON" : ":red: Auto OFF", { ripple: true });
       this.game.registry.set("autoOn", v);
     } catch {}
   }
@@ -246,7 +248,7 @@ export class SlimeFieldScene extends Phaser.Scene {
     if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
       try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
-      (window as any).__saveSceneNow?.("Town");
+  window.__saveSceneNow?.("Town");
       this.scene.start("TownScene");
     }
   }

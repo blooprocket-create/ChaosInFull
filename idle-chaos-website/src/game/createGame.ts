@@ -17,7 +17,7 @@ export function createGame(opts: { parent: HTMLElement; character?: CharacterHUD
     scene: [TownScene, CaveScene, SlimeFieldScene],
   };
   const game = new Phaser.Game(config);
-  (window as any).__phaserRegistry = game.registry as unknown as { get?: (key: string) => unknown };
+  window.__phaserRegistry = game.registry;
   game.registry.set("tutorialStarted", false);
   game.registry.set("spawn", { from: "initial", portal: null });
   if (character) {

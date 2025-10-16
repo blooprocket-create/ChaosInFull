@@ -37,7 +37,7 @@ export function ensurePortalTexture(scene: Phaser.Scene, key: string, color: num
 
 /** Attach a window.__spawnOverhead that renders text above the provided anchor (e.g., player). */
 export function setupOverheadSpawner(scene: Phaser.Scene, getAnchor: () => { x: number; y: number }, defaultColor = "#e5e7eb") {
-  (window as any).__spawnOverhead = (text: string, opts?: OverheadOptions) => {
+  window.__spawnOverhead = (text: string, opts?: OverheadOptions) => {
     const tokens = String(text ?? "").split(/(\s+)/);
     let currentColor = opts?.color || defaultColor;
     const segs: Array<{ text: string; color: string }> = [];
@@ -102,4 +102,4 @@ export function updateNameTag(nameTag: Phaser.GameObjects.Text | undefined, play
 }
 
 /** Gate inputs when typing in chat/inputs */
-export function isTyping(): boolean { return !!(window as any).__isTyping; }
+export function isTyping(): boolean { return !!window.__isTyping; }
