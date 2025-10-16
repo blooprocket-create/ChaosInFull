@@ -397,7 +397,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   };
 
   // Helper: immediate save of current scene to server
-  const saveSceneNow = useCallback(async (sceneOverride?: "Town" | "Cave" | "Slime") => {
+  const saveSceneNow = useCallback(async (sceneOverride?: "Town" | "Cave" | "Slime" | "Slime Meadow") => {
     const game = gameRef.current; if (!game || !character) return;
     const regScene = (game.registry.get("currentScene") as string | undefined) ?? "";
     const low = regScene.toLowerCase();
@@ -1093,6 +1093,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                           gameRef.current?.registry.set('inventory', inv);
                           setInventory({ ...inv });
                         }
+                        // Optimistically remove the completed quest from the panel if rewards were claimed
+                        setQuests(prev => prev.filter(row => row.questId !== q.questId));
+                        // Then refetch to pull any next quest that was auto-activated
                         const res2 = await fetch(`/api/quest?characterId=${character.id}`);
                         const data2 = await res2.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> }));
                         const rows2: Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> = Array.isArray(data2.characterQuests) ? data2.characterQuests : [];

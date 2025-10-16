@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping } from "./common";
+import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping, setupEPortal, EPortalHandle } from "./common";
 import api from "../services/api";
 import { itemByKey } from "@/src/data/items";
 
@@ -22,6 +22,8 @@ export class SlimeFieldScene extends Phaser.Scene {
   private mobContainers = new Map<string, Phaser.GameObjects.Container>();
   private wanderTimer?: Phaser.Time.TimerEvent;
   private lastAutoAttackAt = 0;
+  private townPortalHandle?: EPortalHandle;
+  private meadowPortalHandle?: EPortalHandle;
 
   create() {
     this.game.registry.set("currentScene", "Slime");
@@ -76,15 +78,43 @@ export class SlimeFieldScene extends Phaser.Scene {
 
     ensurePortalTexture(this, "portalExit2", 0x1d4ed8, 24, 44, 10);
     const exitPortal = this.physics.add.staticImage(60, this.groundRect.y - 22, "portalExit2");
-    this.add.text(exitPortal.x, exitPortal.y - 38, "To Town", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
+    this.townPortalHandle = setupEPortal(
+      this,
+      exitPortal,
+      "To Town",
+      "#93c5fd",
+      () => this.player,
+      (this.eKey = this.input.keyboard!.addKey("E", true, true)),
+      () => {
+        try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
+        this.game.registry.set("spawn", { from: "slime", portal: "town" });
+        window.__saveSceneNow?.("Town");
+        this.scene.start("TownScene");
+      },
+      70
+    );
 
-  // Portal to Slime Meadow
-  ensurePortalTexture(this, "portalSlimeMeadow", 0x34d399, 24, 44, 10);
-  const meadowPortal = this.physics.add.staticImage(this.scale.width - 60, this.groundRect.y - 22, "portalSlimeMeadow");
-  this.add.text(meadowPortal.x, meadowPortal.y - 38, "To Slime Meadow", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
+    // Portal to Slime Meadow
+    ensurePortalTexture(this, "portalSlimeMeadow", 0x34d399, 24, 44, 10);
+    const meadowPortal = this.physics.add.staticImage(this.scale.width - 60, this.groundRect.y - 22, "portalSlimeMeadow");
+    this.meadowPortalHandle = setupEPortal(
+      this,
+      meadowPortal,
+      "To Slime Meadow",
+      "#86efac",
+      () => this.player,
+      this.eKey,
+      () => {
+        try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
+        this.game.registry.set("spawn", { from: "slime", portal: "slime_meadow" });
+        window.__saveSceneNow?.("Slime Meadow");
+        this.scene.start("SlimeMeadowScene");
+      },
+      70
+    );
 
   this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
-    this.eKey = this.input.keyboard!.addKey("E", true, true);
+  // E key already created above when wiring portals
 
     this.input.on("pointerdown", () => {
       if (this.input.keyboard) this.input.keyboard.enabled = true;
@@ -101,8 +131,8 @@ export class SlimeFieldScene extends Phaser.Scene {
       const rp1 = this.midPlatforms[0]; const rp2 = this.midPlatforms[1];
       if (rp1) { rp1.rect.setPosition(w / 2 - 120, h - 120).setSize(w * 0.35, 10); rp1.body.setPosition(rp1.rect.x, rp1.rect.y); rp1.body.displayWidth = rp1.rect.width; rp1.body.displayHeight = rp1.rect.height; rp1.body.refreshBody(); }
       if (rp2) { rp2.rect.setPosition(w / 2 + 140, h - 180).setSize(w * 0.3, 10); rp2.body.setPosition(rp2.rect.x, rp2.rect.y); rp2.body.displayWidth = rp2.rect.width; rp2.body.displayHeight = rp2.rect.height; rp2.body.refreshBody(); }
-      exitPortal.setPosition(60, this.groundRect.y - 22);
-      meadowPortal.setPosition(w - 60, this.groundRect.y - 22);
+  exitPortal.setPosition(60, this.groundRect.y - 22);
+  meadowPortal.setPosition(w - 60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
     };
     this.scale.on("resize", this.onResizeHandler);
@@ -114,6 +144,8 @@ export class SlimeFieldScene extends Phaser.Scene {
       if (this.pollEvent) { this.pollEvent.remove(false); this.pollEvent = undefined; }
       if (this.wanderTimer) { this.wanderTimer.remove(false); this.wanderTimer = undefined; }
       this.mobContainers.forEach(c => c.destroy(true)); this.mobContainers.clear();
+  if (this.townPortalHandle) { this.townPortalHandle.destroy(); this.townPortalHandle = undefined; }
+  if (this.meadowPortalHandle) { this.meadowPortalHandle.destroy(); this.meadowPortalHandle = undefined; }
       try {
         if (this.joinedCombat) {
           const cid = String(this.game.registry.get("characterId") || "");
@@ -247,20 +279,7 @@ export class SlimeFieldScene extends Phaser.Scene {
     }
 
     updateNameTag(this.nameTag, this.player);
-    if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
-      try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
-      this.game.registry.set("spawn", { from: "slime", portal: "town" });
-  window.__saveSceneNow?.("Town");
-      this.scene.start("TownScene");
-    }
-    // Enter Slime Meadow when near the right portal and pressing E
-    if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x > (this.scale.width - 100)) {
-      try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
-      this.game.registry.set("spawn", { from: "slime", portal: "slime_meadow" });
-      window.__saveSceneNow?.("Slime");
-      // Reuse the same scene key in Next routing; server room will read zone from API calls
-      this.scene.start("SlimeMeadowScene");
-    }
+    // Portal interactions are handled by setupEPortal.
   }
 }
 

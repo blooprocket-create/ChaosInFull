@@ -9,7 +9,7 @@ declare global {
     __focusGame?: () => void;
 
   __applyExpUpdate?: (payload: { type: "mining" | "character" | "crafting"; exp: number; level: number }) => void;
-  __saveSceneNow?: (scene?: "Town" | "Cave" | "Slime") => void;
+     __saveSceneNow?: (scene?: "Town" | "Cave" | "Slime" | "Slime Meadow") => void;
 
     __openFurnace?: () => void;
     __openWorkbench?: () => void;

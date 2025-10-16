@@ -103,3 +103,49 @@ export function updateNameTag(nameTag: Phaser.GameObjects.Text | undefined, play
 
 /** Gate inputs when typing in chat/inputs */
 export function isTyping(): boolean { return !!window.__isTyping; }
+
+// Centralized helper for E-to-enter portals
+export type EPortalHandle = {
+  portal: Phaser.Physics.Arcade.Image;
+  label: Phaser.GameObjects.Text;
+  prompt: Phaser.GameObjects.Text;
+  radius: number;
+  destroy: () => void;
+};
+
+export function setupEPortal(
+  scene: Phaser.Scene,
+  portal: Phaser.Physics.Arcade.Image,
+  labelText: string,
+  labelColor: string,
+  getPlayer: () => Phaser.GameObjects.Image | undefined,
+  eKey: Phaser.Input.Keyboard.Key,
+  onEnter: () => void,
+  radius = 60
+): EPortalHandle {
+  const label = scene.add.text(portal.x, portal.y - 38, labelText, { color: labelColor, fontSize: "12px" }).setOrigin(0.5);
+  const prompt = scene.add.text(portal.x, portal.y - 60, "Press E to Enter", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
+
+  const update = () => {
+    const p = getPlayer();
+    if (!p) return;
+    // Keep labels anchored to portal each frame
+    label.setPosition(portal.x, portal.y - 38);
+    prompt.setPosition(portal.x, portal.y - 60);
+    const d = Phaser.Math.Distance.Between(p.x, p.y, portal.x, portal.y);
+    const near = d < radius;
+    prompt.setVisible(near);
+    if (near && Phaser.Input.Keyboard.JustDown(eKey) && !isTyping()) {
+      onEnter();
+    }
+  };
+  scene.events.on("update", update);
+  const destroy = () => {
+    scene.events.off("update", update);
+    label.destroy();
+    prompt.destroy();
+  };
+  // Auto-cleanup on shutdown for safety
+  scene.events.once("shutdown", destroy);
+  return { portal, label, prompt, radius, destroy };
+}

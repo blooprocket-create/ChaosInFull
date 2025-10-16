@@ -234,7 +234,7 @@ export async function POST(req: Request) {
   await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
     // Return updated exp/level
   const ch2 = await client.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true, craftingExp: true, craftingLevel: true } });
-  return NextResponse.json({ ok: true, rewards: { gold: q.rewardGold ?? 0, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 }, granted, nextQuest: q.nextQuestId, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingExp, craftingLevel: ch2?.craftingLevel });
+  return NextResponse.json({ ok: true, rewards: { gold: q.rewardGold ?? 0, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 }, granted, nextQuest: q.nextQuestId, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingExp, craftingLevel: ch2?.craftingLevel, claimedRewards: true });
   }
   return NextResponse.json({ ok: false, error: "unsupported" }, { status: 400 });
 }
