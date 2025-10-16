@@ -48,6 +48,7 @@ model Character {
   hat       Hat
   level     Int      @default(1)
   exp       Int      @default(0)
+  gold      Int      @default(0)
   miningExp Int      @default(0)
   miningLevel Int    @default(1)
   woodcuttingExp Int   @default(0)

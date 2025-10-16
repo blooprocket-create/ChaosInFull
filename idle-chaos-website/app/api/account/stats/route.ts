@@ -41,17 +41,21 @@ export async function GET(req: Request) {
   const client = prisma as unknown as {
     character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<CharacterLite | null> };
     user: { findUnique: (args: { where: { id: string }; include: { stats: true } }) => Promise<{ stats: PlayerStatLite | null } | null> };
+    // For per-character gold, extend CharacterLite locally with gold
+    characterGold?: { findUnique: (args: { where: { id: string }; select: { gold: boolean } }) => Promise<{ gold: number } | null> };
   };
   const ch = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
   if (!ch) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const user = await client.user.findUnique({ where: { id: session.userId }, include: { stats: true } });
   const s: PlayerStatLite | null = user?.stats ?? null;
+  // Fetch per-character gold
+  const cg = await prisma.character.findUnique({ where: { id: characterId }, select: { gold: true } }).catch(() => null as unknown as { gold: number } | null);
   const data = {
     base: s ? {
       level: s.level,
       class: s.class,
       exp: s.exp,
-      gold: s.gold,
+      gold: (cg?.gold ?? 0),
       premiumGold: ((): number => {
         const rs = s as unknown as Record<string, unknown>;
         const v = rs["premiumGold"];

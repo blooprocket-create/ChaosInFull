@@ -65,8 +65,9 @@ export async function POST(req: Request) {
     const cookie = req.headers.get("cookie");
     // Only award EXP to the attacker for MVP personal phases.
     const selfReward = rw.find(r => r.characterId === characterId) || (rw.length ? rw[0] : undefined);
-    let newExp: number | undefined;
-    let newLevel: number | undefined;
+  let newExp: number | undefined;
+  let newLevel: number | undefined;
+  let goldDeltaApplied = 0;
     if (selfReward) {
       await awardExp(characterId, selfReward.exp, cookie, req);
       // After awarding EXP, fetch the updated exp/level from DB for immediate HUD update
@@ -85,21 +86,10 @@ export async function POST(req: Request) {
         };
         const killer = await client.character.findUnique({ where: { id: killerId } });
         if (killer) {
-          const ps = await client.playerStat.findUnique({ where: { userId: killer.userId } });
-          const goldDelta = harvested?.loot?.length ? (Math.min(Math.max(1, (harvested.rewards?.[0]?.exp ?? 5) / 2), 5)) : (1 + Math.floor(Math.random() * 3));
-          const newGold = (ps?.gold ?? 0) + goldDelta;
-          if (!ps) {
-            // Try update first; if missing, create
-            await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } }).catch(async () => {
-              if (client.playerStat.create) {
-                await client.playerStat.create({ data: { userId: killer.userId, gold: newGold } }).catch(()=>{});
-              } else {
-                await prisma.playerStat.create({ data: { userId: killer.userId, gold: newGold } }).catch(()=>{});
-              }
-            });
-          } else {
-            await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } });
-          }
+          const baseExp = harvested?.rewards?.find(r=>r.characterId===killerId)?.exp ?? harvested?.rewards?.[0]?.exp ?? 5;
+          const goldDelta = harvested?.loot?.length ? Math.min(Math.max(1, Math.floor(baseExp / 2)), 5) : (1 + Math.floor(Math.random() * 3));
+          await prisma.character.update({ where: { id: killerId }, data: { gold: { increment: goldDelta } } }).catch(()=>{});
+          goldDeltaApplied = goldDelta;
           // Persist each rolled drop
           if (Array.isArray(harvested?.loot)) {
             for (const it of harvested.loot as Array<{ itemId: string; qty: number }>) {
@@ -118,7 +108,7 @@ export async function POST(req: Request) {
           await fetch(`${base}/api/quest`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify({ action: "progress", characterId, progressDelta: 1 }) });
         }
       } catch {}
-      return NextResponse.json({ ok: true, result: res, rewards: selfReward ? [selfReward] : [], loot: harvested?.loot ?? [], exp: newExp, level: newLevel, gold: undefined });
+  return NextResponse.json({ ok: true, result: res, rewards: selfReward ? [selfReward] : [], loot: harvested?.loot ?? [], exp: newExp, level: newLevel, gold: goldDeltaApplied });
     }
     return NextResponse.json({ ok: true, result: res });
   }

@@ -13,6 +13,9 @@ const client = prisma as unknown as {
   npcDef: {
     upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string }>; create: { id: string; name: string } }) => Promise<{ id: string; name: string }>;
   };
+  itemDef: {
+    upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string; description?: string; sell?: number }> ; create: { id: string; name: string; description?: string; sell?: number } }) => Promise<void>;
+  };
   quest: {
     findUnique: (args: { where: { id: string }; include?: { rewardItems?: boolean } }) => Promise<(QuestRow & { rewardItems?: Array<{ itemId: string; qty: number }> }) | null>;
     create: (args: { data: QuestRow & Partial<{ nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }> }) => Promise<QuestRow>;
@@ -27,7 +30,7 @@ const client = prisma as unknown as {
   };
   character: {
   findUnique: (args: { where: { id: string }; select?: { id?: boolean; userId?: boolean; exp?: boolean; level?: boolean; craftingExp?: boolean; craftingLevel?: boolean } }) => Promise<{ id?: string; userId?: string; exp?: number; level?: number; craftingExp?: number; craftingLevel?: number } | null>;
-    update: (args: { where: { id: string }; data: { exp?: { increment: number }; craftingExp?: { increment: number } } }) => Promise<void>;
+    update: (args: { where: { id: string }; data: { exp?: { increment: number }; craftingExp?: { increment: number }; gold?: { increment: number } } }) => Promise<void>;
   };
   playerStat: {
     findUnique: (args: { where: { userId: string } }) => Promise<{ gold: number } | null>;
@@ -47,14 +50,22 @@ const client = prisma as unknown as {
 async function ensureTutorialQuest() {
   // Seed Grimsley NPC
   const grimsley = await client.npcDef.upsert({ where: { id: "grimsley" }, update: {}, create: { id: "grimsley", name: "Grimsley" } });
+  // Ensure core quest reward items exist in ItemDef
+  const requiredItems: Array<{ id: string; name: string; sell?: number }> = [
+    { id: "copper_bar", name: "Copper Bar", sell: 8 },
+    { id: "plank", name: "Plank", sell: 4 },
+  ];
+  for (const it of requiredItems) {
+    await client.itemDef.upsert({ where: { id: it.id }, update: {}, create: { id: it.id, name: it.name, sell: it.sell } });
+  }
   // Seed tutorial quest with DB-driven rewards and next quest link
   const q = await client.quest.upsert({
     where: { id: TUTORIAL_QUEST_ID },
-    update: { giverNpcId: grimsley.id, nextQuestId: CRAFT_DAGGER_QUEST_ID, rewardGold: 500, rewardExp: 250, minLevel: 1, requiresQuestId: null },
+    update: { name: "Can you punch?", description: "Kill 5 slimes in the field.", giverNpcId: grimsley.id, nextQuestId: CRAFT_DAGGER_QUEST_ID, rewardGold: 500, rewardExp: 250, minLevel: 1, requiresQuestId: null },
     create: {
       id: TUTORIAL_QUEST_ID,
-      name: "Slime Introduction",
-      description: "Grimsley wants you to pop 5 slimes in the field to prove you can survive the oozing laughter.",
+      name: "Can you punch?",
+      description: "Kill 5 slimes in the field.",
       objectiveType: "KILL",
       objectiveTarget: "slime",
       objectiveCount: 5,
@@ -78,13 +89,15 @@ async function ensureTutorialQuest() {
 }
 
 async function ensureCraftDaggerQuest() {
+  // Ensure dagger reward item exists for downstream quest progression
+  await client.itemDef.upsert({ where: { id: "copper_dagger" }, update: {}, create: { id: "copper_dagger", name: "Copper Dagger", sell: 16 } });
   await client.quest.upsert({
     where: { id: CRAFT_DAGGER_QUEST_ID },
-    update: { rewardCraftingExp: 150, rewardExp: 150, requiresQuestId: TUTORIAL_QUEST_ID, minLevel: 1 },
+    update: { name: "Can you craft?", description: "Craft one copper dagger at the workbench.", rewardCraftingExp: 150, rewardExp: 150, requiresQuestId: TUTORIAL_QUEST_ID, minLevel: 1 },
     create: {
       id: CRAFT_DAGGER_QUEST_ID,
-      name: "Make A Copper Dagger",
-      description: "Grimsley needs proof you can shape metal. Craft one copper dagger at the workbench.",
+      name: "Can you craft?",
+      description: "Craft one copper dagger at the workbench.",
       objectiveType: "CRAFT",
       objectiveTarget: "copper_dagger",
       objectiveCount: 1,
@@ -176,26 +189,32 @@ export async function POST(req: Request) {
     if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
     // Gold
     if ((q.rewardGold ?? 0) > 0) {
-      const ps = await client.playerStat.findUnique({ where: { userId: ch.userId! } });
-      const newGold = (ps?.gold ?? 0) + (q.rewardGold ?? 0);
-      if (!ps) {
-        await client.playerStat.update({ where: { userId: ch.userId! }, data: { gold: newGold } }).catch(async () => {
-          // If update fails due to missing row, create
-          if (client.playerStat.create) {
-            await client.playerStat.create({ data: { userId: ch.userId!, gold: newGold } }).catch(()=>{});
-          } else {
-            await prisma.playerStat.create({ data: { userId: ch.userId!, gold: newGold } }).catch(()=>{});
-          }
-        });
-      } else {
-        await client.playerStat.update({ where: { userId: ch.userId! }, data: { gold: newGold } });
-      }
+      await client.character.update({ where: { id: characterId }, data: { gold: { increment: q.rewardGold ?? 0 } } });
     }
-    // EXP awards via central endpoint
+    // EXP awards via central endpoint (absolute URL + cookies for auth)
     try {
-      await fetch("/api/account/characters/exp", {
+      const origin = (() => {
+        const env = process.env.NEXT_PUBLIC_BASE_URL;
+        if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, "");
+        const o = req.headers.get("origin") || req.headers.get("x-forwarded-origin") || "";
+        if (o && /^https?:\/\//i.test(o)) return o.replace(/\/$/, "");
+        const xfProto = req.headers.get("x-forwarded-proto");
+        const xfHost = req.headers.get("x-forwarded-host");
+        if (xfHost) {
+          const proto = xfProto && /https/i.test(xfProto) ? "https" : "http";
+          return `${proto}://${xfHost}`;
+        }
+        const host = req.headers.get("host");
+        if (host) {
+          const guessHttps = /:443$/.test(host) || /https/i.test(xfProto || "");
+          return `${guessHttps ? "https" : "http"}://${host}`;
+        }
+        return "http://localhost:3000";
+      })();
+      const cookie = req.headers.get("cookie");
+      await fetch(`${origin}/api/account/characters/exp`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
         body: JSON.stringify({ characterId, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 })
       });
     } catch {}

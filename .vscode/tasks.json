@@ -397,6 +397,90 @@
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Typecheck after per-character gold refactor",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Lint website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build website (verify seed edits)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build website (after seed fix)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build website (quest exp + combat gold)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
 		}
 	]
 }
