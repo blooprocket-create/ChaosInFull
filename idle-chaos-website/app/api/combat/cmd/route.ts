@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
 import { prisma } from "@/src/lib/prisma";
+import { assertCharacterOwner } from "@/src/lib/ownership";
 
 function getAbsoluteBase(req: Request) {
   // Prefer NEXT_PUBLIC_BASE_URL if absolute, else origin header, else http://localhost fallback
@@ -9,8 +10,19 @@ function getAbsoluteBase(req: Request) {
   if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, "");
   const origin = req.headers.get("origin") || req.headers.get("x-forwarded-origin") || "";
   if (origin && /^https?:\/\//i.test(origin)) return origin.replace(/\/$/, "");
+  // Respect TLS terminators / proxies
+  const xfProto = req.headers.get("x-forwarded-proto");
+  const xfHost = req.headers.get("x-forwarded-host");
+  if (xfHost) {
+    const proto = xfProto && /https/i.test(xfProto) ? "https" : "http";
+    return `${proto}://${xfHost}`;
+  }
   const host = req.headers.get("host");
-  if (host) return `http://${host}`;
+  if (host) {
+    // If Host has :443 or the request is on https scheme, prefer https
+    const guessHttps = /:443$/.test(host) || /https/i.test(xfProto || "");
+    return `${guessHttps ? "https" : "http"}://${host}`;
+  }
   return "http://localhost:3000";
 }
 
@@ -31,14 +43,8 @@ export async function POST(req: Request) {
   const { zone, characterId, action, value } = body;
   if (!zone || !characterId || !action) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   // Ownership check: ensure character belongs to current user
-  try {
-    const ch = await (prisma as any).character.findUnique({ where: { id: characterId } });
-    if (!ch || ch.userId !== session.userId) {
-      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-    }
-  } catch {
-    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  }
+  try { await assertCharacterOwner(session.userId, characterId); }
+  catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const room = getZoneRoom(zone);
   if (action === "auto") {
     room.toggleAuto(characterId, !!value);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
-import { prisma } from "@/src/lib/prisma";
+import { assertCharacterOwner } from "@/src/lib/ownership";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -10,14 +10,8 @@ export async function POST(req: Request) {
   if (!zone || !characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
 
   // Ownership check
-  try {
-    const ch = await (prisma as any).character.findUnique({ where: { id: characterId } });
-    if (!ch || ch.userId !== session.userId) {
-      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-    }
-  } catch {
-    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  }
+  try { await assertCharacterOwner(session.userId, characterId); }
+  catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
 
   const room = getZoneRoom(zone);
   room.leave(characterId);

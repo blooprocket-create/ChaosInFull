@@ -92,6 +92,10 @@ class ZoneRoom {
       // Fire and forget; first snapshot/attack will await if needed
       void this.loadContent().catch(()=>{});
     }
+    // If the room had idled and cleared the interval, re-arm it on first join
+    if (!this.tickHandle) {
+      this.tickHandle = setInterval(() => this.tick(), 100);
+    }
     const phase = this.ensurePersonalPhase(charId);
     const ps: PlayerState = { characterId: charId, zone: this.zone, phaseId: phase.id, hp: 100, maxHp: 100, auto: false, lastBasicAt: 0, lastSeenAt: Date.now() };
     this.players.set(charId, ps);
@@ -301,6 +305,26 @@ class ZoneRoom {
       if (phase.members.size === 0) {
         // Clean up empty phase state
         this.phases.delete(phase.id);
+      }
+    }
+    // Remove from any party membership and clean up party if empty; reassign leader if needed
+    for (const [pid, party] of this.parties) {
+      if (party.members.has(charId)) {
+        party.members.delete(charId);
+        if (party.leaderId === charId) {
+          // Reassign leader to first remaining member if any
+          const nextLeader = party.members.values().next().value as string | undefined;
+          if (nextLeader) party.leaderId = nextLeader;
+        }
+        if (party.members.size === 0) {
+          this.parties.delete(pid);
+        } else {
+          // Recalculate associated phase budget based on party size
+          const ph = this.phases.get(party.phaseId);
+          if (ph) {
+            ph.budget = 6 + Math.min(4, party.members.size * 2);
+          }
+        }
       }
     }
     // If no players remain, stop ticking
