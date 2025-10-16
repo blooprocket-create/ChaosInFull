@@ -3,7 +3,7 @@ import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOve
 import api from "../services/api";
 import { itemByKey } from "@/src/data/items";
 
-type Mob = { id: string; hp: number; maxHp: number; level: number };
+type Mob = { id: string; hp: number; maxHp: number; level: number; pos: { x: number; y: number } };
 
 export class SlimeFieldScene extends Phaser.Scene {
   constructor() { super("SlimeFieldScene"); }
@@ -126,11 +126,7 @@ export class SlimeFieldScene extends Phaser.Scene {
     }
   }
 
-  private layoutPositions(ids: string[]) {
-    const y = this.groundRect.y - 28; const pos = new Map<string, { x: number; y: number }>();
-    const slots = [100, 180, 260, 340, 420]; ids.forEach((id, i) => { const slot = slots[i % slots.length]; pos.set(id, { x: slot, y }); });
-    return pos;
-  }
+  // Server provides authoritative mob positions in snapshot; no client-side slotting
 
   private ensureMobContainer(id: string, level: number) {
     let cont = this.mobContainers.get(id); if (cont) return cont;
@@ -150,10 +146,14 @@ export class SlimeFieldScene extends Phaser.Scene {
   private reconcileMobs(mobs: Mob[]) {
     const ids = new Set(mobs.map(m => m.id));
     for (const [id, cont] of this.mobContainers.entries()) { if (!ids.has(id)) { cont.destroy(true); this.mobContainers.delete(id); } }
-    const sorted = mobs.map(m => m.id).sort(); const positions = this.layoutPositions(sorted);
     for (const m of mobs) {
       const cont = this.ensureMobContainer(m.id, m.level);
-      const pos = positions.get(m.id)!; cont.setPosition(pos.x, pos.y);
+      // Place according to server pos; clamp to ground bounds and align to ground Y if server sends 0
+      const y = m.pos?.y && m.pos.y > 0 ? m.pos.y : (this.groundRect.y - 28);
+      const minX = (this.groundRect.x - this.groundRect.width/2) + 40;
+      const maxX = (this.groundRect.x + this.groundRect.width/2) - 40;
+      const x = Phaser.Math.Clamp(m.pos?.x ?? 100, minX, maxX);
+      cont.setPosition(x, y);
       const ratio = Math.max(0, Math.min(1, m.hp / (m.maxHp || 1)));
   const mc = cont as Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
   const bar: Phaser.GameObjects.Rectangle = mc.__bar!; const full: number = mc.__barFull!;
@@ -177,6 +177,7 @@ export class SlimeFieldScene extends Phaser.Scene {
 
   private async basicAttack(characterId: string) {
     try {
+      // Send player's current x as proximity hint
       const data = await api.basicAttack("Slime", characterId, this.player.x);
   if (data?.result?.hit) {
         const mobId = data?.result?.mobId as string | undefined;
@@ -195,8 +196,8 @@ export class SlimeFieldScene extends Phaser.Scene {
         }
       }
       // Apply new EXP/Level to HUD if server returned them
-      if (typeof (data as any)?.exp === "number" && typeof (data as any)?.level === "number") {
-        window.__applyExpUpdate?.({ type: "character", exp: (data as any).exp, level: (data as any).level });
+      if (typeof data?.exp === "number" && typeof data?.level === "number") {
+        window.__applyExpUpdate?.({ type: "character", exp: data.exp, level: data.level });
       }
   const loot: Array<{ itemId: string; qty: number }> = Array.isArray(data?.loot) ? (data.loot as Array<{ itemId: string; qty: number }>) : [];
       if (loot.length) {

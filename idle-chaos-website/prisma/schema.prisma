@@ -118,9 +118,23 @@ model Quest {
   objectiveType   String   // e.g. "KILL"
   objectiveTarget String   // e.g. "slime"
   objectiveCount  Int      // e.g. 5
+  // Optional: NPC that gives/accepts this quest
+  giverNpc       NpcDef?  @relation(fields: [giverNpcId], references: [id])
+  giverNpcId     String?
+  // Optional: next quest in chain
+  nextQuestId    String?
+  // Acceptance requirements
+  minLevel          Int      @default(1)
+  requiresQuestId   String?
+  // Rewards
+  rewardGold         Int      @default(0)
+  rewardExp          Int      @default(0)
+  rewardMiningExp    Int      @default(0)
+  rewardCraftingExp  Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   characterQuests CharacterQuest[]
+  rewardItems     QuestRewardItem[]
 }
 
 model CharacterQuest {
@@ -171,6 +185,7 @@ model ItemDef {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   drops       DropEntry[]
+  questRewards QuestRewardItem[] @relation("ItemToQuestRewards")
 }
 
 model EnemyTemplate {
@@ -229,4 +244,23 @@ model SpawnConfig {
   respawnMs  Int    @default(1200)
   slots      Json?  // e.g., [100,180,260,340,420]
   phaseType  String @default("personal")
+}
+
+// NPC definitions (quest givers, shopkeepers, etc.)
+model NpcDef {
+  id        String @id // e.g., "grimsley"
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  quests    Quest[]
+}
+
+// Per-quest item rewards
+model QuestRewardItem {
+  id        String  @id @default(cuid())
+  quest     Quest   @relation(fields: [questId], references: [id])
+  questId   String
+  item      ItemDef @relation("ItemToQuestRewards", fields: [itemId], references: [id])
+  itemId    String
+  qty       Int     @default(1)
 }

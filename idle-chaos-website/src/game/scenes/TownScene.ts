@@ -171,13 +171,13 @@ export class TownScene extends Phaser.Scene {
         if (!cid) return;
         const data = await api.fetchQuests(cid).catch(() => null);
         if (!data) return;
-        const cqs = (data.characterQuests as Array<{ questId: string; status: string }> | undefined) || [];
-        const has = cqs.find(q => q.questId === "tutorial_kill_slimes_5" && (q.status === "ACTIVE" || q.status === "COMPLETED"));
-        if (has) this.game.registry.set("tutorialStarted", true);
-        const tut = cqs.find(q => q.questId === "tutorial_kill_slimes_5");
-        if (!tut) { this.tutorIcon.setVisible(true).setColor("#fef08a").setText("!"); }
-        else if (tut.status === "COMPLETED") { this.tutorIcon.setVisible(true).setColor("#86efac").setText("?"); }
-        else { this.tutorIcon.setVisible(true).setColor("#cbd5e1").setText("?"); }
+  const cqs = (data.characterQuests as Array<{ questId: string; status: "AVAILABLE"|"ACTIVE"|"COMPLETED" }> | undefined) || [];
+  const tut = cqs.find(q => q.questId === "tutorial_kill_slimes_5");
+  if (tut?.status === "ACTIVE" || tut?.status === "COMPLETED") this.game.registry.set("tutorialStarted", true);
+  // Icon behavior: '!' when not accepted (missing or AVAILABLE), '?' gray when ACTIVE, '?' green when COMPLETED
+  if (!tut || tut.status === "AVAILABLE") { this.tutorIcon.setVisible(true).setColor("#fef08a").setText("!"); }
+  else if (tut.status === "COMPLETED") { this.tutorIcon.setVisible(true).setColor("#86efac").setText("?"); }
+  else { this.tutorIcon.setVisible(true).setColor("#cbd5e1").setText("?"); }
       } catch {}
     })();
 
@@ -266,7 +266,26 @@ export class TownScene extends Phaser.Scene {
         const cid = String(this.game.registry.get("characterId") || "");
         if (!started) {
           window.__spawnOverhead?.(":purple: Grimsley: The portal laughs at cowards. Pop 5 slimes.", { wave: true });
-          if (cid) { api.questAccept(cid).then(res => { if (res.ok) this.game.registry.set("tutorialStarted", true); }).catch(()=>{}); }
+          if (cid) {
+            api.questAccept(cid).then(async res => {
+              if (res.ok) {
+                this.game.registry.set("tutorialStarted", true);
+                // Bump quest dirty count so QuestPanel refreshes
+                const qd = this.game.registry.get("questDirtyCount") as number | undefined;
+                this.game.registry.set("questDirtyCount", (qd ?? 0) + 1);
+                // Refresh icon to '?' (active)
+                try {
+                  type CQ = { questId: string; status: "AVAILABLE"|"ACTIVE"|"COMPLETED" };
+                  const data = (await api.fetchQuests(cid).catch(() => ({ characterQuests: [] as CQ[] }))) as { characterQuests: CQ[] };
+                  const tut = data.characterQuests.find(q=>q.questId === "tutorial_kill_slimes_5");
+                  if (tut?.status === "ACTIVE") this.tutorIcon.setVisible(true).setColor("#cbd5e1").setText("?");
+                } catch {}
+              } else {
+                // Show lock reasons if any
+                try { const payload = await res.json(); if (payload?.locked && Array.isArray(payload.reasons) && payload.reasons.length) { window.__spawnOverhead?.(`:red: ${payload.reasons.join(", ")}`); } } catch {}
+              }
+            }).catch(()=>{});
+          }
         } else {
           (async () => {
             try {
@@ -278,11 +297,16 @@ export class TownScene extends Phaser.Scene {
                 const hand = await api.questComplete(cid, "tutorial_kill_slimes_5");
                 const payload = await hand.json().catch(()=>({}));
                 if (payload?.rewards?.gold) window.__spawnOverhead?.(":yellow: +500 gold", { ripple: true });
-                if (payload?.rewards?.exp) window.__spawnOverhead?.(":green: +250 XP", { wave: true });
+                if (typeof payload?.exp === 'number' && typeof payload?.level === 'number') {
+                  window.__applyExpUpdate?.({ type: 'character', exp: payload.exp, level: payload.level });
+                }
                 const data2 = (await api.fetchQuests(cid).catch(() => ({ characterQuests: [] as CQ[] }))) as { characterQuests: CQ[] };
                 const list2: CQ[] = Array.isArray(data2.characterQuests) ? data2.characterQuests : [];
                 const tut2 = list2.find(q=>q.questId === "tutorial_kill_slimes_5");
                 if (tut2?.status === "COMPLETED") this.tutorIcon.setVisible(true).setColor("#86efac").setText("?");
+                // Bump questDirtyCount so QuestPanel auto-refresh can hide handed-in quest
+                const qd = this.game.registry.get("questDirtyCount") as number | undefined;
+                this.game.registry.set("questDirtyCount", (qd ?? 0) + 1);
                 window.__spawnOverhead?.(":blue: Grimsley: The portal should stop laughing now.");
               } else {
                 window.__spawnOverhead?.(":blue: Grimsley: Goo awaits.");

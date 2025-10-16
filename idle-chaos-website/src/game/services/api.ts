@@ -54,8 +54,8 @@ export const api = {
   },
   async basicAttack(zone: "Slime", characterId: string, x: number): Promise<BasicAttackResult> {
     const r = await api.combatCmd(zone, characterId, "basic", { x });
-    if (!r.ok) return {};
-    return r.json().catch(() => ({}));
+    if (!r.ok) return {} as BasicAttackResult;
+    return (await r.json().catch(() => ({}))) as BasicAttackResult;
   },
   async toggleAuto(zone: "Slime", characterId: string, value: boolean) {
     return api.combatCmd(zone, characterId, "auto", value);

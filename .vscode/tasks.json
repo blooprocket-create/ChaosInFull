@@ -349,6 +349,54 @@
 			],
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Typecheck website after quest accept checks",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck after mob pos changes",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck quests and town scene changes",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck after fixes",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"group": "build"
 		}
 	]
 }

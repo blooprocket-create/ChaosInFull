@@ -7,12 +7,16 @@ import { prisma } from "@/src/lib/prisma";
 const TUTORIAL_QUEST_ID = "tutorial_kill_slimes_5";
 const CRAFT_DAGGER_QUEST_ID = "tutorial_craft_copper_dagger";
 
-type QuestRow = { id: string; name: string; description: string; objectiveType: string; objectiveTarget: string; objectiveCount: number };
+type QuestRow = { id: string; name: string; description: string; objectiveType: string; objectiveTarget: string; objectiveCount: number; nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null };
 type CharacterQuestRow = { characterId: string; questId: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; claimedRewards?: boolean };
 const client = prisma as unknown as {
+  npcDef: {
+    upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string }>; create: { id: string; name: string } }) => Promise<{ id: string; name: string }>;
+  };
   quest: {
-    findUnique: (args: { where: { id: string } }) => Promise<QuestRow | null>;
-    create: (args: { data: QuestRow }) => Promise<QuestRow>;
+    findUnique: (args: { where: { id: string }; include?: { rewardItems?: boolean } }) => Promise<(QuestRow & { rewardItems?: Array<{ itemId: string; qty: number }> }) | null>;
+    create: (args: { data: QuestRow & Partial<{ nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }> }) => Promise<QuestRow>;
+    upsert: (args: { where: { id: string }; update: Partial<QuestRow & { nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }>; create: QuestRow & Partial<{ nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }> }) => Promise<QuestRow>;
   };
   characterQuest: {
     findMany: (args: { where: { characterId: string }; include: { quest: boolean } }) => Promise<Array<CharacterQuestRow & { quest: QuestRow }>>;
@@ -22,12 +26,17 @@ const client = prisma as unknown as {
     delete: (args: { where: { characterId_questId: { characterId: string; questId: string } } }) => Promise<void>;
   };
   character: {
-    findUnique: (args: { where: { id: string } }) => Promise<{ id: string; userId: string } | null>;
+  findUnique: (args: { where: { id: string }; select?: { id?: boolean; userId?: boolean; exp?: boolean; level?: boolean; craftingExp?: boolean; craftingLevel?: boolean } }) => Promise<{ id?: string; userId?: string; exp?: number; level?: number; craftingExp?: number; craftingLevel?: number } | null>;
     update: (args: { where: { id: string }; data: { exp?: { increment: number }; craftingExp?: { increment: number } } }) => Promise<void>;
   };
   playerStat: {
     findUnique: (args: { where: { userId: string } }) => Promise<{ gold: number } | null>;
     update: (args: { where: { userId: string }; data: { gold: number } }) => Promise<void>;
+    create?: (args: { data: { userId: string; gold: number } }) => Promise<void>;
+  };
+  questRewardItem: {
+    findFirst: (args: { where: { questId: string; itemId: string } }) => Promise<{ id: string } | null>;
+    create: (args: { data: { questId: string; itemId: string; qty: number } }) => Promise<void>;
   };
   itemStack: {
     findUnique: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } } }) => Promise<{ count: number } | null>;
@@ -36,31 +45,55 @@ const client = prisma as unknown as {
 };
 
 async function ensureTutorialQuest() {
-  const q = await client.quest.findUnique({ where: { id: TUTORIAL_QUEST_ID } });
-  if (!q) {
-    await client.quest.create({ data: {
+  // Seed Grimsley NPC
+  const grimsley = await client.npcDef.upsert({ where: { id: "grimsley" }, update: {}, create: { id: "grimsley", name: "Grimsley" } });
+  // Seed tutorial quest with DB-driven rewards and next quest link
+  const q = await client.quest.upsert({
+    where: { id: TUTORIAL_QUEST_ID },
+    update: { giverNpcId: grimsley.id, nextQuestId: CRAFT_DAGGER_QUEST_ID, rewardGold: 500, rewardExp: 250, minLevel: 1, requiresQuestId: null },
+    create: {
       id: TUTORIAL_QUEST_ID,
       name: "Slime Introduction",
-      description: "Grimsly wants you to pop 5 slimes in the field to prove you can survive the oozing laughter.",
+      description: "Grimsley wants you to pop 5 slimes in the field to prove you can survive the oozing laughter.",
       objectiveType: "KILL",
       objectiveTarget: "slime",
-      objectiveCount: 5
-    }});
+      objectiveCount: 5,
+      giverNpcId: grimsley.id,
+      nextQuestId: CRAFT_DAGGER_QUEST_ID,
+      rewardGold: 500,
+      rewardExp: 250,
+      minLevel: 1,
+      requiresQuestId: null,
+    }
+  });
+  // Reward items: 1x copper_bar and 1x plank
+  const items: Array<{ itemId: string; qty: number }> = [
+    { itemId: "copper_bar", qty: 1 },
+    { itemId: "plank", qty: 1 },
+  ];
+  for (const it of items) {
+    const exists = await client.questRewardItem.findFirst({ where: { questId: q.id, itemId: it.itemId } });
+    if (!exists) await client.questRewardItem.create({ data: { questId: q.id, itemId: it.itemId, qty: it.qty } });
   }
 }
 
 async function ensureCraftDaggerQuest() {
-  const q = await client.quest.findUnique({ where: { id: CRAFT_DAGGER_QUEST_ID } });
-  if (!q) {
-    await client.quest.create({ data: {
+  await client.quest.upsert({
+    where: { id: CRAFT_DAGGER_QUEST_ID },
+    update: { rewardCraftingExp: 150, rewardExp: 150, requiresQuestId: TUTORIAL_QUEST_ID, minLevel: 1 },
+    create: {
       id: CRAFT_DAGGER_QUEST_ID,
       name: "Make A Copper Dagger",
-      description: "Grimsly needs proof you can shape metal. Craft one copper dagger at the workbench.",
+      description: "Grimsley needs proof you can shape metal. Craft one copper dagger at the workbench.",
       objectiveType: "CRAFT",
       objectiveTarget: "copper_dagger",
       objectiveCount: 1,
-    }});
-  }
+      rewardCraftingExp: 150,
+      rewardExp: 150,
+      requiresQuestId: TUTORIAL_QUEST_ID,
+      minLevel: 1,
+    }
+  });
 }
 
 export async function GET(req: Request) {
@@ -87,6 +120,23 @@ export async function POST(req: Request) {
   await ensureCraftDaggerQuest();
   if (action === "accept") {
     const id = questId || TUTORIAL_QUEST_ID;
+    // Validate acceptance requirements: quest exists, min level, previous quest completion if required
+    const q = await client.quest.findUnique({ where: { id } });
+    if (!q) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
+    // Character level check
+    const ch = await client.character.findUnique({ where: { id: characterId }, select: { id: true, level: true } });
+    if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
+    const reasons: string[] = [];
+    const minLevel = q.minLevel ?? 1;
+    if ((ch.level ?? 1) < minLevel) reasons.push(`Requires level ${minLevel}`);
+    // Previous quest requirement
+    if (q.requiresQuestId) {
+      const rq = await client.characterQuest.findUnique({ where: { characterId_questId: { characterId, questId: q.requiresQuestId } } });
+      if (!rq || rq.status !== "COMPLETED") reasons.push("Requires previous quest completion");
+    }
+    if (reasons.length > 0) {
+      return NextResponse.json({ ok: false, locked: true, reasons }, { status: 400 });
+    }
     // Upsert as ACTIVE (even if already AVAILABLE)
     const cq = await client.characterQuest.upsert({
       where: { characterId_questId: { characterId, questId: id } },
@@ -119,51 +169,53 @@ export async function POST(req: Request) {
     if (!cq) return NextResponse.json({ ok: false, error: "not_active" }, { status: 400 });
     if (cq.status !== "COMPLETED") return NextResponse.json({ ok: false, error: "not_ready" }, { status: 400 });
     if (cq.claimedRewards) return NextResponse.json({ ok: true, alreadyClaimed: true });
-    // Rewards by quest
-  if (id === TUTORIAL_QUEST_ID) {
-      // Give 500 gold to PlayerStat and 250 character XP
-      const ch = await client.character.findUnique({ where: { id: characterId } });
-      if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
-      let ps = await client.playerStat.findUnique({ where: { userId: ch.userId } });
-      const newGold = (ps?.gold ?? 0) + 500;
+    // Generic DB-driven rewards
+  const q = await client.quest.findUnique({ where: { id }, include: { rewardItems: true } });
+    if (!q) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
+  const ch = await client.character.findUnique({ where: { id: characterId }, select: { id: true, userId: true } });
+    if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
+    // Gold
+    if ((q.rewardGold ?? 0) > 0) {
+      const ps = await client.playerStat.findUnique({ where: { userId: ch.userId! } });
+      const newGold = (ps?.gold ?? 0) + (q.rewardGold ?? 0);
       if (!ps) {
-        await prisma.playerStat.create({ data: { userId: ch.userId, gold: newGold } as any }).catch(()=>{});
+        await client.playerStat.update({ where: { userId: ch.userId! }, data: { gold: newGold } }).catch(async () => {
+          // If update fails due to missing row, create
+          if (client.playerStat.create) {
+            await client.playerStat.create({ data: { userId: ch.userId!, gold: newGold } }).catch(()=>{});
+          } else {
+            await prisma.playerStat.create({ data: { userId: ch.userId!, gold: newGold } }).catch(()=>{});
+          }
+        });
       } else {
-        await client.playerStat.update({ where: { userId: ch.userId }, data: { gold: newGold } });
+        await client.playerStat.update({ where: { userId: ch.userId! }, data: { gold: newGold } });
       }
-      // Proper EXP award: call EXP endpoint to compute levels
-      try {
-        await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, exp: 250 }) });
-      } catch {}
-      const ch2 = await prisma.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true } });
-      // Grant materials for next quest and auto-accept it if not present
-      const nextQuestId = CRAFT_DAGGER_QUEST_ID;
-      await client.characterQuest.upsert({
-        where: { characterId_questId: { characterId, questId: nextQuestId } },
-        update: { status: "ACTIVE" },
-        create: { characterId, questId: nextQuestId, status: "ACTIVE", progress: 0 },
+    }
+    // EXP awards via central endpoint
+    try {
+      await fetch("/api/account/characters/exp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ characterId, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 })
       });
-      // Grant 1x copper_bar and 1x plank
-      const grant = async (itemKey: string, qty: number) => {
-        const curr = await client.itemStack.findUnique({ where: { characterId_itemKey: { characterId, itemKey } } });
-        const newCount = Math.max(0, (curr?.count ?? 0) + qty);
-        await client.itemStack.upsert({ where: { characterId_itemKey: { characterId, itemKey } }, update: { count: newCount }, create: { characterId, itemKey, count: newCount } });
-      };
-      await grant("copper_bar", 1);
-      await grant("plank", 1);
-      await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
-      return NextResponse.json({ ok: true, rewards: { gold: 500, exp: 250 }, granted: { copper_bar: 1, plank: 1 }, nextQuest: nextQuestId, exp: ch2?.exp, level: ch2?.level });
+    } catch {}
+    // Grant item rewards
+    const granted: Record<string, number> = {};
+    for (const it of (q.rewardItems || [])) {
+      const curr = await client.itemStack.findUnique({ where: { characterId_itemKey: { characterId, itemKey: it.itemId } } });
+      const newCount = Math.max(0, (curr?.count ?? 0) + Math.max(1, it.qty));
+      await client.itemStack.upsert({ where: { characterId_itemKey: { characterId, itemKey: it.itemId } }, update: { count: newCount }, create: { characterId, itemKey: it.itemId, count: newCount } });
+      granted[it.itemId] = (granted[it.itemId] ?? 0) + Math.max(1, it.qty);
     }
-    if (id === CRAFT_DAGGER_QUEST_ID) {
-      // 150 crafting XP + 150 character XP computed via EXP endpoint
-      try {
-        await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, craftingExp: 150, exp: 150 }) });
-      } catch {}
-      const ch2 = await prisma.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true, craftingExp: true, craftingLevel: true } });
-      await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
-      return NextResponse.json({ ok: true, rewards: { craftingExp: 150, exp: 150 }, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingExp, craftingLevel: ch2?.craftingLevel });
+    // Activate next quest in chain if defined
+    if (q.nextQuestId) {
+      await client.characterQuest.upsert({ where: { characterId_questId: { characterId, questId: q.nextQuestId } }, update: { status: "ACTIVE" }, create: { characterId, questId: q.nextQuestId, status: "ACTIVE", progress: 0 } });
     }
-    return NextResponse.json({ ok: true });
+    // Mark claimed
+  await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
+    // Return updated exp/level
+  const ch2 = await client.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true, craftingExp: true, craftingLevel: true } });
+  return NextResponse.json({ ok: true, rewards: { gold: q.rewardGold ?? 0, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 }, granted, nextQuest: q.nextQuestId, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingExp, craftingLevel: ch2?.craftingLevel });
   }
   return NextResponse.json({ ok: false, error: "unsupported" }, { status: 400 });
 }

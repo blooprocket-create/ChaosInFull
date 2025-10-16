@@ -80,17 +80,23 @@ export async function POST(req: Request) {
         const killerId = characterId;
         const client = prisma as unknown as {
           character: { findUnique: (args: { where: { id: string } }) => Promise<{ id: string; userId: string } | null> };
-          playerStat: { findUnique: (args: { where: { userId: string } }) => Promise<{ gold: number } | null>; update: (args: { where: { userId: string }; data: { gold: number } }) => Promise<void> };
+          playerStat: { findUnique: (args: { where: { userId: string } }) => Promise<{ gold: number } | null>; update: (args: { where: { userId: string }; data: { gold: number } }) => Promise<void>; create?: (args: { data: { userId: string; gold: number } }) => Promise<void> };
           itemStack: { findUnique: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } } }) => Promise<{ count: number } | null>; upsert: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } }; update: { count: number }; create: { characterId: string; itemKey: string; count: number } }) => Promise<void> };
         };
         const killer = await client.character.findUnique({ where: { id: killerId } });
         if (killer) {
-          let ps = await client.playerStat.findUnique({ where: { userId: killer.userId } });
+          const ps = await client.playerStat.findUnique({ where: { userId: killer.userId } });
           const goldDelta = harvested?.loot?.length ? (Math.min(Math.max(1, (harvested.rewards?.[0]?.exp ?? 5) / 2), 5)) : (1 + Math.floor(Math.random() * 3));
           const newGold = (ps?.gold ?? 0) + goldDelta;
           if (!ps) {
-            // Create-on-demand if missing
-            await prisma.playerStat.create({ data: { userId: killer.userId, gold: newGold } as any }).catch(()=>{});
+            // Try update first; if missing, create
+            await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } }).catch(async () => {
+              if (client.playerStat.create) {
+                await client.playerStat.create({ data: { userId: killer.userId, gold: newGold } }).catch(()=>{});
+              } else {
+                await prisma.playerStat.create({ data: { userId: killer.userId, gold: newGold } }).catch(()=>{});
+              }
+            });
           } else {
             await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } });
           }

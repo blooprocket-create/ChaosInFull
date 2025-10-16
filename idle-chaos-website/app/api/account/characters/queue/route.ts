@@ -28,21 +28,39 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  const body = await req.json().catch(() => ({}));
-  const { characterId, furnace, workbench, sawmill } = body as { characterId?: string; furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null };
+  const raw = await req.json().catch(() => null);
+  if (!raw || typeof raw !== "object") return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+  const body = raw as Record<string, unknown>;
+  const characterId = typeof body.characterId === "string" ? body.characterId : undefined;
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+  const furnace = (body.furnace ?? undefined) as FurnaceQueue | null | undefined;
+  const workbench = (body.workbench ?? undefined) as WorkbenchQueue | null | undefined;
+  const sawmill = (body.sawmill ?? undefined) as SawmillQueue | null | undefined;
+  const hasFurnace = Object.prototype.hasOwnProperty.call(body, "furnace");
+  const hasWorkbench = Object.prototype.hasOwnProperty.call(body, "workbench");
+  const hasSawmill = Object.prototype.hasOwnProperty.call(body, "sawmill");
   const client = prisma as unknown as {
     character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
     craftQueue: {
-      upsert: (args: { where: { characterId: string }; update: { furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null }; create: { characterId: string; furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null } }) => Promise<unknown>;
+      upsert: (args: { where: { characterId: string }; update: { furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null }; create: { characterId: string; furnace: FurnaceQueue | null; workbench: WorkbenchQueue | null; sawmill: SawmillQueue | null } }) => Promise<unknown>;
     };
   };
   const owner = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  const updateData: { furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null } = {};
+  if (hasFurnace) updateData.furnace = furnace ?? null;
+  if (hasWorkbench) updateData.workbench = workbench ?? null;
+  if (hasSawmill) updateData.sawmill = sawmill ?? null;
+  const createData: { characterId: string; furnace: FurnaceQueue | null; workbench: WorkbenchQueue | null; sawmill: SawmillQueue | null } = {
+    characterId,
+    furnace: hasFurnace ? (furnace ?? null) : null,
+    workbench: hasWorkbench ? (workbench ?? null) : null,
+    sawmill: hasSawmill ? (sawmill ?? null) : null,
+  };
   await client.craftQueue.upsert({
     where: { characterId },
-    update: { furnace: furnace ?? undefined, workbench: workbench ?? undefined, sawmill: sawmill ?? undefined },
-    create: { characterId, furnace: furnace ?? undefined, workbench: workbench ?? undefined, sawmill: sawmill ?? undefined },
+    update: updateData,
+    create: createData,
   });
   return NextResponse.json({ ok: true });
 }

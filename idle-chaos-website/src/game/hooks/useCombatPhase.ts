@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api, { BasicAttackResult } from "../services/api";
 
-export type Mob = { id: string; hp: number; maxHp: number; level: number };
+export type Mob = { id: string; hp: number; maxHp: number; level: number; pos: { x: number; y: number } };
 export type CombatSnapshot = { snapshot?: { mobs?: Mob[] } };
 
 type UseCombatPhaseArgs = {

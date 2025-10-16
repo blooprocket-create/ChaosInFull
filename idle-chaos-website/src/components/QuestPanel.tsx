@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 let lastQuestDirty: number | undefined;
 
 export default function QuestPanel({ characterId }: { characterId: string }) {
-  type QuestRow = { questId: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } };
+  type QuestRow = { questId: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; claimedRewards?: boolean; quest?: { id: string; name: string; description: string; objectiveCount: number } };
   const [quests, setQuests] = useState<QuestRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +16,8 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
       const res = await fetch(`/api/quest?characterId=${characterId}`, { cache: "no-store" });
       const data: GetQuestsResponse = await res.json().catch(() => ({ ok: true, characterQuests: [] } as GetQuestsResponse));
       const rows: QuestRow[] = Array.isArray(data.characterQuests) ? data.characterQuests : [];
-      setQuests(rows);
+      // Hide quests already handed-in (claimedRewards)
+      setQuests(rows.filter(q => !q.claimedRewards));
     } finally {
       setLoading(false);
     }
@@ -44,11 +45,7 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
     await fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "abandon", characterId, questId: qid }) });
     await load();
   };
-  const handIn = async (qid: string) => {
-    const res = await fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", characterId, questId: qid }) });
-    await res.json().catch(() => ({}));
-    await load();
-  };
+  // No direct hand-in from panel; hand-in is via Grimsley in town.
 
   return (
     <div className="mt-4 rounded-lg border border-white/10 bg-black/60 p-4 text-gray-200">
@@ -85,7 +82,7 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
                   <button className="btn px-2 py-1 text-xs" onClick={() => abandon(q.questId)}>Abandon</button>
                 )}
                 {q.status === "COMPLETED" && (
-                  <button className="btn px-2 py-1 text-xs" onClick={() => handIn(q.questId)}>Hand In</button>
+                  <span className="text-[11px] text-gray-400">Visit Grimsley to hand in</span>
                 )}
               </div>
             </div>
