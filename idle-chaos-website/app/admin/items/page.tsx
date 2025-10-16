@@ -19,21 +19,41 @@ export default function AdminItems() {
   const paged = useMemo(()=>{ const start=(page-1)*pageSize; return rows.slice(start,start+pageSize); },[rows,page]);
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mb-3 text-sm">
+        <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
+      </div>
       <h1 className="text-2xl font-semibold">Items</h1>
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded border border-white/10 bg-black/40 p-4 space-y-2">
+        <div className="rounded border border-white/10 bg-black/40 p-4 space-y-3">
           <h2 className="font-semibold">Create</h2>
-          <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.id} onChange={e=>setForm(f=>({...f,id:e.target.value}))} placeholder="ID (e.g., slime_goop)"/>
-          <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Name"/>
-          <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Description"/>
+          <div>
+            <label className="block text-xs text-gray-300 mb-1">ID</label>
+            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.id} onChange={e=>setForm(f=>({...f,id:e.target.value}))} placeholder="e.g., slime_goop"/>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-300 mb-1">Name</label>
+            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-300 mb-1">Description</label>
+            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} />
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.rarity} onChange={e=>setForm(f=>({...f,rarity:e.target.value}))} placeholder="Rarity"/>
+            <label className="text-xs text-gray-300">Rarity
+              <input className="mt-1 w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.rarity} onChange={e=>setForm(f=>({...f,rarity:e.target.value}))} />
+            </label>
             <label className="text-sm text-gray-300 flex items-center gap-2"><input type="checkbox" checked={form.stackable} onChange={e=>setForm(f=>({...f,stackable:e.target.checked}))}/> Stackable</label>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <input type="number" className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.maxStack} onChange={e=>setForm(f=>({...f,maxStack:parseInt(e.target.value||"0",10)}))} placeholder="Max Stack"/>
-            <input type="number" className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.buy} onChange={e=>setForm(f=>({...f,buy:parseInt(e.target.value||"0",10)}))} placeholder="Buy"/>
-            <input type="number" className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.sell} onChange={e=>setForm(f=>({...f,sell:parseInt(e.target.value||"0",10)}))} placeholder="Sell"/>
+            <label className="text-xs text-gray-300">Max Stack
+              <input type="number" className="mt-1 w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.maxStack} onChange={e=>setForm(f=>({...f,maxStack:parseInt(e.target.value||"0",10)}))} />
+            </label>
+            <label className="text-xs text-gray-300">Buy
+              <input type="number" className="mt-1 w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.buy} onChange={e=>setForm(f=>({...f,buy:parseInt(e.target.value||"0",10)}))} />
+            </label>
+            <label className="text-xs text-gray-300">Sell
+              <input type="number" className="mt-1 w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.sell} onChange={e=>setForm(f=>({...f,sell:parseInt(e.target.value||"0",10)}))} />
+            </label>
           </div>
           <button className="btn px-3 py-1" onClick={create}>Add</button>
         </div>
@@ -43,16 +63,30 @@ export default function AdminItems() {
             {paged.map(r => (
               <div key={r.id} className="rounded border border-white/10 bg-black/35 p-3">
                 <div className="flex items-center justify-between"><div className="font-mono text-xs">{r.id}</div><button className="btn px-2 py-0.5" onClick={()=>remove(r.id)}>Delete</button></div>
-                <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 font-semibold" value={r.name} onChange={e=>update(r.id,{ name: e.target.value })} />
-                <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-xs text-gray-200" value={r.description} onChange={e=>update(r.id,{ description: e.target.value })} />
+                <div>
+                  <label className="block text-xs text-gray-300 mb-1">Name</label>
+                  <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 font-semibold" value={r.name} onChange={e=>update(r.id,{ name: e.target.value })} />
+                </div>
+                <div className="mt-1">
+                  <label className="block text-xs text-gray-300 mb-1">Description</label>
+                  <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-xs text-gray-200" value={r.description} onChange={e=>update(r.id,{ description: e.target.value })} />
+                </div>
                 <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
-                  <input className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.rarity} onChange={e=>update(r.id,{ rarity: e.target.value })} />
+                  <label className="text-xs text-gray-300">Rarity
+                    <input className="mt-1 rounded bg-black/40 border border-white/10 px-2 py-1 w-full" value={r.rarity} onChange={e=>update(r.id,{ rarity: e.target.value })} />
+                  </label>
                   <label className="flex items-center gap-1 text-gray-300"><input type="checkbox" checked={r.stackable} onChange={e=>update(r.id,{ stackable: e.target.checked })}/> Stackable</label>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-1 text-xs">
-                  <input type="number" className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.maxStack} onChange={e=>update(r.id,{ maxStack: parseInt(e.target.value||"0",10) })} />
-                  <input type="number" className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.buy} onChange={e=>update(r.id,{ buy: parseInt(e.target.value||"0",10) })} />
-                  <input type="number" className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.sell} onChange={e=>update(r.id,{ sell: parseInt(e.target.value||"0",10) })} />
+                  <label className="text-xs text-gray-300">Max Stack
+                    <input type="number" className="mt-1 rounded bg-black/40 border border-white/10 px-2 py-1 w-full" value={r.maxStack} onChange={e=>update(r.id,{ maxStack: parseInt(e.target.value||"0",10) })} />
+                  </label>
+                  <label className="text-xs text-gray-300">Buy
+                    <input type="number" className="mt-1 rounded bg-black/40 border border-white/10 px-2 py-1 w-full" value={r.buy} onChange={e=>update(r.id,{ buy: parseInt(e.target.value||"0",10) })} />
+                  </label>
+                  <label className="text-xs text-gray-300">Sell
+                    <input type="number" className="mt-1 rounded bg-black/40 border border-white/10 px-2 py-1 w-full" value={r.sell} onChange={e=>update(r.id,{ sell: parseInt(e.target.value||"0",10) })} />
+                  </label>
                 </div>
               </div>
             ))}

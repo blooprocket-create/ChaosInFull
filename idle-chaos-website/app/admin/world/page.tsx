@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+const GameCanvas = dynamic(() => import("@/src/game/GameCanvas"), { ssr: false });
 
 type Zone = {
   id: string;
@@ -192,6 +194,9 @@ export default function WorldEditorPage() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 space-y-4">
+      <div className="-mt-2 mb-1 text-sm">
+        <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
+      </div>
       <h1 className="text-2xl font-semibold">World Editor</h1>
       <div className="flex items-center gap-2">
         <select className="rounded bg-black/40 border border-white/10 px-2 py-1" value={zoneId} onChange={e=>setZoneId(e.target.value)}>
@@ -202,9 +207,17 @@ export default function WorldEditorPage() {
         <button className="btn px-2 py-1" onClick={addPortal}>Add Portal</button>
         <button className="btn px-2 py-1" onClick={addSpawn}>Add Spawn</button>
       </div>
-      <div className="relative">
-        <canvas ref={canvasRef} width={dims.w} height={dims.h} className="rounded border border-white/10 bg-black/50" />
-        <div className="absolute top-2 left-2 text-xs text-gray-300 bg-black/50 rounded px-2 py-1">Drag portals to reposition. Spawns show as blue squares (slots) — drag a slot to move it, double-click to add, right-click to remove.</div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div className="relative">
+          <canvas ref={canvasRef} width={dims.w} height={dims.h} className="rounded border border-white/10 bg-black/50" />
+          <div className="absolute top-2 left-2 text-xs text-gray-300 bg-black/50 rounded px-2 py-1">Drag portals to reposition. Spawns show as blue squares (slots) — drag a slot to move it, double-click to add, right-click to remove.</div>
+        </div>
+        <div className="sticky top-20">
+          <div className="text-sm text-gray-300 mb-2">Live Scene Preview</div>
+          <div className="rounded border border-white/10 bg-black/40 p-2">
+            <GameCanvas initialScene={activeZone?.name || "Town"} readonly />
+          </div>
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>

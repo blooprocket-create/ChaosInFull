@@ -15,6 +15,9 @@ export default function AdminUsers() {
   const paged = useMemo(()=>{ const start=(page-1)*pageSize; return rows.slice(start,start+pageSize); },[rows,page]);
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mb-3 text-sm">
+        <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
+      </div>
       <h1 className="text-2xl font-semibold">Users</h1>
       <div className="mt-4 grid grid-cols-1 gap-3">
         {paged.map(u => (

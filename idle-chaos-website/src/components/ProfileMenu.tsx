@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function ProfileMenu({ displayName }: { displayName: string }) {
+export default function ProfileMenu({ displayName, isAdmin = false }: { displayName: string; isAdmin?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -42,6 +42,7 @@ export default function ProfileMenu({ displayName }: { displayName: string }) {
           </div>
           <a href="/play" className="block px-3 py-2 text-sm hover:bg-white/5">Play Now</a>
           <a href="/dashboard" className="block px-3 py-2 text-sm hover:bg-white/5">Dashboard</a>
+          {isAdmin && <a href="/admin" className="block px-3 py-2 text-sm text-emerald-300 hover:bg-white/5">Admin Dashboard</a>}
             <a href="/account" className="block px-3 py-2 text-sm hover:bg-white/5">Account Settings</a>
           <button onClick={logout} className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-white/5">Log out</button>
         </div>

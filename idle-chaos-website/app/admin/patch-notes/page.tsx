@@ -54,6 +54,9 @@ export default function AdminPatchNotes() {
   const [page, setPage] = useState(1); const pageSize = 10;
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mb-3 text-sm">
+        <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
+      </div>
       <h1 className="text-2xl font-semibold">Patch Notes</h1>
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="rounded border border-white/10 bg-black/40 p-4">

@@ -7,7 +7,7 @@ import createGame, { CharacterHUD as CharacterHUDType } from "./createGame";
 
 type CharacterHUD = CharacterHUDType;
 
-export default function GameCanvas({ character, initialSeenWelcome, initialScene, offlineSince, initialExp, initialMiningExp, initialMiningLevel }: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number; initialMiningLevel?: number }) {
+export default function GameCanvas({ character, initialSeenWelcome, initialScene, offlineSince, initialExp, initialMiningExp, initialMiningLevel, readonly = false }: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number; initialMiningLevel?: number; readonly?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const [welcomeSeen, setWelcomeSeen] = useState<boolean>(!!initialSeenWelcome);
@@ -988,6 +988,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       ) : null}
       {/* HUD Buttons */}
+      {!readonly && (
       <div className="pointer-events-auto absolute right-3 top-3 z-10 flex gap-2">
         <button className="btn px-3 py-1 text-sm" title="Open your inventory" onClick={() => setOpenInventory(true)}>Items</button>
         <button className="btn px-3 py-1 text-sm" title="View your talent tree">Talents</button>
@@ -1018,8 +1019,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           } catch {}
         }}>Stats</button>
       </div>
+      )}
       {/* Inventory Modal */}
-      {openInventory && (
+      {!readonly && openInventory && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70">
           <div className="w-[min(680px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1059,7 +1061,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Quests Modal */}
-      {showQuests && (
+      {!readonly && showQuests && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(680px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1131,7 +1133,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Shop Modal */}
-      {showShop && (
+      {!readonly && showShop && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(800px,95vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1216,7 +1218,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Workbench Modal */}
-      {showWorkbench && (
+      {!readonly && showWorkbench && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(560px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1264,7 +1266,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Sawmill Modal */}
-      {showSawmill && (
+      {!readonly && showSawmill && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1312,7 +1314,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Storage Modal */}
-      {showStorage && (
+      {!readonly && showStorage && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(760px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
@@ -1441,7 +1443,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       )}
       {/* Chat moved to dedicated ChatClient under the canvas */}
       {/* AFK Combat Modal */}
-      {afkCombatModal?.open && (
+      {!readonly && afkCombatModal?.open && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <h3 className="text-lg font-semibold text-white">While you were away…</h3>
@@ -1480,7 +1482,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Welcome Modal (first time) */}
-      {!welcomeSeen && (
+      {!readonly && !welcomeSeen && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">
           <div className="w-[min(560px,92vw)] rounded-lg border border-white/10 bg-black/80 p-5 text-gray-200 shadow-xl">
             <h3 className="text-xl font-semibold text-white">Welcome to Chaos In Full</h3>
@@ -1505,7 +1507,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       )}
 
       {/* Offline Gains Modal */}
-      {offlineModal?.open && (
+      {!readonly && offlineModal?.open && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <h3 className="text-lg font-semibold text-white">While you were away…</h3>
@@ -1530,7 +1532,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       )}
 
       {/* Stats Modal */}
-      {showStats && (
+      {!readonly && showStats && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
           <div className="w-[min(560px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">

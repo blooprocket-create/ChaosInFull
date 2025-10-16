@@ -6,13 +6,13 @@ import BloodLinkButton from "@/src/components/BloodLinkButton";
 import type { SessionData } from "@/src/lib/auth";
 
 export default function NavAuth({ initial }: { initial: SessionData | null }) {
-  const [session, setSession] = useState<SessionData | null>(initial);
+  const [session, setSession] = useState<(SessionData & { isAdmin?: boolean }) | null>(initial as any);
 
   async function refetch() {
     try {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
-      const data = await res.json();
-      setSession(data.ok ? data.user : null);
+  const data = await res.json();
+  setSession(data.ok ? (data.user as (SessionData & { isAdmin?: boolean })) : null);
     } catch {
       // ignore
     }
@@ -36,7 +36,7 @@ export default function NavAuth({ initial }: { initial: SessionData | null }) {
       <div className="flex items-center gap-4">
         <div className="hidden sm:block"><BloodLinkButton href="/play" className="btn">Play Now</BloodLinkButton></div>
         <div className="sm:hidden"><Link href="/play" className="rounded bg-purple-600 hover:bg-purple-500 px-3 py-1.5 font-semibold">Play</Link></div>
-        <ProfileMenu displayName={session.email || "C"} />
+  <ProfileMenu displayName={session.email || "C"} isAdmin={!!session.isAdmin} />
       </div>
     );
   }
