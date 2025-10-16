@@ -2,6 +2,25 @@ import * as Phaser from "phaser";
 
 export type OverheadOptions = { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string };
 
+/** Parse leading chat effect tags like :wave:, :ripple:, :red: and return stripped text + effect options */
+export function parseOverheadEffects(raw: string): { text: string; opts: OverheadOptions } {
+  const parts = String(raw ?? "").trim().split(/\s+/);
+  const opts: OverheadOptions = {};
+  while (parts.length && /^:.+:$/.test(parts[0])) {
+    const tag = parts.shift()!.toLowerCase();
+    if (tag === ":wave:") opts.wave = true;
+    else if (tag === ":shake:") opts.shake = true;
+    else if (tag === ":ripple:") opts.ripple = true;
+    else if (tag === ":rainbow:") opts.rainbow = true;
+    else if (tag === ":blue:") opts.color = "#60a5fa";
+    else if (tag === ":red:") opts.color = "#ef4444";
+    else if (tag === ":green:") opts.color = "#22c55e";
+    else if (tag === ":yellow:") opts.color = "#f59e0b";
+    else if (tag === ":purple:") opts.color = "#a78bfa";
+  }
+  return { text: parts.join(" "), opts };
+}
+
 /** Create a tiny rectangle texture for ground-like bodies */
 export function ensureGroundTexture(scene: Phaser.Scene, key = "groundTex", size = 4) {
   if (scene.textures.exists(key)) return key;
@@ -35,64 +54,73 @@ export function ensurePortalTexture(scene: Phaser.Scene, key: string, color: num
   return key;
 }
 
+/** Low-level overhead spawner used by scenes. Renders text above the provided anchor (e.g., player). */
+export function spawnOverhead(
+  scene: Phaser.Scene,
+  getAnchor: () => { x: number; y: number },
+  text: string,
+  opts?: OverheadOptions,
+  defaultColor = "#e5e7eb"
+) {
+  const tokens = String(text ?? "").split(/(\s+)/);
+  let currentColor = opts?.color || defaultColor;
+  const segs: Array<{ text: string; color: string }> = [];
+  const applyColor = (tag: string) => {
+    switch (tag.toLowerCase()) {
+      case ":red:": currentColor = "#ef4444"; break;
+      case ":green:": currentColor = "#22c55e"; break;
+      case ":blue:": currentColor = "#60a5fa"; break;
+      case ":yellow:": currentColor = "#f59e0b"; break;
+      case ":purple:": currentColor = "#a78bfa"; break;
+    }
+  };
+  for (const tok of tokens) {
+    if (/^:.+:$/.test(tok)) { applyColor(tok); continue; }
+    if (tok) segs.push({ text: tok, color: currentColor });
+  }
+  const container = scene.add.container(0, 0).setDepth(15);
+  const charTexts: Phaser.GameObjects.Text[] = [];
+  let xOff = 0;
+  for (const seg of segs) {
+    for (const ch of seg.text.split("")) {
+      const t = scene.add.text(xOff, 0, ch, { color: seg.color, fontSize: "12px" }).setOrigin(0, 0.5);
+      container.add(t);
+      charTexts.push(t);
+      xOff += t.width;
+    }
+  }
+  const totalWidth = xOff;
+  const anchor = getAnchor();
+  container.setSize(totalWidth, 16).setPosition(anchor.x - totalWidth / 2, anchor.y - 36);
+  const follow = scene.time.addEvent({ delay: 50, loop: true, callback: () => {
+    const a = getAnchor();
+    container.setPosition(a.x - totalWidth / 2, a.y - 36);
+  }});
+  const tweens: Phaser.Tweens.Tween[] = [];
+  if (opts?.wave) charTexts.forEach((t, i) => tweens.push(scene.tweens.add({ targets: t, y: { from: -3, to: 3 }, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
+  if (opts?.ripple) charTexts.forEach((t, i) => tweens.push(scene.tweens.add({ targets: t, scale: { from: 1, to: 1.12 }, duration: 560, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
+  if (opts?.shake) tweens.push(scene.tweens.add({ targets: container, x: container.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
+  let colorTimer: Phaser.Time.TimerEvent | null = null;
+  if (opts?.rainbow) {
+    let hue = 0;
+    colorTimer = scene.time.addEvent({ delay: 80, loop: true, callback: () => {
+      hue = (hue + 12) % 360;
+      const hex = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color.toString(16).padStart(6, "0");
+      const col = `#${hex}`;
+      charTexts.forEach(t => t.setColor(col));
+    }});
+  }
+  scene.time.delayedCall(2800, () => {
+    tweens.forEach(tr => tr.stop());
+    if (colorTimer) colorTimer.remove(false);
+    follow.remove();
+    scene.tweens.add({ targets: container, alpha: 0, duration: 350, onComplete: () => container.destroy(true) });
+  });
+}
+
 /** Attach a window.__spawnOverhead that renders text above the provided anchor (e.g., player). */
 export function setupOverheadSpawner(scene: Phaser.Scene, getAnchor: () => { x: number; y: number }, defaultColor = "#e5e7eb") {
-  window.__spawnOverhead = (text: string, opts?: OverheadOptions) => {
-    const tokens = String(text ?? "").split(/(\s+)/);
-    let currentColor = opts?.color || defaultColor;
-    const segs: Array<{ text: string; color: string }> = [];
-    const applyColor = (tag: string) => {
-      switch (tag.toLowerCase()) {
-        case ":red:": currentColor = "#ef4444"; break;
-        case ":green:": currentColor = "#22c55e"; break;
-        case ":blue:": currentColor = "#60a5fa"; break;
-        case ":yellow:": currentColor = "#f59e0b"; break;
-        case ":purple:": currentColor = "#a78bfa"; break;
-      }
-    };
-    for (const tok of tokens) {
-      if (/^:.+:$/.test(tok)) { applyColor(tok); continue; }
-      if (tok) segs.push({ text: tok, color: currentColor });
-    }
-    const container = scene.add.container(0, 0).setDepth(15);
-    const charTexts: Phaser.GameObjects.Text[] = [];
-    let xOff = 0;
-    for (const seg of segs) {
-      for (const ch of seg.text.split("")) {
-        const t = scene.add.text(xOff, 0, ch, { color: seg.color, fontSize: "12px" }).setOrigin(0, 0.5);
-        container.add(t);
-        charTexts.push(t);
-        xOff += t.width;
-      }
-    }
-    const totalWidth = xOff;
-    const anchor = getAnchor();
-    container.setSize(totalWidth, 16).setPosition(anchor.x - totalWidth / 2, anchor.y - 36);
-    const follow = scene.time.addEvent({ delay: 50, loop: true, callback: () => {
-      const a = getAnchor();
-      container.setPosition(a.x - totalWidth / 2, a.y - 36);
-    }});
-    const tweens: Phaser.Tweens.Tween[] = [];
-    if (opts?.wave) charTexts.forEach((t, i) => tweens.push(scene.tweens.add({ targets: t, y: { from: -3, to: 3 }, duration: 700, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
-    if (opts?.ripple) charTexts.forEach((t, i) => tweens.push(scene.tweens.add({ targets: t, scale: { from: 1, to: 1.12 }, duration: 560, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: i * 60 })));
-    if (opts?.shake) tweens.push(scene.tweens.add({ targets: container, x: container.x + 3, duration: 60, yoyo: true, repeat: -1, ease: "Sine.easeInOut" }));
-    let colorTimer: Phaser.Time.TimerEvent | null = null;
-    if (opts?.rainbow) {
-      let hue = 0;
-      colorTimer = scene.time.addEvent({ delay: 80, loop: true, callback: () => {
-        hue = (hue + 12) % 360;
-        const hex = Phaser.Display.Color.HSLToColor(hue / 360, 0.9, 0.6).color.toString(16).padStart(6, "0");
-        const col = `#${hex}`;
-        charTexts.forEach(t => t.setColor(col));
-      }});
-    }
-    scene.time.delayedCall(2800, () => {
-      tweens.forEach(tr => tr.stop());
-      if (colorTimer) colorTimer.remove(false);
-      follow.remove();
-      scene.tweens.add({ targets: container, alpha: 0, duration: 350, onComplete: () => container.destroy(true) });
-    });
-  };
+  window.__spawnOverhead = (text: string, opts?: OverheadOptions) => spawnOverhead(scene, getAnchor, text, opts, defaultColor);
 }
 
 /** Simple utility to update name tag position above an image */

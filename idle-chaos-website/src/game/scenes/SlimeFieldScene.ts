@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping, setupEPortal, EPortalHandle } from "./common";
+import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping, setupEPortal, EPortalHandle, parseOverheadEffects, spawnOverhead } from "./common";
 import api from "../services/api";
 import { itemByKey } from "@/src/data/items";
 
@@ -141,6 +141,16 @@ export class SlimeFieldScene extends Phaser.Scene {
     this.scale.on("resize", this.onResizeHandler);
 
     setupOverheadSpawner(this, () => ({ x: this.player.x, y: this.player.y }));
+    // Hook global overhead-for to spawn bubbles on specific players
+    const selfCid = String(this.game.registry.get("characterId") || "");
+    window.__spawnOverheadFor = (charId: string, text: string) => {
+      try {
+        const { text: cleaned, opts } = parseOverheadEffects(text);
+        if (charId && charId === selfCid) { spawnOverhead(this, () => ({ x: this.player.x, y: this.player.y }), cleaned, opts); return; }
+        const other = charId ? this.others.get(charId) : undefined;
+        if (other) spawnOverhead(this, () => ({ x: other.sprite.x, y: other.sprite.y }), cleaned, opts);
+      } catch {}
+    };
 
     // Presence heartbeat + polling (Slime)
     ensureCircleTexture(this, "dot", 7, 0xffffff);
@@ -184,6 +194,7 @@ export class SlimeFieldScene extends Phaser.Scene {
       if (this.presencePollTimer) { this.presencePollTimer.remove(false); this.presencePollTimer = undefined; }
       for (const obj of this.others.values()) { obj.sprite.destroy(); obj.tag.destroy(); }
       this.others.clear();
+  if (window.__spawnOverheadFor) window.__spawnOverheadFor = undefined;
       try {
         if (this.joinedCombat) {
           const cid = String(this.game.registry.get("characterId") || "");

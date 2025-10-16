@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ensureGroundTexture, ensurePortalTexture, ensureCircleTexture, setupOverheadSpawner, updateNameTag, isTyping } from "./common";
+import { ensureGroundTexture, ensurePortalTexture, ensureCircleTexture, setupOverheadSpawner, updateNameTag, isTyping, parseOverheadEffects, spawnOverhead } from "./common";
 import api from "../services/api";
 
 export class TownScene extends Phaser.Scene {
@@ -206,6 +206,21 @@ export class TownScene extends Phaser.Scene {
 
     // Overhead
     setupOverheadSpawner(this, () => ({ x: this.player.x, y: this.player.y }));
+    // Allow chat client to render overhead for a specific characterId (self or others)
+    const selfCid = String(this.game.registry.get("characterId") || "");
+    window.__spawnOverheadFor = (charId: string, text: string) => {
+      try {
+        const { text: cleaned, opts } = parseOverheadEffects(text);
+        if (charId && charId === selfCid) {
+          spawnOverhead(this, () => ({ x: this.player.x, y: this.player.y }), cleaned, opts);
+          return;
+        }
+        const other = charId ? this.others.get(charId) : undefined;
+        if (other) {
+          spawnOverhead(this, () => ({ x: other.sprite.x, y: other.sprite.y }), cleaned, opts);
+        }
+      } catch {}
+    };
 
     // Presence heartbeat + polling
   const cid = String(this.game.registry.get("characterId") || "");
@@ -250,6 +265,8 @@ export class TownScene extends Phaser.Scene {
       if (this.presenceTimer) { this.presenceTimer.remove(false); this.presenceTimer = undefined; }
       for (const obj of this.others.values()) { obj.sprite.destroy(); obj.tag.destroy(); }
       this.others.clear();
+      // Unhook overhead-for when scene closes
+      if (window.__spawnOverheadFor) window.__spawnOverheadFor = undefined;
     });
   }
 

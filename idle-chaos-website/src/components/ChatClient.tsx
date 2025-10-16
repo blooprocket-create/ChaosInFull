@@ -2,11 +2,16 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 declare global {
-  interface Window { __spawnOverhead?: (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => void; __setTyping?: (v: boolean) => void; __focusGame?: () => void; }
+  interface Window {
+    __spawnOverhead?: (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => void;
+    __spawnOverheadFor?: (characterId: string, text: string) => void;
+    __setTyping?: (v: boolean) => void;
+    __focusGame?: () => void;
+  }
 }
 
 export default function ChatClient({ characterId, scene: initialScene }: { characterId: string; scene: string }) {
-  const [messages, setMessages] = useState<Array<{ id: string; text: string; createdAt: string; characterId?: string | null }>>([]);
+  const [messages, setMessages] = useState<Array<{ id: string; text: string; createdAt: string; characterId?: string | null; characterName?: string | null }>>([]);
   const [input, setInput] = useState("");
   const [scene, setScene] = useState<string>(initialScene);
   // focus state not kept beyond gating
@@ -74,7 +79,7 @@ export default function ChatClient({ characterId, scene: initialScene }: { chara
       const res = await fetch(`/api/chat?since=${encodeURIComponent(lastTsRef.current)}&scene=${encodeURIComponent(scene)}`);
       if (!res.ok) return;
       const data = await res.json();
-      const msgs = (data?.messages as Array<{ id: string; text: string; createdAt: string; characterId?: string | null }>) || [];
+      const msgs = (data?.messages as Array<{ id: string; text: string; createdAt: string; characterId?: string | null; characterName?: string | null }>) || [];
       if (msgs.length > 0) {
         // dedupe by id and append
         const newOnes: typeof msgs = [];
@@ -84,7 +89,16 @@ export default function ChatClient({ characterId, scene: initialScene }: { chara
             newOnes.push(m);
           }
         }
-        if (newOnes.length) setMessages((curr) => [...curr, ...newOnes]);
+        if (newOnes.length) {
+          // Spawn overhead for others as they come in
+          for (const m of newOnes) {
+            if (m.characterId && m.characterId !== characterId) {
+              // Pass the raw text so scene-side parser can handle effects
+              window.__spawnOverheadFor?.(m.characterId, m.text);
+            }
+          }
+          setMessages((curr) => [...curr, ...newOnes]);
+        }
         lastTsRef.current = msgs[msgs.length - 1].createdAt;
       }
     } catch {}
@@ -141,7 +155,7 @@ export default function ChatClient({ characterId, scene: initialScene }: { chara
     try {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, text: raw, scene }) });
   if (res.ok) {
-        // show overhead locally
+  // show overhead locally
         const color = parsed.rainbow ? undefined : parsed.color;
         window.__spawnOverhead?.(parsed.text, { wave: parsed.wave, shake: parsed.shake, ripple: parsed.ripple, rainbow: parsed.rainbow, color });
         setInput("");
@@ -210,6 +224,7 @@ export default function ChatClient({ characterId, scene: initialScene }: { chara
           }));
           return (
             <div key={m.id} className="leading-tight">
+              {m.characterName ? <span className="text-gray-400 mr-1">{m.characterName}:</span> : null}
               {enriched.map((seg, i) => renderSegment(seg, `${m.id}-${i}`))}
             </div>
           );

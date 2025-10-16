@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping } from "./common";
+import { ensureGroundTexture, ensureCircleTexture, ensurePortalTexture, setupOverheadSpawner, updateNameTag, isTyping, parseOverheadEffects, spawnOverhead } from "./common";
 import api from "../services/api";
 
 export class CaveScene extends Phaser.Scene {
@@ -100,6 +100,19 @@ export class CaveScene extends Phaser.Scene {
 
     // Overhead spawner
     setupOverheadSpawner(this, () => ({ x: this.player.x, y: this.player.y }));
+    // Hook for overhead above specific character (self/others)
+    const selfCid = String(this.game.registry.get("characterId") || "");
+    window.__spawnOverheadFor = (charId: string, text: string) => {
+      try {
+        const { text: cleaned, opts } = parseOverheadEffects(text);
+        if (charId && charId === selfCid) {
+          spawnOverhead(this, () => ({ x: this.player.x, y: this.player.y }), cleaned, opts);
+          return;
+        }
+        const other = charId ? this.others.get(charId) : undefined;
+        if (other) spawnOverhead(this, () => ({ x: other.sprite.x, y: other.sprite.y }), cleaned, opts);
+      } catch {}
+    };
     // Presence heartbeat + polling
     ensureCircleTexture(this, "dot", 7, 0xffffff);
   const cid = String(this.game.registry.get("characterId") || "");
@@ -137,6 +150,7 @@ export class CaveScene extends Phaser.Scene {
       if (this.presencePollTimer) { this.presencePollTimer.remove(false); this.presencePollTimer = undefined; }
       for (const obj of this.others.values()) { obj.sprite.destroy(); obj.tag.destroy(); }
       this.others.clear();
+      if (window.__spawnOverheadFor) window.__spawnOverheadFor = undefined;
     });
   }
 
