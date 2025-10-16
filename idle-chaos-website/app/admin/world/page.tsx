@@ -47,6 +47,9 @@ export default function WorldEditorPage() {
   const [spawns, setSpawns] = useState<Spawn[]>([]);
   const [selectedSpawnId, setSelectedSpawnId] = useState<string>("");
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 800, h: 600 });
+  const [liveMode, setLiveMode] = useState<boolean>(true);
+  const previewWrapRef = useRef<HTMLDivElement | null>(null);
+  const [previewDims, setPreviewDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
   const activeZone = useMemo(() => zones.find((z) => z.id === zoneId) || null, [zones, zoneId]);
 
@@ -133,6 +136,19 @@ export default function WorldEditorPage() {
     });
   }, [portals, spawns, dims, selectedSpawnId]);
 
+  // Measure and track the preview wrapper size for overlay scaling
+  useEffect(() => {
+    const el = previewWrapRef.current; if (!el) return;
+    const calc = () => {
+      const w = el.clientWidth;
+      const h = Math.max(360, Math.floor(w * 9 / 16));
+      setPreviewDims({ w, h });
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
+
   // Mouse interactions on canvas
   useEffect(() => {
     const cvs = canvasRef.current; if (!cvs) return;
@@ -198,6 +214,12 @@ export default function WorldEditorPage() {
         <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
       </div>
       <h1 className="text-2xl font-semibold">World Editor</h1>
+      <div className="flex items-center gap-3 text-sm">
+        <label className="flex items-center gap-2 text-gray-300">
+          <input type="checkbox" checked={liveMode} onChange={e=>setLiveMode(e.target.checked)} /> Live Preview Mode
+        </label>
+        <span className="text-xs text-gray-400">When enabled, drag portals directly on the scene preview. Use the grid editor to manage spawn slots.</span>
+      </div>
       <div className="flex items-center gap-2">
         <select className="rounded bg-black/40 border border-white/10 px-2 py-1" value={zoneId} onChange={e=>setZoneId(e.target.value)}>
           {zones.map(z=> (<option key={z.id} value={z.id}>{z.name} ({z.id})</option>))}
@@ -208,14 +230,65 @@ export default function WorldEditorPage() {
         <button className="btn px-2 py-1" onClick={addSpawn}>Add Spawn</button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <div className="relative">
+        <div className={`relative ${liveMode ? 'opacity-70 pointer-events-none' : ''}`}>
           <canvas ref={canvasRef} width={dims.w} height={dims.h} className="rounded border border-white/10 bg-black/50" />
           <div className="absolute top-2 left-2 text-xs text-gray-300 bg-black/50 rounded px-2 py-1">Drag portals to reposition. Spawns show as blue squares (slots) — drag a slot to move it, double-click to add, right-click to remove.</div>
         </div>
         <div className="sticky top-20">
           <div className="text-sm text-gray-300 mb-2">Live Scene Preview</div>
-          <div className="rounded border border-white/10 bg-black/40 p-2">
-            <GameCanvas initialScene={activeZone?.name || "Town"} readonly />
+          <div ref={previewWrapRef} className="relative rounded border border-white/10 bg-black/40 p-2">
+            <GameCanvas initialScene={
+              (activeZone?.sceneKey === 'Cave') ? 'Cave' :
+              (activeZone?.sceneKey === 'Slime') ? 'Slime' :
+              (activeZone?.sceneKey === 'Slime Meadow') ? 'Slime Meadow' :
+              (activeZone?.name === 'Cave') ? 'Cave' :
+              (activeZone?.name === 'Slime') ? 'Slime' :
+              (activeZone?.name === 'Slime Meadow') ? 'Slime Meadow' : 'Town'
+            } readonly />
+            {liveMode && (
+              <div className="absolute inset-2" style={{ width: Math.max(0, previewDims.w - 16), height: Math.max(0, previewDims.h - 16), pointerEvents: 'none' }}>
+                {(() => {
+                  const ow = Math.max(1, previewDims.w - 16);
+                  const oh = Math.max(1, previewDims.h - 16);
+                  const scaleX = ow / Math.max(1, dims.w);
+                  const scaleY = oh / Math.max(1, dims.h);
+                  return portals.map(p => {
+                    const left = Math.round(p.x * scaleX);
+                    const top = Math.round(p.y * scaleY);
+                    const size = 16;
+                    return (
+                      <div key={p.id}
+                           className="absolute"
+                           style={{ left: Math.max(0, left - size/2), top: Math.max(0, top - size/2), width: size, height: size, pointerEvents: 'auto', cursor: 'grab' }}
+                           onMouseDown={(e) => {
+                             e.preventDefault();
+                             const startX = e.clientX; const startY = e.clientY;
+                             const origX = p.x; const origY = p.y;
+                             const onMove = (ev: MouseEvent) => {
+                               const dx = (ev.clientX - startX) / Math.max(1e-6, scaleX);
+                               const dy = (ev.clientY - startY) / Math.max(1e-6, scaleY);
+                               const nx = Math.round(Math.max(0, Math.min(dims.w, origX + dx)));
+                               const ny = Math.round(Math.max(0, Math.min(dims.h, origY + dy)));
+                               setPortals(prev => prev.map(row => row.id === p.id ? { ...row, x: nx, y: ny } : row));
+                             };
+                             const onUp = async () => {
+                               window.removeEventListener('mousemove', onMove);
+                               window.removeEventListener('mouseup', onUp);
+                               const curr = (portals.find(pp => pp.id === p.id) || p);
+                               await fetch(`/api/admin/zones/${zoneId}/portals/${curr.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ x: curr.x, y: curr.y }) });
+                             };
+                             window.addEventListener('mousemove', onMove);
+                             window.addEventListener('mouseup', onUp);
+                           }}
+                      >
+                        <div className="rounded-full bg-purple-500/70 ring-2 ring-purple-300/70 w-full h-full" title={p.label || p.targetZoneId}></div>
+                        <div className="absolute left-4 top-0 text-xs text-gray-200 whitespace-nowrap" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>{p.label || `→ ${p.targetZoneId}`}</div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </div>
         </div>
       </div>
