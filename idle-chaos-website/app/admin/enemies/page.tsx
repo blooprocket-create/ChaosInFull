@@ -9,7 +9,7 @@ export default function AdminEnemies() {
   const load = async () => { const res = await fetch("/api/admin/enemies"); if (res.ok) { const j = await res.json(); setRows(j.rows); } };
   useEffect(() => { load(); }, []);
   const notify = (msg: string) => {
-    try { (window as any).showToast?.(msg); } catch {}
+    try { window.showToast?.(msg); } catch {}
   };
   const create = async () => {
     const res = await fetch("/api/admin/enemies", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });

@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { assertAdmin } from "@/src/lib/authz";
+import { prisma } from "@/src/lib/prisma";
+
+type Ctx = { params: { id: string } };
+
+export async function GET(_req: Request, { params }: Ctx) {
+  try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
+  const row = await prisma.zoneDef.findUnique({ where: { id: params.id } });
+  if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  return NextResponse.json({ ok: true, row });
+}
+
+export async function PATCH(req: Request, { params }: Ctx) {
+  try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
+  const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const data: { name?: string; sceneKey?: string; width?: number | null; height?: number | null } = {};
+  if (typeof b.name === 'string') data.name = b.name;
+  if (typeof b.sceneKey === 'string') data.sceneKey = b.sceneKey;
+  if (typeof b.width === 'number') data.width = b.width;
+  if (typeof b.height === 'number') data.height = b.height;
+  const row = await prisma.zoneDef.update({ where: { id: params.id }, data });
+  return NextResponse.json({ ok: true, row });
+}
+
+export async function DELETE(_req: Request, { params }: Ctx) {
+  try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
+  await prisma.zoneDef.delete({ where: { id: params.id } });
+  return NextResponse.json({ ok: true });
+}

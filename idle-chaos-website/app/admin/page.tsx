@@ -14,6 +14,7 @@ export default async function AdminIndex() {
         <li><Link className="text-emerald-300 hover:underline" href="/admin/patch-notes">Patch Notes</Link></li>
         <li><Link className="text-emerald-300 hover:underline" href="/admin/items">Items</Link></li>
         <li><Link className="text-emerald-300 hover:underline" href="/admin/enemies">Enemies</Link></li>
+  <li><Link className="text-emerald-300 hover:underline" href="/admin/world">World Editor</Link></li>
         <li><Link className="text-emerald-300 hover:underline" href="/admin/users">Users</Link></li>
       </ul>
     </section>

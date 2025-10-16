@@ -8,7 +8,7 @@ export default function AdminItems() {
   const [form, setForm] = useState<Item>({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 });
   const load = async () => { const res = await fetch("/api/admin/items"); if (res.ok) { const j = await res.json(); setRows(j.rows); } };
   useEffect(() => { load(); }, []);
-  const notify = (msg: string) => { try { (window as any).showToast?.(msg); } catch {} };
+  const notify = (msg: string) => { try { window.showToast?.(msg); } catch {} };
   const create = async () => {
     const res = await fetch("/api/admin/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     if (res.ok) { setForm({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 }); notify("Item created"); await load(); } else { notify("Failed to create item"); }

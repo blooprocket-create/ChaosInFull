@@ -38,7 +38,7 @@ export default function AdminPatchNotes() {
     const res = await fetch("/api/admin/patch-notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (res.ok) { setForm({ date: new Date().toISOString().slice(0,10), version: "", title: "", highlights: "", notes: "" }); await load(); }
   };
-  const notify = (msg: string) => { try { (window as any).showToast?.(msg); } catch {} };
+  const notify = (msg: string) => { try { window.showToast?.(msg); } catch {} };
   const remove = async (id: string) => { if (!confirm("Delete this patch note?")) return; const r = await fetch(`/api/admin/patch-notes/${id}`, { method: "DELETE" }); notify(r.ok?"Deleted":"Delete failed"); await load(); };
   const update = async (id: string, patch: Partial<PN> & { highlightsText?: string; notesText?: string }) => {
     const payload: Partial<PN> & { highlights?: string[]; notes?: string[] } = {};

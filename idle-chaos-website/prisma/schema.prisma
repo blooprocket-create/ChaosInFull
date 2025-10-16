@@ -232,9 +232,12 @@ model ZoneDef {
   id        String @id // e.g., "Slime"
   name      String
   sceneKey  String // e.g., "Slime"
+  width     Int    @default(800)
+  height    Int    @default(600)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   spawns    SpawnConfig[]
+  portals   PortalDef[]
 }
 
 model SpawnConfig {
@@ -247,6 +250,21 @@ model SpawnConfig {
   respawnMs  Int    @default(1200)
   slots      Json?  // e.g., [100,180,260,340,420]
   phaseType  String @default("personal")
+}
+
+// Links two zones via a portal placed at (x,y) within the source zone
+model PortalDef {
+  id           String  @id @default(cuid())
+  zone         ZoneDef @relation(fields: [zoneId], references: [id])
+  zoneId       String
+  targetZone   ZoneDef @relation("PortalTarget", fields: [targetZoneId], references: [id])
+  targetZoneId String
+  x            Int
+  y            Int
+  radius       Int     @default(32)
+  label        String  @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // NPC definitions (quest givers, shopkeepers, etc.)

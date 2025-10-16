@@ -7,7 +7,7 @@ export default function AdminUsers() {
   const [rows, setRows] = useState<U[]>([]);
   const load = async () => { const res = await fetch("/api/admin/users"); if (res.ok) { const j = await res.json(); setRows(j.rows); } };
   useEffect(() => { load(); }, []);
-  const notify = (msg: string) => { try { (window as any).showToast?.(msg); } catch {} };
+  const notify = (msg: string) => { try { window.showToast?.(msg); } catch {} };
   const remove = async (id: string) => { if (!confirm("Delete this user?")) return; const r = await fetch(`/api/admin/users/${id}`, { method: "DELETE" }); notify(r.ok?"Deleted":"Delete failed"); await load(); };
   const toggleAdmin = async (id: string, curr: boolean) => { const r = await fetch(`/api/admin/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isAdmin: !curr }) }); notify(r.ok?"Saved":"Save failed"); await load(); };
   const update = async (id: string, patch: Partial<U>) => { const r = await fetch(`/api/admin/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }); notify(r.ok?"Saved":"Save failed"); await load(); };
