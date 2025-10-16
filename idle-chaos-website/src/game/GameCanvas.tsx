@@ -386,7 +386,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         .catch(() => {});
     }, 15000);
     return () => { clearInterval(t); clearInterval(r); };
-  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, showSawmill, craftingExpState, craftingMax, character]);
+  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, showSawmill, craftingExpState, craftingMax, character, activeSceneKey]);
 
   // Periodically persist inventory while playing
   useEffect(() => {

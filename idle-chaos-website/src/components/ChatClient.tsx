@@ -103,7 +103,7 @@ export default function ChatClient({ characterId, scene: initialScene }: { chara
       }
     } catch {}
     finally { pollInFlight.current = false; }
-  }, [scene]);
+  }, [scene, characterId]);
 
   // Listen for scene changes from the game canvas
   useEffect(() => {
