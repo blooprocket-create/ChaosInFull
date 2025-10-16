@@ -481,6 +481,18 @@
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Typecheck+Build after AFK changes",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; npm run build"
+			],
+			"group": "build"
 		}
 	]
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
 import { assertCharacterOwner } from "@/src/lib/ownership";
+import { prisma } from "@/src/lib/prisma";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -14,5 +15,12 @@ export async function POST(req: Request) {
   const room = getZoneRoom(zone);
   const ps = room.join(characterId);
   const snap = room.snapshot(characterId);
+  // If AFK was previously on, refresh startedAt to now when rejoining
+  try {
+    const state = await (prisma as any).afkCombatState.findUnique?.({ where: { characterId } });
+    if (state?.auto) {
+      await (prisma as any).afkCombatState.update({ where: { characterId }, data: { startedAt: new Date() } });
+    }
+  } catch {}
   return NextResponse.json({ ok: true, phaseId: ps.phaseId, snapshot: snap });
 }

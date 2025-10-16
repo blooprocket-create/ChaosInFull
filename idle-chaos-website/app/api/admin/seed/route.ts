@@ -40,6 +40,8 @@ export async function POST() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   const client = prisma as unknown as PrismaLoose;
+  // Reset AFK combat state for clean local seeds
+  try { await (prisma as any).afkCombatState.deleteMany({}); } catch {}
   // Items
   for (const it of ITEMS) {
     await client.itemDef.upsert({ where: { id: it.id }, update: { name: it.name, description: it.description ?? "", sell: it.sell, buy: it.buy ?? 0 }, create: { id: it.id, name: it.name, description: it.description ?? "", sell: it.sell, buy: it.buy ?? 0 } });

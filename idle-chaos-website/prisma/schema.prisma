@@ -66,6 +66,7 @@ model Character {
   craftQueue CraftQueue?
   chatMessages ChatMessage[]
   characterQuests CharacterQuest[]
+  afkCombat AfkCombatState?
   @@unique([userId, name])
 }
 
@@ -264,4 +265,18 @@ model QuestRewardItem {
   item      ItemDef @relation("ItemToQuestRewards", fields: [itemId], references: [id])
   itemId    String
   qty       Int     @default(1)
+}
+
+// Persistent AFK combat state per character
+model AfkCombatState {
+  id            String    @id @default(cuid())
+  character     Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  characterId   String    @unique
+  zone          String
+  auto          Boolean   @default(false)
+  startedAt     DateTime?
+  lastSnapshot  DateTime?
+  pendingLoot   Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

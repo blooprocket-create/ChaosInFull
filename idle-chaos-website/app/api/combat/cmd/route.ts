@@ -47,7 +47,19 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const room = getZoneRoom(zone);
   if (action === "auto") {
-    room.toggleAuto(characterId, !!value);
+    const on = !!value;
+    room.toggleAuto(characterId, on);
+    // Persist AFK state
+    try {
+      const now = new Date();
+      const zoneId = zone;
+      // Upsert per-character AFK row
+      await (prisma as any).afkCombatState.upsert({
+        where: { characterId: characterId },
+        update: { auto: on, zone: zoneId, ...(on ? { startedAt: now } : { lastSnapshot: now }) },
+        create: { characterId: characterId, zone: zoneId, auto: on, startedAt: now, lastSnapshot: now },
+      });
+    } catch {}
     return NextResponse.json({ ok: true });
   }
   if (action === "basic") {
