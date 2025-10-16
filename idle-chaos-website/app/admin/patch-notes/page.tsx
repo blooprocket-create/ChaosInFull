@@ -53,20 +53,17 @@ export default function AdminPatchNotes() {
   };
   const [page, setPage] = useState(1); const pageSize = 10;
   return (
-    <section className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-3 text-sm">
-        <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
-      </div>
-      <h1 className="text-2xl font-semibold">Patch Notes</h1>
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded border border-white/10 bg-black/40 p-4">
+    <section className="px-1 py-2 md:px-2 md:py-3">
+      <h1 className="text-2xl font-semibold mb-3">Patch Notes</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="panel p-4">
           <h2 className="font-semibold">Create</h2>
           <div className="mt-3 space-y-2 text-sm">
-            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} placeholder="Date (YYYY-MM-DD)"/>
-            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.version} onChange={e=>setForm(f=>({...f,version:e.target.value}))} placeholder="Version"/>
-            <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Title"/>
-            <textarea className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 h-24" value={form.highlights} onChange={e=>setForm(f=>({...f,highlights:e.target.value}))} placeholder="Highlights (one per line)"/>
-            <textarea className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 h-24" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Notes (optional, one per line)"/>
+            <input className="input" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} placeholder="Date (YYYY-MM-DD)"/>
+            <input className="input" value={form.version} onChange={e=>setForm(f=>({...f,version:e.target.value}))} placeholder="Version"/>
+            <input className="input" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Title"/>
+            <textarea className="textarea" value={form.highlights} onChange={e=>setForm(f=>({...f,highlights:e.target.value}))} placeholder="Highlights (one per line)"/>
+            <textarea className="textarea" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Notes (optional, one per line)"/>
             <button className="btn px-3 py-1" onClick={create}>Add</button>
           </div>
         </div>
@@ -74,18 +71,34 @@ export default function AdminPatchNotes() {
           <h2 className="font-semibold">Existing</h2>
           <div className="mt-3 space-y-3">
             {rows.slice((page-1)*pageSize, (page-1)*pageSize + pageSize).map(r=> (
-              <div key={r.id} className="rounded border border-white/10 bg-black/35 p-3 space-y-2">
+              <div key={r.id} className="panel p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2 text-xs">
-                    <input className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.date} onChange={e=>update(r.id,{ date: e.target.value })} />
-                    <input className="rounded bg-black/40 border border-white/10 px-2 py-1 w-28" value={r.version} onChange={e=>update(r.id,{ version: e.target.value })} placeholder="Version"/>
+                    <input
+                      className="input"
+                      value={r.date}
+                      onChange={e=>setRows(prev=>prev.map(x=>x.id===r.id?{...x,date:e.target.value}:x))}
+                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{ date: r.date }); } }}
+                    />
+                    <input
+                      className="input w-28"
+                      value={r.version}
+                      onChange={e=>setRows(prev=>prev.map(x=>x.id===r.id?{...x,version:e.target.value}:x))}
+                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{ version: r.version }); } }}
+                      placeholder="Version"
+                    />
                   </div>
                   <button className="btn px-2 py-0.5" onClick={()=>remove(r.id)}>Delete</button>
                 </div>
-                <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 font-semibold" value={r.title} onChange={e=>update(r.id,{ title: e.target.value })} />
+                <input
+                  className="input font-semibold"
+                  value={r.title}
+                  onChange={e=>setRows(prev=>prev.map(x=>x.id===r.id?{...x,title:e.target.value}:x))}
+                  onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{ title: r.title }); } }}
+                />
                 <div className="grid grid-cols-2 gap-2">
-                  <textarea className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 h-24 text-sm" defaultValue={r.highlights.join("\n")} onBlur={e=>update(r.id,{ highlightsText: e.target.value })} placeholder="Highlights (one per line)"/>
-                  <textarea className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 h-24 text-sm" defaultValue={(r.notes||[]).join("\n")} onBlur={e=>update(r.id,{ notesText: e.target.value })} placeholder="Notes (optional)"/>
+                  <textarea className="textarea text-sm" defaultValue={r.highlights.join("\n")} onBlur={e=>update(r.id,{ highlightsText: e.target.value })} placeholder="Highlights (one per line)"/>
+                  <textarea className="textarea text-sm" defaultValue={(r.notes||[]).join("\n")} onBlur={e=>update(r.id,{ notesText: e.target.value })} placeholder="Notes (optional)"/>
                 </div>
               </div>
             ))}

@@ -209,10 +209,7 @@ export default function WorldEditorPage() {
   const updatePortal = async (id: string, patch: Partial<Portal>) => { const r = await fetch(`/api/admin/zones/${zoneId}/portals/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }); if (r.ok) { const j = await (await fetch(`/api/admin/zones/${zoneId}/portals`)).json(); setPortals(j.rows); notify('Saved','success'); } };
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-8 space-y-4">
-      <div className="-mt-2 mb-1 text-sm">
-        <a href="/admin" className="text-emerald-300 hover:underline">← Back to Admin</a>
-      </div>
+    <section className="px-1 py-2 md:px-2 md:py-3 space-y-4">
       <h1 className="text-2xl font-semibold">World Editor</h1>
       <div className="flex items-center gap-3 text-sm">
         <label className="flex items-center gap-2 text-gray-300">
@@ -220,8 +217,8 @@ export default function WorldEditorPage() {
         </label>
         <span className="text-xs text-gray-400">When enabled, drag portals directly on the scene preview. Use the grid editor to manage spawn slots.</span>
       </div>
-      <div className="flex items-center gap-2">
-        <select className="rounded bg-black/40 border border-white/10 px-2 py-1" value={zoneId} onChange={e=>setZoneId(e.target.value)}>
+      <div className="toolbar">
+        <select className="select" value={zoneId} onChange={e=>setZoneId(e.target.value)}>
           {zones.map(z=> (<option key={z.id} value={z.id}>{z.name} ({z.id})</option>))}
         </select>
         <button className="btn px-2 py-1" onClick={addZone}>New Zone</button>
@@ -230,13 +227,13 @@ export default function WorldEditorPage() {
         <button className="btn px-2 py-1" onClick={addSpawn}>Add Spawn</button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <div className={`relative ${liveMode ? 'opacity-70 pointer-events-none' : ''}`}>
+        <div className={`relative panel p-2 ${liveMode ? 'opacity-70 pointer-events-none' : ''}`}>
           <canvas ref={canvasRef} width={dims.w} height={dims.h} className="rounded border border-white/10 bg-black/50" />
           <div className="absolute top-2 left-2 text-xs text-gray-300 bg-black/50 rounded px-2 py-1">Drag portals to reposition. Spawns show as blue squares (slots) — drag a slot to move it, double-click to add, right-click to remove.</div>
         </div>
         <div className="sticky top-20">
           <div className="text-sm text-gray-300 mb-2">Live Scene Preview</div>
-          <div ref={previewWrapRef} className="relative rounded border border-white/10 bg-black/40 p-2">
+          <div ref={previewWrapRef} className="relative panel p-2">
             <GameCanvas initialScene={
               (activeZone?.sceneKey === 'Cave') ? 'Cave' :
               (activeZone?.sceneKey === 'Slime') ? 'Slime' :
@@ -297,11 +294,22 @@ export default function WorldEditorPage() {
           <h2 className="font-semibold">Portals</h2>
           <div className="mt-2 space-y-2">
             {portals.map(p => (
-              <div key={p.id} className="rounded border border-white/10 bg-black/35 p-2 flex items-center justify-between">
+              <div key={p.id} className="panel p-2 flex items-center justify-between">
                 <div className="text-sm flex items-center gap-2">
                   <span className="opacity-70">({p.x},{p.y})</span>
-                  <input className="rounded bg-black/40 border border-white/10 px-2 py-1 w-40" value={p.targetZoneId} onChange={e=>updatePortal(p.id,{ targetZoneId: e.target.value })} />
-                  <input className="rounded bg-black/40 border border-white/10 px-2 py-1 w-36" value={p.label||""} placeholder="label" onChange={e=>updatePortal(p.id,{ label: e.target.value })} />
+                  <input
+                    className="input w-40"
+                    value={p.targetZoneId}
+                    onChange={e=>setPortals(prev=>prev.map(x=>x.id===p.id?{...x,targetZoneId:e.target.value}:x))}
+                    onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); updatePortal(p.id,{ targetZoneId: p.targetZoneId }); } }}
+                  />
+                  <input
+                    className="input w-36"
+                    value={p.label||""}
+                    placeholder="label"
+                    onChange={e=>setPortals(prev=>prev.map(x=>x.id===p.id?{...x,label:e.target.value}:x))}
+                    onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); updatePortal(p.id,{ label: p.label || "" }); } }}
+                  />
                 </div>
                 <button className="btn px-2 py-1" onClick={()=>deletePortal(p.id)}>Delete</button>
               </div>
@@ -312,11 +320,28 @@ export default function WorldEditorPage() {
           <h2 className="font-semibold">Spawns</h2>
           <div className="mt-2 space-y-2">
             {spawns.map(s => (
-              <div key={s.id} className={`rounded border border-white/10 p-2 flex items-center justify-between ${s.id===selectedSpawnId? 'bg-black/60':'bg-black/35'}`} onClick={()=>setSelectedSpawnId(s.id)}>
+              <div key={s.id} className={`panel p-2 flex items-center justify-between ${s.id===selectedSpawnId? 'panel-strong':'panel'}`} onClick={()=>setSelectedSpawnId(s.id)}>
                 <div className="text-sm flex items-center gap-2">
-                  <input className="rounded bg-black/40 border border-white/10 px-2 py-1 w-44" value={s.templateId} onChange={e=>updateSpawn(s.id,{ templateId: e.target.value })} />
-                  <label className="text-xs opacity-80">Budget <input type="number" className="w-20 rounded bg-black/40 border border-white/10 px-2 py-1" value={s.budget} onChange={e=>updateSpawn(s.id,{ budget: parseInt(e.target.value||'0',10) })} /></label>
-                  <label className="text-xs opacity-80">Respawn <input type="number" className="w-24 rounded bg-black/40 border border-white/10 px-2 py-1" value={s.respawnMs} onChange={e=>updateSpawn(s.id,{ respawnMs: parseInt(e.target.value||'0',10) })} /></label>
+                  <input
+                    className="input w-44"
+                    value={s.templateId}
+                    onChange={e=>setSpawns(prev=>prev.map(x=>x.id===s.id?{...x,templateId:e.target.value}:x))}
+                    onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); updateSpawn(s.id,{ templateId: s.templateId }); } }}
+                  />
+                  <label className="text-xs opacity-80">Budget
+                    <input
+                      type="number" className="input w-20" value={s.budget}
+                      onChange={e=>{ const v=parseInt(e.target.value||'0',10); setSpawns(prev=>prev.map(x=>x.id===s.id?{...x,budget:isNaN(v)?0:v}:x)); }}
+                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); updateSpawn(s.id,{ budget: s.budget }); } }}
+                    />
+                  </label>
+                  <label className="text-xs opacity-80">Respawn
+                    <input
+                      type="number" className="input w-24" value={s.respawnMs}
+                      onChange={e=>{ const v=parseInt(e.target.value||'0',10); setSpawns(prev=>prev.map(x=>x.id===s.id?{...x,respawnMs:isNaN(v)?0:v}:x)); }}
+                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); updateSpawn(s.id,{ respawnMs: s.respawnMs }); } }}
+                    />
+                  </label>
                 </div>
                 <button className="btn px-2 py-1" onClick={()=>deleteSpawn(s.id)}>Delete</button>
               </div>
