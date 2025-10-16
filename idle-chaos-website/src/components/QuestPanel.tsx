@@ -1,6 +1,15 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 
+declare global {
+  interface Window {
+    __phaserRegistry?: Map<string, unknown>;
+  }
+}
+
+// Module-scoped cache for last quest dirty value (avoids using any on component)
+let lastQuestDirty: number | undefined;
+
 export default function QuestPanel({ characterId }: { characterId: string }) {
   type QuestRow = { questId: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } };
   const [quests, setQuests] = useState<QuestRow[]>([]);
@@ -24,10 +33,10 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
     let t: number | null = null;
     const poll = () => {
       try {
-        const reg = (window as any)?.__phaserRegistry as Map<string, unknown> | undefined;
+        const reg = window.__phaserRegistry;
         const v = (reg?.get?.("questDirtyCount") as number | undefined) ?? 0;
-        if ((QuestPanel as any).__lastQuestDirty !== v) {
-          (QuestPanel as any).__lastQuestDirty = v;
+        if (lastQuestDirty !== v) {
+          lastQuestDirty = v;
           load();
         }
       } catch {}

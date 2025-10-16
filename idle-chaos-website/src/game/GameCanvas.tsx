@@ -22,6 +22,8 @@ declare global {
     __setTyping?: (v: boolean) => void;
     __focusGame?: () => void;
     __isTyping?: boolean;
+    // Expose Phaser registry with a minimal "get" shape to avoid any
+    __phaserRegistry?: { get?: (key: string) => unknown };
   }
 }
 
@@ -1027,7 +1029,6 @@ class SlimeFieldScene extends Phaser.Scene {
       // HUD: apply character EXP update payload if provided
       if (Array.isArray(data?.rewards) && data.rewards.length) {
         const r = data.rewards[0] as { exp: number };
-        const prevLevel = (this.game.registry.get("charLevel") as number) ?? 1;
         // We don't know new level from server here, but the exp endpoint will have updated; fetch current stats
         const cid = String(this.game.registry.get("characterId") || "");
         if (cid) {
@@ -1218,8 +1219,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       scene: [TownScene, CaveScene, SlimeFieldScene],
     };
   gameRef.current = new Phaser.Game(config);
-    // Expose registry for cross-component signals (read-only)
-    ;(window as any).__phaserRegistry = gameRef.current.registry;
+  // Expose registry for cross-component signals (read-only)
+  window.__phaserRegistry = gameRef.current.registry as unknown as { get?: (key: string) => unknown };
     // Seed registry flags (e.g., tutorial gate) if needed; default false
     gameRef.current.registry.set("tutorialStarted", false);
     gameRef.current.registry.set("spawn", { from: "initial", portal: null });
