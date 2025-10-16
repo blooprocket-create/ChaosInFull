@@ -205,6 +205,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
             gameRef.current?.registry.set('inventory', inv);
             setInventory({ ...inv });
           }
+          // Apply immediate EXP + level HUD update if provided
+          if (typeof data.newLevel === 'number' && typeof data.newExp === 'number') {
+            window.__applyExpUpdate?.({ type: 'character', level: data.newLevel, exp: data.newExp });
+          }
           // EXP is applied on server; optionally refresh from stats or rely on next action to sync
           setAfkCombatModal({ open: true, zone: data.zone || (initialScene || 'Slime'), kills: data.kills, exp: data.exp ?? 0, gold: data.gold ?? 0, loot: Array.isArray(data.loot) ? data.loot : [] });
         }

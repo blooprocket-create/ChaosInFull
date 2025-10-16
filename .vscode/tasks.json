@@ -639,6 +639,66 @@
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Typecheck, Lint, and Build after combat/AFK changes",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck, Lint, and Build after AFK HUD sync",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck, Lint, and Build after spawn/portal fixes",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck, Lint, and Build after Prisma schema fix",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck and Build after Zone PATCH type fix",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build"
+			],
+			"group": "build"
 		}
 	]
 }

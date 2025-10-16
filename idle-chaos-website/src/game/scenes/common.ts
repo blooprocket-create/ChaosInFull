@@ -102,7 +102,17 @@ export function updateNameTag(nameTag: Phaser.GameObjects.Text | undefined, play
 }
 
 /** Gate inputs when typing in chat/inputs */
-export function isTyping(): boolean { return !!window.__isTyping; }
+export function isTyping(): boolean {
+  try {
+    const typingFlag = !!window.__isTyping;
+    const el = (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null);
+    const tag = el?.tagName?.toLowerCase();
+    const inField = tag === 'input' || tag === 'textarea' || (el?.isContentEditable === true);
+    return typingFlag || inField;
+  } catch {
+    return !!window.__isTyping;
+  }
+}
 
 // Centralized helper for E-to-enter portals
 export type EPortalHandle = {

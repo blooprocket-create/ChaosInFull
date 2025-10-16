@@ -6,7 +6,7 @@ import BloodLinkButton from "@/src/components/BloodLinkButton";
 import type { SessionData } from "@/src/lib/auth";
 
 export default function NavAuth({ initial }: { initial: SessionData | null }) {
-  const [session, setSession] = useState<(SessionData & { isAdmin?: boolean }) | null>(initial as any);
+  const [session, setSession] = useState<(SessionData & { isAdmin?: boolean }) | null>(initial as (SessionData & { isAdmin?: boolean }) | null);
 
   async function refetch() {
     try {

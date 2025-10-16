@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
 import { prisma } from "@/src/lib/prisma";
+// Some environments might not have Prisma client typings for PortalDef under prisma.portalDef at build time.
+// Use a loose cast to avoid type errors while keeping the actual call unchanged.
+const portalClient = prisma as unknown as { portalDef: { update: (args: { where: { id: string }, data: { x?: number; y?: number; radius?: number; label?: string; targetZoneId?: string } }) => Promise<unknown>; delete: (args: { where: { id: string } }) => Promise<void> } };
 
 type Ctx = { params: Promise<{ id: string; portalId: string }> };
 
@@ -14,13 +17,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (typeof b.label === 'string') data.label = b.label;
   if (typeof b.targetZoneId === 'string') data.targetZoneId = b.targetZoneId;
   const { portalId } = await params;
-  const row = await prisma.portalDef.update({ where: { id: portalId }, data });
+  const row = await portalClient.portalDef.update({ where: { id: portalId }, data });
   return NextResponse.json({ ok: true, row });
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const { portalId } = await params;
-  await prisma.portalDef.delete({ where: { id: portalId } });
+  await portalClient.portalDef.delete({ where: { id: portalId } });
   return NextResponse.json({ ok: true });
 }

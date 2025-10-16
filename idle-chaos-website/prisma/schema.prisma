@@ -238,6 +238,8 @@ model ZoneDef {
   updatedAt DateTime @updatedAt
   spawns    SpawnConfig[]
   portals   PortalDef[]
+  // Opposite side of the "PortalTarget" relation from PortalDef.targetZone
+  incomingPortals PortalDef[] @relation("PortalTarget")
 }
 
 model SpawnConfig {

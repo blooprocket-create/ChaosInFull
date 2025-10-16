@@ -56,6 +56,10 @@ type Phase = {
   mobs: Map<string, Mob>;
   contrib: Map<string, Map<string, Contribution>>; // mobId -> (charId -> contribution)
   budget: number;
+  // Simple respawn gate to avoid instant pop-in after a kill
+  nextRespawnAt?: number | null;
+  // Round-robin slot cursor per template to avoid clustering at one spot
+  slotCursor?: Record<string, number>;
 };
 
 type Party = { id: string; leaderId: string; members: Set<string>; phaseId: string };
@@ -214,8 +218,17 @@ class ZoneRoom {
 
   private ensureSpawnsForPhase(phase: Phase) {
     if (phase.mobs.size >= phase.budget) return;
+    // Gate respawns if we're refilling after a kill; allow full initial fill when empty
+    const now = Date.now();
+    if (phase.mobs.size > 0 && phase.nextRespawnAt && now < phase.nextRespawnAt) return;
     const matching = this.spawnCfg.filter(c => c.phaseType === phase.type);
-    const configs = matching.length ? matching : this.spawnCfg;
+    let configs = matching.length ? matching : this.spawnCfg;
+    // Safety: if DB has no spawn configs, seed a default slime composition
+    if (!configs.length) {
+      configs = [{ templateId: "slime", budget: 6, respawnMs: 1200, slots: [100,180,260,340,420], phaseType: phase.type }];
+    }
+    // Ensure slot cursor map exists
+    if (!phase.slotCursor) phase.slotCursor = {};
     for (const cfg of configs) {
       if (!cfg) continue;
       const tpl = this.templates.get(cfg.templateId);
@@ -223,19 +236,21 @@ class ZoneRoom {
       if (budget <= 0) continue;
       const existing = Array.from(phase.mobs.values()).filter(m => m.templateId === cfg.templateId).length;
       let remainingForTemplate = Math.max(0, budget - existing);
-      let spawnOffset = 0;
+      // Use rotating slot cursor per template to avoid always picking the same slot when one dies
+      const slots = cfg.slots ?? [100, 180, 260, 340, 420];
+      const len = Math.max(1, slots.length);
+      if (phase.slotCursor[cfg.templateId] === undefined) phase.slotCursor[cfg.templateId] = 0;
       while (remainingForTemplate > 0 && phase.mobs.size < phase.budget) {
         const id = this.uid("mob");
         const hp = tpl?.baseHp ?? 30;
         const lvl = tpl?.level ?? 1;
-        const slots = cfg.slots ?? [100, 180, 260, 340, 420];
-        const slotIndex = (existing + spawnOffset) % Math.max(1, slots.length);
+        const slotIndex = phase.slotCursor[cfg.templateId]! % len;
         const x = slots[slotIndex];
         const mob: Mob = { id, templateId: tpl?.id || cfg.templateId, hp, maxHp: hp, level: lvl, pos: { x, y: 0 } };
         phase.mobs.set(id, mob);
         phase.contrib.set(id, new Map());
         remainingForTemplate -= 1;
-        spawnOffset += 1;
+        phase.slotCursor[cfg.templateId] = (phase.slotCursor[cfg.templateId]! + 1) % len;
       }
       if (phase.mobs.size >= phase.budget) break;
     }
@@ -307,8 +322,10 @@ class ZoneRoom {
       // Remove the mob and its contrib before returning to avoid budget lock
       phase.mobs.delete(mobId);
       phase.contrib.delete(mobId);
-      // Delayed respawn to avoid instant pop-in
-      setTimeout(() => this.ensureSpawnsForPhase(phase), (this.spawnCfg.find(c=>c.phaseType===phase.type)?.respawnMs ?? 1200));
+      // Delayed respawn to avoid instant pop-in: set a phase-level gate, refilled on next snapshot after delay
+      const cfgs = this.spawnCfg.filter(c => c.phaseType === phase.type && c.templateId === mob.templateId);
+      const respawnMs = cfgs.length ? cfgs[0].respawnMs : (this.spawnCfg.find(c => c.phaseType === phase.type)?.respawnMs ?? 1200);
+      phase.nextRespawnAt = Date.now() + Math.max(300, respawnMs || 1200);
       // Roll drops
       const loot = this.rollDrops(tpl?.dropTableId || null);
       return { templateId: mob.templateId, rewards: [{ characterId: ownerId, exp: expBase }], loot };

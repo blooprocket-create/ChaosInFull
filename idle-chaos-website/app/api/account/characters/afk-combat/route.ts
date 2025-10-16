@@ -40,7 +40,11 @@ export async function POST(req: Request) {
   }
 
   const elapsedSec = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 1000));
-  if (elapsedSec <= 0) return NextResponse.json({ ok: true, kills: 0, exp: 0, gold: 0, loot: [] });
+  // Only calculate AFK simulation if at least 60 seconds have elapsed
+  if (elapsedSec < 60) {
+    await afk.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
+    return NextResponse.json({ ok: true, kills: 0, exp: 0, gold: 0, loot: [] });
+  }
   // Character damage model (MVP): pull class and a baseline weaponless damage similar to server basicAttack
   const ch = await prisma.character.findUnique({ where: { id: characterId }, select: { level: true, class: true, userId: true } }).catch(()=>null);
   // Damage formula mirrors ZoneRoom.computeAndCacheDamage
@@ -108,13 +112,20 @@ export async function POST(req: Request) {
   }
 
   // Apply EXP via the central endpoint
+  let newTotals: { level?: number; exp?: number } = {};
   try {
     const origin = (() => {
       const env = process.env.NEXT_PUBLIC_BASE_URL;
       if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, "");
       return "http://localhost:3000";
     })();
-    await fetch(`${origin}/api/account/characters/exp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, exp: expTotal }) });
+    const resp = await fetch(`${origin}/api/account/characters/exp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, exp: expTotal }) });
+    if (resp.ok) {
+      const payload = await resp.json().catch(()=>null);
+      if (payload && typeof payload.level === 'number' && typeof payload.exp === 'number') {
+        newTotals = { level: payload.level, exp: payload.exp };
+      }
+    }
   } catch {}
 
   // Apply gold and loot
@@ -129,5 +140,5 @@ export async function POST(req: Request) {
   await afk.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
 
   // Return applied rewards
-  return NextResponse.json({ ok: true, zone: zoneId, kills, exp: expTotal, gold: goldTotal, loot: goop > 0 ? [{ itemId: "slime_goop", qty: goop }] : [] });
+  return NextResponse.json({ ok: true, zone: zoneId, kills, exp: expTotal, gold: goldTotal, loot: goop > 0 ? [{ itemId: "slime_goop", qty: goop }] : [], newLevel: newTotals.level, newExp: newTotals.exp });
 }
