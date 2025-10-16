@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
+import { assertAdmin } from "@/src/lib/authz";
 import { prisma } from "@/src/lib/prisma";
+import { items as SHOP_ITEMS } from "@/src/data/items";
 
 type PrismaLoose = {
   itemDef: { upsert: (args: { where: { id: string }; update: Partial<{ name: string; description: string; sell: bigint; buy: bigint }>; create: { id: string; name: string; description: string; sell: bigint; buy: bigint } }) => Promise<void> };
@@ -14,19 +16,8 @@ type PrismaLoose = {
   spawnConfig: { create: (args: { data: { zoneId: string; templateId: string; budget: number; respawnMs: number; slots: number[]; phaseType: string } }) => Promise<void> };
 };
 
-const ITEMS: Array<{ id: string; name: string; sell: number; buy?: number; description?: string }> = [
-  { id: "copper", name: "Copper Ore", sell: 2 },
-  { id: "tin", name: "Tin Ore", sell: 3 },
-  { id: "copper_bar", name: "Copper Bar", sell: 8 },
-  { id: "bronze_bar", name: "Bronze Bar", sell: 12 },
-  { id: "log", name: "Log", sell: 2 },
-  { id: "plank", name: "Plank", sell: 4 },
-  { id: "oak_log", name: "Oak Log", sell: 4 },
-  { id: "oak_plank", name: "Oak Plank", sell: 7 },
-  { id: "copper_armor", name: "Copper Armor", sell: 24 },
-  { id: "copper_dagger", name: "Copper Dagger", sell: 16 },
-  { id: "slime_goop", name: "Slime Goop", sell: 5 },
-];
+// Items will be sourced from the centralized shop data (src/data/items.ts)
+// to keep prices and names consistent across UI, APIs, and seeds.
 
 const ENEMIES: Array<{ id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number }> = [
   { id: "slime", name: "Slime", level: 1, baseHp: 30, expBase: 5, goldMin: 1, goldMax: 3 },
@@ -41,12 +32,17 @@ type AfkDelegate = { deleteMany: (args?: { where?: { characterId?: string } }) =
 export async function POST() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const client = prisma as unknown as PrismaLoose;
   // Reset AFK combat state for clean local seeds
   try { await (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState.deleteMany({}); } catch {}
   // Items
-  for (const it of ITEMS) {
-    await client.itemDef.upsert({ where: { id: it.id }, update: { name: it.name, description: it.description ?? "", sell: BigInt(it.sell), buy: BigInt(it.buy ?? 0) }, create: { id: it.id, name: it.name, description: it.description ?? "", sell: BigInt(it.sell), buy: BigInt(it.buy ?? 0) } });
+  for (const it of SHOP_ITEMS) {
+    await client.itemDef.upsert({
+      where: { id: it.key },
+      update: { name: it.name, description: "", sell: BigInt(it.sell), buy: BigInt(it.buy) },
+      create: { id: it.key, name: it.name, description: "", sell: BigInt(it.sell), buy: BigInt(it.buy) },
+    });
   }
   // NPCs
   await client.npcDef.upsert({ where: { id: "grimsley" }, update: { name: "Grimsley" }, create: { id: "grimsley", name: "Grimsley" } });
@@ -93,7 +89,7 @@ export async function POST() {
     create: { id: "tutorial_craft_copper_dagger", name: "Can you craft?", description: "Craft one copper dagger at the workbench.", objectiveType: "CRAFT", objectiveTarget: "copper_dagger", objectiveCount: 1, giverNpcId: "grimsley", minLevel: 1, requiresQuestId: "tutorial_kill_slimes_5", rewardCraftingExp: 150, rewardExp: 150 }
   });
 
-  return NextResponse.json({ ok: true, seeded: { items: ITEMS.length, enemies: ENEMIES.length, npcs: 1, quests: 2, zone: 1 } });
+  return NextResponse.json({ ok: true, seeded: { items: SHOP_ITEMS.length, enemies: ENEMIES.length, npcs: 1, quests: 2, zone: 1 } });
 }
 
 export async function GET() {
