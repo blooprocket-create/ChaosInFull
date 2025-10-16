@@ -8,7 +8,7 @@ import NavAuth from "@/src/components/NavAuth";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import StatusChip from "@/src/components/StatusChip";
-import "@/src/lib/telemetry";
+import TelemetryInit from "@/src/components/TelemetryInit";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
 const mono = Roboto_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400","700"] });
@@ -57,7 +57,8 @@ export default async function RootLayout({
           {/* Vignette */}
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.6))]" />
         </div>
-        <CursorAura />
+  <CursorAura />
+  <TelemetryInit />
         <header className="sticky top-0 z-20 backdrop-blur border-b border-white/10 bg-black/50">
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold tracking-widest">CHAOS IN FULL</Link>
