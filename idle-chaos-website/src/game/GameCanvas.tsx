@@ -1044,7 +1044,9 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                         const res = await fetch('/api/quest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', characterId: character.id, questId: q.questId }) });
                         const payload = await res.json().catch(()=>({}));
                         if (payload?.rewards?.gold) setGold((g)=>g + Number(payload.rewards.gold||0));
-                        if (payload?.rewards?.exp) window.__applyExpUpdate?.({ type: 'character', exp: payload.rewards.exp, level: 0 });
+                        if (typeof payload?.exp === 'number' && typeof payload?.level === 'number') {
+                          window.__applyExpUpdate?.({ type: 'character', exp: payload.exp, level: payload.level });
+                        }
                         const inv = (gameRef.current?.registry.get('inventory') as Record<string, number>) || {};
                         if (payload?.granted) {
                           for (const [k,v] of Object.entries(payload.granted as Record<string,number>)) inv[k] = (inv[k]??0)+Number(v||0);

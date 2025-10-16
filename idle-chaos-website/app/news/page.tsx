@@ -5,7 +5,7 @@ export default function NewsPage() {
   const posts = [
     { title: "Somewhat Playable Build Deployed", date: "2025-10-14", excerpt: "You can move, mine, craft queues, and pretend this is stable. Expect polite desyncs." },
     { title: "Website MVP is live", date: "2025-10-14", excerpt: "Accounts, login, dashboard stats. UI now judges your AFK duration." },
-    { title: "Town zone planning", date: "2025-10-15", excerpt: "Workbench, Anvil, Furnace, Storage modal, Task Board sketch, tutorial NPC script drafts." },
+    { title: "Town zone planning", date: "2025-10-14", excerpt: "Workbench, Anvil, Furnace, Storage modal, Task Board sketch, tutorial NPC script drafts." },
   ];
   return (
     <section className="relative mx-auto max-w-5xl px-4 py-12">

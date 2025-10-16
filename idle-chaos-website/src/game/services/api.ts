@@ -1,6 +1,14 @@
 // Centralized API helpers used by scenes and hooks
 
-export type BasicAttackResult = { result?: { hit?: boolean; mobId?: string }; rewards?: Array<{ exp?: number }>; loot?: Array<{ itemId: string; qty: number }> };
+export type BasicAttackResult = {
+  result?: { hit?: boolean; mobId?: string };
+  rewards?: Array<{ exp?: number }>;
+  loot?: Array<{ itemId: string; qty: number }>;
+  // New fields returned by server for HUD updates without extra fetches
+  level?: number;
+  exp?: number;
+  gold?: number;
+};
 
 export const api = {
   // Account/state

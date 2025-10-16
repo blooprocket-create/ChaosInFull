@@ -120,16 +120,22 @@ export async function POST(req: Request) {
     if (cq.status !== "COMPLETED") return NextResponse.json({ ok: false, error: "not_ready" }, { status: 400 });
     if (cq.claimedRewards) return NextResponse.json({ ok: true, alreadyClaimed: true });
     // Rewards by quest
-    if (id === TUTORIAL_QUEST_ID) {
+  if (id === TUTORIAL_QUEST_ID) {
       // Give 500 gold to PlayerStat and 250 character XP
       const ch = await client.character.findUnique({ where: { id: characterId } });
       if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
-      const ps = await client.playerStat.findUnique({ where: { userId: ch.userId } });
-      if (ps) {
-        await client.playerStat.update({ where: { userId: ch.userId }, data: { gold: ps.gold + 500 } });
+      let ps = await client.playerStat.findUnique({ where: { userId: ch.userId } });
+      const newGold = (ps?.gold ?? 0) + 500;
+      if (!ps) {
+        await prisma.playerStat.create({ data: { userId: ch.userId, gold: newGold } as any }).catch(()=>{});
+      } else {
+        await client.playerStat.update({ where: { userId: ch.userId }, data: { gold: newGold } });
       }
-      // naive exp add: reuse /characters/exp logic is client-side; here, update minimal
-      await client.character.update({ where: { id: characterId }, data: { exp: { increment: 250 } } });
+      // Proper EXP award: call EXP endpoint to compute levels
+      try {
+        await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, exp: 250 }) });
+      } catch {}
+      const ch2 = await prisma.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true } });
       // Grant materials for next quest and auto-accept it if not present
       const nextQuestId = CRAFT_DAGGER_QUEST_ID;
       await client.characterQuest.upsert({
@@ -146,13 +152,16 @@ export async function POST(req: Request) {
       await grant("copper_bar", 1);
       await grant("plank", 1);
       await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
-      return NextResponse.json({ ok: true, rewards: { gold: 500, exp: 250 }, granted: { copper_bar: 1, plank: 1 }, nextQuest: nextQuestId });
+      return NextResponse.json({ ok: true, rewards: { gold: 500, exp: 250 }, granted: { copper_bar: 1, plank: 1 }, nextQuest: nextQuestId, exp: ch2?.exp, level: ch2?.level });
     }
     if (id === CRAFT_DAGGER_QUEST_ID) {
-      // 150 crafting XP + 150 character XP
-      await client.character.update({ where: { id: characterId }, data: { craftingExp: { increment: 150 }, exp: { increment: 150 } } });
+      // 150 crafting XP + 150 character XP computed via EXP endpoint
+      try {
+        await fetch("/api/account/characters/exp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, craftingExp: 150, exp: 150 }) });
+      } catch {}
+      const ch2 = await prisma.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true, craftingExp: true, craftingLevel: true } });
       await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
-      return NextResponse.json({ ok: true, rewards: { craftingExp: 150, exp: 150 } });
+      return NextResponse.json({ ok: true, rewards: { craftingExp: 150, exp: 150 }, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingExp, craftingLevel: ch2?.craftingLevel });
     }
     return NextResponse.json({ ok: true });
   }

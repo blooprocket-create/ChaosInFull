@@ -65,7 +65,16 @@ export async function POST(req: Request) {
     const cookie = req.headers.get("cookie");
     // Only award EXP to the attacker for MVP personal phases.
     const selfReward = rw.find(r => r.characterId === characterId) || (rw.length ? rw[0] : undefined);
-    if (selfReward) await awardExp(characterId, selfReward.exp, cookie, req);
+    let newExp: number | undefined;
+    let newLevel: number | undefined;
+    if (selfReward) {
+      await awardExp(characterId, selfReward.exp, cookie, req);
+      // After awarding EXP, fetch the updated exp/level from DB for immediate HUD update
+      try {
+        const ch2 = await prisma.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true } });
+        if (ch2) { newExp = ch2.exp; newLevel = ch2.level; }
+      } catch {}
+    }
       // Minimal gold + loot for killer
       try {
         const killerId = characterId;
@@ -76,10 +85,15 @@ export async function POST(req: Request) {
         };
         const killer = await client.character.findUnique({ where: { id: killerId } });
         if (killer) {
-          const ps = await client.playerStat.findUnique({ where: { userId: killer.userId } });
+          let ps = await client.playerStat.findUnique({ where: { userId: killer.userId } });
           const goldDelta = harvested?.loot?.length ? (Math.min(Math.max(1, (harvested.rewards?.[0]?.exp ?? 5) / 2), 5)) : (1 + Math.floor(Math.random() * 3));
           const newGold = (ps?.gold ?? 0) + goldDelta;
-          await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } });
+          if (!ps) {
+            // Create-on-demand if missing
+            await prisma.playerStat.create({ data: { userId: killer.userId, gold: newGold } as any }).catch(()=>{});
+          } else {
+            await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } });
+          }
           // Persist each rolled drop
           if (Array.isArray(harvested?.loot)) {
             for (const it of harvested.loot as Array<{ itemId: string; qty: number }>) {
@@ -98,7 +112,7 @@ export async function POST(req: Request) {
           await fetch(`${base}/api/quest`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify({ action: "progress", characterId, progressDelta: 1 }) });
         }
       } catch {}
-      return NextResponse.json({ ok: true, result: res, rewards: selfReward ? [selfReward] : [], loot: harvested?.loot ?? [] });
+      return NextResponse.json({ ok: true, result: res, rewards: selfReward ? [selfReward] : [], loot: harvested?.loot ?? [], exp: newExp, level: newLevel, gold: undefined });
     }
     return NextResponse.json({ ok: true, result: res });
   }

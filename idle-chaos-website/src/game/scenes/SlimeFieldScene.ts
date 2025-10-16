@@ -178,7 +178,7 @@ export class SlimeFieldScene extends Phaser.Scene {
   private async basicAttack(characterId: string) {
     try {
       const data = await api.basicAttack("Slime", characterId, this.player.x);
-      if (data?.result?.hit) {
+  if (data?.result?.hit) {
         const mobId = data?.result?.mobId as string | undefined;
         const cont = mobId ? this.mobContainers.get(mobId) : undefined;
         if (cont) {
@@ -194,14 +194,9 @@ export class SlimeFieldScene extends Phaser.Scene {
           for (let i = 0; i < 12; i++) this.time.delayedCall(i * 8, () => spawnSpark());
         }
       }
-  if (Array.isArray(data?.rewards) && data.rewards.length) {
-        const cid = String(this.game.registry.get("characterId") || "");
-        if (cid) {
-          fetch(`/api/account/stats?characterId=${encodeURIComponent(cid)}`).then(res => res.ok ? res.json() : null).then(data2 => {
-            if (!data2) return; const base = data2.base as { exp: number; level: number } | undefined;
-            if (base) window.__applyExpUpdate?.({ type: "character", exp: base.exp, level: base.level });
-          }).catch(()=>{});
-        }
+      // Apply new EXP/Level to HUD if server returned them
+      if (typeof (data as any)?.exp === "number" && typeof (data as any)?.level === "number") {
+        window.__applyExpUpdate?.({ type: "character", exp: (data as any).exp, level: (data as any).level });
       }
   const loot: Array<{ itemId: string; qty: number }> = Array.isArray(data?.loot) ? (data.loot as Array<{ itemId: string; qty: number }>) : [];
       if (loot.length) {
