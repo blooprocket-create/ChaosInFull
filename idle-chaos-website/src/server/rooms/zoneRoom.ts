@@ -44,6 +44,8 @@ type PlayerState = {
   auto: boolean;
   lastBasicAt: number;
   lastSeenAt: number; // for idle cleanup
+  dmgPerHit: number; // derived from class/main stat/level/weapon
+  atkMs: number; // basic attack cooldown in ms
 };
 
 type Phase = {
@@ -112,9 +114,34 @@ class ZoneRoom {
       this.tickHandle = setInterval(() => this.tick(), 100);
     }
     const phase = this.ensurePersonalPhase(charId);
-    const ps: PlayerState = { characterId: charId, zone: this.zone, phaseId: phase.id, hp: 100, maxHp: 100, auto: false, lastBasicAt: 0, lastSeenAt: Date.now() };
+    const ps: PlayerState = { characterId: charId, zone: this.zone, phaseId: phase.id, hp: 100, maxHp: 100, auto: false, lastBasicAt: 0, lastSeenAt: Date.now(), dmgPerHit: 8, atkMs: 600 };
     this.players.set(charId, ps);
+    // Compute damage using a simple formula based on class and stats; cache on PlayerState
+    void this.computeAndCacheDamage(charId).catch(()=>{});
     return ps;
+  }
+
+  private async computeAndCacheDamage(charId: string) {
+    const ps = this.players.get(charId); if (!ps) return;
+    try {
+      // Load character for class/userId
+      const ch = await prisma.character.findUnique({ where: { id: charId }, select: { userId: true, class: true, level: true, id: true } });
+      if (!ch) return;
+      const stats = await prisma.playerStat.findUnique({ where: { userId: ch.userId }, select: { strength: true, agility: true, intellect: true, luck: true } });
+      const cls = (ch.class || "Beginner").toLowerCase();
+      const main = cls.includes("horror") ? (stats?.strength ?? 1)
+                 : cls.includes("occult") ? (stats?.intellect ?? 1)
+                 : cls.includes("shade") ? (stats?.agility ?? 1)
+                 : (stats?.luck ?? 1);
+      // Basic weapon bonus: if the player has a copper dagger, add a small damage bonus
+      const hasDagger = !!(await prisma.itemStack.findUnique({ where: { characterId_itemKey: { characterId: charId, itemKey: "copper_dagger" } }, select: { count: true } }))?.count;
+      const weaponBonus = hasDagger ? 3 : 1; // 1 if bare hands, +3 if dagger present
+      // Level scaling keeps early damage near previous static 8
+      const levelBonus = Math.floor((ch.level ?? 1) / 2);
+      const dmg = Math.max(1, Math.floor(6 + main + levelBonus + weaponBonus));
+      ps.dmgPerHit = dmg;
+      ps.atkMs = 600;
+    } catch {}
   }
 
   private async loadContent() {
@@ -218,7 +245,7 @@ class ZoneRoom {
     const now = Date.now();
     const ps = this.players.get(charId); if (!ps) throw new Error("not_joined");
     ps.lastSeenAt = now;
-    if (now - ps.lastBasicAt < 600) return { hit: false, reason: "cooldown" };
+    if (now - ps.lastBasicAt < (ps.atkMs || 600)) return { hit: false, reason: "cooldown" };
     ps.lastBasicAt = now;
     const phase = this.phases.get(ps.phaseId)!;
     // Pick the nearest alive mob to hintX if provided; else first
@@ -238,7 +265,7 @@ class ZoneRoom {
       target = candidates[0];
     }
     if (!target) return { hit: false, reason: "no_target" };
-    const dmg = 8; // MVP static damage
+  const dmg = Math.max(1, ps.dmgPerHit || 8);
     target.hp = Math.max(0, target.hp - dmg);
     // Contributions
     const contribMap = phase.contrib.get(target.id)!;

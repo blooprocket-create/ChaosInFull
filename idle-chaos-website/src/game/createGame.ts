@@ -2,10 +2,11 @@ import * as Phaser from "phaser";
 import TownScene from "./scenes/TownScene";
 import CaveScene from "./scenes/CaveScene";
 import SlimeFieldScene from "./scenes/SlimeFieldScene";
+import SlimeMeadowScene from "./scenes/SlimeMeadowScene";
 
 export type CharacterHUD = { id: string; name: string; class: string; level: number };
 
-export function createGame(opts: { parent: HTMLElement; character?: CharacterHUD; initialScene?: "Town" | "Cave" | "Slime"; initialMiningLevel?: number }) {
+export function createGame(opts: { parent: HTMLElement; character?: CharacterHUD; initialScene?: "Town" | "Cave" | "Slime" | "Slime Meadow"; initialMiningLevel?: number }) {
   const { parent, character, initialScene, initialMiningLevel } = opts;
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -14,7 +15,7 @@ export function createGame(opts: { parent: HTMLElement; character?: CharacterHUD
     backgroundColor: "#0b0b0b",
     parent,
     physics: { default: "arcade", arcade: { debug: false } },
-    scene: [TownScene, CaveScene, SlimeFieldScene],
+    scene: [TownScene, CaveScene, SlimeFieldScene, SlimeMeadowScene],
   };
   const game = new Phaser.Game(config);
   window.__phaserRegistry = game.registry;
@@ -26,11 +27,12 @@ export function createGame(opts: { parent: HTMLElement; character?: CharacterHUD
     game.registry.set("miningLevel", initialMiningLevel ?? 1);
     game.registry.set("craftingLevel", 1);
   }
-  const startScene = (initialScene || "Town") as "Town" | "Cave" | "Slime";
+  const startScene = (initialScene || "Town") as "Town" | "Cave" | "Slime" | "Slime Meadow";
   if (startScene !== "Town") {
     setTimeout(() => {
       if (game.scene.isActive("TownScene")) game.scene.stop("TownScene");
-      game.scene.start(`${startScene}Scene`);
+      const key = startScene === "Cave" ? "CaveScene" : startScene === "Slime" ? "SlimeFieldScene" : startScene === "Slime Meadow" ? "SlimeMeadowScene" : "TownScene";
+      game.scene.start(key);
     }, 0);
   }
   return game;

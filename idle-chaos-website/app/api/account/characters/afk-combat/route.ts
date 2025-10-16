@@ -35,10 +35,23 @@ export async function POST(req: Request) {
   const elapsedSec = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 1000));
   if (elapsedSec <= 0) return NextResponse.json({ ok: true, kills: 0, exp: 0, gold: 0, loot: [] });
   // Character damage model (MVP): pull class and a baseline weaponless damage similar to server basicAttack
-  const ch = await prisma.character.findUnique({ where: { id: characterId }, select: { level: true, class: true } }).catch(()=>null);
-  const baseDmg = 8; // match ZoneRoom.basicAttack
+  const ch = await prisma.character.findUnique({ where: { id: characterId }, select: { level: true, class: true, userId: true } }).catch(()=>null);
+  // Damage formula mirrors ZoneRoom.computeAndCacheDamage
+  let dmgPerHit = 8;
+  try {
+    const stats = ch?.userId ? await prisma.playerStat.findUnique({ where: { userId: ch.userId }, select: { strength: true, agility: true, intellect: true, luck: true } }) : null;
+    const cls = (ch?.class || "Beginner").toLowerCase();
+    const main = cls.includes("horror") ? (stats?.strength ?? 1)
+               : cls.includes("occult") ? (stats?.intellect ?? 1)
+               : cls.includes("shade") ? (stats?.agility ?? 1)
+               : (stats?.luck ?? 1);
+    const hasDagger = !!(await prisma.itemStack.findUnique({ where: { characterId_itemKey: { characterId, itemKey: "copper_dagger" } }, select: { count: true } }))?.count;
+    const weaponBonus = hasDagger ? 3 : 1;
+    const levelBonus = Math.floor(((ch?.level ?? 1)) / 2);
+    dmgPerHit = Math.max(1, Math.floor(6 + main + levelBonus + weaponBonus));
+  } catch {}
   const atkPerSec = 1000 / 600; // one hit every 600ms
-  const dps = baseDmg * atkPerSec; // ~13.33 DPS
+  const dps = dmgPerHit * atkPerSec;
 
   // Load zone spawn composition and enemy templates
   const zoneId = String(state.zone);

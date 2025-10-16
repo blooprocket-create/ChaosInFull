@@ -5,8 +5,9 @@ import { itemByKey } from "@/src/data/items";
 
 type Mob = { id: string; hp: number; maxHp: number; level: number; pos: { x: number; y: number } };
 
-export class SlimeFieldScene extends Phaser.Scene {
-  constructor() { super("SlimeFieldScene"); }
+// A distinct meadow look: brighter palette, rolling mid platforms, different labels
+export class SlimeMeadowScene extends Phaser.Scene {
+  constructor() { super("SlimeMeadowScene"); }
   private onResizeHandler?: (gameSize: Phaser.Structs.Size) => void;
   private player!: Phaser.Physics.Arcade.Image;
   private groundRect!: Phaser.GameObjects.Rectangle;
@@ -24,30 +25,33 @@ export class SlimeFieldScene extends Phaser.Scene {
   private lastAutoAttackAt = 0;
 
   create() {
-    this.game.registry.set("currentScene", "Slime");
+    this.game.registry.set("currentScene", "Slime Meadow");
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
-    this.add.text(center.x, 40, "Slime Field", { color: "#e5e7eb", fontSize: "20px" }).setOrigin(0.5);
-    this.groundRect = this.add.rectangle(center.x, this.scale.height - 40, this.scale.width * 0.9, 12, 0x0f172a).setOrigin(0.5);
-    this.groundRect.setStrokeStyle(1, 0xffffff, 0.2);
-    const groundKey = ensureGroundTexture(this, "groundTex3", 4);
+    this.add.text(center.x, 40, "Slime Meadow", { color: "#bbf7d0", fontSize: "20px" }).setOrigin(0.5);
+    this.cameras.main.setBackgroundColor("#07200f");
+    this.groundRect = this.add.rectangle(center.x, this.scale.height - 36, this.scale.width * 0.92, 12, 0x052e1a).setOrigin(0.5);
+    this.groundRect.setStrokeStyle(1, 0x10b981, 0.25);
+    const groundKey = ensureGroundTexture(this, "groundTexMeadow", 6);
     const ground = this.physics.add.staticImage(this.groundRect.x, this.groundRect.y, groundKey);
     ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
 
     const makePlatform = (x: number, y: number, w: number) => {
-      const rect = this.add.rectangle(x, y, w, 10, 0x18212f).setOrigin(0.5);
-      rect.setStrokeStyle(1, 0xffffff, 0.15);
+      const rect = this.add.rectangle(x, y, w, 10, 0x083e26).setOrigin(0.5);
+      rect.setStrokeStyle(1, 0x34d399, 0.2);
       const body = this.physics.add.staticImage(x, y, groundKey);
       body.displayWidth = w; body.displayHeight = 10; body.refreshBody();
       this.midPlatforms.push({ rect, body });
       return body;
     };
-    makePlatform(center.x - 120, this.scale.height - 120, this.scale.width * 0.35);
-    makePlatform(center.x + 140, this.scale.height - 180, this.scale.width * 0.3);
+    // Rolling terraces: staggered
+    makePlatform(center.x - 160, this.scale.height - 130, this.scale.width * 0.28);
+    makePlatform(center.x + 40, this.scale.height - 170, this.scale.width * 0.22);
+    makePlatform(center.x + 200, this.scale.height - 110, this.scale.width * 0.26);
 
-    ensureCircleTexture(this, "playerTex3", 8, 0xffffff);
-    const spawn = (this.game.registry.get("spawn") as { from: string; portal: string | null }) || { from: "town", portal: "slime" };
-    const x = spawn.from === "town" ? 100 : 100;
-    this.player = this.physics.add.image(x, this.groundRect.y - 60, "playerTex3").setTint(0x22c55e);
+    ensureCircleTexture(this, "playerTexMeadow", 8, 0xffffff);
+    const spawn = (this.game.registry.get("spawn") as { from: string; portal: string | null }) || { from: "slime", portal: "slime_meadow" };
+    const x = spawn.from === "slime" ? (this.scale.width - 100) : 100;
+    this.player = this.physics.add.image(x, this.groundRect.y - 60, "playerTexMeadow").setTint(0x86efac);
     (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900); this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, ground);
     this.midPlatforms.forEach(p => this.physics.add.collider(this.player, p.body));
@@ -59,50 +63,51 @@ export class SlimeFieldScene extends Phaser.Scene {
     this.rKey = this.input.keyboard!.addKey("R", true, true);
     this.add.text(this.scale.width - 12, 14, "Space: Attack   R: Auto", { color: "#9ca3af", fontSize: "10px" }).setOrigin(1, 0);
 
-    ensureCircleTexture(this, "sDot", 2, 0xffffff);
+    ensureCircleTexture(this, "mDot", 2, 0xffffff);
 
     const characterId = String(this.game.registry.get("characterId") || "");
     (async () => {
       try {
         if (!characterId) return;
-        const res = await api.combatJoin("Slime", characterId);
+        const res = await api.combatJoin("Slime Meadow", characterId);
         if (res.ok) {
           this.joinedCombat = true;
           this.pollEvent = this.time.addEvent({ delay: 300, loop: true, callback: () => this.pollSnapshot(characterId) });
-          this.wanderTimer = this.time.addEvent({ delay: 2000, loop: true, callback: () => this.wanderMobs() });
+          this.wanderTimer = this.time.addEvent({ delay: 2200, loop: true, callback: () => this.wanderMobs() });
         }
       } catch {}
     })();
 
-    ensurePortalTexture(this, "portalExit2", 0x1d4ed8, 24, 44, 10);
-    const exitPortal = this.physics.add.staticImage(60, this.groundRect.y - 22, "portalExit2");
-    this.add.text(exitPortal.x, exitPortal.y - 38, "To Town", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
+    // Portals: Back to Slime Field (left) and to Town (far right)
+    ensurePortalTexture(this, "portalBackSlime", 0x10b981, 24, 44, 10);
+    const backPortal = this.physics.add.staticImage(60, this.groundRect.y - 22, "portalBackSlime");
+    this.add.text(backPortal.x, backPortal.y - 38, "To Slime Field", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
+    ensurePortalTexture(this, "portalTownMeadow", 0x1d4ed8, 24, 44, 10);
+    const townPortal = this.physics.add.staticImage(this.scale.width - 60, this.groundRect.y - 22, "portalTownMeadow");
+    this.add.text(townPortal.x, townPortal.y - 38, "To Town", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
 
-  // Portal to Slime Meadow
-  ensurePortalTexture(this, "portalSlimeMeadow", 0x34d399, 24, 44, 10);
-  const meadowPortal = this.physics.add.staticImage(this.scale.width - 60, this.groundRect.y - 22, "portalSlimeMeadow");
-  this.add.text(meadowPortal.x, meadowPortal.y - 38, "To Slime Meadow", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
-
-  this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
+    this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
     this.eKey = this.input.keyboard!.addKey("E", true, true);
 
     this.input.on("pointerdown", () => {
       if (this.input.keyboard) this.input.keyboard.enabled = true;
-  window.__setTyping?.(false);
-  window.__focusGame?.();
+      window.__setTyping?.(false);
+      window.__focusGame?.();
     });
 
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
     this.onResizeHandler = (gameSize: Phaser.Structs.Size) => {
       const w = gameSize?.width ?? this.scale.width; const h = gameSize?.height ?? this.scale.height;
       if (!this.groundRect || !ground) return;
-      this.groundRect.setPosition(w / 2, h - 40); this.groundRect.setSize(w * 0.9, 12);
+      this.groundRect.setPosition(w / 2, h - 36); this.groundRect.setSize(w * 0.92, 12);
       ground.setPosition(this.groundRect.x, this.groundRect.y); ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
-      const rp1 = this.midPlatforms[0]; const rp2 = this.midPlatforms[1];
-      if (rp1) { rp1.rect.setPosition(w / 2 - 120, h - 120).setSize(w * 0.35, 10); rp1.body.setPosition(rp1.rect.x, rp1.rect.y); rp1.body.displayWidth = rp1.rect.width; rp1.body.displayHeight = rp1.rect.height; rp1.body.refreshBody(); }
-      if (rp2) { rp2.rect.setPosition(w / 2 + 140, h - 180).setSize(w * 0.3, 10); rp2.body.setPosition(rp2.rect.x, rp2.rect.y); rp2.body.displayWidth = rp2.rect.width; rp2.body.displayHeight = rp2.rect.height; rp2.body.refreshBody(); }
-      exitPortal.setPosition(60, this.groundRect.y - 22);
-      meadowPortal.setPosition(w - 60, this.groundRect.y - 22);
+      // Reposition terraces
+      const rp1 = this.midPlatforms[0]; const rp2 = this.midPlatforms[1]; const rp3 = this.midPlatforms[2];
+      if (rp1) { rp1.rect.setPosition(w / 2 - 160, h - 130).setSize(w * 0.28, 10); rp1.body.setPosition(rp1.rect.x, rp1.rect.y); rp1.body.displayWidth = rp1.rect.width; rp1.body.displayHeight = rp1.rect.height; rp1.body.refreshBody(); }
+      if (rp2) { rp2.rect.setPosition(w / 2 + 40, h - 170).setSize(w * 0.22, 10); rp2.body.setPosition(rp2.rect.x, rp2.rect.y); rp2.body.displayWidth = rp2.rect.width; rp2.body.displayHeight = rp2.rect.height; rp2.body.refreshBody(); }
+      if (rp3) { rp3.rect.setPosition(w / 2 + 200, h - 110).setSize(w * 0.26, 10); rp3.body.setPosition(rp3.rect.x, rp3.rect.y); rp3.body.displayWidth = rp3.rect.width; rp3.body.displayHeight = rp3.rect.height; rp3.body.refreshBody(); }
+      backPortal.setPosition(60, this.groundRect.y - 22);
+      townPortal.setPosition(w - 60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
     };
     this.scale.on("resize", this.onResizeHandler);
@@ -117,34 +122,34 @@ export class SlimeFieldScene extends Phaser.Scene {
       try {
         if (this.joinedCombat) {
           const cid = String(this.game.registry.get("characterId") || "");
-          if (cid) api.combatLeave("Slime", cid).catch(()=>{});
+          if (cid) api.combatLeave("Slime Meadow", cid).catch(()=>{});
         }
       } catch {}
     });
   }
 
   private wanderMobs() {
-    const range = 14;
+    const range = 18;
     for (const cont of this.mobContainers.values()) {
       const origX = cont.x;
       const toX = Phaser.Math.Clamp(origX + Phaser.Math.Between(-range, range), (this.groundRect.x - this.groundRect.width/2) + 40, (this.groundRect.x + this.groundRect.width/2) - 40);
-      this.tweens.add({ targets: cont, x: toX, duration: Phaser.Math.Between(600, 1000), ease: "Sine.easeInOut", yoyo: true });
+      this.tweens.add({ targets: cont, x: toX, duration: Phaser.Math.Between(700, 1100), ease: "Sine.easeInOut", yoyo: true });
     }
   }
 
-  // Server provides authoritative mob positions in snapshot; no client-side slotting
-
-  private ensureMobContainer(id: string, level: number) {
+  private ensureMobContainer(id: string, level: number, templateId?: string) {
     let cont = this.mobContainers.get(id); if (cont) return cont;
-    const g = this.add.graphics(); g.fillStyle(0x22c55e, 1); g.fillEllipse(8, 10, 16, 12); g.fillStyle(0x16a34a, 1); g.fillEllipse(9, 8, 8, 6); g.generateTexture(`slime_${id}`, 16, 16); g.destroy();
-    const sprite = this.add.image(0, 0, `slime_${id}`);
-    this.tweens.add({ targets: sprite, y: "-=4", duration: 500, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: Phaser.Math.Between(0, 300) });
-    const barBg = this.add.rectangle(-22, -16, 44, 4, 0x111827).setOrigin(0, 0.5).setAlpha(0.9);
-    const bar = this.add.rectangle(-22, -16, 44, 4, 0xef4444).setOrigin(0, 0.5);
-    const label = this.add.text(0, -28, `Slime Lv ${level}`, { color: "#9ca3af", fontSize: "10px" }).setOrigin(0.5, 0.5);
-  type MobContainer = Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
-  cont = this.add.container(0, 0, [sprite, barBg, bar, label]).setDepth(5) as MobContainer;
-  (cont as MobContainer).__bar = bar; (cont as MobContainer).__barFull = 44;
+    // Vary tint slightly based on template
+    const tint = templateId?.includes("epic") ? 0xf59e0b : templateId?.includes("big") ? 0x22d3ee : 0x34d399;
+    const g = this.add.graphics(); g.fillStyle(tint, 1); g.fillEllipse(8, 10, 16, 12); g.fillStyle(0xffffff, 0.2); g.fillEllipse(9, 8, 8, 6); g.generateTexture(`meadow_slime_${id}`, 16, 16); g.destroy();
+    const sprite = this.add.image(0, 0, `meadow_slime_${id}`);
+    this.tweens.add({ targets: sprite, y: "-=6", duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: Phaser.Math.Between(0, 300) });
+    const barBg = this.add.rectangle(-22, -16, 44, 4, 0x0b1f16).setOrigin(0, 0.5).setAlpha(0.9);
+    const bar = this.add.rectangle(-22, -16, 44, 4, 0xfca5a5).setOrigin(0, 0.5);
+    const label = this.add.text(0, -28, `Lv ${level}`, { color: "#a7f3d0", fontSize: "10px" }).setOrigin(0.5, 0.5);
+    type MobContainer = Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
+    cont = this.add.container(0, 0, [sprite, barBg, bar, label]).setDepth(5) as MobContainer;
+    (cont as MobContainer).__bar = bar; (cont as MobContainer).__barFull = 44;
     this.mobContainers.set(id, cont);
     return cont;
   }
@@ -154,22 +159,21 @@ export class SlimeFieldScene extends Phaser.Scene {
     for (const [id, cont] of this.mobContainers.entries()) { if (!ids.has(id)) { cont.destroy(true); this.mobContainers.delete(id); } }
     for (const m of mobs) {
       const cont = this.ensureMobContainer(m.id, m.level);
-      // Place according to server pos; clamp to ground bounds and align to ground Y if server sends 0
       const y = m.pos?.y && m.pos.y > 0 ? m.pos.y : (this.groundRect.y - 28);
       const minX = (this.groundRect.x - this.groundRect.width/2) + 40;
       const maxX = (this.groundRect.x + this.groundRect.width/2) - 40;
       const x = Phaser.Math.Clamp(m.pos?.x ?? 100, minX, maxX);
       cont.setPosition(x, y);
       const ratio = Math.max(0, Math.min(1, m.hp / (m.maxHp || 1)));
-  const mc = cont as Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
-  const bar: Phaser.GameObjects.Rectangle = mc.__bar!; const full: number = mc.__barFull!;
+      const mc = cont as Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
+      const bar: Phaser.GameObjects.Rectangle = mc.__bar!; const full: number = mc.__barFull!;
       bar.width = full * ratio;
     }
   }
 
   private async pollSnapshot(characterId: string) {
     try {
-      const data = await api.combatSnapshot("Slime", characterId);
+      const data = await api.combatSnapshot("Slime Meadow", characterId);
       const mobs = (data?.snapshot?.mobs as Mob[]) || [];
       this.reconcileMobs(mobs);
     } catch {}
@@ -183,32 +187,28 @@ export class SlimeFieldScene extends Phaser.Scene {
 
   private async basicAttack(characterId: string) {
     try {
-      // Send player's current x as proximity hint
-      const data = await api.basicAttack("Slime", characterId, this.player.x);
-  if (data?.result?.hit) {
+      const data = await api.basicAttack("Slime Meadow", characterId, this.player.x);
+      if (data?.result?.hit) {
         const mobId = data?.result?.mobId as string | undefined;
         const cont = mobId ? this.mobContainers.get(mobId) : undefined;
         if (cont) {
           const bar: Phaser.GameObjects.Rectangle | undefined = (cont as (Phaser.GameObjects.Container & { __bar?: Phaser.GameObjects.Rectangle })).__bar;
-          if (bar) { bar.setFillStyle(0xfca5a5); this.time.delayedCall(120, () => bar.setFillStyle(0xef4444)); }
-          const spawnSpark = () => {
-            const img = this.add.image(cont.x, cont.y, "sDot");
-            img.setTint(0x22c55e).setAlpha(0.9).setScale(Phaser.Math.FloatBetween(0.8, 1.2));
+          if (bar) { bar.setFillStyle(0xfca5a5); this.time.delayedCall(120, () => bar.setFillStyle(0xfca5a5)); }
+          for (let i = 0; i < 10; i++) this.time.delayedCall(i * 10, () => {
+            const img = this.add.image(cont.x, cont.y, "mDot").setTint(0x34d399).setAlpha(0.9).setScale(Phaser.Math.FloatBetween(0.8, 1.2));
             const ang = Phaser.Math.FloatBetween(0, Math.PI * 2); const speed = Phaser.Math.Between(40, 100);
             const toX = cont.x + Math.cos(ang) * speed * 0.4; const toY = cont.y + Math.sin(ang) * speed * 0.4;
             this.tweens.add({ targets: img, x: toX, y: toY, alpha: 0, duration: 280, ease: "Sine.easeOut", onComplete: () => img.destroy() });
-          };
-          for (let i = 0; i < 12; i++) this.time.delayedCall(i * 8, () => spawnSpark());
+          });
         }
       }
-      // Apply new EXP/Level to HUD if server returned them
       if (typeof data?.exp === "number" && typeof data?.level === "number") {
         window.__applyExpUpdate?.({ type: "character", exp: data.exp, level: data.level });
       }
-  const loot: Array<{ itemId: string; qty: number }> = Array.isArray(data?.loot) ? (data.loot as Array<{ itemId: string; qty: number }>) : [];
+      const loot: Array<{ itemId: string; qty: number }> = Array.isArray(data?.loot) ? (data.loot as Array<{ itemId: string; qty: number }>) : [];
       if (loot.length) {
         const inv = (this.game.registry.get("inventory") as Record<string, number>) || {};
-  for (const drop of loot) { inv[drop.itemId] = (inv[drop.itemId] ?? 0) + Math.max(1, drop.qty); const name = this.formatItem(drop.itemId); window.__spawnOverhead?.(`:yellow: +${drop.qty} ${name}`, { ripple: true }); }
+        for (const drop of loot) { inv[drop.itemId] = (inv[drop.itemId] ?? 0) + Math.max(1, drop.qty); const name = this.formatItem(drop.itemId); window.__spawnOverhead?.(`:yellow: +${drop.qty} ${name}`, { ripple: true }); }
         this.game.registry.set("inventory", inv);
       }
       const q = this.game.registry.get("questDirtyCount") as number | undefined;
@@ -218,8 +218,8 @@ export class SlimeFieldScene extends Phaser.Scene {
 
   private async toggleAuto(characterId: string) {
     try {
-      const v = !this.auto; this.auto = v; await api.toggleAuto("Slime", characterId, v);
-  window.__spawnOverhead?.(v ? ":green: Auto ON" : ":red: Auto OFF", { ripple: true });
+      const v = !this.auto; this.auto = v; await api.toggleAuto("Slime Meadow", characterId, v);
+      window.__spawnOverhead?.(v ? ":green: Auto ON" : ":red: Auto OFF", { ripple: true });
       this.game.registry.set("autoOn", v);
     } catch {}
   }
@@ -247,21 +247,21 @@ export class SlimeFieldScene extends Phaser.Scene {
     }
 
     updateNameTag(this.nameTag, this.player);
+    // Back to Slime Field
     if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
-      try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
-      this.game.registry.set("spawn", { from: "slime", portal: "town" });
-  window.__saveSceneNow?.("Town");
-      this.scene.start("TownScene");
-    }
-    // Enter Slime Meadow when near the right portal and pressing E
-    if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x > (this.scale.width - 100)) {
-      try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime", cid).catch(()=>{}); } catch {}
-      this.game.registry.set("spawn", { from: "slime", portal: "slime_meadow" });
+      try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime Meadow", cid).catch(()=>{}); } catch {}
+      this.game.registry.set("spawn", { from: "slime_meadow", portal: "slime" });
       window.__saveSceneNow?.("Slime");
-      // Reuse the same scene key in Next routing; server room will read zone from API calls
-      this.scene.start("SlimeMeadowScene");
+      this.scene.start("SlimeFieldScene");
+    }
+    // To Town
+    if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x > (this.scale.width - 100)) {
+      try { const cid = String(this.game.registry.get("characterId") || ""); if (cid && this.joinedCombat) api.combatLeave("Slime Meadow", cid).catch(()=>{}); } catch {}
+      this.game.registry.set("spawn", { from: "slime_meadow", portal: "town" });
+      window.__saveSceneNow?.("Town");
+      this.scene.start("TownScene");
     }
   }
 }
 
-export default SlimeFieldScene;
+export default SlimeMeadowScene;

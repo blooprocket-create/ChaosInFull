@@ -10,6 +10,8 @@ export type BasicAttackResult = {
   gold?: number;
 };
 
+type Zone = "Slime" | "Slime Meadow";
+
 export const api = {
   // Account/state
   saveScene(characterId: string, scene: "Town" | "Cave" | "Slime") {
@@ -40,24 +42,24 @@ export const api = {
   },
 
   // Combat
-  combatJoin(zone: "Slime", characterId: string) {
+  combatJoin(zone: Zone, characterId: string) {
     return fetch("/api/combat/join", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone, characterId }) });
   },
-  combatLeave(zone: "Slime", characterId: string) {
+  combatLeave(zone: Zone, characterId: string) {
     return fetch("/api/combat/leave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone, characterId }) });
   },
-  combatSnapshot(zone: "Slime", characterId: string) {
+  combatSnapshot(zone: Zone, characterId: string) {
     return fetch(`/api/combat/snapshot?zone=${zone}&characterId=${encodeURIComponent(characterId)}`).then(r => r.ok ? r.json() : Promise.reject());
   },
-  combatCmd(zone: "Slime", characterId: string, action: string, value?: unknown) {
+  combatCmd(zone: Zone, characterId: string, action: string, value?: unknown) {
     return fetch("/api/combat/cmd", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone, characterId, action, value }) });
   },
-  async basicAttack(zone: "Slime", characterId: string, x: number): Promise<BasicAttackResult> {
+  async basicAttack(zone: Zone, characterId: string, x: number): Promise<BasicAttackResult> {
     const r = await api.combatCmd(zone, characterId, "basic", { x });
     if (!r.ok) return {} as BasicAttackResult;
     return (await r.json().catch(() => ({}))) as BasicAttackResult;
   },
-  async toggleAuto(zone: "Slime", characterId: string, value: boolean) {
+  async toggleAuto(zone: Zone, characterId: string, value: boolean) {
     return api.combatCmd(zone, characterId, "auto", value);
   },
 };
