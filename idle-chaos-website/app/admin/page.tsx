@@ -13,6 +13,7 @@ export default async function AdminIndex() {
       <ul className="mt-6 space-y-3">
         <li><Link className="text-emerald-300 hover:underline" href="/admin/patch-notes">Patch Notes</Link></li>
         <li><Link className="text-emerald-300 hover:underline" href="/admin/items">Items</Link></li>
+        <li><Link className="text-emerald-300 hover:underline" href="/admin/enemies">Enemies</Link></li>
         <li><Link className="text-emerald-300 hover:underline" href="/admin/users">Users</Link></li>
       </ul>
     </section>

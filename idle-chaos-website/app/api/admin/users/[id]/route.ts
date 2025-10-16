@@ -12,8 +12,11 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const body = await req.json().catch(() => ({}));
-  const data: Record<string, unknown> = {};
-  for (const k of ["email", "username", "isAdmin"]) if (k in body) (data as any)[k] = body[k];
+  const b = body as Record<string, unknown>;
+  const data: { email?: string; username?: string; isAdmin?: boolean } = {};
+  if (typeof b.email === 'string') data.email = b.email;
+  if (typeof b.username === 'string') data.username = b.username;
+  if (typeof b.isAdmin === 'boolean') data.isAdmin = b.isAdmin;
   const row = await prisma.user.update({ where: { id: params.id }, data });
   return NextResponse.json({ ok: true, row });
 }

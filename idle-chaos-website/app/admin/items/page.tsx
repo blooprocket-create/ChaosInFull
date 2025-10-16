@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Item = { id: string; name: string; description: string; rarity: string; stackable: boolean; maxStack: number; buy: number; sell: number };
 
@@ -8,11 +8,15 @@ export default function AdminItems() {
   const [form, setForm] = useState<Item>({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 });
   const load = async () => { const res = await fetch("/api/admin/items"); if (res.ok) { const j = await res.json(); setRows(j.rows); } };
   useEffect(() => { load(); }, []);
+  const notify = (msg: string) => { try { (window as any).showToast?.(msg); } catch {} };
   const create = async () => {
     const res = await fetch("/api/admin/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    if (res.ok) { setForm({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 }); await load(); }
+    if (res.ok) { setForm({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 }); notify("Item created"); await load(); } else { notify("Failed to create item"); }
   };
-  const remove = async (id: string) => { await fetch(`/api/admin/items/${id}`, { method: "DELETE" }); await load(); };
+  const remove = async (id: string) => { if (!confirm("Delete this item?")) return; const r = await fetch(`/api/admin/items/${id}`, { method: "DELETE" }); notify(r.ok?"Deleted":"Delete failed"); await load(); };
+  const update = async (id: string, patch: Partial<Item>) => { const r = await fetch(`/api/admin/items/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }); notify(r.ok?"Saved":"Save failed"); await load(); };
+  const [page, setPage] = useState(1); const pageSize = 12;
+  const paged = useMemo(()=>{ const start=(page-1)*pageSize; return rows.slice(start,start+pageSize); },[rows,page]);
   return (
     <section className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-2xl font-semibold">Items</h1>
@@ -36,14 +40,27 @@ export default function AdminItems() {
         <div>
           <h2 className="font-semibold">Existing</h2>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {rows.map(r => (
+            {paged.map(r => (
               <div key={r.id} className="rounded border border-white/10 bg-black/35 p-3">
                 <div className="flex items-center justify-between"><div className="font-mono text-xs">{r.id}</div><button className="btn px-2 py-0.5" onClick={()=>remove(r.id)}>Delete</button></div>
-                <div className="font-semibold">{r.name}</div>
-                <div className="text-xs text-gray-400">{r.description}</div>
-                <div className="text-xs mt-1">Buy {r.buy} • Sell {r.sell} • Max {r.maxStack}</div>
+                <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 font-semibold" value={r.name} onChange={e=>update(r.id,{ name: e.target.value })} />
+                <input className="w-full rounded bg-black/40 border border-white/10 px-2 py-1 text-xs text-gray-200" value={r.description} onChange={e=>update(r.id,{ description: e.target.value })} />
+                <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                  <input className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.rarity} onChange={e=>update(r.id,{ rarity: e.target.value })} />
+                  <label className="flex items-center gap-1 text-gray-300"><input type="checkbox" checked={r.stackable} onChange={e=>update(r.id,{ stackable: e.target.checked })}/> Stackable</label>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-1 text-xs">
+                  <input type="number" className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.maxStack} onChange={e=>update(r.id,{ maxStack: parseInt(e.target.value||"0",10) })} />
+                  <input type="number" className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.buy} onChange={e=>update(r.id,{ buy: parseInt(e.target.value||"0",10) })} />
+                  <input type="number" className="rounded bg-black/40 border border-white/10 px-2 py-1" value={r.sell} onChange={e=>update(r.id,{ sell: parseInt(e.target.value||"0",10) })} />
+                </div>
               </div>
             ))}
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+            <button className="btn px-2 py-1" disabled={page===1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Prev</button>
+            <div>Page {page} / {Math.max(1, Math.ceil(rows.length/pageSize))}</div>
+            <button className="btn px-2 py-1" disabled={page>=Math.ceil(rows.length/pageSize)} onClick={()=>setPage(p=>p+1)}>Next</button>
           </div>
         </div>
       </div>

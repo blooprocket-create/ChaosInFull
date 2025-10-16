@@ -13,8 +13,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const body = await req.json().catch(() => ({}));
-  const data: Record<string, unknown> = {};
-  for (const k of ["date", "version", "title", "highlights", "notes"]) if (k in body) (data as any)[k] = k === "date" ? new Date(body[k]) : body[k];
+  const data: { date?: Date; version?: string; title?: string; highlights?: string[]; notes?: string[] } = {};
+  const b = body as Record<string, unknown>;
+  if (typeof b.date === 'string') data.date = new Date(b.date);
+  if (b.date instanceof Date) data.date = b.date;
+  if (typeof b.version === 'string') data.version = b.version;
+  if (typeof b.title === 'string') data.title = b.title;
+  if (Array.isArray(b.highlights)) data.highlights = b.highlights.map((s) => String(s));
+  if (Array.isArray(b.notes)) data.notes = b.notes.map((s) => String(s));
   const client = prisma as unknown as { patchNote: { update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown> } };
   const row = await client.patchNote.update({ where: { id: params.id }, data });
   return NextResponse.json({ ok: true, row });
