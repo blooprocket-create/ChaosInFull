@@ -3,13 +3,22 @@ import { prisma } from "@/src/lib/prisma";
 export const metadata = { title: "News • Chaos In Full" };
 
 export default async function NewsPage() {
-  // Load patch notes from DB; if empty/unavailable, fallback to static
+  // Load patch notes from DB; merge with static notes (dedupe by version)
   let patchNotes = staticNotes;
   try {
-    const client = prisma as unknown as { patchNote: { findMany: (args: { orderBy: Array<{ date?: "asc" | "desc"; version?: "asc" | "desc" }> }) => Promise<Array<{ date: string | Date; version: string; title: string; highlights: string[]; notes?: string[] }> > } };
+    const client = prisma as unknown as { patchNote: { findMany: (args: { orderBy: Array<{ date?: "asc" | "desc"; version?: "asc" | "desc" }> }) => Promise<Array<{ date: string | Date; version: string; title: string; highlights: unknown; notes?: unknown }> > } };
     const rows = await client.patchNote.findMany({ orderBy: [{ date: "desc" }, { version: "desc" }] });
     if (Array.isArray(rows) && rows.length) {
-      patchNotes = rows.map(r => ({ date: (typeof r.date === 'string' ? r.date : new Date(r.date).toISOString().slice(0,10)), version: r.version, title: r.title, highlights: r.highlights, notes: r.notes }));
+      const dbNotes = rows.map(r => ({
+        date: (typeof r.date === 'string' ? r.date : new Date(r.date).toISOString().slice(0,10)),
+        version: r.version,
+        title: r.title,
+        highlights: Array.isArray(r.highlights) ? (r.highlights as string[]) : [],
+        notes: Array.isArray(r.notes) ? (r.notes as string[]) : undefined,
+      }));
+      const seen = new Set(dbNotes.map(n => n.version));
+      const rest = staticNotes.filter(n => !seen.has(n.version));
+      patchNotes = [...dbNotes, ...rest];
     }
   } catch {}
   const posts = [
