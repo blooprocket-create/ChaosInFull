@@ -8,6 +8,7 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   const { zone, characterId } = await req.json().catch(() => ({ zone: "", characterId: "" }));
   if (!zone || !characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+
   // Ownership check
   try {
     const ch = await (prisma as any).character.findUnique({ where: { id: characterId } });
@@ -17,7 +18,8 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
+
   const room = getZoneRoom(zone);
-  const { partyId, phaseId } = room.createParty(characterId);
-  return NextResponse.json({ ok: true, partyId, phaseId });
+  room.leave(characterId);
+  return NextResponse.json({ ok: true });
 }

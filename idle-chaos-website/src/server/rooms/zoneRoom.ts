@@ -1,4 +1,32 @@
 // In-memory ZoneRoom manager. Authoritative for combat state in this MVP.
+import { prisma } from "@/src/lib/prisma";
+// Local minimal types to avoid `any` while not depending on generated Prisma types at build-time
+type DropEntryRow = { itemId: string; weight: number; minQty: number; maxQty: number };
+type EnemyTemplateRow = { id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number; dropTable?: { id: string; entries?: DropEntryRow[] } | null };
+type SpawnConfigRow = { templateId: string; budget: number; respawnMs: number; slots: unknown; phaseType: string };
+type PrismaLoose = {
+  zoneDef: {
+    findUnique: (args: { where: { id: string }; include?: { spawns: boolean } }) => Promise<{ id: string; spawns?: SpawnConfigRow[] } | null>;
+    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sceneKey: string } }) => Promise<void>;
+  };
+  enemyTemplate: {
+    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number } }) => Promise<void>;
+    findMany: (args: { include: { dropTable: { include: { entries: boolean } } } }) => Promise<EnemyTemplateRow[]>;
+  };
+  dropTable: {
+    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; templateId: string } }) => Promise<void>;
+  };
+  itemDef: {
+    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sell: number; description: string } }) => Promise<void>;
+  };
+  dropEntry: {
+    findMany: (args: { where: { dropTableId: string; itemId: string } }) => Promise<Array<{ id: string }>>;
+    create: (args: { data: { dropTableId: string; itemId: string; weight: number; minQty: number; maxQty: number } }) => Promise<void>;
+  };
+  spawnConfig: {
+    create: (args: { data: { zoneId: string; templateId: string; budget: number; respawnMs: number; slots: number[]; phaseType: string } }) => Promise<void>;
+  };
+};
 // Not clustered; single-process only. For production, move to a real server + shared store.
 
 export type PhaseType = "personal" | "party" | "event";
@@ -15,6 +43,7 @@ type PlayerState = {
   maxHp: number;
   auto: boolean;
   lastBasicAt: number;
+  lastSeenAt: number; // for idle cleanup
 };
 
 type Phase = {
@@ -35,6 +64,11 @@ class ZoneRoom {
   phases = new Map<string, Phase>();
   parties = new Map<string, Party>();
   tickHandle: NodeJS.Timeout | null = null;
+  // Cached content
+  private contentLoaded = false;
+  private spawnCfg: Array<{ templateId: string; budget: number; respawnMs: number; slots: number[]; phaseType: PhaseType }> = [];
+  private templates = new Map<string, { id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number; dropTableId?: string | null }>();
+  private drops = new Map<string, Array<{ itemId: string; weight: number; minQty: number; maxQty: number }>>();
 
   constructor(zone: string) {
     this.zone = zone;
@@ -53,10 +87,46 @@ class ZoneRoom {
   }
 
   join(charId: string) {
+    // Lazy-load content once
+    if (!this.contentLoaded) {
+      // Fire and forget; first snapshot/attack will await if needed
+      void this.loadContent().catch(()=>{});
+    }
     const phase = this.ensurePersonalPhase(charId);
-    const ps: PlayerState = { characterId: charId, zone: this.zone, phaseId: phase.id, hp: 100, maxHp: 100, auto: false, lastBasicAt: 0 };
+    const ps: PlayerState = { characterId: charId, zone: this.zone, phaseId: phase.id, hp: 100, maxHp: 100, auto: false, lastBasicAt: 0, lastSeenAt: Date.now() };
     this.players.set(charId, ps);
     return ps;
+  }
+
+  private async loadContent() {
+    if (this.contentLoaded) return;
+  const client = prisma as unknown as PrismaLoose;
+  const zone = await client.zoneDef.findUnique({ where: { id: this.zone }, include: { spawns: true } }).catch(()=>null);
+    if (!zone) {
+      // Fallback: create defaults for Slime zone
+  await client.zoneDef.upsert({ where: { id: this.zone }, update: {}, create: { id: this.zone, name: `${this.zone} Zone`, sceneKey: this.zone } });
+  await client.enemyTemplate.upsert({ where: { id: "slime" }, update: {}, create: { id: "slime", name: "Slime", level: 1, baseHp: 30, expBase: 5, goldMin: 1, goldMax: 3 } });
+  await client.dropTable.upsert({ where: { id: "slime_default" }, update: {}, create: { id: "slime_default", templateId: "slime" } });
+  await client.itemDef.upsert({ where: { id: "slime_goop" }, update: {}, create: { id: "slime_goop", name: "Slime Goop", sell: 1, description: "Jiggly residue" } });
+      // Ensure an entry exists (id is cuid, skip if exists)
+      const entries = await client.dropEntry.findMany({ where: { dropTableId: "slime_default", itemId: "slime_goop" } });
+      if (!entries.length) {
+        await client.dropEntry.create({ data: { dropTableId: "slime_default", itemId: "slime_goop", weight: 35, minQty: 1, maxQty: 1 } });
+      }
+      await client.spawnConfig.create({ data: { zoneId: this.zone, templateId: "slime", budget: 6, respawnMs: 1200, slots: [100,180,260,340,420], phaseType: "personal" } }).catch(()=>{});
+    }
+    const z = await client.zoneDef.findUnique({ where: { id: this.zone }, include: { spawns: true } });
+    const spawns = (z?.spawns as SpawnConfigRow[]) ?? [];
+    this.spawnCfg = spawns.map(s => ({ templateId: s.templateId, budget: s.budget, respawnMs: s.respawnMs, slots: (Array.isArray(s.slots) ? (s.slots as number[]) : [100,180,260,340,420]), phaseType: ((s.phaseType || "personal") as PhaseType) }));
+    const tpls = await client.enemyTemplate.findMany({ include: { dropTable: { include: { entries: true } } } });
+    for (const t of tpls) {
+      const tpl = t as EnemyTemplateRow;
+      this.templates.set(tpl.id, { id: tpl.id, name: tpl.name, level: tpl.level ?? 1, baseHp: tpl.baseHp, expBase: tpl.expBase, goldMin: tpl.goldMin, goldMax: tpl.goldMax, dropTableId: tpl.dropTable?.id ?? null });
+      if (tpl.dropTable?.entries && tpl.dropTable.entries.length) {
+        this.drops.set(tpl.dropTable.id, tpl.dropTable.entries.map((e: DropEntryRow) => ({ itemId: e.itemId, weight: e.weight, minQty: e.minQty, maxQty: e.maxQty })));
+      }
+    }
+    this.contentLoaded = true;
   }
 
   createParty(leaderId: string) {
@@ -91,15 +161,17 @@ class ZoneRoom {
   private ensureSpawnsForPhase(phase: Phase) {
     // Drip spawns until budget met
     if (phase.mobs.size >= phase.budget) return;
-    const need = phase.budget - phase.mobs.size;
+    const cfg = this.spawnCfg.find(c => c.phaseType === phase.type) || this.spawnCfg[0];
+    const tpl = cfg ? this.templates.get(cfg.templateId) : undefined;
+    const need = (cfg?.budget ?? 6) - phase.mobs.size;
     for (let i = 0; i < need; i++) {
       const id = this.uid("mob");
-      const lvl = 1; // MVP: static level
-      const hp = 30;
-      // Spawn at fixed slots to avoid visible teleport jitter; keep Y at ground (- for client animation)
-      const slot = (phase.mobs.size + i) % 5;
-      const x = 100 + slot * 80; // evenly spaced baseline
-      const mob: Mob = { id, templateId: "slime", hp, maxHp: hp, level: lvl, pos: { x, y: 0 } };
+      const hp = tpl?.baseHp ?? 30;
+      const lvl = tpl?.level ?? 1;
+      const slots = cfg?.slots ?? [100,180,260,340,420];
+      const slot = (phase.mobs.size + i) % Math.max(1, slots.length);
+      const x = slots[slot];
+      const mob: Mob = { id, templateId: tpl?.id || "slime", hp, maxHp: hp, level: lvl, pos: { x, y: 0 } };
       phase.mobs.set(id, mob);
       phase.contrib.set(id, new Map());
     }
@@ -108,6 +180,7 @@ class ZoneRoom {
   // Positioning is client-relative; we don't simulate map pathing in MVP
   snapshot(charId: string) {
     const ps = this.players.get(charId); if (!ps) throw new Error("not_joined");
+    ps.lastSeenAt = Date.now();
     const phase = this.phases.get(ps.phaseId)!;
     this.ensureSpawnsForPhase(phase);
     const mobs = Array.from(phase.mobs.values());
@@ -117,6 +190,7 @@ class ZoneRoom {
   basicAttack(charId: string, hintX?: number) {
     const now = Date.now();
     const ps = this.players.get(charId); if (!ps) throw new Error("not_joined");
+    ps.lastSeenAt = now;
     if (now - ps.lastBasicAt < 600) return { hit: false, reason: "cooldown" };
     ps.lastBasicAt = now;
     const phase = this.phases.get(ps.phaseId)!;
@@ -129,6 +203,10 @@ class ZoneRoom {
         const bd = Math.abs((best?.pos.x ?? m.pos.x) - hintX);
         return d < bd ? m : best;
       }, candidates[0]);
+      // Require proximity to prevent sniping across the map
+      if (Math.abs(target.pos.x - hintX) > 80) {
+        return { hit: false, reason: "out_of_range" };
+      }
     } else {
       target = candidates[0];
     }
@@ -143,16 +221,17 @@ class ZoneRoom {
     return { hit: true, dmg, killed, mobId: target.id };
   }
 
-  harvestRewardsIfDead(mobId: string) {
+  harvestRewardsIfDead(mobId: string): { templateId: string; rewards: Array<{ characterId: string; exp: number }>; loot: Array<{ itemId: string; qty: number }> } | null {
     // Compute contribution shares and remove mob
     let phase: Phase | undefined;
     for (const ph of this.phases.values()) { if (ph.mobs.has(mobId)) { phase = ph; break; } }
     if (!phase) return null;
     const mob = phase.mobs.get(mobId)!;
     if (mob.hp > 0) return null;
-    const contrib = phase.contrib.get(mobId) || new Map();
+  const contrib = phase.contrib.get(mobId) || new Map<string, Contribution>();
     const total = Array.from(contrib.values()).reduce((s, v) => s + v.damage, 0) || 1;
-    const expBase = 5;
+    const tpl = this.templates.get(mob.templateId);
+    const expBase = tpl?.expBase ?? 5;
     const rewards = Array.from(contrib.entries()).map(([charId, v]) => {
       // Floor for supports (MVP: treat low damage as floor 10%)
       const ratio = Math.max(0.1, v.damage / total);
@@ -162,20 +241,73 @@ class ZoneRoom {
     if (phase.type === "personal") {
       const ownerId = Array.from(phase.members)[0];
       // Remove the mob and its contrib before returning to avoid budget lock
-      const removed = phase.mobs.get(mobId);
       phase.mobs.delete(mobId);
       phase.contrib.delete(mobId);
       // Delayed respawn to avoid instant pop-in
-      setTimeout(() => this.ensureSpawnsForPhase(phase), 1200);
-      return { templateId: mob.templateId, rewards: [{ characterId: ownerId, exp: expBase }] };
+      setTimeout(() => this.ensureSpawnsForPhase(phase), (this.spawnCfg.find(c=>c.phaseType===phase.type)?.respawnMs ?? 1200));
+      // Roll drops
+      const loot = this.rollDrops(tpl?.dropTableId || null);
+      return { templateId: mob.templateId, rewards: [{ characterId: ownerId, exp: expBase }], loot };
     }
     // Party/event: proportional rewards
     phase.mobs.delete(mobId); phase.contrib.delete(mobId);
-    return { templateId: mob.templateId, rewards };
+    const loot = this.rollDrops(tpl?.dropTableId || null);
+    return { templateId: mob.templateId, rewards, loot };
+  }
+
+  private rollDrops(dropTableId: string | null) {
+    if (!dropTableId) return [] as Array<{ itemId: string; qty: number }>;
+    const entries = this.drops.get(dropTableId) || [];
+    if (!entries.length) return [];
+    // Simple weighted single-pick; extend to multiple rolls if desired
+    const total = entries.reduce((s, e) => s + Math.max(0, e.weight), 0) || 0;
+    if (total <= 0) return [];
+    let r = Math.floor(Math.random() * total) + 1;
+    for (const e of entries) {
+      r -= Math.max(0, e.weight);
+      if (r <= 0) {
+        const qty = e.minQty === e.maxQty ? e.minQty : (e.minQty + Math.floor(Math.random() * Math.max(1, e.maxQty - e.minQty + 1)));
+        return [{ itemId: e.itemId, qty }];
+      }
+    }
+    return [];
   }
 
   tick() {
-    // Minimal bounce animation state on server could be added later. For now, no server-side AI.
+    // Minimal bounce animation state on server could be added later. For now, also prune idle players.
+    const now = Date.now();
+    // Remove players idle for > 2 minutes
+    const idleCutoff = now - 2 * 60 * 1000;
+    for (const [cid, ps] of this.players) {
+      if ((ps.lastSeenAt || 0) < idleCutoff) {
+        this.leave(cid);
+      }
+    }
+    // If room empty, clear interval to avoid memory leaks
+    if (this.players.size === 0 && this.tickHandle) {
+      clearInterval(this.tickHandle);
+      this.tickHandle = null;
+    }
+  }
+
+  leave(charId: string) {
+    const ps = this.players.get(charId);
+    if (!ps) return;
+    this.players.delete(charId);
+    // Remove from phase membership
+    const phase = this.phases.get(ps.phaseId);
+    if (phase) {
+      phase.members.delete(charId);
+      if (phase.members.size === 0) {
+        // Clean up empty phase state
+        this.phases.delete(phase.id);
+      }
+    }
+    // If no players remain, stop ticking
+    if (this.players.size === 0 && this.tickHandle) {
+      clearInterval(this.tickHandle);
+      this.tickHandle = null;
+    }
   }
 }
 

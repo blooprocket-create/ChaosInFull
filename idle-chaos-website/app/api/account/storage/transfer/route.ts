@@ -31,6 +31,17 @@ export async function POST(req: NextRequest) {
   }
   const { characterId, direction, itemKey } = body;
   let { count } = body;
+  // Validate count if provided: must be a positive integer
+  if (count !== undefined) {
+    if (typeof count !== "number" || !Number.isFinite(count)) {
+      return NextResponse.json({ error: "Invalid count" }, { status: 400 });
+    }
+    // Normalize to integer
+    count = Math.floor(count);
+    if (count < 1) {
+      return NextResponse.json({ error: "Count must be at least 1" }, { status: 400 });
+    }
+  }
   // Verify character belongs to user
   // Defensive narrowed typing (Prisma client not regenerated yet)
   interface CharacterLite { id: string; userId: string; }
@@ -66,7 +77,9 @@ export async function POST(req: NextRequest) {
   if (direction === "toStorage") {
     const available = charStack?.count ?? 0;
     if (available <= 0) return NextResponse.json({ error: "No items" }, { status: 400 });
-    if (count == null || count > available) count = available;
+    if (count == null) count = available;
+    // Clamp to available
+    if (count > available) count = available;
   await client.$transaction(async (tx) => {
       // decrement / delete character stack
       const amt = count ?? available;
@@ -87,7 +100,9 @@ export async function POST(req: NextRequest) {
   } else {
     const available = acctStack?.count ?? 0;
     if (available <= 0) return NextResponse.json({ error: "No items" }, { status: 400 });
-    if (count == null || count > available) count = available;
+    if (count == null) count = available;
+    // Clamp to available
+    if (count > available) count = available;
   await client.$transaction(async (tx) => {
       // decrement / delete account stack
       const amt = count ?? available;

@@ -19,6 +19,23 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
     }
   }, [characterId]);
   useEffect(() => { load(); }, [characterId, load]);
+  // Listen to a global registry bump (Phaser side) via a polling event to auto-refresh
+  useEffect(() => {
+    let t: number | null = null;
+    const poll = () => {
+      try {
+        const reg = (window as any)?.__phaserRegistry as Map<string, unknown> | undefined;
+        const v = (reg?.get?.("questDirtyCount") as number | undefined) ?? 0;
+        if ((QuestPanel as any).__lastQuestDirty !== v) {
+          (QuestPanel as any).__lastQuestDirty = v;
+          load();
+        }
+      } catch {}
+      t = window.setTimeout(poll, 1000);
+    };
+    t = window.setTimeout(poll, 1000);
+    return () => { if (t) window.clearTimeout(t); };
+  }, [load]);
 
   const abandon = async (qid: string) => {
     await fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "abandon", characterId, questId: qid }) });

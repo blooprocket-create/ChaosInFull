@@ -11,11 +11,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const t = tx as unknown as {
       itemStack: { deleteMany: (args: { where: { characterId: string } }) => Promise<{ count: number }> };
       craftQueue: { deleteMany: (args: { where: { characterId: string } }) => Promise<{ count: number }> };
+      characterQuest: { deleteMany: (args: { where: { characterId: string } }) => Promise<{ count: number }> };
+      chatMessage: { updateMany: (args: { where: { characterId: string }, data: { characterId: null } }) => Promise<{ count: number }> };
       character: { deleteMany: (args: { where: { id: string; userId: string } }) => Promise<{ count: number }> };
     };
     // Delete dependents first to satisfy FK constraints
     await t.itemStack.deleteMany({ where: { characterId: id } });
     await t.craftQueue.deleteMany({ where: { characterId: id } });
+    await t.characterQuest.deleteMany({ where: { characterId: id } });
+    await t.chatMessage.updateMany({ where: { characterId: id }, data: { characterId: null } });
     return t.character.deleteMany({ where: { id, userId: session.userId } });
   });
   if (res.count === 0) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });

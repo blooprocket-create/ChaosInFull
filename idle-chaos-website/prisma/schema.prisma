@@ -70,7 +70,7 @@ model Character {
 
 model ItemStack {
   id           String   @id @default(cuid())
-  character    Character @relation(fields: [characterId], references: [id])
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
   characterId  String
   itemKey      String
   count        Int      @default(0)
@@ -80,7 +80,7 @@ model ItemStack {
 
 model CraftQueue {
   id           String    @id @default(cuid())
-  character    Character @relation(fields: [characterId], references: [id])
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
   characterId  String    @unique
   furnace      Json?
   workbench    Json?
@@ -102,7 +102,7 @@ model ChatMessage {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id])
   userId    String
-  character Character? @relation(fields: [characterId], references: [id])
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
   characterId String?
   text      String
   createdAt DateTime @default(now())
@@ -125,7 +125,7 @@ model Quest {
 
 model CharacterQuest {
   id           String    @id @default(cuid())
-  character    Character @relation(fields: [characterId], references: [id])
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
   characterId  String
   quest        Quest     @relation(fields: [questId], references: [id])
   questId      String
@@ -155,4 +155,78 @@ enum Hat {
   INT
   AGI
   LUK
+}
+
+// Content data: DB-driven items, enemies, drops, zones, and spawn configs
+
+model ItemDef {
+  id          String  @id // e.g., "slime_goop"
+  name        String
+  description String  @default("")
+  rarity      String  @default("common")
+  stackable   Boolean @default(true)
+  maxStack    Int     @default(999)
+  buy         Int     @default(0)
+  sell        Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  drops       DropEntry[]
+}
+
+model EnemyTemplate {
+  id        String  @id // e.g., "slime"
+  name      String
+  level     Int     @default(1)
+  baseHp    Int     @default(30)
+  expBase   Int     @default(5)
+  goldMin   Int     @default(1)
+  goldMax   Int     @default(3)
+  tags      String  @default("") // CSV or JSON-encoded if needed
+  // Relations
+  dropTable DropTable?   @relation("TemplateToDropTable")
+  spawns    SpawnConfig[] @relation("TemplateToSpawns")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DropTable {
+  id         String @id // e.g., "slime_default"
+  template   EnemyTemplate @relation("TemplateToDropTable", fields: [templateId], references: [id])
+  templateId String @unique
+  entries    DropEntry[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model DropEntry {
+  id          String   @id @default(cuid())
+  dropTable   DropTable @relation(fields: [dropTableId], references: [id])
+  dropTableId String
+  item        ItemDef  @relation(fields: [itemId], references: [id])
+  itemId      String
+  weight      Int      @default(1)
+  minQty      Int      @default(1)
+  maxQty      Int      @default(1)
+  uniqueRoll  Boolean  @default(false)
+}
+
+model ZoneDef {
+  id        String @id // e.g., "Slime"
+  name      String
+  sceneKey  String // e.g., "Slime"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  spawns    SpawnConfig[]
+}
+
+model SpawnConfig {
+  id         String @id @default(cuid())
+  zone       ZoneDef @relation(fields: [zoneId], references: [id])
+  zoneId     String
+  template   EnemyTemplate @relation("TemplateToSpawns", fields: [templateId], references: [id])
+  templateId String
+  budget     Int    @default(6)
+  respawnMs  Int    @default(1200)
+  slots      Json?  // e.g., [100,180,260,340,420]
+  phaseType  String @default("personal")
 }

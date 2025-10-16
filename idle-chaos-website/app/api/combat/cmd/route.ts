@@ -3,14 +3,24 @@ import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
 import { prisma } from "@/src/lib/prisma";
 
-async function awardExp(characterId: string, exp: number, cookie: string | null) {
-  try {
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/account/characters/exp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
-      body: JSON.stringify({ characterId, exp })
-    });
-  } catch {}
+function getAbsoluteBase(req: Request) {
+  // Prefer NEXT_PUBLIC_BASE_URL if absolute, else origin header, else http://localhost fallback
+  const env = process.env.NEXT_PUBLIC_BASE_URL;
+  if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, "");
+  const origin = req.headers.get("origin") || req.headers.get("x-forwarded-origin") || "";
+  if (origin && /^https?:\/\//i.test(origin)) return origin.replace(/\/$/, "");
+  const host = req.headers.get("host");
+  if (host) return `http://${host}`;
+  return "http://localhost:3000";
+}
+
+async function awardExp(characterId: string, exp: number, cookie: string | null, req: Request) {
+  const base = getAbsoluteBase(req);
+  await fetch(`${base}/api/account/characters/exp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
+    body: JSON.stringify({ characterId, exp })
+  });
 }
 
 export async function POST(req: Request) {
@@ -20,6 +30,15 @@ export async function POST(req: Request) {
   const body: CmdBody = await req.json().catch(() => ({} as CmdBody));
   const { zone, characterId, action, value } = body;
   if (!zone || !characterId || !action) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+  // Ownership check: ensure character belongs to current user
+  try {
+    const ch = await (prisma as any).character.findUnique({ where: { id: characterId } });
+    if (!ch || ch.userId !== session.userId) {
+      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   const room = getZoneRoom(zone);
   if (action === "auto") {
     room.toggleAuto(characterId, !!value);
@@ -32,12 +51,15 @@ export async function POST(req: Request) {
       if (typeof vx === "number") hintX = vx;
     }
     const res = room.basicAttack(characterId, hintX);
-    if (res.killed && res.mobId) {
-      const harvested = room.harvestRewardsIfDead(res.mobId);
+  if (res.killed && res.mobId) {
+      type Harvested = { templateId: string; rewards: Array<{ characterId: string; exp: number }>; loot: Array<{ itemId: string; qty: number }> };
+      const harvested = room.harvestRewardsIfDead(res.mobId) as Harvested | null;
       const rw = harvested ? harvested.rewards : [];
       // MVP: award only EXP via internal endpoint
-      const cookie = req.headers.get("cookie");
-      await Promise.all(rw.map(r => awardExp(r.characterId, r.exp, cookie)));
+    const cookie = req.headers.get("cookie");
+    // Only award EXP to the attacker for MVP personal phases.
+    const selfReward = rw.find(r => r.characterId === characterId) || (rw.length ? rw[0] : undefined);
+    if (selfReward) await awardExp(characterId, selfReward.exp, cookie, req);
       // Minimal gold + loot for killer
       try {
         const killerId = characterId;
@@ -49,14 +71,16 @@ export async function POST(req: Request) {
         const killer = await client.character.findUnique({ where: { id: killerId } });
         if (killer) {
           const ps = await client.playerStat.findUnique({ where: { userId: killer.userId } });
-          const goldDelta = 1 + Math.floor(Math.random() * 3); // 1-3 gold
+          const goldDelta = harvested?.loot?.length ? (Math.min(Math.max(1, (harvested.rewards?.[0]?.exp ?? 5) / 2), 5)) : (1 + Math.floor(Math.random() * 3));
           const newGold = (ps?.gold ?? 0) + goldDelta;
           await client.playerStat.update({ where: { userId: killer.userId }, data: { gold: newGold } });
-          // 35% chance for slime_goop
-          if (Math.random() < 0.35) {
-            const curr = await client.itemStack.findUnique({ where: { characterId_itemKey: { characterId: killerId, itemKey: "slime_goop" } } });
-            const count = (curr?.count ?? 0) + 1;
-            await client.itemStack.upsert({ where: { characterId_itemKey: { characterId: killerId, itemKey: "slime_goop" } }, update: { count }, create: { characterId: killerId, itemKey: "slime_goop", count } });
+          // Persist each rolled drop
+          if (Array.isArray(harvested?.loot)) {
+            for (const it of harvested.loot as Array<{ itemId: string; qty: number }>) {
+              const curr = await client.itemStack.findUnique({ where: { characterId_itemKey: { characterId: killerId, itemKey: it.itemId } } });
+              const count = (curr?.count ?? 0) + Math.max(1, it.qty);
+              await client.itemStack.upsert({ where: { characterId_itemKey: { characterId: killerId, itemKey: it.itemId } }, update: { count }, create: { characterId: killerId, itemKey: it.itemId, count } });
+            }
           }
         }
       } catch {}
@@ -64,10 +88,11 @@ export async function POST(req: Request) {
       try {
         if (harvested && harvested.templateId === "slime") {
           const cookie = req.headers.get("cookie");
-          await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/quest`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify({ action: "progress", characterId, progressDelta: 1 }) });
+          const base = getAbsoluteBase(req);
+          await fetch(`${base}/api/quest`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify({ action: "progress", characterId, progressDelta: 1 }) });
         }
       } catch {}
-      return NextResponse.json({ ok: true, result: res, rewards: rw });
+      return NextResponse.json({ ok: true, result: res, rewards: selfReward ? [selfReward] : [], loot: harvested?.loot ?? [] });
     }
     return NextResponse.json({ ok: true, result: res });
   }

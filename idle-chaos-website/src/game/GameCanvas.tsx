@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { items as shopItems } from "@/src/data/items";
+import { useInventorySync } from "@/src/game/hooks/useInventorySync";
+import { items as shopItems, itemByKey } from "@/src/data/items";
 import * as Phaser from "phaser";
 
 declare global {
@@ -817,15 +818,34 @@ class SlimeFieldScene extends Phaser.Scene {
     // Resize
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
     this.onResizeHandler = (gameSize: Phaser.Structs.Size) => {
-      const w = gameSize.width; const h = gameSize.height;
+      const w = gameSize?.width ?? this.scale.width;
+      const h = gameSize?.height ?? this.scale.height;
       if (!this.groundRect || !ground) return;
-  this.groundRect.setPosition(w / 2, h - 40).setSize(w * 0.9, 12);
+      this.groundRect.setPosition(w / 2, h - 40);
+      this.groundRect.setSize(w * 0.9, 12);
       ground.setPosition(this.groundRect.x, this.groundRect.y);
-      ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
-  // Reposition mid platforms
-  const rp1 = this.midPlatforms[0]; const rp2 = this.midPlatforms[1];
-  if (rp1) { rp1.rect.setPosition(w/2 - 120, h - 120).setSize(w * 0.35, 10); rp1.body.setPosition(rp1.rect.x, rp1.rect.y); rp1.body.displayWidth = rp1.rect.width; rp1.body.displayHeight = rp1.rect.height; rp1.body.refreshBody(); }
-  if (rp2) { rp2.rect.setPosition(w/2 + 140, h - 180).setSize(w * 0.3, 10); rp2.body.setPosition(rp2.rect.x, rp2.rect.y); rp2.body.displayWidth = rp2.rect.width; rp2.body.displayHeight = rp2.rect.height; rp2.body.refreshBody(); }
+      ground.displayWidth = this.groundRect.width;
+      ground.displayHeight = this.groundRect.height;
+      ground.refreshBody();
+      // Reposition mid platforms
+      const rp1 = this.midPlatforms[0];
+      const rp2 = this.midPlatforms[1];
+      if (rp1) {
+        rp1.rect.setPosition(w / 2 - 120, h - 120);
+        rp1.rect.setSize(w * 0.35, 10);
+        rp1.body.setPosition(rp1.rect.x, rp1.rect.y);
+        rp1.body.displayWidth = rp1.rect.width;
+        rp1.body.displayHeight = rp1.rect.height;
+        rp1.body.refreshBody();
+      }
+      if (rp2) {
+        rp2.rect.setPosition(w / 2 + 140, h - 180);
+        rp2.rect.setSize(w * 0.3, 10);
+        rp2.body.setPosition(rp2.rect.x, rp2.rect.y);
+        rp2.body.displayWidth = rp2.rect.width;
+        rp2.body.displayHeight = rp2.rect.height;
+        rp2.body.refreshBody();
+      }
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
     };
@@ -887,6 +907,15 @@ class SlimeFieldScene extends Phaser.Scene {
       this.mobContainers.forEach(c => c.destroy(true));
       this.mobContainers.clear();
       this.mobState.clear();
+      // Inform server we're leaving combat if we had joined
+      try {
+        if (this.joinedCombat) {
+          const characterId = String(this.game.registry.get("characterId") || "");
+          if (characterId) {
+            fetch("/api/combat/leave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Slime", characterId }) }).catch(()=>{});
+          }
+        }
+      } catch {}
     });
   }
   private wanderMobs() {
@@ -960,6 +989,12 @@ class SlimeFieldScene extends Phaser.Scene {
       this.reconcileMobs(mobs);
     } catch {}
   }
+  private formatItem(key: string) {
+    const def = (itemByKey as Record<string, { name: string }>)[key];
+    if (def?.name) return def.name;
+    // Fallback: prettify snake_case
+    return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  }
   private async basicAttack(characterId: string) {
     try {
       const res = await fetch("/api/combat/cmd", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Slime", characterId, action: "basic", value: { x: this.player.x } }) });
@@ -977,7 +1012,7 @@ class SlimeFieldScene extends Phaser.Scene {
             this.time.delayedCall(120, () => bar.setFillStyle(0xef4444));
           }
           // Simple particle burst at slime position using sDot
-          const spawnSpark = (i: number) => {
+          const spawnSpark = () => {
             const img = this.add.image(cont.x, cont.y, "sDot");
             img.setTint(0x22c55e).setAlpha(0.9).setScale(Phaser.Math.FloatBetween(0.8, 1.2));
             const ang = Phaser.Math.FloatBetween(0, Math.PI * 2);
@@ -986,8 +1021,38 @@ class SlimeFieldScene extends Phaser.Scene {
             const toY = cont.y + Math.sin(ang) * speed * 0.4;
             this.tweens.add({ targets: img, x: toX, y: toY, alpha: 0, duration: 280, ease: "Sine.easeOut", onComplete: () => img.destroy() });
           };
-          for (let i = 0; i < 12; i++) this.time.delayedCall(i * 8, () => spawnSpark(i));
+          for (let i = 0; i < 12; i++) this.time.delayedCall(i * 8, () => spawnSpark());
         }
+      }
+      // HUD: apply character EXP update payload if provided
+      if (Array.isArray(data?.rewards) && data.rewards.length) {
+        const r = data.rewards[0] as { exp: number };
+        const prevLevel = (this.game.registry.get("charLevel") as number) ?? 1;
+        // We don't know new level from server here, but the exp endpoint will have updated; fetch current stats
+        const cid = String(this.game.registry.get("characterId") || "");
+        if (cid) {
+          fetch(`/api/account/stats?characterId=${encodeURIComponent(cid)}`).then(res => res.ok ? res.json() : null).then(data2 => {
+            if (!data2) return;
+            const base = data2.base as { exp: number; level: number; gold: number } | undefined;
+            if (base && typeof base.exp === "number" && typeof base.level === "number") {
+              window.__applyExpUpdate?.({ type: "character", exp: base.exp, level: base.level });
+            }
+          }).catch(()=>{});
+        }
+      }
+      // After kills, refresh quest panel silently by toggling a registry flag the React panel watches
+      const q = this.game.registry.get("questDirtyCount") as number | undefined;
+      this.game.registry.set("questDirtyCount", (q ?? 0) + 1);
+      // Loot handling: update local inventory and toast item names
+      const loot: Array<{ itemId: string; qty: number }> = Array.isArray(data?.loot) ? data.loot : [];
+      if (loot.length) {
+        const inv = (this.game.registry.get("inventory") as Record<string, number>) || {};
+        for (const drop of loot) {
+          inv[drop.itemId] = (inv[drop.itemId] ?? 0) + Math.max(1, drop.qty);
+          const name = this.formatItem(drop.itemId);
+          window.__spawnOverhead?.(`:yellow: +${drop.qty} ${name}`, { ripple: true });
+        }
+        this.game.registry.set("inventory", inv);
       }
     } catch {}
   }
@@ -1054,6 +1119,13 @@ class SlimeFieldScene extends Phaser.Scene {
     }
     if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
     if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
+      // Leave combat before transitioning out
+      try {
+        const characterId = String(this.game.registry.get("characterId") || "");
+        if (characterId && this.joinedCombat) {
+          fetch("/api/combat/leave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Slime", characterId }) }).catch(()=>{});
+        }
+      } catch {}
       this.game.registry.set("spawn", { from: "slime", portal: "town" });
       window.__saveSceneNow?.("Town");
       this.scene.start("TownScene");
@@ -1146,6 +1218,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       scene: [TownScene, CaveScene, SlimeFieldScene],
     };
   gameRef.current = new Phaser.Game(config);
+    // Expose registry for cross-component signals (read-only)
+    ;(window as any).__phaserRegistry = gameRef.current.registry;
     // Seed registry flags (e.g., tutorial gate) if needed; default false
     gameRef.current.registry.set("tutorialStarted", false);
     gameRef.current.registry.set("spawn", { from: "initial", portal: null });
@@ -1277,6 +1351,18 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
     };
   }, [character]);
+
+  // Minimal integration of reusable inventory sync
+  useInventorySync({
+    characterId: character?.id,
+    getInventory: () => (gameRef.current?.registry.get("inventory") as Record<string, number> | undefined),
+    onHydrate: (items) => {
+      const g = gameRef.current; if (!g) return;
+      g.registry.set("inventory", items);
+      setInventory({ ...items });
+    },
+    skipWhile: () => !!(furnaceRef.current || workRef.current || sawRef.current),
+  });
 
   // Expose helpers to scenes via window is set up after saveSceneNow definition below
 

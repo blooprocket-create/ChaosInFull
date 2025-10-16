@@ -18,24 +18,8 @@ export async function POST(req: Request) {
   const miningDelta = typeof miningExp === "number" ? clamp(miningExp) : 0;
   const craftingDelta = typeof craftingExp === "number" ? clamp(craftingExp) : 0;
 
-  // Fetch character with ownership check
-  // Cast prisma to avoid any local typing hiccups with generated client in this environment
-  const client = prisma as unknown as {
-    character: {
-      findFirst: (args: { where: { id: string; userId: string } }) => Promise<{
-        id: string;
-        userId: string;
-        level: number;
-        exp: number;
-        miningExp: number;
-        miningLevel?: number | null;
-        craftingExp: number;
-        craftingLevel?: number | null;
-      } | null>;
-      update: (args: { where: { id: string }; data: { exp: number; level: number; miningExp: number; miningLevel: number; craftingExp: number; craftingLevel: number } }) => Promise<void>;
-    };
-  };
-  const ch = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  // Fetch character with ownership check using generated Prisma types
+  const ch = await prisma.character.findFirst({ where: { id: characterId, userId: session.userId } });
   if (!ch) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
 
   // Geometric growth thresholds
@@ -84,7 +68,7 @@ export async function POST(req: Request) {
     if (newCraftingLevel > 999) { newCraftExp = 0; break; }
   }
 
-  await client.character.update({
+  await prisma.character.update({
     where: { id: ch.id },
     data: { exp: newCharExp, level: newLevel, miningExp: newMineExp, miningLevel: newMiningLevel, craftingExp: newCraftExp, craftingLevel: newCraftingLevel },
   });
