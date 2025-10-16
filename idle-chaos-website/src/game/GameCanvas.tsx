@@ -50,6 +50,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [craftingExpState, setCraftingExpState] = useState<number>(0);
   const [craftingMax, setCraftingMax] = useState<number>(reqCraft(1));
   const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: reqChar(character?.level ?? 1) });
+  // AFK combat modal
+  const [afkCombatModal, setAfkCombatModal] = useState<{ open: boolean; zone: string; kills: number; exp: number; gold: number; loot: Array<{ itemId: string; qty: number }> } | null>(null);
   // Simple character vitals and auto status (client HUD only for now)
   const [hp, setHp] = useState<number>(100);
   const [mp, setMp] = useState<number>(50);
@@ -172,6 +174,35 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       gameRef.current = null;
     };
   }, [initialScene, character, initialMiningLevel]);
+
+  // On return to an AFK combat zone, query applied AFK rewards and show a modal
+  useEffect(() => {
+    if (!character) return;
+    const scene = (initialScene || "Town").toLowerCase();
+    const isAfkZone = scene === "slime" || scene === "slime meadow";
+    if (!isAfkZone) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/account/characters/afk-combat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id }) });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.ok && typeof data.kills === 'number' && data.kills > 0) {
+          // Apply HUD updates for gold and inventory (server has already applied)
+          if (typeof data.gold === 'number' && data.gold > 0) setGold((g)=>g + data.gold);
+          if (Array.isArray(data.loot) && data.loot.length) {
+            const inv = (gameRef.current?.registry.get('inventory') as Record<string, number>) || {};
+            for (const it of data.loot as Array<{ itemId: string; qty: number }>) {
+              inv[it.itemId] = (inv[it.itemId] ?? 0) + Math.max(1, Number(it.qty||0));
+            }
+            gameRef.current?.registry.set('inventory', inv);
+            setInventory({ ...inv });
+          }
+          // EXP is applied on server; optionally refresh from stats or rely on next action to sync
+          setAfkCombatModal({ open: true, zone: data.zone || (initialScene || 'Slime'), kills: data.kills, exp: data.exp ?? 0, gold: data.gold ?? 0, loot: Array.isArray(data.loot) ? data.loot : [] });
+        }
+      } catch {}
+    })();
+  }, [character, initialScene]);
 
   // Save immediately on unmount as a fallback for client-side navigation
   useEffect(() => {
@@ -1376,6 +1407,45 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Chat moved to dedicated ChatClient under the canvas */}
+      {/* AFK Combat Modal */}
+      {afkCombatModal?.open && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(520px,92vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <h3 className="text-lg font-semibold text-white">While you were away…</h3>
+            <p className="mt-1 text-sm text-gray-300">Your character battled in {afkCombatModal.zone}.</p>
+            <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="text-gray-300">Enemies Defeated</div>
+                <div className="mt-1 text-white text-xl font-semibold">+{afkCombatModal.kills}</div>
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="text-gray-300">Character EXP</div>
+                <div className="mt-1 text-white text-xl font-semibold">+{afkCombatModal.exp}</div>
+              </div>
+              <div className="rounded border border-white/10 bg-black/40 p-3">
+                <div className="text-gray-300">Gold</div>
+                <div className="mt-1 text-yellow-300 text-xl font-semibold">+{afkCombatModal.gold}</div>
+              </div>
+            </div>
+            {afkCombatModal.loot?.length ? (
+              <div className="mt-3">
+                <div className="text-sm text-gray-300 mb-1">Loot</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {afkCombatModal.loot.map((l, idx) => (
+                    <div key={idx} className="rounded border border-white/10 bg-black/40 p-2 text-xs flex items-center justify-between">
+                      <span>{l.itemId}</span>
+                      <span className="text-white/90 font-semibold">+{l.qty}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn px-3 py-1" onClick={() => setAfkCombatModal(null)}>Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Welcome Modal (first time) */}
       {!welcomeSeen && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">

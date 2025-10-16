@@ -50,6 +50,7 @@ export async function POST() {
   await client.npcDef.upsert({ where: { id: "grimsley" }, update: { name: "Grimsley" }, create: { id: "grimsley", name: "Grimsley" } });
   // Zone and enemies
   await client.zoneDef.upsert({ where: { id: "Slime" }, update: {}, create: { id: "Slime", name: "Slime Zone", sceneKey: "Slime" } });
+  await client.zoneDef.upsert({ where: { id: "Slime Meadow" }, update: {}, create: { id: "Slime Meadow", name: "Slime Meadow", sceneKey: "Slime" } });
   for (const e of ENEMIES) {
     await client.enemyTemplate.upsert({ where: { id: e.id }, update: {}, create: e });
     // One drop table per template
@@ -63,6 +64,10 @@ export async function POST() {
   }
   // Spawn config: default personal spawns for regular slime (others available for future variety)
   await client.spawnConfig.create({ data: { zoneId: "Slime", templateId: "slime", budget: 6, respawnMs: 1200, slots: [100,180,260,340,420], phaseType: "personal" } }).catch(() => {});
+  // Slime Meadow: mix of regular slime, epic slime, and big slime
+  await client.spawnConfig.create({ data: { zoneId: "Slime Meadow", templateId: "slime", budget: 4, respawnMs: 1100, slots: [100,180,260,340,420], phaseType: "personal" } }).catch(() => {});
+  await client.spawnConfig.create({ data: { zoneId: "Slime Meadow", templateId: "slime_epic", budget: 1, respawnMs: 1500, slots: [140,220,300,380,460], phaseType: "personal" } }).catch(() => {});
+  await client.spawnConfig.create({ data: { zoneId: "Slime Meadow", templateId: "big_slime", budget: 1, respawnMs: 2000, slots: [180,260,340,420,500], phaseType: "personal" } }).catch(() => {});
   // Quests
   // Tutorial: Can you punch?
   await client.quest.upsert({

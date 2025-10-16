@@ -33,18 +33,58 @@ export async function POST(req: Request) {
   }
 
   const elapsedSec = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 1000));
-  const killsPerMin = 6;
-  const kills = Math.floor((elapsedSec / 60) * killsPerMin);
+  if (elapsedSec <= 0) return NextResponse.json({ ok: true, kills: 0, exp: 0, gold: 0, loot: [] });
+  // Character damage model (MVP): pull class and a baseline weaponless damage similar to server basicAttack
+  const ch = await prisma.character.findUnique({ where: { id: characterId }, select: { level: true, class: true } }).catch(()=>null);
+  const baseDmg = 8; // match ZoneRoom.basicAttack
+  const atkPerSec = 1000 / 600; // one hit every 600ms
+  const dps = baseDmg * atkPerSec; // ~13.33 DPS
+
+  // Load zone spawn composition and enemy templates
+  const zoneId = String(state.zone);
+  const spawns = await prisma.spawnConfig.findMany({ where: { zoneId: zoneId } }).catch(() => []);
+  const tpls = await prisma.enemyTemplate.findMany({}).catch(() => [] as any[]);
+  const byId = new Map<string, { baseHp: number; expBase: number; goldMin: number; goldMax: number }>();
+  for (const t of tpls) byId.set((t as any).id, { baseHp: (t as any).baseHp, expBase: (t as any).expBase, goldMin: (t as any).goldMin, goldMax: (t as any).goldMax });
+  // Derive a simple weighted kill rate: budget approximates concurrent targets; we assume constant uptime
+  // Time to kill for a template: baseHp / dps; kills per second for that template: budget / ttk
+  type Part = { templateId: string; budget: number };
+  const parts: Part[] = spawns.map(s => ({ templateId: s.templateId, budget: s.budget }));
+  if (!parts.length) {
+    // Fallback to Slime-only composition if zone not configured
+    parts.push({ templateId: "slime", budget: 6 });
+  }
+  let killsPerSec = 0;
+  for (const p of parts) {
+    const tpl = byId.get(p.templateId);
+    const hp = tpl?.baseHp ?? 30;
+    const ttk = Math.max(0.1, hp / dps); // seconds
+    killsPerSec += (p.budget / ttk);
+  }
+  // Personal phases have respawn times; cap by total budget/respawn window roughly
+  // Average respawn from spawn config; use median-ish 1.5s if absent
+  const avgRespawnMs = spawns.length ? Math.max(300, Math.floor(spawns.reduce((s, x) => s + (x.respawnMs || 1200), 0) / spawns.length)) : 1200;
+  const budgetTotal = parts.reduce((s, p) => s + p.budget, 0) || 6;
+  const respawnCapPerSec = budgetTotal / (avgRespawnMs / 1000);
+  const effectiveKps = Math.min(killsPerSec, respawnCapPerSec);
+  const kills = Math.floor(effectiveKps * elapsedSec);
   if (kills <= 0) return NextResponse.json({ ok: true, kills: 0, exp: 0, gold: 0, loot: [] });
 
-  // Fetch slime template for exp
-  const slime = await prisma.enemyTemplate.findUnique({ where: { id: "slime" } }).catch(() => null);
-  const expPer = slime?.expBase ?? 5;
-  const expTotal = kills * expPer;
-  // Gold: 1-3 average ~2
-  const goldTotal = kills * 2;
-  // Loot: roughly 50% chance goop per kill
-  const goop = Math.floor(kills * 0.5);
+  // Expected rewards aggregate across composition proportional to their share of kills
+  let expTotal = 0;
+  let goldTotal = 0;
+  let goop = 0;
+  for (const p of parts) {
+    const tpl = byId.get(p.templateId) || { baseHp: 30, expBase: 5, goldMin: 1, goldMax: 3 };
+    const ttk = Math.max(0.1, (tpl.baseHp) / dps);
+    const share = (p.budget / ttk) / Math.max(1e-6, killsPerSec);
+    const killsHere = Math.floor(kills * share);
+    expTotal += killsHere * (tpl.expBase);
+    const goldAvg = Math.round((tpl.goldMin + tpl.goldMax) / 2);
+    goldTotal += killsHere * goldAvg;
+    // Slime Goop drops from slimes and big slimes; assume ~50% rate per kill for slime-family
+    if (/slime/.test(p.templateId)) goop += Math.floor(killsHere * 0.5);
+  }
 
   // Apply EXP via the central endpoint
   try {
@@ -68,5 +108,5 @@ export async function POST(req: Request) {
   await (prisma as any).afkCombatState.update({ where: { characterId }, data: { lastSnapshot: now } }).catch(() => {});
 
   // Return applied rewards
-  return NextResponse.json({ ok: true, kills, exp: expTotal, gold: goldTotal, loot: goop > 0 ? [{ itemId: "slime_goop", qty: goop }] : [] });
+  return NextResponse.json({ ok: true, zone: zoneId, kills, exp: expTotal, gold: goldTotal, loot: goop > 0 ? [{ itemId: "slime_goop", qty: goop }] : [] });
 }
