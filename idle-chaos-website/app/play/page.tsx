@@ -4,6 +4,7 @@ import GameCanvasClient from "@/src/game/GameCanvasClient";
 import CharacterSelect from "@/src/components/CharacterSelect";
 import { prisma } from "@/src/lib/prisma";
 import ChatClient from "@/src/components/ChatClient";
+import QuestPanel from "@/src/components/QuestPanel";
 
 export const metadata = { title: "Play • Chaos In Full" };
 export const dynamic = "force-dynamic";
@@ -56,7 +57,9 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
               <div className="mt-4">
                 {/* Decoupled chat panel below the game */}
                 <ChatClient characterId={character.id} scene={(character.lastScene as string) || "Town"} />
+                <QuestPanel characterId={character.id} />
               </div>
+              {/* Combat UI is in-scene (Slime); no under-game panels */}
             </>
           )}
         </>

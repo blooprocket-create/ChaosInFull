@@ -32,6 +32,7 @@ class TownScene extends Phaser.Scene {
   private eKey!: Phaser.Input.Keyboard.Key;
   private platformCollider?: Phaser.Physics.Arcade.Collider;
   private groundRect!: Phaser.GameObjects.Rectangle;
+  private midPlatforms: Array<{ rect: Phaser.GameObjects.Rectangle; body: Phaser.Physics.Arcade.Image }> = [];
   private upperPlatformRect!: Phaser.GameObjects.Rectangle;
   private upperPlatformBody!: Phaser.Physics.Arcade.Image;
   private cavePortal!: Phaser.Physics.Arcade.Image;
@@ -49,6 +50,7 @@ class TownScene extends Phaser.Scene {
   private storageBox!: Phaser.Physics.Arcade.Image;
   private storagePrompt!: Phaser.GameObjects.Text;
   private tutorialNpc!: Phaser.GameObjects.Image;
+  private tutorIcon!: Phaser.GameObjects.Text;
   private nameTag!: Phaser.GameObjects.Text;
   preload() {}
   create() {
@@ -144,6 +146,10 @@ class TownScene extends Phaser.Scene {
   npcG.destroy();
   this.tutorialNpc = this.add.image(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15, "tutorialNpcTex");
   this.add.text(this.tutorialNpc.x, this.tutorialNpc.y - 20, "Grimsley", { color: "#c7d2fe", fontSize: "10px" }).setOrigin(0.5);
+  // Quest icon above NPC
+  this.tutorIcon = this.add.text(this.tutorialNpc.x, this.tutorialNpc.y - 34, "", { color: "#fef08a", fontSize: "14px" }).setOrigin(0.5).setVisible(false);
+  // Tutorial prompt (hidden until near)
+  this.add.text(this.tutorialNpc.x, this.tutorialNpc.y - 32, "Press E to Talk", { color: "#e5e7eb", fontSize: "12px" }).setOrigin(0.5).setVisible(false);
   // Labels
   this.add.text(this.cavePortal.x, this.cavePortal.y - 40, "Cave", { color: "#93c5fd", fontSize: "12px" }).setOrigin(0.5);
   this.add.text(this.slimePortal.x, this.slimePortal.y - 40, "Slime Field", { color: "#86efac", fontSize: "12px" }).setOrigin(0.5);
@@ -244,7 +250,8 @@ class TownScene extends Phaser.Scene {
       this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
   this.shopStall.setPosition(this.upperPlatformRect.x, this.upperPlatformRect.y - 14);
   this.shopPrompt.setPosition(this.shopStall.x, this.shopStall.y - 32);
-      this.tutorialNpc.setPosition(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15);
+  this.tutorialNpc.setPosition(this.upperPlatformRect.x - this.upperPlatformRect.width / 2 + 30, this.upperPlatformRect.y - 15);
+  this.tutorIcon.setPosition(this.tutorialNpc.x, this.tutorialNpc.y - 34);
       this.cavePrompt.setPosition(this.cavePortal.x, this.cavePortal.y - 60);
       this.slimePrompt.setPosition(this.slimePortal.x, this.slimePortal.y - 60);
   this.furnacePrompt.setPosition(this.furnace.x, this.furnace.y - 48);
@@ -254,6 +261,24 @@ class TownScene extends Phaser.Scene {
       this.physics.world.setBounds(0, 0, w, h);
     };
     this.scale.on("resize", this.onResizeHandler);
+    // Hydrate tutorial quest state to gate portal
+    (async () => {
+      try {
+        const cid = String(this.game.registry.get("characterId") || "");
+        if (!cid) return;
+        const res = await fetch(`/api/quest?characterId=${encodeURIComponent(cid)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const cqs = (data?.characterQuests as Array<{ questId: string; status: string }> | undefined) || [];
+        const has = cqs.find(q => q.questId === "tutorial_kill_slimes_5" && (q.status === "ACTIVE" || q.status === "COMPLETED"));
+        if (has) this.game.registry.set("tutorialStarted", true);
+        // Update NPC icon state
+        const tut = cqs.find(q => q.questId === "tutorial_kill_slimes_5");
+        if (!tut) { this.tutorIcon.setVisible(true).setColor("#fef08a").setText("!"); }
+        else if (tut.status === "COMPLETED") { this.tutorIcon.setVisible(true).setColor("#86efac").setText("?"); }
+        else { this.tutorIcon.setVisible(true).setColor("#cbd5e1").setText("?"); }
+      } catch {}
+    })();
     // Ambient particles: generate a tiny dot texture
     const g = this.add.graphics();
     g.fillStyle(0xffffff, 1);
@@ -396,6 +421,8 @@ class TownScene extends Phaser.Scene {
   const nearSawmill = dist(this.player, this.sawmill) < 60;
   const nearStorage = dist(this.player, this.storageBox) < 60;
   const nearShop = dist(this.player, this.shopStall) < 60;
+  // Distance to tutorial NPC
+  const nearTutor = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.tutorialNpc.x, this.tutorialNpc.y) < 60;
     this.cavePrompt.setVisible(nearCave);
     // Slime portal gated by tutorialStarted flag in registry
     const tutorialStarted = !!this.game.registry.get("tutorialStarted");
@@ -406,6 +433,11 @@ class TownScene extends Phaser.Scene {
   this.sawmillPrompt.setVisible(nearSawmill);
       this.shopPrompt.setVisible(nearShop);
       this.storagePrompt.setVisible(nearStorage);
+  // The tutorial prompt text was created locally; search it by content and toggle vis when near
+  const tPrompt = this.children.getAll().find((obj): obj is Phaser.GameObjects.Text => {
+    return (obj as Phaser.GameObjects.Text).text !== undefined && (obj as Phaser.GameObjects.Text).text === "Press E to Talk";
+  });
+  if (tPrompt) tPrompt.setVisible(nearTutor);
   // Keep name tag positioned
   if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
   // Auto-close modals if you leave range
@@ -424,6 +456,44 @@ class TownScene extends Phaser.Scene {
         this.game.registry.set("spawn", { from: "slime", portal: "town" });
         window.__saveSceneNow?.("Slime");
         this.scene.start("SlimeFieldScene");
+      } else if (nearTutor) {
+        const tutorialStarted = !!this.game.registry.get("tutorialStarted");
+        const cid = String(this.game.registry.get("characterId") || "");
+        if (!tutorialStarted) {
+          window.__spawnOverhead?.(":purple: Grimsley: The portal laughs at cowards. Pop 5 slimes.", { wave: true });
+          if (cid) {
+            fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "accept", characterId: cid }) })
+              .then(res => { if (res.ok) this.game.registry.set("tutorialStarted", true); })
+              .catch(() => {});
+          }
+        } else {
+          // Try to hand in if completed
+          (async () => {
+            try {
+              const res = await fetch(`/api/quest?characterId=${encodeURIComponent(cid)}`);
+              const data = await res.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string }> }));
+              const list: Array<{ questId: string; status: string }> = Array.isArray(data.characterQuests) ? data.characterQuests : [];
+              const tut = list.find(q=>q.questId === "tutorial_kill_slimes_5");
+              if (tut?.status === "COMPLETED") {
+                const hand = await fetch("/api/quest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", characterId: cid, questId: "tutorial_kill_slimes_5" }) });
+                const payload = await hand.json().catch(()=>({}));
+                if (payload?.rewards?.gold) window.__spawnOverhead?.(":yellow: +500 gold", { ripple: true });
+                if (payload?.rewards?.exp) window.__spawnOverhead?.(":green: +250 XP", { wave: true });
+                // Refresh icon to show next quest state if any
+                const res2 = await fetch(`/api/quest?characterId=${encodeURIComponent(cid)}`);
+                const data2 = await res2.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string }> }));
+                const list2: Array<{ questId: string; status: string }> = Array.isArray(data2.characterQuests) ? data2.characterQuests : [];
+                const tut2 = list2.find(q=>q.questId === "tutorial_kill_slimes_5");
+                if (tut2?.status === "COMPLETED") this.tutorIcon.setVisible(true).setColor("#86efac").setText("?");
+                window.__spawnOverhead?.(":blue: Grimsley: The portal should stop laughing now.");
+              } else {
+                window.__spawnOverhead?.(":blue: Grimsley: Goo awaits.");
+              }
+            } catch {
+              window.__spawnOverhead?.(":blue: Grimsley: Goo awaits.");
+            }
+          })();
+        }
       } else if (nearFurnace) {
         // Open furnace modal via React
         window.__openFurnace?.();
@@ -665,9 +735,20 @@ class SlimeFieldScene extends Phaser.Scene {
   private onResizeHandler?: (gameSize: Phaser.Structs.Size) => void;
   private player!: Phaser.Physics.Arcade.Image;
   private groundRect!: Phaser.GameObjects.Rectangle;
+  private midPlatforms: Array<{ rect: Phaser.GameObjects.Rectangle; body: Phaser.Physics.Arcade.Image }> = [];
   private cursors!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private eKey!: Phaser.Input.Keyboard.Key;
   private nameTag!: Phaser.GameObjects.Text;
+  // Combat integration
+  private spaceKey!: Phaser.Input.Keyboard.Key;
+  private rKey!: Phaser.Input.Keyboard.Key;
+  private pollEvent?: Phaser.Time.TimerEvent;
+  private joinedCombat = false;
+  private auto = false;
+  private mobContainers = new Map<string, Phaser.GameObjects.Container>();
+  private mobState = new Map<string, { hp: number; maxHp: number; level: number }>();
+  private wanderTimer?: Phaser.Time.TimerEvent;
+  private lastAutoAttackAt = 0;
   create() {
     this.game.registry.set("currentScene", "Slime");
     const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
@@ -677,24 +758,49 @@ class SlimeFieldScene extends Phaser.Scene {
     const gtex = this.add.graphics(); gtex.fillStyle(0xffffff, 1); gtex.fillRect(0, 0, 4, 4); gtex.generateTexture("groundTex3", 4, 4); gtex.destroy();
     const ground = this.physics.add.staticImage(this.groundRect.x, this.groundRect.y, "groundTex3");
     ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
+    // Mid platforms: two tiers
+    const makePlatform = (x: number, y: number, w: number) => {
+      const rect = this.add.rectangle(x, y, w, 10, 0x18212f).setOrigin(0.5);
+      rect.setStrokeStyle(1, 0xffffff, 0.15);
+      const body = this.physics.add.staticImage(x, y, "groundTex3");
+      body.displayWidth = w; body.displayHeight = 10; body.refreshBody();
+      this.midPlatforms.push({ rect, body });
+      return body;
+    };
+  makePlatform(center.x - 120, this.scale.height - 120, this.scale.width * 0.35);
+  makePlatform(center.x + 140, this.scale.height - 180, this.scale.width * 0.3);
     // Player
     const ptex = this.add.graphics(); ptex.fillStyle(0xffffff, 1); ptex.fillCircle(8, 8, 8); ptex.generateTexture("playerTex3", 16, 16); ptex.destroy();
   const spawn = (this.game.registry.get("spawn") as { from: string; portal: string | null }) || { from: "town", portal: "slime" };
   const x = spawn.from === "town" ? 100 : 100;
   this.player = this.physics.add.image(x, this.groundRect.y - 60, "playerTex3").setTint(0x22c55e);
     (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(900); this.player.setCollideWorldBounds(true);
-    this.physics.add.collider(this.player, ground);
+  this.physics.add.collider(this.player, ground);
+  this.midPlatforms.forEach(p => this.physics.add.collider(this.player, p.body));
     const cname = String(this.game.registry.get("characterName") || "You");
     this.nameTag = this.add.text(this.player.x, this.player.y - 24, cname, { color: "#e5e7eb", fontSize: "11px" }).setOrigin(0.5).setDepth(10);
-    // Simple slimes (ambient placeholders)
-    const slimeTex = this.add.graphics(); slimeTex.fillStyle(0x22c55e, 1); slimeTex.fillCircle(6, 6, 6); slimeTex.generateTexture("slimeTex", 12, 12); slimeTex.destroy();
-    const spawnSlime = (x: number) => {
-      const s = this.physics.add.image(x, this.groundRect.y - 30, "slimeTex");
-      s.setBounce(1).setCollideWorldBounds(true).setVelocityX(Phaser.Math.Between(-80, 80));
-      this.physics.add.collider(s, ground);
-      return s;
-    };
-    for (let i = 0; i < 5; i++) spawnSlime(center.x + Phaser.Math.Between(-200, 200));
+    // Controls for combat
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, true, true);
+    this.rKey = this.input.keyboard!.addKey("R", true, true);
+    // Small hint text
+    this.add.text(this.scale.width - 12, 14, "Space: Attack   R: Auto", { color: "#9ca3af", fontSize: "10px" }).setOrigin(1, 0);
+    // Create a small particle dot texture for hit effects
+    const dot = this.add.graphics(); dot.fillStyle(0xffffff, 1); dot.fillCircle(2, 2, 2); dot.generateTexture("sDot", 4, 4); dot.destroy();
+    // Join combat for this zone and start polling snapshot
+    const characterId = String(this.game.registry.get("characterId") || "");
+    (async () => {
+      try {
+        if (!characterId) return;
+        const res = await fetch("/api/combat/join", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Slime", characterId }) });
+        if (res.ok) {
+          this.joinedCombat = true;
+          // Begin polling server snapshots
+          this.pollEvent = this.time.addEvent({ delay: 300, loop: true, callback: () => this.pollSnapshot(characterId) });
+          // Begin simple wander tween for mobs every ~2s
+          this.wanderTimer = this.time.addEvent({ delay: 2000, loop: true, callback: () => this.wanderMobs() });
+        }
+      } catch {}
+    })();
     // Exit portal
     const exitG = this.add.graphics(); exitG.fillStyle(0x1d4ed8, 0.8); exitG.fillRoundedRect(0, 0, 24, 44, 10); exitG.generateTexture("portalExit2", 24, 44); exitG.destroy();
     const exitPortal = this.physics.add.staticImage(60, this.groundRect.y - 22, "portalExit2");
@@ -702,18 +808,28 @@ class SlimeFieldScene extends Phaser.Scene {
     // Input
     this.cursors = this.input.keyboard!.addKeys({ W: "W", A: "A", S: "S", D: "D" }) as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
     this.eKey = this.input.keyboard!.addKey("E", true, true);
+    // Clicking/tapping the scene should re-focus keyboard control
+    this.input.on("pointerdown", () => {
+      if (this.input.keyboard) this.input.keyboard.enabled = true;
+      window.__setTyping?.(false);
+      window.__focusGame?.();
+    });
     // Resize
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
     this.onResizeHandler = (gameSize: Phaser.Structs.Size) => {
       const w = gameSize.width; const h = gameSize.height;
       if (!this.groundRect || !ground) return;
-      this.groundRect.setPosition(w / 2, h - 40).setSize(w * 0.9, 12);
+  this.groundRect.setPosition(w / 2, h - 40).setSize(w * 0.9, 12);
       ground.setPosition(this.groundRect.x, this.groundRect.y);
       ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
+  // Reposition mid platforms
+  const rp1 = this.midPlatforms[0]; const rp2 = this.midPlatforms[1];
+  if (rp1) { rp1.rect.setPosition(w/2 - 120, h - 120).setSize(w * 0.35, 10); rp1.body.setPosition(rp1.rect.x, rp1.rect.y); rp1.body.displayWidth = rp1.rect.width; rp1.body.displayHeight = rp1.rect.height; rp1.body.refreshBody(); }
+  if (rp2) { rp2.rect.setPosition(w/2 + 140, h - 180).setSize(w * 0.3, 10); rp2.body.setPosition(rp2.rect.x, rp2.rect.y); rp2.body.displayWidth = rp2.rect.width; rp2.body.displayHeight = rp2.rect.height; rp2.body.refreshBody(); }
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
     };
-    this.scale.on("resize", this.onResizeHandler);
+  this.scale.on("resize", this.onResizeHandler);
     // Overhead chat spawner for Slime scene
     window.__spawnOverhead = (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => {
       const tokens = text.split(/(\s+)/);
@@ -766,7 +882,122 @@ class SlimeFieldScene extends Phaser.Scene {
     };
     this.events.on("shutdown", () => {
       if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
+      if (this.pollEvent) { this.pollEvent.remove(false); this.pollEvent = undefined; }
+      if (this.wanderTimer) { this.wanderTimer.remove(false); this.wanderTimer = undefined; }
+      this.mobContainers.forEach(c => c.destroy(true));
+      this.mobContainers.clear();
+      this.mobState.clear();
     });
+  }
+  private wanderMobs() {
+    // Tween each mob container slightly left/right to simulate idle movement
+    const range = 14;
+    for (const cont of this.mobContainers.values()) {
+      const origX = cont.x;
+      const toX = Phaser.Math.Clamp(origX + Phaser.Math.Between(-range, range), (this.groundRect.x - this.groundRect.width/2) + 40, (this.groundRect.x + this.groundRect.width/2) - 40);
+      this.tweens.add({ targets: cont, x: toX, duration: Phaser.Math.Between(600, 1000), ease: "Sine.easeInOut", yoyo: true });
+    }
+  }
+  private layoutPositions(ids: string[]) {
+    // Use fixed slots to reduce visible teleport and align with server hints
+    const y = this.groundRect.y - 28;
+    const pos = new Map<string, { x: number; y: number }>();
+    const slots = [100, 180, 260, 340, 420];
+    ids.forEach((id, i) => { const slot = slots[i % slots.length]; pos.set(id, { x: slot, y }); });
+    return pos;
+  }
+  private ensureMobContainer(id: string, level: number) {
+    let cont = this.mobContainers.get(id);
+    if (cont) return cont;
+  // Create visuals: slime blob + bounce tween
+  const g = this.add.graphics();
+  g.fillStyle(0x22c55e, 1);
+  g.fillEllipse(8, 10, 16, 12);
+  g.fillStyle(0x16a34a, 1);
+  g.fillEllipse(9, 8, 8, 6);
+  g.generateTexture(`slime_${id}`, 16, 16);
+  g.destroy();
+  const sprite = this.add.image(0, 0, `slime_${id}`);
+  this.tweens.add({ targets: sprite, y: "-=4", duration: 500, yoyo: true, repeat: -1, ease: "Sine.easeInOut", delay: Phaser.Math.Between(0, 300) });
+    const barBg = this.add.rectangle(-22, -16, 44, 4, 0x111827).setOrigin(0, 0.5).setAlpha(0.9);
+    const bar = this.add.rectangle(-22, -16, 44, 4, 0xef4444).setOrigin(0, 0.5);
+    const label = this.add.text(0, -28, `Slime Lv ${level}`, { color: "#9ca3af", fontSize: "10px" }).setOrigin(0.5, 0.5);
+    cont = this.add.container(0, 0, [sprite, barBg, bar, label]).setDepth(5);
+    // Save bar width for updates
+  interface MobContainer extends Phaser.GameObjects.Container { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number }
+  (cont as MobContainer).__bar = bar;
+  (cont as MobContainer).__barFull = 44;
+    this.mobContainers.set(id, cont);
+    return cont;
+  }
+  private reconcileMobs(mobs: Array<{ id: string; hp: number; maxHp: number; level: number }>) {
+    // Remove missing
+    const ids = new Set(mobs.map(m => m.id));
+    for (const [id, cont] of this.mobContainers.entries()) {
+      if (!ids.has(id)) { cont.destroy(true); this.mobContainers.delete(id); this.mobState.delete(id); }
+    }
+    // Create/update existing
+    const sorted = mobs.map(m => m.id).sort();
+    const positions = this.layoutPositions(sorted);
+    for (const m of mobs) {
+      const cont = this.ensureMobContainer(m.id, m.level);
+      const pos = positions.get(m.id)!;
+      cont.setPosition(pos.x, pos.y);
+      const ratio = Math.max(0, Math.min(1, m.hp / (m.maxHp || 1)));
+  const mc = cont as { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
+  const bar: Phaser.GameObjects.Rectangle = mc.__bar!;
+  const full: number = mc.__barFull!;
+      bar.width = full * ratio;
+      this.mobState.set(m.id, { hp: m.hp, maxHp: m.maxHp, level: m.level });
+    }
+  }
+  private async pollSnapshot(characterId: string) {
+    try {
+      const res = await fetch(`/api/combat/snapshot?zone=Slime&characterId=${encodeURIComponent(characterId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const mobs = (data?.snapshot?.mobs as Array<{ id: string; hp: number; maxHp: number; level: number }>) || [];
+      this.reconcileMobs(mobs);
+    } catch {}
+  }
+  private async basicAttack(characterId: string) {
+    try {
+      const res = await fetch("/api/combat/cmd", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Slime", characterId, action: "basic", value: { x: this.player.x } }) });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.result?.hit) {
+        // Tiny feedback: flash the first mob's bar
+        const mobId = data?.result?.mobId as string | undefined;
+        const cont = mobId ? this.mobContainers.get(mobId) : undefined;
+        if (cont) {
+          const mc = cont as { __bar?: Phaser.GameObjects.Rectangle; __barFull?: number };
+          const bar: Phaser.GameObjects.Rectangle | undefined = mc.__bar;
+          if (bar) {
+            bar.setFillStyle(0xfca5a5);
+            this.time.delayedCall(120, () => bar.setFillStyle(0xef4444));
+          }
+          // Simple particle burst at slime position using sDot
+          const spawnSpark = (i: number) => {
+            const img = this.add.image(cont.x, cont.y, "sDot");
+            img.setTint(0x22c55e).setAlpha(0.9).setScale(Phaser.Math.FloatBetween(0.8, 1.2));
+            const ang = Phaser.Math.FloatBetween(0, Math.PI * 2);
+            const speed = Phaser.Math.Between(40, 100);
+            const toX = cont.x + Math.cos(ang) * speed * 0.4;
+            const toY = cont.y + Math.sin(ang) * speed * 0.4;
+            this.tweens.add({ targets: img, x: toX, y: toY, alpha: 0, duration: 280, ease: "Sine.easeOut", onComplete: () => img.destroy() });
+          };
+          for (let i = 0; i < 12; i++) this.time.delayedCall(i * 8, () => spawnSpark(i));
+        }
+      }
+    } catch {}
+  }
+  private async toggleAuto(characterId: string) {
+    try {
+      const v = !this.auto; this.auto = v;
+      await fetch("/api/combat/cmd", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Slime", characterId, action: "auto", value: v }) });
+      window.__spawnOverhead?.(v ? ":green: Auto ON" : ":red: Auto OFF", { wave: false, ripple: true });
+      this.game.registry.set("autoOn", v);
+    } catch {}
   }
   update() {
     if (!this.player || !this.cursors) return;
@@ -777,6 +1008,49 @@ class SlimeFieldScene extends Phaser.Scene {
       const onFloor = (this.player.body as Phaser.Physics.Arcade.Body).blocked.down; if (this.cursors.W.isDown && onFloor) this.player.setVelocityY(-420);
     } else {
       this.player.setVelocityX(0);
+    }
+    // Combat keys
+    if (!typing && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      const characterId = String(this.game.registry.get("characterId") || "");
+      if (characterId) {
+        // Player squish animation
+        this.tweens.add({ targets: this.player, scaleY: 0.85, yoyo: true, duration: 90, repeat: 0 });
+        this.basicAttack(characterId);
+      }
+    }
+    if (!typing && Phaser.Input.Keyboard.JustDown(this.rKey)) {
+      const characterId = String(this.game.registry.get("characterId") || "");
+      if (characterId) this.toggleAuto(characterId);
+    }
+    // Simple autopilot: move toward the first mob and attack on a small cooldown
+    if (this.auto && this.joinedCombat && !typing) {
+      // Choose nearest mob by x distance
+      let nearest: Phaser.GameObjects.Container | undefined;
+      let nearestDist = Number.POSITIVE_INFINITY;
+      for (const cont of this.mobContainers.values()) {
+        const d = Math.abs(cont.x - this.player.x);
+        if (d < nearestDist) { nearest = cont; nearestDist = d; }
+      }
+      const first = nearest;
+      if (first) {
+        const dx = first.x - this.player.x;
+        const abs = Math.abs(dx);
+        const dir = Math.sign(dx);
+        const approachSpeed = 140;
+        if (abs > 20) {
+          this.player.setVelocityX(dir * approachSpeed);
+        } else {
+          this.player.setVelocityX(0);
+          const now = this.time.now;
+          if (now - this.lastAutoAttackAt > 350) {
+            const characterId = String(this.game.registry.get("characterId") || "");
+            if (characterId) this.basicAttack(characterId);
+            this.lastAutoAttackAt = now;
+            // tiny squish
+            this.tweens.add({ targets: this.player, scaleY: 0.88, yoyo: true, duration: 90 });
+          }
+        }
+      }
     }
     if (this.nameTag) this.nameTag.setPosition(this.player.x, this.player.y - 24);
     if (!typing && Phaser.Input.Keyboard.JustDown(this.eKey) && this.player.x < 100) {
@@ -837,6 +1111,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const [craftingExpState, setCraftingExpState] = useState<number>(0);
   const [craftingMax, setCraftingMax] = useState<number>(reqCraft(1));
   const [expHud, setExpHud] = useState<{ label: string; value: number; max: number }>({ label: "Character EXP", value: initialExp ?? 0, max: reqChar(character?.level ?? 1) });
+  // Simple character vitals and auto status (client HUD only for now)
+  const [hp, setHp] = useState<number>(100);
+  const [mp, setMp] = useState<number>(50);
+  const [autoOn, setAutoOn] = useState<boolean>(false);
   // Toasts
   const [toasts, setToasts] = useState<Array<{ id: number; text: string }>>([]);
   const pushToast = useCallback((text: string) => {
@@ -852,6 +1130,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   const typingRef = useRef<boolean>(false);
   // Currency
   const [gold, setGold] = useState<number>(0);
+  const [showQuests, setShowQuests] = useState(false);
+  const [quests, setQuests] = useState<Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }>>([]);
   const [premiumGold, setPremiumGold] = useState<number>(0);
 
   useEffect(() => {
@@ -1061,6 +1341,12 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       if (!game) return;
       const inv = (game.registry.get("inventory") as Record<string, number>) || {};
       setInventory({ ...inv });
+      // Pull lightweight vitals and auto flag from registry until server stats wire-up
+      const auto = !!game.registry.get("autoOn");
+      setAutoOn(auto);
+      // Placeholder vitals: keep static for now unless wired to combat snapshot
+      setHp((v) => v);
+      setMp((v) => v);
       // Update HUD based on active scene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
@@ -1501,6 +1787,10 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           window.__applyExpUpdate?.({ type: "crafting", exp: data.craftingExp, level: data.craftingLevel });
         }
       }
+      // If dagger crafted, progress crafting quest
+      if (currQ.recipe === "dagger") {
+        await fetch('/api/quest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'progress', characterId: character.id, questId: 'tutorial_craft_copper_dagger', progressDelta: 1 }) }).catch(()=>{});
+      }
       // Decrement and continue or clear
       setWorkQueue((prev) => {
         if (!prev) { workRef.current = null; return null; }
@@ -1676,6 +1966,31 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
           </div>
           {/* Contextual EXP bar */}
           <div className="mt-2 w-56">
+            {/* Vitals */}
+            <div className="mb-2">
+              <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
+                <span>HP</span>
+                <span>{hp} / {100}</span>
+              </div>
+              <div className="h-2 w-full rounded bg-white/10">
+                <div className="h-2 rounded bg-rose-500" style={{ width: `${Math.min(100, (hp / 100) * 100)}%` }} />
+              </div>
+            </div>
+            <div className="mb-2">
+              <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
+                <span>MP</span>
+                <span>{mp} / {50}</span>
+              </div>
+              <div className="h-2 w-full rounded bg-white/10">
+                <div className="h-2 rounded bg-sky-500" style={{ width: `${Math.min(100, (mp / 50) * 100)}%` }} />
+              </div>
+            </div>
+            {/* Auto indicator */}
+            <div className="mb-2 text-[11px] text-gray-300">
+              <span className={`rounded px-2 py-0.5 ring-1 ${autoOn ? "bg-emerald-900/40 text-emerald-300 ring-emerald-500/30" : "bg-black/30 text-gray-300 ring-white/10"}`}>
+                Auto: {autoOn ? "ON" : "OFF"}
+              </span>
+            </div>
             <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
               <span>{expHud.label}</span>
               <span>{expHud.value} / {expHud.max}</span>
@@ -1694,7 +2009,18 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       <div className="pointer-events-auto absolute right-3 top-3 z-10 flex gap-2">
         <button className="btn px-3 py-1 text-sm" title="Open your inventory" onClick={() => setOpenInventory(true)}>Items</button>
         <button className="btn px-3 py-1 text-sm" title="View your talent tree">Talents</button>
-        <button className="btn px-3 py-1 text-sm" title="Quests, Tips, AFK Info">Codex</button>
+        <button className="btn px-3 py-1 text-sm" title="Quests, Tips, AFK Info" onClick={async () => {
+          if (!character) return;
+          setShowQuests(true);
+          try {
+            const res = await fetch(`/api/quest?characterId=${character.id}`);
+            if (res.ok) {
+              const data = await res.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> }));
+              const rows: Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> = Array.isArray(data.characterQuests) ? data.characterQuests : [];
+              setQuests(rows);
+            }
+          } catch {}
+        }}>Codex</button>
   {/* Shop is now a Town interaction, not a HUD button */}
         <button className="btn px-3 py-1 text-sm" title="View your stats and skills" onClick={async () => {
           if (!character) return;
@@ -1746,6 +2072,73 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Quests Modal */}
+      {showQuests && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+          <div className="w-[min(680px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Quests</h3>
+              <button className="btn px-3 py-1" onClick={() => setShowQuests(false)}>Close</button>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              {quests.length === 0 && <div className="text-sm text-gray-400">No quests yet. Talk to Grimsley in town.</div>}
+              {quests.map((q) => (
+                <div key={q.questId} className="rounded border border-white/10 bg-black/40 p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-white/90">{q.quest?.name || q.questId}</div>
+                      <div className="text-xs text-gray-300">{q.quest?.description}</div>
+                    </div>
+                    <div className="text-xs">{q.status}</div>
+                  </div>
+                  {typeof q.progress === 'number' && typeof q.quest?.objectiveCount === 'number' && (
+                    <div className="mt-2">
+                      <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
+                        <span>Progress</span>
+                        <span>{q.progress} / {q.quest.objectiveCount}</span>
+                      </div>
+                      <div className="h-2 w-full rounded bg-white/10">
+                        <div className="h-2 rounded bg-green-500" style={{ width: `${Math.min(100, (q.progress / Math.max(1,q.quest.objectiveCount)) * 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    {q.status === 'ACTIVE' && (
+                      <button className="btn px-2 py-1 text-xs" onClick={async () => {
+                        if (!character) return;
+                        await fetch('/api/quest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'abandon', characterId: character.id, questId: q.questId }) });
+                        const res = await fetch(`/api/quest?characterId=${character.id}`);
+                        const data = await res.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> }));
+                        const rows: Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> = Array.isArray(data.characterQuests) ? data.characterQuests : [];
+                        setQuests(rows);
+                      }}>Abandon</button>
+                    )}
+                    {q.status === 'COMPLETED' && (
+                      <button className="btn px-2 py-1 text-xs" onClick={async () => {
+                        if (!character) return;
+                        const res = await fetch('/api/quest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', characterId: character.id, questId: q.questId }) });
+                        const payload = await res.json().catch(()=>({}));
+                        if (payload?.rewards?.gold) setGold((g)=>g + Number(payload.rewards.gold||0));
+                        if (payload?.rewards?.exp) window.__applyExpUpdate?.({ type: 'character', exp: payload.rewards.exp, level: 0 });
+                        const inv = (gameRef.current?.registry.get('inventory') as Record<string, number>) || {};
+                        if (payload?.granted) {
+                          for (const [k,v] of Object.entries(payload.granted as Record<string,number>)) inv[k] = (inv[k]??0)+Number(v||0);
+                          gameRef.current?.registry.set('inventory', inv);
+                          setInventory({ ...inv });
+                        }
+                        const res2 = await fetch(`/api/quest?characterId=${character.id}`);
+                        const data2 = await res2.json().catch(()=>({ characterQuests: [] as Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> }));
+                        const rows2: Array<{ questId: string; status: string; progress: number; quest?: { id: string; name: string; description: string; objectiveCount: number } }> = Array.isArray(data2.characterQuests) ? data2.characterQuests : [];
+                        setQuests(rows2);
+                      }}>Hand In</button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

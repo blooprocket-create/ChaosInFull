@@ -64,6 +64,7 @@ model Character {
   itemStacks ItemStack[]
   craftQueue CraftQueue?
   chatMessages ChatMessage[]
+  characterQuests CharacterQuest[]
   @@unique([userId, name])
 }
 
@@ -107,6 +108,40 @@ model ChatMessage {
   createdAt DateTime @default(now())
   // Optional zone/scene for scoping later
   scene     String   @default("Town")
+}
+
+// Quests
+model Quest {
+  id              String   @id
+  name            String
+  description     String
+  objectiveType   String   // e.g. "KILL"
+  objectiveTarget String   // e.g. "slime"
+  objectiveCount  Int      // e.g. 5
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  characterQuests CharacterQuest[]
+}
+
+model CharacterQuest {
+  id           String    @id @default(cuid())
+  character    Character @relation(fields: [characterId], references: [id])
+  characterId  String
+  quest        Quest     @relation(fields: [questId], references: [id])
+  questId      String
+  status       QuestStatus @default(ACTIVE)
+  progress     Int       @default(0)
+  // Whether the player has claimed the rewards for this quest (for hand-in steps)
+  claimedRewards Boolean  @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  @@unique([characterId, questId])
+}
+
+enum QuestStatus {
+  AVAILABLE
+  ACTIVE
+  COMPLETED
 }
 
 enum Gender {
