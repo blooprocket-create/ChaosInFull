@@ -6,6 +6,7 @@ import AudioToggle from "@/src/components/AudioToggle";
 import CursorAura from "@/src/components/CursorAura";
 import NavAuth from "@/src/components/NavAuth";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/react";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
 const mono = Roboto_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400","700"] });
@@ -72,6 +73,7 @@ export default async function RootLayout({
         <footer className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
           © {new Date().getFullYear()} Chaos In Full
         </footer>
+        <Analytics />
       </body>
     </html>
   );

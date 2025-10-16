@@ -29,6 +29,8 @@ export class TownScene extends Phaser.Scene {
   private tutorialNpc!: Phaser.GameObjects.Image;
   private tutorIcon!: Phaser.GameObjects.Text;
   private nameTag!: Phaser.GameObjects.Text;
+  private others = new Map<string, { sprite: Phaser.GameObjects.Image; tag: Phaser.GameObjects.Text }>();
+  private presenceTimer?: Phaser.Time.TimerEvent;
 
   create() {
     this.game.registry.set("currentScene", "Town");
@@ -205,8 +207,50 @@ export class TownScene extends Phaser.Scene {
     // Overhead
     setupOverheadSpawner(this, () => ({ x: this.player.x, y: this.player.y }));
 
+    // Presence heartbeat + polling
+  const cid = String(this.game.registry.get("characterId") || "");
+  const cname2 = String(this.game.registry.get("characterName") || "You");
+    if (cid) {
+      const sendHeartbeat = async () => {
+        try {
+          await fetch("/api/world/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Town", characterId: cid, name: cname2, x: this.player.x, y: this.player.y }) });
+        } catch {}
+      };
+      const pollOthers = async () => {
+        try {
+          const res = await fetch(`/api/world/presence?zone=Town&characterId=${encodeURIComponent(cid)}`);
+          const data = await res.json().catch(() => ({ players: [] as Array<{ id: string; name: string; x: number; y: number }> }));
+          const players: Array<{ id: string; name: string; x: number; y: number }> = Array.isArray(data.players) ? data.players : [];
+          const seen = new Set(players.map(p => p.id));
+          // Remove missing
+          for (const [id, obj] of this.others) { if (!seen.has(id)) { obj.sprite.destroy(); obj.tag.destroy(); this.others.delete(id); } }
+          // Upsert others
+          for (const p of players) {
+            let obj = this.others.get(p.id);
+            if (!obj) {
+              const dot = this.add.image(p.x, p.y, "dot").setTint(0xffffff).setScale(0.6).setAlpha(0.9).setDepth(4);
+              const tag = this.add.text(p.x, p.y - 18, p.name || "Player", { color: "#9ca3af", fontSize: "10px" }).setOrigin(0.5).setDepth(5);
+              obj = { sprite: dot, tag }; this.others.set(p.id, obj);
+            }
+            obj.sprite.setPosition(p.x, p.y);
+            obj.tag.setPosition(p.x, p.y - 18).setText(p.name || "Player");
+          }
+        } catch {}
+      };
+      // Staggered: heartbeat every 2.5s, poll others every 2.5s offset by 1.25s
+      this.time.addEvent({ delay: 2500, loop: true, callback: sendHeartbeat });
+      this.presenceTimer = this.time.addEvent({ delay: 2500, loop: true, callback: pollOthers, startAt: 1250 });
+      // Fire initial immediately
+      void sendHeartbeat(); void pollOthers();
+    }
+
     // Cleanup
-    this.events.on("shutdown", () => { if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler); });
+    this.events.on("shutdown", () => {
+      if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
+      if (this.presenceTimer) { this.presenceTimer.remove(false); this.presenceTimer = undefined; }
+      for (const obj of this.others.values()) { obj.sprite.destroy(); obj.tag.destroy(); }
+      this.others.clear();
+    });
   }
 
   update() {

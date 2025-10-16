@@ -5,9 +5,10 @@ declare global {
   interface Window { __spawnOverhead?: (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => void; __setTyping?: (v: boolean) => void; __focusGame?: () => void; }
 }
 
-export default function ChatClient({ characterId, scene }: { characterId: string; scene: string }) {
+export default function ChatClient({ characterId, scene: initialScene }: { characterId: string; scene: string }) {
   const [messages, setMessages] = useState<Array<{ id: string; text: string; createdAt: string; characterId?: string | null }>>([]);
   const [input, setInput] = useState("");
+  const [scene, setScene] = useState<string>(initialScene);
   // focus state not kept beyond gating
   const lastTsRef = useRef<string>(new Date(Date.now() - 60_000).toISOString());
   const boxRef = useRef<HTMLDivElement>(null);
@@ -89,6 +90,21 @@ export default function ChatClient({ characterId, scene }: { characterId: string
     } catch {}
     finally { pollInFlight.current = false; }
   }, [scene]);
+
+  // Listen for scene changes from the game canvas
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { scene: string } | undefined;
+      if (detail?.scene && typeof detail.scene === 'string') {
+        setScene(detail.scene);
+        // reset polling cursor so we fetch recent messages for new scene
+        lastTsRef.current = new Date(Date.now() - 60_000).toISOString();
+        setMessages([]);
+      }
+    };
+    window.addEventListener("game:scene-changed", handler as EventListener);
+    return () => window.removeEventListener("game:scene-changed", handler as EventListener);
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => void poll(), 1200);

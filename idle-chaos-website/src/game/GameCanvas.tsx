@@ -352,7 +352,16 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       // Update HUD based on active scene
       const scenes = game.scene.getScenes(true);
       const active = scenes.length ? scenes[0].scene.key : "TownScene";
-      setActiveSceneKey(active);
+      if (active !== activeSceneKey) {
+        setActiveSceneKey(active);
+        // Emit scene change event for listeners (e.g., ChatClient)
+        const canonical: "Town" | "Cave" | "Slime" | "Slime Meadow" =
+          active === "SlimeMeadowScene" ? "Slime Meadow" :
+          active === "SlimeFieldScene" || active === "SlimeScene" ? "Slime" :
+          active === "CaveScene" ? "Cave" : "Town";
+        const evt = new CustomEvent("game:scene-changed", { detail: { scene: canonical } });
+        window.dispatchEvent(evt);
+      }
       if (showFurnace || showWorkbench || showSawmill) {
         setExpHud({ label: "Crafting EXP", value: craftingExpState, max: craftingMax });
       } else if (active === "CaveScene") {

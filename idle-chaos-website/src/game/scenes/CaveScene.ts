@@ -14,6 +14,9 @@ export class CaveScene extends Phaser.Scene {
   private tinCount = 0;
   private copperNode!: Phaser.GameObjects.Image;
   private tinNode!: Phaser.GameObjects.Image;
+  private others = new Map<string, { sprite: Phaser.GameObjects.Image; tag: Phaser.GameObjects.Text }>();
+  private presenceHeartbeatTimer?: Phaser.Time.TimerEvent;
+  private presencePollTimer?: Phaser.Time.TimerEvent;
 
   create() {
     this.game.registry.set("currentScene", "Cave");
@@ -97,8 +100,44 @@ export class CaveScene extends Phaser.Scene {
 
     // Overhead spawner
     setupOverheadSpawner(this, () => ({ x: this.player.x, y: this.player.y }));
+    // Presence heartbeat + polling
+    ensureCircleTexture(this, "dot", 7, 0xffffff);
+  const cid = String(this.game.registry.get("characterId") || "");
+    if (cid) {
+      const sendHeartbeat = async () => {
+        try { await fetch("/api/world/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone: "Cave", characterId: cid, name: cname, x: this.player.x, y: this.player.y }) }); } catch {}
+      };
+      const pollOthers = async () => {
+        try {
+          const res = await fetch(`/api/world/presence?zone=Cave&characterId=${encodeURIComponent(cid)}`);
+          const data = await res.json().catch(() => ({ players: [] as Array<{ id: string; name: string; x: number; y: number }> }));
+          const players: Array<{ id: string; name: string; x: number; y: number }> = Array.isArray(data.players) ? data.players : [];
+          const seen = new Set(players.map(p => p.id));
+          for (const [id, obj] of this.others) { if (!seen.has(id)) { obj.sprite.destroy(); obj.tag.destroy(); this.others.delete(id); } }
+          for (const p of players) {
+            let obj = this.others.get(p.id);
+            if (!obj) {
+              const dot = this.add.image(p.x, p.y, "dot").setTint(0xffffff).setScale(0.6).setAlpha(0.9).setDepth(4);
+              const tag = this.add.text(p.x, p.y - 18, p.name || "Player", { color: "#9ca3af", fontSize: "10px" }).setOrigin(0.5).setDepth(5);
+              obj = { sprite: dot, tag }; this.others.set(p.id, obj);
+            }
+            obj.sprite.setPosition(p.x, p.y);
+            obj.tag.setPosition(p.x, p.y - 18).setText(p.name || "Player");
+          }
+        } catch {}
+      };
+      this.presenceHeartbeatTimer = this.time.addEvent({ delay: 2500, loop: true, callback: sendHeartbeat });
+      this.presencePollTimer = this.time.addEvent({ delay: 2500, loop: true, callback: pollOthers, startAt: 1250 });
+      void sendHeartbeat(); void pollOthers();
+    }
 
-    this.events.on("shutdown", () => { if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler); });
+    this.events.on("shutdown", () => {
+      if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
+      if (this.presenceHeartbeatTimer) { this.presenceHeartbeatTimer.remove(false); this.presenceHeartbeatTimer = undefined; }
+      if (this.presencePollTimer) { this.presencePollTimer.remove(false); this.presencePollTimer = undefined; }
+      for (const obj of this.others.values()) { obj.sprite.destroy(); obj.tag.destroy(); }
+      this.others.clear();
+    });
   }
 
   private isNearNode(node: Phaser.GameObjects.Image) {
