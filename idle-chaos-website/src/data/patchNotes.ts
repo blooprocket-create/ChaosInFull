@@ -9,6 +9,33 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-10-16",
+    version: "0.0.11",
+    title: "Beta Prep: Admin overhaul, inventory grid, batch shop, BigInt prices",
+    highlights: [
+      "Admin polish: shared layout, Enter-to-save, rarity dropdown with centralized colors",
+      "Items API hardened: BigInt buy/sell, validation + clear error messages",
+      "Inventory overhaul: fixed-slot grid UI + split stack modal (partial moves)",
+      "Shop upgrade: batch buy/sell in one transaction; gold tracked per character",
+      "Zero-pruning: stacks at 0 are deleted server-side to keep DB clean",
+      "Deployment ready: Postgres schema, Prisma postinstall, Vercel config + envs"
+    ],
+    notes: [
+      "Centralized rarity mapping and colors; consistent across admin and UI",
+      "Admin items list shows proper empty and error states instead of disappearing",
+      "Split-stack modal supports moving partial counts to storage; right-click to split",
+      "Inventory sort/filter controls added (view-only for now)",
+      "Shop uses bulk endpoints; client toasts and validations added",
+      "Character.gold is the single source of truth for gold changes from shop",
+      "Prisma schema migrated: ItemDef.buy/sell are BigInt to prevent overflow",
+      "APIs serialize BigInt safely when returning JSON",
+      "Seed endpoint now sources items from src/data/items to keep prices consistent",
+      "Postgres-specific Prisma schema added; generate on build for Vercel",
+      "Added vercel.json and deployment docs; .env.example updated for Postgres",
+      "General cleanup: removed any types in routes, corrected Next.js route params typing"
+    ]
+  },
+  {
+    date: "2025-10-16",
     version: "0.0.10",
     title: "New Zone: Slime Meadow + Portal UX Pass",
     highlights: [

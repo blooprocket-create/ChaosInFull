@@ -843,6 +843,30 @@
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Lint Next.js website",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\.bin\\eslint) { node_modules\\.bin\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build (Next.js) website once",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
 		}
 	]
 }

@@ -22,6 +22,7 @@ export default async function NewsPage() {
     }
   } catch {}
   const posts = [
+    { title: "BIG NEWS: Testing is live", date: "2025-10-16", excerpt: "Public testing has begun. A bug report page is coming soon—expect it to judge your typos and our code equally." },
     { title: "Somewhat Playable Build Deployed", date: "2025-10-14", excerpt: "You can move, mine, craft queues, and pretend this is stable. Expect polite desyncs." },
     { title: "Website MVP is live", date: "2025-10-14", excerpt: "Accounts, login, dashboard stats. UI now judges your AFK duration." },
     { title: "Town zone planning", date: "2025-10-14", excerpt: "Workbench, Anvil, Furnace, Storage modal, Task Board sketch, tutorial NPC script drafts." },
