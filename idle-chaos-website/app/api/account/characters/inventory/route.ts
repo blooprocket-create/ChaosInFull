@@ -9,22 +9,16 @@ export async function POST(req: Request) {
   const { characterId, items } = body as { characterId?: string; items?: Record<string, number> };
   if (!characterId || !items) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   // Verify ownership
-  const client = prisma as unknown as {
-    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
-    itemStack: {
-      upsert: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } }; update: { count: number }; create: { characterId: string; itemKey: string; count: number } }) => Promise<unknown>
-    };
-  };
-  const owner = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  const owner = await prisma.character.findFirst({ where: { id: characterId, userId: session.userId } });
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const entries = Object.entries(items);
   for (const [itemKey, count] of entries) {
     const safe = Math.max(0, Math.floor(count));
     if (safe <= 0) {
       // Delete stack when zero to keep DB clean
-      await (prisma as any).itemStack.delete({ where: { characterId_itemKey: { characterId, itemKey } } }).catch(() => {});
+      await prisma.itemStack.delete({ where: { characterId_itemKey: { characterId, itemKey } } }).catch(() => {});
     } else {
-      await client.itemStack.upsert({
+      await prisma.itemStack.upsert({
         where: { characterId_itemKey: { characterId, itemKey } },
         update: { count: safe },
         create: { characterId, itemKey, count: safe },
@@ -40,13 +34,9 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const characterId = searchParams.get("characterId") || undefined;
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
-  const client = prisma as unknown as {
-    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
-    itemStack: { findMany: (args: { where: { characterId: string } }) => Promise<Array<{ itemKey: string; count: number }>> };
-  };
-  const owner = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  const owner = await prisma.character.findFirst({ where: { id: characterId, userId: session.userId } });
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-  const rows = await client.itemStack.findMany({ where: { characterId } });
+  const rows = await prisma.itemStack.findMany({ where: { characterId } });
   const items: Record<string, number> = {};
   for (const r of rows) {
     if (r.count > 0) items[r.itemKey] = r.count;

@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
 import { prisma } from "@/src/lib/prisma";
-import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const rows = await prisma.itemDef.findMany({ orderBy: { id: "asc" } });
-  const safe = rows.map(r => ({
+  const safe = rows.map((r: { id: string; name: string; description: string; rarity: string; stackable: boolean; maxStack: number; buy: bigint; sell: bigint; createdAt: Date; updatedAt: Date; }) => ({
     ...r,
     // Serialize BigInt to string for JSON safety
-    buy: (r as any).buy?.toString?.() ?? "0",
-    sell: (r as any).sell?.toString?.() ?? "0",
+    buy: String(r.buy),
+    sell: String(r.sell),
   }));
   return NextResponse.json({ ok: true, rows: safe });
 }
@@ -39,8 +38,8 @@ export async function POST(req: Request) {
   if (!/^[-a-z0-9_]+$/i.test(id)) return NextResponse.json({ ok: false, error: "invalid_id_format" }, { status: 400 });
   if (maxStack < 1) return NextResponse.json({ ok: false, error: "invalid_maxStack" }, { status: 400 });
   try {
-  const row = await prisma.itemDef.create({ data: { id, name, description, rarity, stackable, maxStack, buy: buy as unknown as Prisma.InputJsonValue as any, sell: sell as unknown as Prisma.InputJsonValue as any } as any });
-  const safe = { ...row, buy: (row as any).buy?.toString?.() ?? "0", sell: (row as any).sell?.toString?.() ?? "0" };
+  const row = await prisma.itemDef.create({ data: { id, name, description, rarity, stackable, maxStack, buy, sell } });
+  const safe = { ...row, buy: row.buy.toString(), sell: row.sell.toString() };
   return NextResponse.json({ ok: true, row: safe });
   } catch (err: unknown) {
     const e = err as { code?: string; message?: string };
