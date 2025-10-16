@@ -5,29 +5,6 @@ import { items as shopItems } from "@/src/data/items";
 import * as Phaser from "phaser";
 import createGame, { CharacterHUD as CharacterHUDType } from "./createGame";
 
-declare global {
-  interface Window {
-    __saveSceneNow?: (sceneOverride?: "Town" | "Cave" | "Slime") => void;
-    __applyExpUpdate?: (payload: { type: "character" | "mining" | "crafting"; exp: number; level: number }) => void;
-    __openFurnace?: () => void;
-    __openWorkbench?: () => void;
-    __openStorage?: () => void;
-    __openSawmill?: () => void;
-    __openShop?: () => void;
-    __closeFurnace?: () => void;
-    __closeWorkbench?: () => void;
-    __closeStorage?: () => void;
-    __closeSawmill?: () => void;
-    __closeShop?: () => void;
-    __spawnOverhead?: (text: string, opts?: { wave?: boolean; shake?: boolean; ripple?: boolean; rainbow?: boolean; color?: string }) => void;
-    __setTyping?: (v: boolean) => void;
-    __focusGame?: () => void;
-    __isTyping?: boolean;
-    // Expose Phaser registry with a minimal "get" shape to avoid any
-    __phaserRegistry?: { get?: (key: string) => unknown };
-  }
-}
-
 type CharacterHUD = CharacterHUDType;
 
 export default function GameCanvas({ character, initialSeenWelcome, initialScene, offlineSince, initialExp, initialMiningExp, initialMiningLevel }: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number; initialMiningLevel?: number }) {

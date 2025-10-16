@@ -1,12 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 
-declare global {
-  interface Window {
-    __phaserRegistry?: Map<string, unknown>;
-  }
-}
-
 // Module-scoped cache for last quest dirty value (avoids using any on component)
 let lastQuestDirty: number | undefined;
 

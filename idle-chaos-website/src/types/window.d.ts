@@ -8,8 +8,8 @@ declare global {
     __setTyping?: (v: boolean) => void;
     __focusGame?: () => void;
 
-    __applyExpUpdate?: (payload: { type: "mining" | "character"; exp: number; level: number }) => void;
-    __saveSceneNow?: (scene: "Town" | "Cave" | "Slime") => void;
+  __applyExpUpdate?: (payload: { type: "mining" | "character" | "crafting"; exp: number; level: number }) => void;
+  __saveSceneNow?: (scene?: "Town" | "Cave" | "Slime") => void;
 
     __openFurnace?: () => void;
     __openWorkbench?: () => void;
@@ -22,6 +22,6 @@ declare global {
     __closeShop?: () => void;
     __closeStorage?: () => void;
 
-    __phaserRegistry?: import("phaser").Data.DataManager;
+    __phaserRegistry?: import("phaser").Data.DataManager | { get?: (key: string) => unknown };
   }
 }
