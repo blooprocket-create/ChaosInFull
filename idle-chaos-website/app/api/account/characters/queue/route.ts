@@ -4,7 +4,7 @@ import { getSession } from "@/src/lib/auth";
 
 type FurnaceQueue = { recipe: "copper" | "bronze"; eta: number; startedAt: number; remaining: number; per: number; total: number };
 type WorkbenchQueue = { recipe: "armor" | "dagger"; eta: number; startedAt: number; remaining: number; per: number; total: number };
-type SawmillQueue = { recipe: "plank" | "oak_plank"; eta: number; startedAt: number; remaining: number; per: number; total: number };
+type SawmillQueue = { recipe: "normal_planks" | "oak_plank"; eta: number; startedAt: number; remaining: number; per: number; total: number };
 
 export async function GET(req: Request) {
   const session = await getSession();

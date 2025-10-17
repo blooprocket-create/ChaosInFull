@@ -13,7 +13,7 @@ export const items: ItemDef[] = [
   { key: "bronze_bar", name: "Bronze Bar", buy: 24, sell: 12, category: "bar" },
   { key: "log", name: "Log", buy: 4, sell: 2, category: "wood" },
   { key: "oak_log", name: "Oak Log", buy: 8, sell: 4, category: "wood" },
-  { key: "plank", name: "Plank", buy: 8, sell: 4, category: "plank" },
+  { key: "normal_planks", name: "Plank", buy: 8, sell: 4, category: "plank" },
   { key: "oak_plank", name: "Oak Plank", buy: 14, sell: 7, category: "plank" },
   { key: "copper_dagger", name: "Copper Dagger", buy: 30, sell: 16, category: "weapon" },
   { key: "copper_armor", name: "Copper Armor", buy: 42, sell: 24, category: "armor" },

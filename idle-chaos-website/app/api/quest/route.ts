@@ -14,7 +14,7 @@ async function ensureTutorialQuest() {
   await q`insert into "NpcDef" (id, name) values ('grimsley', 'Grimsley') on conflict (id) do update set name = excluded.name`;
   // Ensure core items exist
   await q`insert into "ItemDef" (id, name, sell, stackable, maxstack) values ('copper_bar','Copper Bar', 8, true, 999) on conflict (id) do nothing`;
-  await q`insert into "ItemDef" (id, name, sell, stackable, maxstack) values ('plank','Plank', 4, true, 999) on conflict (id) do nothing`;
+  await q`insert into "ItemDef" (id, name, sell, stackable, maxstack) values ('normal_planks','Plank', 4, true, 999) on conflict (id) do nothing`;
   // Upsert quest
   await q`insert into "Quest" (id, name, description, objectivetype, objectivetarget, objectivecount, givernpcid, nextquestid, rewardgold, rewardexp, minlevel)
            values (${TUTORIAL_QUEST_ID}, 'Can you punch?', 'Kill 5 slimes in the field.', 'KILL', 'slime', 5, 'grimsley', ${CRAFT_DAGGER_QUEST_ID}, 500, 250, 1)
@@ -24,7 +24,7 @@ async function ensureTutorialQuest() {
            values (${TUTORIAL_QUEST_ID + "__copper_bar"}, ${TUTORIAL_QUEST_ID}, 'copper_bar', 1)
            on conflict (id) do nothing`;
   await q`insert into "QuestRewardItem" (id, questid, itemid, qty)
-           values (${TUTORIAL_QUEST_ID + "__plank"}, ${TUTORIAL_QUEST_ID}, 'plank', 2)
+           values (${TUTORIAL_QUEST_ID + "__normal_planks"}, ${TUTORIAL_QUEST_ID}, 'normal_planks', 1)
            on conflict (id) do update set itemid = excluded.itemid, qty = excluded.qty`;
 }
 

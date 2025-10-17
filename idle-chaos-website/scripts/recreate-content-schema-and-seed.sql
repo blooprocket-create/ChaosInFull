@@ -138,7 +138,7 @@ INSERT INTO "ItemDef" (id, name, description, rarity, stackable, maxstack, buy, 
   ('copper_bar', 'Copper Bar', 'Smelted ambition. Warm to the touch, metaphorically.', 'common', TRUE, 999, 15, 8),
   ('bronze_bar', 'Bronze Bar', 'A cooperative effort between copper and tin. Polyamorous metallurgy.', 'common', TRUE, 999, 24, 12),
   ('log', 'Log', 'Fallen tree segment, still processing its feelings.', 'common', TRUE, 999, 4, 2),
-  ('plank', 'Plank', 'A log that went to finishing school.', 'common', TRUE, 999, 8, 4),
+  ('normal_planks', 'Plank', 'A log that went to finishing school.', 'common', TRUE, 999, 8, 4),
   ('oak_log', 'Oak Log', 'Heavier, moodier wood. Smells like confidence.', 'common', TRUE, 999, 8, 4),
   ('oak_plank', 'Oak Plank', 'Premium plank with faint notes of superiority.', 'common', TRUE, 999, 14, 7),
   ('slime_goop', 'Slime Goop', 'Jiggly residue. Surprisingly marketable.', 'common', TRUE, 999, 10, 5),
@@ -268,7 +268,7 @@ UPDATE "Quest" SET requiresquestid = 'tutorial_kill_slimes_5' WHERE id = 'tutori
 
 INSERT INTO "QuestRewardItem" (id, questid, itemid, qty) VALUES
   ('tutorial_kill_slimes_5__copper_bar', 'tutorial_kill_slimes_5', 'copper_bar', 1),
-  ('tutorial_kill_slimes_5__plank', 'tutorial_kill_slimes_5', 'plank', 2)
+  ('tutorial_kill_slimes_5__normal_planks', 'tutorial_kill_slimes_5', 'normal_planks', 2)
 ON CONFLICT (id) DO UPDATE SET itemid = EXCLUDED.itemid, qty = EXCLUDED.qty;
 
 -- Portals
