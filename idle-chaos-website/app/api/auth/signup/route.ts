@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 import { hashPassword, createSession } from "@/src/lib/auth";
-import { Prisma } from "@prisma/client";
 
 const schema = z.object({
   email: z.string().email(),
@@ -18,27 +17,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     const { email, username, password } = parsed.data;
-    const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
-    if (existing) {
+    const dup = await sql<{ exists: boolean }[]>`
+      select exists(
+        select 1 from "User" where email = ${email} or username = ${username}
+      ) as exists
+    `;
+    if (dup[0]?.exists) {
       return NextResponse.json({ error: "Email or username already in use" }, { status: 409 });
     }
     const passwordHash = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: { email, username, passwordHash, stats: { create: {} } },
-    });
+    const rows = await sql<{ id: string; email: string }[]>`
+      with ins as (
+        insert into "User" (id, email, username, passwordhash, isadmin)
+        values (gen_random_uuid()::text, ${email}, ${username}, ${passwordHash}, false)
+        returning id, email
+      )
+      insert into "PlayerStat" (id, userid)
+      select gen_random_uuid()::text, id from ins
+      returning (select id from ins limit 1) as id, (select email from ins limit 1) as email;
+    `;
+    const user = rows[0];
     await createSession({ userId: user.id, email: user.email });
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
-    // Common Prisma errors
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === "P2002") {
-        return NextResponse.json({ error: "Email or username already in use" }, { status: 409 });
-      }
-    }
-    if (err instanceof Prisma.PrismaClientInitializationError) {
-      console.error("Prisma init error during signup:", err.message);
-      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-    }
     console.error("/api/auth/signup error:", err);
     return NextResponse.json({ error: "Signup failed" }, { status: 500 });
   }

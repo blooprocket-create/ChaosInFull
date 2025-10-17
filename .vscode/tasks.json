@@ -1026,6 +1026,28 @@
 				"-Command",
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx prisma validate"
 			]
+		},
+		{
+			"label": "Typecheck web after Neon refactor",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx tsc -p tsconfig.json --noEmit"
+			]
+		},
+		{
+			"label": "Lint web after Neon refactor",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx eslint . --max-warnings=0"
+			]
 		}
 	]
 }

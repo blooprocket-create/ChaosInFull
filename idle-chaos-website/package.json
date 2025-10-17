@@ -17,6 +17,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@sentry/nextjs": "^8.35.0",
     "posthog-js": "^1.199.0",
     "@prisma/client": "^6.17.1",
