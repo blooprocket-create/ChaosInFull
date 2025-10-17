@@ -65,6 +65,75 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     setToasts((t) => [...t, { id, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
   }, []);
+  // Bug reporting
+  const [bugModalOpen, setBugModalOpen] = useState(false);
+  const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
+  const [bugDescription, setBugDescription] = useState("");
+  const [bugSubmitting, setBugSubmitting] = useState(false);
+  const [bugFeedback, setBugFeedback] = useState<string | null>(null);
+  const openBugReporter = useCallback(() => {
+    if (readonly) return;
+    let captured: string | null = null;
+    try {
+      const canvas = ref.current?.querySelector("canvas") as HTMLCanvasElement | null;
+      if (canvas) {
+        captured = canvas.toDataURL("image/png");
+      } else {
+        setBugFeedback("Unable to capture screenshot (canvas not ready).");
+      }
+    } catch {
+      setBugFeedback("Unable to capture screenshot.");
+    }
+    setBugScreenshot(captured);
+    setBugModalOpen(true);
+  }, [readonly]);
+
+  const closeBugReporter = useCallback(() => {
+    if (bugSubmitting) return;
+    setBugModalOpen(false);
+    setBugDescription("");
+    setBugFeedback(null);
+    setBugScreenshot(null);
+  }, [bugSubmitting]);
+
+  const submitBugReport = useCallback(async () => {
+    if (!character?.id) {
+      setBugFeedback("Character context missing.");
+      return;
+    }
+    if (!bugDescription.trim()) {
+      setBugFeedback("Please describe the issue you encountered.");
+      return;
+    }
+    setBugSubmitting(true);
+    setBugFeedback(null);
+    try {
+      const res = await fetch("/api/bug-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: character.id,
+          description: bugDescription.trim(),
+          screenshot: bugScreenshot,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const message = typeof data?.message === "string" ? data.message : typeof data?.error === "string" ? data.error : "Failed to submit report.";
+        setBugFeedback(message);
+        return;
+      }
+      setBugFeedback("Thanks! Your report has been sent.");
+      setBugDescription("");
+      setTimeout(() => {
+        closeBugReporter();
+      }, 1200);
+    } catch {
+      setBugFeedback("Network error submitting report.");
+    } finally {
+      setBugSubmitting(false);
+    }
+  }, [character?.id, bugDescription, bugScreenshot, closeBugReporter]);
 
   // Storage UI state
   const [showStorage, setShowStorage] = useState(false);
@@ -1506,6 +1575,65 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         </div>
       )}
       {/* Chat moved to dedicated ChatClient under the canvas */}
+      {!readonly && (
+        <button
+          onClick={openBugReporter}
+          className="fixed bottom-6 right-6 z-40 rounded-full bg-rose-600/90 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400"
+        >
+          Report Bug
+        </button>
+      )}
+
+      {!readonly && bugModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur">
+          <div className="w-[min(560px,92vw)] max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-black/85 p-6 text-gray-200 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-semibold text-white">Report a Bug</h3>
+              <button className="btn px-3 py-1" onClick={closeBugReporter} disabled={bugSubmitting}>Close</button>
+            </div>
+            <p className="mt-2 text-sm text-gray-400">
+              A screenshot of your current game view is captured automatically. Please describe what went wrong so the team can investigate.
+            </p>
+            <label className="mt-4 block text-sm text-gray-300">
+              Description
+              <textarea
+                className="mt-1 h-32 w-full resize-none rounded border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="What were you doing? What happened? Any steps to reproduce?"
+                value={bugDescription}
+                onChange={(e) => setBugDescription(e.target.value)}
+                disabled={bugSubmitting}
+              />
+            </label>
+            <div className="mt-4">
+              <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Screenshot</div>
+              {bugScreenshot ? (
+                <div className="overflow-hidden rounded border border-white/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={bugScreenshot} alt="Bug screenshot" className="w-full object-contain" />
+                </div>
+              ) : (
+                <div className="rounded border border-dashed border-white/20 bg-black/30 px-3 py-6 text-sm text-gray-400">
+                  Screenshot unavailable. You can still submit your description.
+                </div>
+              )}
+            </div>
+            {bugFeedback ? <div className="mt-3 text-sm text-amber-300">{bugFeedback}</div> : null}
+            <div className="mt-5 flex justify-end gap-3">
+              <button className="btn px-3 py-1" onClick={closeBugReporter} disabled={bugSubmitting}>
+                Cancel
+              </button>
+              <button
+                className="btn px-4 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                onClick={submitBugReport}
+                disabled={bugSubmitting}
+              >
+                {bugSubmitting ? "Sending…" : "Send Report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AFK Combat Modal */}
       {!readonly && afkCombatModal?.open && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">

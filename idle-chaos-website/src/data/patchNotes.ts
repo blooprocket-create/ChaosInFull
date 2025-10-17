@@ -8,6 +8,27 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-10-17",
+    version: "0.0.12",
+    title: "Neon nights, bug stomps, and quest triage",
+    highlights: [
+      "Sunset the old Prisma connection in favor of Neon; lighter, faster, deploy-friendly database wiring",
+      "Players can now smack the new “Report Bug” button to capture a screenshot, add context, and send it straight to the team",
+      "Admin dashboard gains a Bug Reports view with screenshots, reporter metadata, and a single-click complete flow",
+      "Rebuilt the Grimsley quest flow (again) so acceptance, progress, and completion survive real traffic instead of imploding combat",
+      "Combat snapshot and inventory sync polling now back off intelligently instead of DDOSing our own API during outages"
+    ],
+    notes: [
+      "Database helper exports dropped the unused Neon fetch cache flag (the option is always on upstream, so the warning spam is gone)",
+      "Bug report API stores descriptions, optional screenshots, and links to user/character IDs with resolvable statuses",
+      "Play scene captures the current canvas, hydrates a modal, and posts to `/api/bug-report`; failed uploads show inline feedback",
+      "Admin bug desk lists open tickets chronologically, previews screenshots inline, and revalidates the list after resolving",
+      "Combat polling in Slime/Meadow scenes uses exponential backoff; client side wander tweens were removed so server snapshots stay authoritative",
+      "Inventory sync now diffs payloads, filters zero-count stacks, and skips redundant POSTs to keep the DB calm",
+      "Quest completion and loot drops generate IDs server-side to avoid duplicate-key 500s that previously broke combat rewards"
+    ]
+  },
+  {
     date: "2025-10-16",
     version: "0.0.11",
     title: "Beta Prep: Admin overhaul, inventory grid, batch shop, BigInt prices",

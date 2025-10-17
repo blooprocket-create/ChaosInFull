@@ -9,6 +9,7 @@ const nav = [
   { href: "/admin/patch-notes", label: "Patch Notes" },
   { href: "/admin/items", label: "Items" },
   { href: "/admin/enemies", label: "Enemies" },
+  { href: "/admin/bug-reports", label: "Bug Reports" },
   { href: "/admin/world", label: "World" },
   { href: "/admin/users", label: "Users" },
 ];

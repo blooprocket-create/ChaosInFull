@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 
 type Enemy = { id: string; name: string; level: number; baseHp: number; damage: number; expBase: number; goldMin: number; goldMax: number; tags: string };
 
-const StatPill = ({ label, value }: { label: string; value: number | string }) => (
-  <span className="inline-flex items-center gap-1 rounded bg-zinc-800/70 px-2 py-0.5 text-[11px] uppercase tracking-wide text-gray-200">
-    <span className="font-semibold text-white">{value}</span>
-    <span className="opacity-70">{label}</span>
-  </span>
+const StatPill = ({ label, value, accent }: { label: string; value: number | string; accent?: string }) => (
+  <div className="flex flex-col items-center rounded border border-white/10 bg-black/40 px-2 py-1 text-[11px]">
+    <span className="text-[9px] uppercase tracking-wide text-gray-400">{label}</span>
+    <span className={`text-sm font-semibold ${accent ?? "text-white"}`}>{value}</span>
+  </div>
 );
 
 export default function AdminEnemies() {
@@ -112,13 +112,6 @@ export default function AdminEnemies() {
                   <div className="font-mono text-xs">{r.id}</div>
                   <button className="btn px-2 py-0.5" onClick={()=>remove(r.id)}>Delete</button>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <StatPill label="LV" value={r.level} />
-                  <StatPill label="HP" value={r.baseHp} />
-                  <StatPill label="DMG" value={r.damage} />
-                  <StatPill label="EXP" value={r.expBase} />
-                  <StatPill label="GOLD" value={`${r.goldMin}-${r.goldMax}`} />
-                </div>
                 <div>
                   <label className="label">Name</label>
                   <input
@@ -127,6 +120,16 @@ export default function AdminEnemies() {
                     onChange={e=>setRows(prev=>prev.map(x=>x.id===r.id?{...x,name:e.target.value}:x))}
                     onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{name:r.name}); } }}
                   />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <StatPill label="LV" value={r.level} accent="text-amber-300" />
+                  <StatPill label="HP" value={r.baseHp} accent="text-emerald-300" />
+                  <StatPill label="DMG" value={r.damage} accent="text-rose-300" />
+                  <StatPill label="EXP" value={r.expBase} accent="text-sky-300" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <StatPill label="Gold Min" value={r.goldMin} accent="text-yellow-200" />
+                  <StatPill label="Gold Max" value={r.goldMax} accent="text-yellow-200" />
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-sm">
                   <label className="label">Level
