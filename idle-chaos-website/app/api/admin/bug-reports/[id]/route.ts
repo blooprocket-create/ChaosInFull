@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { q } from "@/src/lib/db";
+import { ensureBugReportTable, q } from "@/src/lib/db";
 import { assertAdmin } from "@/src/lib/authz";
-import { ensureBugReportTable } from "@/src/lib/bugReports";
 
 type Params = { params: Promise<{ id: string }> };
 

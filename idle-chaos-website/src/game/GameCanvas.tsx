@@ -331,7 +331,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
   }, [character]);
 
   // Minimal integration of reusable inventory sync
-  useInventorySync({
+  const { syncNow: syncInventoryNow } = useInventorySync({
     characterId: character?.id,
     getInventory: () => (gameRef.current?.registry.get("inventory") as Record<string, number> | undefined),
     onHydrate: (items) => {
@@ -405,7 +405,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
     }
   }, [offlineSince, initialScene]);
 
-  // Poll inventory from Phaser registry into React UI
+  // Poll inventory from Phaser registry into React UI (client state only)
   useEffect(() => {
     const t = setInterval(() => {
       const game = gameRef.current;
@@ -439,34 +439,8 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
         setExpHud({ label: "Character EXP", value: charExp, max: charMax });
       }
     }, 800);
-    // Periodically reconcile with DB as source of truth when no queues running
-    const r = setInterval(() => {
-      if (!character) return;
-  if (furnaceRef.current || workRef.current || sawRef.current) return; // don't override while crafting
-      fetch(`/api/account/characters/inventory?characterId=${character.id}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (!data) return;
-          const items = (data.items as Record<string, number>) || {};
-          const g = gameRef.current; if (!g) return;
-          g.registry.set("inventory", items);
-          setInventory({ ...items });
-        })
-        .catch(() => {});
-    }, 15000);
-    return () => { clearInterval(t); clearInterval(r); };
-  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, showSawmill, craftingExpState, craftingMax, character, activeSceneKey]);
-
-  // Periodically persist inventory while playing
-  useEffect(() => {
-    if (!character) return;
-    const t = setInterval(() => {
-      const game = gameRef.current; if (!game) return;
-      const inv = (game.registry.get("inventory") as Record<string, number>) || {};
-      fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: inv }) }).catch(() => {});
-    }, 7000);
-    return () => clearInterval(t);
-  }, [character]);
+    return () => { clearInterval(t); };
+  }, [charExp, charMax, miningExpState, miningMax, showFurnace, showWorkbench, showSawmill, craftingExpState, craftingMax, activeSceneKey]);
 
   // Load storage when opened
   useEffect(() => {
@@ -623,8 +597,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       game.registry.set("inventory", inv);
     }
     try {
-      // Persist inventory
-      await fetch("/api/account/characters/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId: character.id, items: (gameRef.current?.registry.get("inventory") as Record<string, number>) || {} }) });
+      await syncInventoryNow();
       // Award mining EXP: 3 per ore
       const miningExpDelta = (copper + tin) * 3;
       if (miningExpDelta > 0) {
@@ -638,7 +611,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       }
     } catch {}
     setOfflineModal(null);
-  }, [character, offlineModal]);
+  }, [character, offlineModal, syncInventoryNow]);
 
   // Furnace helpers: schedule looped smelting and cancel
   const scheduleNext: () => Promise<void> = useCallback(async () => {

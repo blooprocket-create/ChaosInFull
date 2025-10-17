@@ -253,8 +253,23 @@ export class SlimeFieldScene extends Phaser.Scene {
       const mobs = (data?.snapshot?.mobs as Mob[]) || [];
       this.reconcileMobs(mobs);
       this.currentPollDelay = this.basePollDelay;
-    } catch {
-      this.currentPollDelay = Math.min(this.currentPollDelay * 1.5, this.maxPollDelay);
+    } catch (err) {
+      const status = typeof err === "object" && err && "status" in err ? (err as { status?: number }).status : undefined;
+      if (status === 400) {
+        this.joinedCombat = false;
+        const cid = String(this.game.registry.get("characterId") || "");
+        if (cid) {
+          try {
+            const res = await api.combatJoin("Slime", cid);
+            if (res.ok) {
+              this.joinedCombat = true;
+              this.currentPollDelay = this.basePollDelay;
+            }
+          } catch {}
+        }
+      } else {
+        this.currentPollDelay = Math.min(this.currentPollDelay * 1.5, this.maxPollDelay);
+      }
     } finally {
       if (this.joinedCombat && this.scene.isActive(this.scene.key)) {
         this.scheduleNextPoll(characterId, this.currentPollDelay);

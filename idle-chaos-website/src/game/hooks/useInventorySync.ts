@@ -1,20 +1,26 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 type Options = {
   characterId?: string;
   getInventory: () => Record<string, number> | undefined;
   onHydrate?: (items: Record<string, number>) => void;
-  persistEveryMs?: number;
-  reconcileEveryMs?: number;
+  debounceMs?: number;
   skipWhile?: () => boolean; // e.g., active crafting queues
 };
 
+export type InventorySyncHandle = {
+  markDirty: () => void;
+  syncNow: () => Promise<void>;
+  hydrate: () => Promise<void>;
+};
+
 // Minimal reusable inventory sync hook between Phaser registry and server.
-export function useInventorySync(opts: Options) {
-  const { characterId, getInventory, onHydrate, persistEveryMs = 7000, reconcileEveryMs = 15000, skipWhile } = opts;
+export function useInventorySync(opts: Options): InventorySyncHandle {
+  const { characterId, getInventory, onHydrate, debounceMs = 800, skipWhile } = opts;
   const lastPersistPayload = useRef<string | null>(null);
   const persistInFlight = useRef(false);
   const lastHydratedPayload = useRef<string | null>(null);
+  const timeoutRef = useRef<number | null>(null);
 
   const normalize = (input: Record<string, number> | undefined) => {
     const clean: Record<string, number> = {};
@@ -26,73 +32,67 @@ export function useInventorySync(opts: Options) {
     return clean;
   };
 
-  // Hydrate once on mount
-  useEffect(() => {
+  const hydrate = useCallback(async () => {
     if (!characterId) return;
-    let aborted = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/account/characters/inventory?characterId=${characterId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!aborted) {
-          const items = (data?.items as Record<string, number>) || {};
-          const clean = normalize(items);
-          const payload = JSON.stringify(clean);
-          lastHydratedPayload.current = payload;
-          lastPersistPayload.current = payload;
-          onHydrate?.(clean);
-        }
-      } catch {}
-    })();
-    return () => { aborted = true; };
+    try {
+      const res = await fetch(`/api/account/characters/inventory?characterId=${characterId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = (data?.items as Record<string, number>) || {};
+      const clean = normalize(items);
+      const payload = JSON.stringify(clean);
+      lastHydratedPayload.current = payload;
+      lastPersistPayload.current = payload;
+      onHydrate?.(clean);
+    } catch {}
   }, [characterId, onHydrate]);
 
-  // Periodic persist
-  useEffect(() => {
+  const syncNow = useCallback(async () => {
     if (!characterId) return;
-    const tick = () => {
-      if (skipWhile?.() || persistInFlight.current) return;
-      const clean = normalize(getInventory());
-      const payload = JSON.stringify(clean);
-      if (payload === lastPersistPayload.current) return;
-      persistInFlight.current = true;
-      fetch("/api/account/characters/inventory", {
+    if (skipWhile?.()) return;
+    if (persistInFlight.current) return;
+    const clean = normalize(getInventory());
+    const payload = JSON.stringify(clean);
+    if (payload === lastPersistPayload.current) return;
+    persistInFlight.current = true;
+    try {
+      const res = await fetch("/api/account/characters/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ characterId, items: clean })
-      })
-        .then((res) => {
-          if (res.ok) lastPersistPayload.current = payload;
-        })
-        .catch(() => {})
-        .finally(() => { persistInFlight.current = false; });
-    };
-    const t = setInterval(tick, persistEveryMs);
-    return () => clearInterval(t);
-  }, [characterId, getInventory, persistEveryMs, skipWhile]);
+      });
+      if (res.ok) {
+        lastPersistPayload.current = payload;
+      }
+    } catch {
+      // swallow errors; caller can retry via markDirty
+    } finally {
+      persistInFlight.current = false;
+    }
+  }, [characterId, getInventory, skipWhile]);
 
-  // Periodic reconcile from server
+  const markDirty = useCallback(() => {
+    if (!characterId) return;
+    if (skipWhile?.()) return;
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(() => {
+      timeoutRef.current = null;
+      void syncNow();
+    }, debounceMs);
+  }, [characterId, debounceMs, skipWhile, syncNow]);
+
+  // Hydrate once on mount
   useEffect(() => {
     if (!characterId) return;
-    if (!onHydrate) return;
-    const tick = () => {
-      if (skipWhile?.()) return;
-      fetch(`/api/account/characters/inventory?characterId=${characterId}`)
-        .then(res => (res.ok ? res.json() : null))
-        .then(data => {
-          if (!data) return;
-          const items = (data.items as Record<string, number>) || {};
-          const clean = normalize(items);
-          const payload = JSON.stringify(clean);
-          if (payload === lastHydratedPayload.current) return;
-          lastHydratedPayload.current = payload;
-          lastPersistPayload.current = payload;
-          onHydrate(clean);
-        })
-        .catch(() => {});
+    void hydrate();
+    return () => {
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
-    const r = setInterval(tick, reconcileEveryMs);
-    return () => clearInterval(r);
-  }, [characterId, onHydrate, reconcileEveryMs, skipWhile]);
+  }, [characterId, hydrate]);
+
+  return {
+    markDirty,
+    syncNow,
+    hydrate,
+  };
 }

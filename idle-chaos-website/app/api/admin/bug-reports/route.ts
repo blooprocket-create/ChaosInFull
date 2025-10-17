@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
-import { q } from "@/src/lib/db";
-import { ensureBugReportTable } from "@/src/lib/bugReports";
+import { ensureBugReportTable, q } from "@/src/lib/db";
 
 export async function GET() {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }

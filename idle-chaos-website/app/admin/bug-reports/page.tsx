@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { assertAdmin } from "@/src/lib/authz";
-import { ensureBugReportTable } from "@/src/lib/bugReports";
-import { q } from "@/src/lib/db";
+import { ensureBugReportTable, q } from "@/src/lib/db";
 
 type BugReport = {
   id: string;

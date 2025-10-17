@@ -49,7 +49,15 @@ export const api = {
     return fetch("/api/combat/leave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone, characterId }) });
   },
   combatSnapshot(zone: Zone, characterId: string) {
-    return fetch(`/api/combat/snapshot?zone=${zone}&characterId=${encodeURIComponent(characterId)}`).then(r => r.ok ? r.json() : Promise.reject());
+    return fetch(`/api/combat/snapshot?zone=${zone}&characterId=${encodeURIComponent(characterId)}`).then(async (res) => {
+      if (res.ok) return res.json();
+      let message: string | undefined;
+      try {
+        const data = await res.json();
+        message = data?.error ?? data?.message;
+      } catch {}
+      throw { status: res.status, message };
+    });
   },
   combatCmd(zone: Zone, characterId: string, action: string, value?: unknown) {
     return fetch("/api/combat/cmd", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zone, characterId, action, value }) });

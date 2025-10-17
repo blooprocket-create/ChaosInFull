@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { ensurePgcrypto, q } from "@/src/lib/db";
-import { ensureBugReportTable } from "@/src/lib/bugReports";
+import { ensurePgcrypto, ensureBugReportTable, q } from "@/src/lib/db";
 
 type BugPayload = {
   characterId?: string;

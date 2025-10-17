@@ -162,11 +162,12 @@ function EnemyCard({ enemy, onUpdate, onDelete }: EnemyCardProps) {
     setSaving(true);
     try {
       const patch: Partial<Enemy> = {};
-      (["name", "level", "baseHp", "damage", "expBase", "goldMin", "goldMax", "tags"] as const).forEach(key => {
+      const applyDiff = <K extends keyof Enemy>(key: K) => {
         if (draft[key] !== enemy[key]) {
-          (patch as any)[key] = draft[key];
+          patch[key] = draft[key];
         }
-      });
+      };
+      (["name", "level", "baseHp", "damage", "expBase", "goldMin", "goldMax", "tags"] as const).forEach(applyDiff);
       if (Object.keys(patch).length > 0) {
         await onUpdate(enemy.id, patch);
       }
