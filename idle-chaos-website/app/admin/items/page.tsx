@@ -13,6 +13,48 @@ type Item = {
   sell: number;
 };
 
+type ApiItemRow = {
+  id: string;
+  name: string;
+  description?: string | null;
+  rarity?: string | null;
+  stackable?: boolean | null;
+  maxStack?: number | null;
+  maxstack?: number | null;
+  buy?: string | number | null;
+  sell?: string | number | null;
+};
+
+const toPositiveInt = (value: unknown, fallback: number): number => {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+      ? Number(value)
+      : fallback;
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.floor(numeric));
+};
+
+const normalizeItem = (row: ApiItemRow): Item => {
+  const maxStackCandidate =
+    typeof row.maxStack === "number" && Number.isFinite(row.maxStack)
+      ? row.maxStack
+      : typeof row.maxstack === "number" && Number.isFinite(row.maxstack)
+      ? row.maxstack
+      : 999;
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? "",
+    rarity: row.rarity ?? "common",
+    stackable: typeof row.stackable === "boolean" ? row.stackable : true,
+    maxStack: maxStackCandidate,
+    buy: toPositiveInt(row.buy, 0),
+    sell: toPositiveInt(row.sell, 0),
+  };
+};
+
 export default function AdminItems() {
   const [rows, setRows] = useState<Item[]>([]);
   const [form, setForm] = useState<Item>({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 });
@@ -23,19 +65,14 @@ export default function AdminItems() {
     try {
       const res = await fetch("/api/admin/items");
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setListError(j?.error || "Failed to load items");
+        const j: Record<string, unknown> = await res.json().catch(() => ({}));
+        setListError(typeof (j as { error?: string })?.error === "string" ? (j as { error?: string }).error ?? "Failed to load items" : "Failed to load items");
         return;
       }
-      const j = await res.json();
+      const j: { rows?: ApiItemRow[] } = await res.json();
       setRows(
         Array.isArray(j.rows)
-          ? (j.rows as Item[]).map(r => ({
-              ...r,
-              buy: typeof r.buy === 'string' ? parseInt(r.buy as string, 10) : Number(r.buy) || 0,
-              sell: typeof r.sell === 'string' ? parseInt(r.sell as string, 10) : Number(r.sell) || 0,
-              maxStack: typeof r.maxStack === 'number' ? r.maxStack : (typeof (r as unknown as { maxstack?: number }).maxstack === 'number' ? (r as unknown as { maxstack: number }).maxstack : 999),
-            }))
+          ? j.rows.map(normalizeItem)
           : []
       );
     } catch {

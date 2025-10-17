@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getSession } from "@/src/lib/auth";
 import { q } from "@/src/lib/db";
 
@@ -90,9 +91,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, locked: true, reasons }, { status: 400 });
     }
     // Upsert as ACTIVE (even if already AVAILABLE)
+    const newId = randomUUID();
     const up = await q<CharacterQuestRow>`
-      insert into "CharacterQuest" (characterid, questid, status, progress)
-      values (${characterId}, ${id}, 'ACTIVE', 0)
+      insert into "CharacterQuest" (id, characterid, questid, status, progress)
+      values (${newId}, ${characterId}, ${id}, 'ACTIVE', 0)
       on conflict (characterid, questid) do update set status = 'ACTIVE'
       returning *
     `;
@@ -172,7 +174,12 @@ export async function POST(req: Request) {
     }
     // Activate next quest in chain if defined
     if (qrow.nextquestid) {
-      await q`insert into "CharacterQuest" (characterid, questid, status, progress) values (${characterId}, ${qrow.nextquestid}, 'ACTIVE', 0) on conflict (characterid, questid) do update set status = 'ACTIVE'`;
+      const chainId = randomUUID();
+      await q`
+        insert into "CharacterQuest" (id, characterid, questid, status, progress)
+        values (${chainId}, ${characterId}, ${qrow.nextquestid}, 'ACTIVE', 0)
+        on conflict (characterid, questid) do update set status = 'ACTIVE'
+      `;
     }
     // Mark claimed
     await q`update "CharacterQuest" set claimedrewards = true where characterid = ${characterId} and questid = ${id}`;
