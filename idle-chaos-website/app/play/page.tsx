@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
 import GameCanvasClient from "@/src/game/GameCanvasClient";
 import CharacterSelect from "@/src/components/CharacterSelect";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 import ChatClient from "@/src/components/ChatClient";
 import QuestPanel from "@/src/components/QuestPanel";
 import StatusChip from "@/src/components/StatusChip";
@@ -20,11 +20,51 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
   const ch = sp?.ch;
   let character: (CharacterLite & { seenWelcome?: boolean; lastScene?: string; lastSeenAt?: string }) | null = null;
   if (ch) {
-    const client = prisma as unknown as {
-      character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
+    type Row = {
+      id: string;
+      userId: string;
+      name: string;
+      class: string;
+      level: number;
+      exp: number | null;
+      miningExp: number | null;
+      miningLevel: number | null;
+      seenWelcome: boolean | null;
+      lastScene: string | null;
+      lastSeenAt: string | null;
     };
-    const found = await client.character.findFirst({ where: { id: ch, userId: session.userId } });
-    character = (found as CharacterLite & { seenWelcome?: boolean; lastScene?: string; lastSeenAt?: string }) ?? null;
+    const rows = await q<Row>`
+      select id,
+             userid as "userId",
+             name,
+             class,
+             level,
+             exp as "exp",
+             miningexp as "miningExp",
+             mininglevel as "miningLevel",
+             seenwelcome as "seenWelcome",
+             lastscene as "lastScene",
+             lastseenat as "lastSeenAt"
+      from "Character"
+      where id = ${ch} and userid = ${session.userId}
+      limit 1
+    `;
+    const r = rows[0];
+    if (r) {
+      character = {
+        id: r.id,
+        userId: r.userId,
+        name: r.name,
+        class: r.class,
+        level: r.level,
+        exp: r.exp ?? undefined,
+        miningExp: r.miningExp ?? undefined,
+        miningLevel: r.miningLevel ?? undefined,
+        seenWelcome: Boolean(r.seenWelcome ?? false),
+        lastScene: r.lastScene ?? undefined,
+        lastSeenAt: r.lastSeenAt ?? undefined,
+      };
+    }
   }
   return (
     <section className="mx-auto max-w-6xl px-4 py-12">

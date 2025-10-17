@@ -1,37 +1,45 @@
 import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const client = prisma as unknown as { patchNote: { findUnique: (args: { where: { id: string } }) => Promise<unknown | null> } };
   const { id } = await params;
-  const row = await client.patchNote.findUnique({ where: { id } });
-  if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  return NextResponse.json({ ok: true, row });
+  const rows = await q<{ id: string; date: string; version: string; title: string; highlights: string[]; notes: string[] | null }>`
+    select id, to_char(date, 'YYYY-MM-DD') as date, version, title, highlights, notes
+    from "PatchNote" where id = ${id} limit 1
+  `;
+  if (!rows[0]) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  return NextResponse.json({ ok: true, row: rows[0] });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
   const body = await req.json().catch(() => ({}));
-  const data: { date?: Date; version?: string; title?: string; highlights?: string[]; notes?: string[] } = {};
   const b = body as Record<string, unknown>;
-  if (typeof b.date === 'string') data.date = new Date(b.date);
-  if (b.date instanceof Date) data.date = b.date;
-  if (typeof b.version === 'string') data.version = b.version;
-  if (typeof b.title === 'string') data.title = b.title;
-  if (Array.isArray(b.highlights)) data.highlights = b.highlights.map((s) => String(s));
-  if (Array.isArray(b.notes)) data.notes = b.notes.map((s) => String(s));
-  const client = prisma as unknown as { patchNote: { update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown> } };
   const { id } = await params;
-  const row = await client.patchNote.update({ where: { id }, data });
-  return NextResponse.json({ ok: true, row });
+  const date = typeof b.date === 'string' ? b.date : undefined;
+  const version = typeof b.version === 'string' ? b.version : undefined;
+  const title = typeof b.title === 'string' ? b.title : undefined;
+  const highlights = Array.isArray(b.highlights) ? (b.highlights as unknown[]).map(String) : undefined;
+  const notes = Array.isArray(b.notes) ? (b.notes as unknown[]).map(String) : undefined;
+  const rows = await q<{ id: string; date: string; version: string; title: string; highlights: string[]; notes: string[] | null }>`
+    update "PatchNote"
+    set
+      date = coalesce(${date}::date, date),
+      version = coalesce(${version}, version),
+      title = coalesce(${title}, title),
+      highlights = coalesce(${highlights ? JSON.stringify(highlights) : null}::jsonb, highlights),
+      notes = coalesce(${notes ? JSON.stringify(notes) : null}::jsonb, notes)
+    where id = ${id}
+    returning id, to_char(date, 'YYYY-MM-DD') as date, version, title, highlights, notes
+  `;
+  return NextResponse.json({ ok: true, row: rows[0] });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const client = prisma as unknown as { patchNote: { delete: (args: { where: { id: string } }) => Promise<void> } };
   const { id } = await params;
-  await client.patchNote.delete({ where: { id } });
+  await q`delete from "PatchNote" where id = ${id}`;
   return NextResponse.json({ ok: true });
 }

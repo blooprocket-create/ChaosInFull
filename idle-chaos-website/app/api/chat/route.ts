@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
 import { getSession } from "@/src/lib/auth";
+import { q } from "@/src/lib/db";
 
 // Simple in-memory rate limiter per user: allow 3 messages per 5 seconds
 // Note: In-memory limits reset on server restart and are per-instance. For production,
@@ -15,20 +15,34 @@ export async function GET(req: Request) {
   const sinceParam = searchParams.get("since");
   const scene = searchParams.get("scene") || undefined;
   const since = sinceParam ? new Date(sinceParam) : new Date(Date.now() - 60_000);
-  const msgs = await prisma.chatMessage.findMany({
-    where: { createdAt: { gt: since }, ...(scene ? { scene } : {}) },
-    orderBy: { createdAt: "asc" },
-    take: 100,
-    select: { id: true, text: true, createdAt: true, characterId: true, userId: true, scene: true, character: { select: { name: true } } },
-  });
+  let msgs: { id: string; text: string; createdat: string; characterid: string | null; userid: string; scene: string; charactername: string | null }[] = [];
+  if (scene) {
+    msgs = await q<{ id: string; text: string; createdat: string; characterid: string | null; userid: string; scene: string; charactername: string | null }>`
+      select cm.id, cm.text, cm.createdat, cm.characterid, cm.userid, cm.scene, c.name as charactername
+      from "ChatMessage" cm
+      left join "Character" c on c.id = cm.characterid
+      where cm.createdat > ${since} and cm.scene = ${scene}
+      order by cm.createdat asc
+      limit 100
+    `;
+  } else {
+    msgs = await q<{ id: string; text: string; createdat: string; characterid: string | null; userid: string; scene: string; charactername: string | null }>`
+      select cm.id, cm.text, cm.createdat, cm.characterid, cm.userid, cm.scene, c.name as charactername
+      from "ChatMessage" cm
+      left join "Character" c on c.id = cm.characterid
+      where cm.createdat > ${since}
+      order by cm.createdat asc
+      limit 100
+    `;
+  }
   const out = msgs.map(m => ({
     id: m.id,
     text: m.text,
-    createdAt: m.createdAt,
-    characterId: m.characterId,
-    userId: m.userId,
+    createdAt: m.createdat,
+    characterId: m.characterid,
+    userId: m.userid,
     scene: m.scene,
-    characterName: m.character?.name || null,
+    characterName: m.charactername,
   }));
   return NextResponse.json({ ok: true, messages: out });
 }
@@ -57,11 +71,17 @@ export async function POST(req: Request) {
   const trimmed = text.trim();
   if (!trimmed) return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   // Validate ownership
-  const owner = await prisma.character.findFirst({ where: { id: characterId, userId: session.userId }, select: { id: true } });
-  if (!owner) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  const created = await prisma.chatMessage.create({
-    data: { userId: session.userId, characterId, text: trimmed, scene: scene || "Town" },
-    select: { id: true, text: true, createdAt: true, characterId: true, scene: true, character: { select: { name: true } } },
-  });
-  return NextResponse.json({ ok: true, message: { id: created.id, text: created.text, createdAt: created.createdAt, characterId: created.characterId, scene: created.scene, characterName: created.character?.name || null } });
+  const owns = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId} limit 1`;
+  if (!owns[0]) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  const created = await q<{ id: string; text: string; createdat: string; characterid: string | null; scene: string; name: string | null }>`
+    with ins as (
+      insert into "ChatMessage" (id, userid, characterid, text, scene)
+      values (gen_random_uuid()::text, ${session.userId}, ${characterId}, ${trimmed}, ${scene || "Town"})
+      returning id, text, createdat, characterid, scene
+    )
+    select ins.id, ins.text, ins.createdat, ins.characterid, ins.scene, c.name
+    from ins left join "Character" c on c.id = ins.characterid
+  `;
+  const m = created[0];
+  return NextResponse.json({ ok: true, message: { id: m.id, text: m.text, createdAt: m.createdat, characterId: m.characterid, scene: m.scene, characterName: m.name } });
 }
