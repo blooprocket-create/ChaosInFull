@@ -2,11 +2,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { RARITY_OPTIONS, getRarityColor } from "@/src/lib/rarity";
 
-type Item = { id: string; name: string; description: string; rarity: string; stackable: boolean; maxStack: number; buy: string; sell: string };
+type Item = {
+  id: string;
+  name: string;
+  description: string;
+  rarity: string;
+  stackable: boolean;
+  maxStack: number;
+  buy: number;
+  sell: number;
+};
 
 export default function AdminItems() {
   const [rows, setRows] = useState<Item[]>([]);
-  const [form, setForm] = useState<Item>({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: "0", sell: "0" });
+  const [form, setForm] = useState<Item>({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 });
   const [createError, setCreateError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const load = async () => {
@@ -14,11 +23,21 @@ export default function AdminItems() {
     try {
       const res = await fetch("/api/admin/items");
       if (!res.ok) {
-        const j = await res.json().catch(()=>({}));
+        const j = await res.json().catch(() => ({}));
         setListError(j?.error || "Failed to load items");
         return;
       }
-  const j = await res.json(); setRows(Array.isArray(j.rows) ? j.rows : []);
+      const j = await res.json();
+      setRows(
+        Array.isArray(j.rows)
+          ? j.rows.map((r: any) => ({
+              ...r,
+              buy: typeof r.buy === 'string' ? parseInt(r.buy, 10) : Number(r.buy) || 0,
+              sell: typeof r.sell === 'string' ? parseInt(r.sell, 10) : Number(r.sell) || 0,
+              maxStack: typeof r.maxStack === 'number' ? r.maxStack : (typeof r.maxstack === 'number' ? r.maxstack : 999),
+            }))
+          : []
+      );
     } catch {
       setListError("Network error loading items");
     }
@@ -29,9 +48,13 @@ export default function AdminItems() {
   const [query, setQuery] = useState("");
   const create = async () => {
     setCreateError(null);
-    const res = await fetch("/api/admin/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const res = await fetch("/api/admin/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, buy: Number(form.buy), sell: Number(form.sell), maxStack: Number(form.maxStack) })
+    });
     if (res.ok) {
-  setForm({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: "0", sell: "0" });
+      setForm({ id: "", name: "", description: "", rarity: "common", stackable: true, maxStack: 999, buy: 0, sell: 0 });
       notify("Item created");
       await load();
     } else {
@@ -46,7 +69,15 @@ export default function AdminItems() {
     }
   };
   const remove = async (id: string) => { if (!confirm("Delete this item?")) return; const r = await fetch(`/api/admin/items/${id}`, { method: "DELETE" }); notify(r.ok?"Deleted":"Delete failed"); await load(); };
-  const update = async (id: string, patch: Partial<Item>) => { const r = await fetch(`/api/admin/items/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }); notify(r.ok?"Saved":"Save failed"); await load(); };
+  const update = async (id: string, patch: Partial<Item>) => {
+    const r = await fetch(`/api/admin/items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...patch, buy: patch.buy !== undefined ? Number(patch.buy) : undefined, sell: patch.sell !== undefined ? Number(patch.sell) : undefined, maxStack: patch.maxStack !== undefined ? Number(patch.maxStack) : undefined })
+    });
+    notify(r.ok ? "Saved" : "Save failed");
+    await load();
+  };
   const [page, setPage] = useState(1); const pageSize = 12;
   const filtered = useMemo(()=> rows.filter(r => (r.id+r.name+r.description).toLowerCase().includes(query.toLowerCase())), [rows, query]);
   const paged = useMemo(()=>{ const start=(page-1)*pageSize; return filtered.slice(start,start+pageSize); },[filtered,page]);
@@ -90,16 +121,10 @@ export default function AdminItems() {
               <input type="number" className="input mt-1" value={form.maxStack} onChange={e=>setForm(f=>({...f,maxStack:parseInt(e.target.value||"0",10)}))} />
             </label>
             <label className="label">Buy
-              <input type="number" className="input mt-1" value={form.buy} onChange={e=>{
-                const v = e.target.value.replace(/[^0-9]/g,"");
-                setForm(f=>({...f,buy: v === "" ? "0" : v}));
-              }} />
+              <input type="number" className="input mt-1" value={form.buy} onChange={e=>setForm(f=>({...f,buy:parseInt(e.target.value||"0",10)}))} />
             </label>
             <label className="label">Sell
-              <input type="number" className="input mt-1" value={form.sell} onChange={e=>{
-                const v = e.target.value.replace(/[^0-9]/g,"");
-                setForm(f=>({...f,sell: v === "" ? "0" : v}));
-              }} />
+              <input type="number" className="input mt-1" value={form.sell} onChange={e=>setForm(f=>({...f,sell:parseInt(e.target.value||"0",10)}))} />
             </label>
           </div>
           <button
@@ -182,8 +207,8 @@ export default function AdminItems() {
                       className="input mt-1"
                       value={r.buy}
                       onChange={e=>{
-                        const v = e.target.value.replace(/[^0-9]/g,"");
-                        setRows(prev=>prev.map(x=>x.id===r.id?{...x,buy: v === "" ? "0" : v}:x));
+                        const v = parseInt(e.target.value||"0",10);
+                        setRows(prev=>prev.map(x=>x.id===r.id?{...x,buy:isNaN(v)?0:v}:x));
                       }}
                       onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{ buy: r.buy }); } }}
                     />
@@ -194,8 +219,8 @@ export default function AdminItems() {
                       className="input mt-1"
                       value={r.sell}
                       onChange={e=>{
-                        const v = e.target.value.replace(/[^0-9]/g,"");
-                        setRows(prev=>prev.map(x=>x.id===r.id?{...x,sell: v === "" ? "0" : v}:x));
+                        const v = parseInt(e.target.value||"0",10);
+                        setRows(prev=>prev.map(x=>x.id===r.id?{...x,sell:isNaN(v)?0:v}:x));
                       }}
                       onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{ sell: r.sell }); } }}
                     />

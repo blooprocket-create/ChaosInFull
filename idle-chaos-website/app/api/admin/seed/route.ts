@@ -52,7 +52,7 @@ export async function POST() {
   await q`insert into "Quest" (id, name, description, objectivetype, objectivetarget, objectivecount, givernpcid, nextquestid, minlevel, requiresquestid, rewardgold, rewardexp)
           values ('tutorial_kill_slimes_5', 'Can you punch?', 'Kill 5 slimes in the field.', 'KILL', 'slime', 5, 'grimsley', 'tutorial_craft_copper_dagger', 1, null, 500, 250)
           on conflict (id) do update set name = excluded.name, description = excluded.description, objectivetype = excluded.objectivetype, objectivetarget = excluded.objectivetarget, objectivecount = excluded.objectivecount, givernpcid = excluded.givernpcid, nextquestid = excluded.nextquestid, minlevel = excluded.minlevel, requiresquestid = excluded.requiresquestid, rewardgold = excluded.rewardgold, rewardexp = excluded.rewardexp`;
-  const rewards: Array<{ itemid: string; qty: number }> = [ { itemid: 'copper_bar', qty: 1 }, { itemid: 'plank', qty: 1 } ];
+  const rewards: Array<{ itemid: string; qty: number }> = [ { itemid: 'copper_bar', qty: 1 }, { itemid: 'normal_planks', qty: 2 } ];
   for (const r of rewards) {
     const exists = await q<{ id: string }>`select id from "QuestRewardItem" where questid = 'tutorial_kill_slimes_5' and itemid = ${r.itemid}`;
     if (!exists.length) {
