@@ -18,10 +18,12 @@ export class SlimeMeadowScene extends Phaser.Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private rKey!: Phaser.Input.Keyboard.Key;
   private pollEvent?: Phaser.Time.TimerEvent;
+  private readonly basePollDelay = 400;
+  private readonly maxPollDelay = 4000;
+  private currentPollDelay = this.basePollDelay;
   private joinedCombat = false;
   private auto = false;
   private mobContainers = new Map<string, Phaser.GameObjects.Container>();
-  private wanderTimer?: Phaser.Time.TimerEvent;
   private lastAutoAttackAt = 0;
   private backPortal!: Phaser.Physics.Arcade.Image;
   private backHandle?: EPortalHandle;
@@ -77,8 +79,8 @@ export class SlimeMeadowScene extends Phaser.Scene {
         const res = await api.combatJoin("Slime Meadow", characterId);
         if (res.ok) {
           this.joinedCombat = true;
-          this.pollEvent = this.time.addEvent({ delay: 300, loop: true, callback: () => this.pollSnapshot(characterId) });
-          this.wanderTimer = this.time.addEvent({ delay: 2200, loop: true, callback: () => this.wanderMobs() });
+          this.currentPollDelay = this.basePollDelay;
+          this.scheduleNextPoll(characterId, this.currentPollDelay);
         }
       } catch {}
     })();
@@ -173,7 +175,6 @@ export class SlimeMeadowScene extends Phaser.Scene {
     this.events.on("shutdown", () => {
       if (this.onResizeHandler) this.scale.off("resize", this.onResizeHandler);
       if (this.pollEvent) { this.pollEvent.remove(false); this.pollEvent = undefined; }
-      if (this.wanderTimer) { this.wanderTimer.remove(false); this.wanderTimer = undefined; }
       this.mobContainers.forEach(c => c.destroy(true)); this.mobContainers.clear();
       try { if (this.joinedCombat) { const cid = String(this.game.registry.get("characterId") || ""); if (cid) api.combatLeave("Slime Meadow", cid).catch(()=>{}); } } catch {}
       if (this.backHandle) { this.backHandle.destroy(); this.backHandle = undefined; }
@@ -183,15 +184,6 @@ export class SlimeMeadowScene extends Phaser.Scene {
       this.others.clear();
       if (window.__spawnOverheadFor) window.__spawnOverheadFor = undefined;
     });
-  }
-
-  private wanderMobs() {
-    const range = 18;
-    for (const cont of this.mobContainers.values()) {
-      const origX = cont.x;
-      const toX = Phaser.Math.Clamp(origX + Phaser.Math.Between(-range, range), (this.groundRect.x - this.groundRect.width/2) + 40, (this.groundRect.x + this.groundRect.width/2) - 40);
-      this.tweens.add({ targets: cont, x: toX, duration: Phaser.Math.Between(700, 1100), ease: "Sine.easeInOut", yoyo: true });
-    }
   }
 
   private ensureMobContainer(id: string, level: number, templateId?: string) {
@@ -231,12 +223,26 @@ export class SlimeMeadowScene extends Phaser.Scene {
     }
   }
 
+  private scheduleNextPoll(characterId: string, delay: number) {
+    if (!this.scene.isActive(this.scene.key)) return;
+    if (this.pollEvent) { this.pollEvent.remove(false); this.pollEvent = undefined; }
+    this.pollEvent = this.time.delayedCall(delay, () => this.pollSnapshot(characterId));
+  }
+
   private async pollSnapshot(characterId: string) {
+    if (!this.joinedCombat || !this.scene.isActive(this.scene.key)) return;
     try {
       const data = await api.combatSnapshot("Slime Meadow", characterId);
       const mobs = (data?.snapshot?.mobs as Mob[]) || [];
       this.reconcileMobs(mobs);
-    } catch {}
+      this.currentPollDelay = this.basePollDelay;
+    } catch {
+      this.currentPollDelay = Math.min(this.currentPollDelay * 1.5, this.maxPollDelay);
+    } finally {
+      if (this.joinedCombat && this.scene.isActive(this.scene.key)) {
+        this.scheduleNextPoll(characterId, this.currentPollDelay);
+      }
+    }
   }
 
   private formatItem(key: string) {

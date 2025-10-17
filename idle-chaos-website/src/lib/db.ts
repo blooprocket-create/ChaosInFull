@@ -1,4 +1,4 @@
-import { neon, neonConfig } from "@neondatabase/serverless";
+import { neon } from "@neondatabase/serverless";
 
 const url = process.env.DATABASE_URL;
 if (!url) {

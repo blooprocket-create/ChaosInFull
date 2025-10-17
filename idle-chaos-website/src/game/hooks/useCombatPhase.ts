@@ -35,14 +35,28 @@ export function useCombatPhase({ zone, characterId, pollMs = 300 }: UseCombatPha
   // polling
   useEffect(() => {
     if (!joined || !characterId) return;
-    const id = window.setInterval(async () => {
+    let cancelled = false;
+    let currentDelay = pollMs;
+    const maxDelay = 5000;
+
+    const poll = async () => {
+      if (cancelled) return;
       try {
         const data = (await api.combatSnapshot(zone, characterId)) as CombatSnapshot;
         setMobs(Array.isArray(data?.snapshot?.mobs) ? (data!.snapshot!.mobs as Mob[]) : []);
-      } catch {}
-    }, pollMs);
-    polling.current = id;
-    return () => { if (polling.current) { clearInterval(polling.current); polling.current = null; } };
+        currentDelay = pollMs;
+      } catch {
+        currentDelay = Math.min(currentDelay * 1.5, maxDelay);
+      } finally {
+        if (!cancelled) polling.current = window.setTimeout(poll, currentDelay);
+      }
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+      if (polling.current) { window.clearTimeout(polling.current); polling.current = null; }
+    };
   }, [joined, characterId, zone, pollMs]);
 
   const actions = useMemo(() => ({
