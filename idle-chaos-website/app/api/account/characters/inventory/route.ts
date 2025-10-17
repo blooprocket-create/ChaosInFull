@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   if (!characterId || !items) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   // Verify ownership
   const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId} limit 1`;
-  if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const entries = Object.entries(items);
   for (const [itemKey, count] of entries) {
     const safe = Math.max(0, Math.floor(count));
@@ -25,7 +25,11 @@ export async function POST(req: Request) {
       `;
     }
   }
-  return NextResponse.json({ ok: true });
+  // Return updated snapshot
+  const rows = await q<{ itemkey: string; count: number }>`select itemkey, count from "ItemStack" where characterid = ${characterId}`;
+  const next: Record<string, number> = {};
+  for (const r of rows) if (r.count > 0) next[r.itemkey] = r.count;
+  return NextResponse.json({ ok: true, items: next });
 }
 
 export async function GET(req: Request) {
@@ -35,7 +39,7 @@ export async function GET(req: Request) {
   const characterId = searchParams.get("characterId") || undefined;
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId} limit 1`;
-  if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const rows = await q<{ itemkey: string; count: number }>`select itemkey, count from "ItemStack" where characterid = ${characterId}`;
   const items: Record<string, number> = {};
   for (const r of rows) {

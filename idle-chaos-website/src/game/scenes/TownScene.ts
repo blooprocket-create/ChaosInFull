@@ -163,6 +163,12 @@ export class TownScene extends Phaser.Scene {
       this.sawmillPrompt.setPosition(this.sawmill.x, this.sawmill.y - 30);
       this.storagePrompt.setPosition(this.storageBox.x, this.storageBox.y - 28);
       this.physics.world.setBounds(0, 0, w, h);
+      // Re-seat player above ground line to avoid jitter during resizes
+      if (this.player) {
+        const groundTop = this.groundRect.y - (this.groundRect.height / 2);
+        const targetY = groundTop - (this.player.displayHeight / 2) - 48;
+        this.player.setY(targetY);
+      }
     };
     this.scale.on("resize", this.onResizeHandler);
 
@@ -293,7 +299,7 @@ export class TownScene extends Phaser.Scene {
 
     this.cavePrompt.setVisible(nearCave);
     const tutorialStarted = !!this.game.registry.get("tutorialStarted");
-    this.slimePrompt.setText(tutorialStarted ? "Press E to Enter" : "Portal sealed—begin Tutorial").setVisible(nearSlime);
+  this.slimePrompt.setText(tutorialStarted ? "Press E to Enter" : "Portal sealed—begin Tutorial").setVisible(nearSlime);
     this.furnacePrompt.setVisible(nearFurnace);
     this.workbenchPrompt.setVisible(nearWorkbench);
     this.sawmillPrompt.setVisible(nearSawmill);
@@ -322,6 +328,26 @@ export class TownScene extends Phaser.Scene {
         this.game.registry.set("spawn", { from: "slime", portal: "town" });
   window.__saveSceneNow?.("Slime");
         this.scene.start("SlimeFieldScene");
+      } else if (nearSlime && !tutorialStarted) {
+        // Safety: if tutorial quest is AVAILABLE, auto-accept when trying portal to reduce confusion
+        const cid = String(this.game.registry.get("characterId") || "");
+        if (cid) {
+          (async () => {
+            try {
+              const data = await api.fetchQuests(cid).catch(() => null);
+              const cqs: Array<{ questId: string; status: string }> = data?.characterQuests || [];
+              const tut = cqs.find(q => q.questId === "tutorial_kill_slimes_5");
+              if (!tut || tut.status === "AVAILABLE") {
+                const res = await api.questAccept(cid);
+                if (res.ok) {
+                  this.game.registry.set("tutorialStarted", true);
+                  this.tutorIcon.setVisible(true).setColor("#cbd5e1").setText("?");
+                  window.__spawnOverhead?.(":blue: Grimsley: Pop 5 slimes to unseal it.");
+                }
+              }
+            } catch {}
+          })();
+        }
       } else if (nearTutor) {
         const started = !!this.game.registry.get("tutorialStarted");
         const cid = String(this.game.registry.get("characterId") || "");

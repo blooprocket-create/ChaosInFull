@@ -2,11 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 
 declare global {
-  interface Window { webkitAudioContext?: typeof AudioContext }
+  interface Window {
+    AudioContext?: typeof AudioContext;
+    webkitAudioContext?: typeof AudioContext;
+  }
 }
 
 function createToneCtx() {
-  const AC = window.AudioContext || window.webkitAudioContext;
+  const AC: typeof AudioContext = (window.AudioContext || window.webkitAudioContext)!;
   const ctx = new AC();
   const gain = ctx.createGain();
   gain.gain.value = 0.1; // slightly louder so it's audible

@@ -55,7 +55,7 @@ export default function InventoryGrid({ items, orderedKeys, slots = 48, classNam
 
   return (
     <div
-      className={`grid grid-cols-6 gap-3 sm:grid-cols-8 rounded border border-white/10 bg-black/40 p-3 ${className}`}
+      className={`grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-3 rounded border border-white/10 bg-black/40 p-3 ${className}`}
       onDragOver={onContainerDragOver}
       onDrop={onContainerDrop}
     >

@@ -1064,7 +1064,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       {/* Inventory Modal */}
       {!readonly && openInventory && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70">
-          <div className="w-[min(680px,94vw)] rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
+          <div className="max-h-[88vh] w-[min(720px,96vw)] overflow-auto rounded-lg border border-white/10 bg-black/85 p-5 text-gray-200 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Inventory</h3>
               <button className="btn px-3 py-1" onClick={() => setOpenInventory(false)}>Close</button>

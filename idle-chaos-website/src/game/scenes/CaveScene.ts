@@ -55,7 +55,7 @@ export class CaveScene extends Phaser.Scene {
 
     // AFK mining timers
     ensureCircleTexture(this, "dot", 7, 0xffffff);
-    this.time.addEvent({ delay: 2500, loop: true, callback: () => {
+  this.time.addEvent({ delay: 2500, loop: true, callback: async () => {
       const miningLevel = (this.game.registry.get("miningLevel") as number) ?? 1;
       if (miningLevel >= 1 && this.isNearNode(this.copperNode)) {
         this.copperCount += 1; this.miningFx(this.copperNode); this.updateHUD();
@@ -63,9 +63,22 @@ export class CaveScene extends Phaser.Scene {
           .then((res) => res.ok ? res.json() : null)
           .then((data) => { if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel }); })
           .catch(() => {});
+        // Persist inventory immediately and hydrate registry with DB snapshot to avoid drift
+        const cid = (this.game.registry.get("characterId") as string) || "";
+        if (cid) {
+          const inv = (this.game.registry.get("inventory") as Record<string, number>) || {};
+          try {
+            const r = await api.setInventory(cid, inv);
+            if (r.ok) {
+              const payload = await r.json().catch(() => null);
+              const items = (payload?.items as Record<string, number>) || inv;
+              this.game.registry.set("inventory", items);
+            }
+          } catch {}
+        }
       }
     }});
-    this.time.addEvent({ delay: 3500, loop: true, callback: () => {
+    this.time.addEvent({ delay: 3500, loop: true, callback: async () => {
       const miningLevel = (this.game.registry.get("miningLevel") as number) ?? 1;
       if (miningLevel >= 1 && this.isNearNode(this.tinNode)) {
         this.tinCount += 1; this.miningFx(this.tinNode); this.updateHUD();
@@ -73,6 +86,18 @@ export class CaveScene extends Phaser.Scene {
           .then((res) => res.ok ? res.json() : null)
           .then((data) => { if (data && typeof data.miningExp === "number" && typeof data.miningLevel === "number") window.__applyExpUpdate?.({ type: "mining", exp: data.miningExp, level: data.miningLevel }); })
           .catch(() => {});
+        const cid = (this.game.registry.get("characterId") as string) || "";
+        if (cid) {
+          const inv = (this.game.registry.get("inventory") as Record<string, number>) || {};
+          try {
+            const r = await api.setInventory(cid, inv);
+            if (r.ok) {
+              const payload = await r.json().catch(() => null);
+              const items = (payload?.items as Record<string, number>) || inv;
+              this.game.registry.set("inventory", items);
+            }
+          } catch {}
+        }
       }
     }});
 
@@ -95,6 +120,11 @@ export class CaveScene extends Phaser.Scene {
       ground.displayWidth = this.groundRect.width; ground.displayHeight = this.groundRect.height; ground.refreshBody();
       exitPortal.setPosition(60, this.groundRect.y - 22);
       this.physics.world.setBounds(0, 0, w, h);
+      // Keep player aligned above ground height to prevent falling/glitches on resize
+      if (this.player) {
+        const targetY = this.groundRect.y - 60;
+        this.player.setY(targetY);
+      }
     };
     this.scale.on("resize", this.onResizeHandler);
 
