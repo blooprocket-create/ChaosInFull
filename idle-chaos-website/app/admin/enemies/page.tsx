@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent } from "react";
 
 type Enemy = { id: string; name: string; level: number; baseHp: number; damage: number; expBase: number; goldMin: number; goldMax: number; tags: string };
 
@@ -107,92 +108,12 @@ export default function AdminEnemies() {
           <h2 className="font-semibold">Existing</h2>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {paged.map(r => (
-              <div key={r.id} className="panel p-3 space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-xs">{r.id}</div>
-                  <button className="btn px-2 py-0.5" onClick={()=>remove(r.id)}>Delete</button>
-                </div>
-                <div>
-                  <label className="label">Name</label>
-                  <input
-                    className="input"
-                    value={r.name}
-                    onChange={e=>setRows(prev=>prev.map(x=>x.id===r.id?{...x,name:e.target.value}:x))}
-                    onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{name:r.name}); } }}
-                  />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <StatPill label="LV" value={r.level} accent="text-amber-300" />
-                  <StatPill label="HP" value={r.baseHp} accent="text-emerald-300" />
-                  <StatPill label="DMG" value={r.damage} accent="text-rose-300" />
-                  <StatPill label="EXP" value={r.expBase} accent="text-sky-300" />
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <StatPill label="Gold Min" value={r.goldMin} accent="text-yellow-200" />
-                  <StatPill label="Gold Max" value={r.goldMax} accent="text-yellow-200" />
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-sm">
-                  <label className="label">Level
-                    <input
-                      type="number"
-                      className="input mt-1"
-                      value={r.level}
-                      onChange={e=>{ const v=parseInt(e.target.value||"0",10); setRows(prev=>prev.map(x=>x.id===r.id?{...x,level:isNaN(v)?0:v}:x)); }}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{level:r.level}); } }}
-                    />
-                  </label>
-                  <label className="label">HP
-                    <input
-                      type="number"
-                      className="input mt-1"
-                      value={r.baseHp}
-                      onChange={e=>{ const v=parseInt(e.target.value||"0",10); setRows(prev=>prev.map(x=>x.id===r.id?{...x,baseHp:isNaN(v)?0:v}:x)); }}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{baseHp:r.baseHp}); } }}
-                    />
-                  </label>
-                  <label className="label">DMG
-                    <input
-                      type="number"
-                      className="input mt-1"
-                      value={r.damage}
-                      onChange={e=>{ const v=parseInt(e.target.value||"0",10); setRows(prev=>prev.map(x=>x.id===r.id?{...x,damage:isNaN(v)?0:v}:x)); }}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{damage:r.damage}); } }}
-                    />
-                  </label>
-                  <label className="label">EXP
-                    <input
-                      type="number"
-                      className="input mt-1"
-                      value={r.expBase}
-                      onChange={e=>{ const v=parseInt(e.target.value||"0",10); setRows(prev=>prev.map(x=>x.id===r.id?{...x,expBase:isNaN(v)?0:v}:x)); }}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{expBase:r.expBase}); } }}
-                    />
-                  </label>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <label className="label">Gold Min
-                    <input
-                      type="number" className="input mt-1" value={r.goldMin}
-                      onChange={e=>{ const v=parseInt(e.target.value||"0",10); setRows(prev=>prev.map(x=>x.id===r.id?{...x,goldMin:isNaN(v)?0:v}:x)); }}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{goldMin:r.goldMin}); } }}
-                    />
-                  </label>
-                  <label className="label">Gold Max
-                    <input
-                      type="number" className="input mt-1" value={r.goldMax}
-                      onChange={e=>{ const v=parseInt(e.target.value||"0",10); setRows(prev=>prev.map(x=>x.id===r.id?{...x,goldMax:isNaN(v)?0:v}:x)); }}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{goldMax:r.goldMax}); } }}
-                    />
-                  </label>
-                  <label className="label">Tags
-                    <input
-                      className="input mt-1" value={r.tags}
-                      onChange={e=>setRows(prev=>prev.map(x=>x.id===r.id?{...x,tags:e.target.value}:x))}
-                      onKeyDown={e=>{ if (e.key==='Enter') { e.preventDefault(); update(r.id,{tags:r.tags}); } }}
-                    />
-                  </label>
-                </div>
-              </div>
+              <EnemyCard
+                key={r.id}
+                enemy={r}
+                onUpdate={update}
+                onDelete={remove}
+              />
             ))}
           </div>
           <div className="mt-4 flex items-center justify-center gap-3 text-sm">
@@ -203,5 +124,157 @@ export default function AdminEnemies() {
         </div>
       </div>
     </section>
+  );
+}
+
+type EnemyCardProps = {
+  enemy: Enemy;
+  onUpdate: (id: string, patch: Partial<Enemy>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+};
+
+function EnemyCard({ enemy, onUpdate, onDelete }: EnemyCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<Enemy>(enemy);
+
+  useEffect(() => {
+    setDraft(enemy);
+  }, [enemy]);
+
+  const handleNumberChange = (field: keyof Pick<Enemy, "level" | "baseHp" | "damage" | "expBase" | "goldMin" | "goldMax">) => (e: ChangeEvent<HTMLInputElement>) => {
+    const raw = parseInt(e.target.value || "0", 10);
+    const safe = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+    setDraft(prev => ({ ...prev, [field]: safe }));
+  };
+
+  const handleTextChange = (field: keyof Pick<Enemy, "name" | "tags">) => (e: ChangeEvent<HTMLInputElement>) => {
+    setDraft(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const cancelEdit = () => {
+    setDraft(enemy);
+    setEditing(false);
+  };
+
+  const saveEdit = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const patch: Partial<Enemy> = {};
+      (["name", "level", "baseHp", "damage", "expBase", "goldMin", "goldMax", "tags"] as const).forEach(key => {
+        if (draft[key] !== enemy[key]) {
+          (patch as any)[key] = draft[key];
+        }
+      });
+      if (Object.keys(patch).length > 0) {
+        await onUpdate(enemy.id, patch);
+      }
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tagList = (enemy.tags || "")
+    .split(",")
+    .map(tag => tag.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="panel p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-mono text-[11px] uppercase tracking-wide text-gray-400">{enemy.id}</div>
+          {!editing ? (
+            <>
+              <div className="mt-1 truncate text-lg font-semibold text-white">{enemy.name || "Unnamed Enemy"}</div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {tagList.length ? tagList.map(tag => (
+                  <span key={tag} className="rounded-full border border-white/10 bg-black/40 px-2 py-0.5 text-[11px] uppercase tracking-wide text-gray-300">
+                    {tag}
+                  </span>
+                )) : <span className="text-xs text-gray-500">No tags assigned</span>}
+              </div>
+            </>
+          ) : (
+            <label className="label mt-2 block text-sm">
+              Name
+              <input className="input mt-1" value={draft.name} onChange={handleTextChange("name")} />
+            </label>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {!editing && (
+            <button className="btn px-2 py-1 text-sm" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+          )}
+          <button className="btn px-2 py-1 text-sm bg-red-600 hover:bg-red-500" onClick={() => onDelete(enemy.id)}>
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {!editing ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <StatPill label="Level" value={enemy.level} accent="text-amber-300" />
+            <StatPill label="HP" value={enemy.baseHp} accent="text-emerald-300" />
+            <StatPill label="Damage" value={enemy.damage} accent="text-rose-300" />
+            <StatPill label="EXP" value={enemy.expBase} accent="text-sky-300" />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <StatPill label="Gold Min" value={enemy.goldMin} accent="text-yellow-200" />
+            <StatPill label="Gold Max" value={enemy.goldMax} accent="text-yellow-200" />
+          </div>
+        </>
+      ) : (
+        <div className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">
+              Level
+              <input type="number" className="input mt-1" value={draft.level} onChange={handleNumberChange("level")} />
+            </label>
+            <label className="label">
+              HP
+              <input type="number" className="input mt-1" value={draft.baseHp} onChange={handleNumberChange("baseHp")} />
+            </label>
+            <label className="label">
+              Damage
+              <input type="number" className="input mt-1" value={draft.damage} onChange={handleNumberChange("damage")} />
+            </label>
+            <label className="label">
+              EXP
+              <input type="number" className="input mt-1" value={draft.expBase} onChange={handleNumberChange("expBase")} />
+            </label>
+            <label className="label">
+              Gold Min
+              <input type="number" className="input mt-1" value={draft.goldMin} onChange={handleNumberChange("goldMin")} />
+            </label>
+            <label className="label">
+              Gold Max
+              <input type="number" className="input mt-1" value={draft.goldMax} onChange={handleNumberChange("goldMax")} />
+            </label>
+            <label className="label col-span-2">
+              Tags (CSV)
+              <input className="input mt-1" value={draft.tags} onChange={handleTextChange("tags")} placeholder="slime,undead" />
+            </label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button className="btn px-3 py-1" onClick={cancelEdit} disabled={saving}>
+              Cancel
+            </button>
+            <button
+              className="btn px-3 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+              onClick={saveEdit}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
