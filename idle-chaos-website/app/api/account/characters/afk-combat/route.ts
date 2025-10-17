@@ -106,15 +106,30 @@ export async function POST(req: Request) {
     if (/slime/.test(p.templateId)) goop += Math.floor(killsHere * 0.5);
   }
 
-  // Apply EXP via the central endpoint
+  // Apply EXP via the central endpoint (forwarding the user's cookie so auth passes)
   let newTotals: { level?: number; exp?: number } = {};
   try {
-    const origin = (() => {
+    const getAbsoluteBase = () => {
       const env = process.env.NEXT_PUBLIC_BASE_URL;
       if (env && /^https?:\/\//i.test(env)) return env.replace(/\/$/, "");
+      const origin = req.headers.get("origin") || req.headers.get("x-forwarded-origin") || "";
+      if (origin && /^https?:\/\//i.test(origin)) return origin.replace(/\/$/, "");
+      const xfProto = req.headers.get("x-forwarded-proto");
+      const xfHost = req.headers.get("x-forwarded-host");
+      if (xfHost) {
+        const proto = xfProto && /https/i.test(xfProto || "") ? "https" : "http";
+        return `${proto}://${xfHost}`;
+      }
+      const host = req.headers.get("host");
+      if (host) {
+        const guessHttps = /:443$/.test(host) || /https/i.test(xfProto || "");
+        return `${guessHttps ? "https" : "http"}://${host}`;
+      }
       return "http://localhost:3000";
-    })();
-    const resp = await fetch(`${origin}/api/account/characters/exp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ characterId, exp: expTotal }) });
+    };
+    const origin = getAbsoluteBase();
+    const cookie = req.headers.get("cookie");
+    const resp = await fetch(`${origin}/api/account/characters/exp`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify({ characterId, exp: expTotal }) });
     if (resp.ok) {
       const payload = await resp.json().catch(()=>null);
       if (payload && typeof payload.level === 'number' && typeof payload.exp === 'number') {

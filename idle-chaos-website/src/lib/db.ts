@@ -32,3 +32,17 @@ export function q<T extends RowObject = RowObject>(
   ) => Promise<unknown>;
   return sqlFn(strings, ...params) as Promise<T[]>;
 }
+
+// Ensure pgcrypto exists for gen_random_uuid() usage
+let pgcryptoChecked = false;
+export async function ensurePgcrypto() {
+  if (pgcryptoChecked) return;
+  try {
+    // Neon supports CREATE EXTENSION in a transactionless context; ignore errors in case of permissions
+    await sql`create extension if not exists pgcrypto`;
+  } catch {
+    // Best-effort; continue even if extension cannot be created here
+  } finally {
+    pgcryptoChecked = true;
+  }
+}

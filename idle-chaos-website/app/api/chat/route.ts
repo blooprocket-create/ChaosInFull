@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q } from "@/src/lib/db";
+import { q, ensurePgcrypto } from "@/src/lib/db";
 
 // Simple in-memory rate limiter per user: allow 3 messages per 5 seconds
 // Note: In-memory limits reset on server restart and are per-instance. For production,
@@ -51,6 +51,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  await ensurePgcrypto();
   // Rate limiting: 3 per 5s per user
   const now = Date.now();
   const key = session.userId;

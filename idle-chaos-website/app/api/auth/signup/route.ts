@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { q } from "@/src/lib/db";
+import { q, ensurePgcrypto } from "@/src/lib/db";
 import { hashPassword, createSession } from "@/src/lib/auth";
 
 const schema = z.object({
@@ -11,6 +11,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
+    await ensurePgcrypto();
     const data = await req.json();
     const parsed = schema.safeParse(data);
     if (!parsed.success) {

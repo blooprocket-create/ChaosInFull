@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   room.leave(characterId);
   try {
     await sql`
-      update "AfkCombatState" set lastsnapshot = now(), auto = false where characterid = ${characterId}
+      update "AfkCombatState" set lastsnapshot = now() where characterid = ${characterId}
     `;
   } catch {}
   return NextResponse.json({ ok: true });

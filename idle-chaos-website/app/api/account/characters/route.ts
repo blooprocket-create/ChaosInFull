@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q } from "@/src/lib/db";
+import { q, ensurePgcrypto } from "@/src/lib/db";
 
 export async function GET() {
   try {
@@ -24,6 +24,7 @@ export async function POST(req: Request) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    await ensurePgcrypto();
     const form = await req.formData();
     const name = String(form.get("name") || "").trim();
     const gender = String(form.get("gender") || "Male");
