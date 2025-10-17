@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
 import { q } from "@/src/lib/db";
 
-type IdCtx = { params: { id: string } };
+type IdCtx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: IdCtx) {
 	try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
 	const rows = await q<{ id: string; name: string; level: number; basehp: number; expbase: number; goldmin: number; goldmax: number; tags: string | null }>`
-		select id, name, level, basehp, expbase, goldmin, goldmax, tags from "EnemyTemplate" where id = ${params.id}
+		select id, name, level, basehp, expbase, goldmin, goldmax, tags from "EnemyTemplate" where id = ${(await params).id}
 	`;
 	const r = rows[0];
 	if (!r) return NextResponse.json({ ok: false, error: "not-found" }, { status: 404 });
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: IdCtx) {
 			goldmin = coalesce(${typeof goldMin === 'number' ? goldMin : null}::int, goldmin),
 			goldmax = coalesce(${typeof goldMax === 'number' ? goldMax : null}::int, goldmax),
 			tags = coalesce(${typeof tags === 'string' ? tags : null}::text, tags)
-		where id = ${params.id}
+		where id = ${(await params).id}
 		returning id, name, level, basehp, expbase, goldmin, goldmax, tags
 	`;
 	const r = rows[0];
@@ -39,7 +39,7 @@ export async function PATCH(req: Request, { params }: IdCtx) {
 
 export async function DELETE(_req: Request, { params }: IdCtx) {
 	try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-	const { id } = params;
+	const { id } = await params;
 	await q`delete from "EnemyTemplate" where id = ${id}`;
 	return NextResponse.json({ ok: true });
 }

@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
 import { q } from "@/src/lib/db";
 
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { id } = params;
+  const { id } = await params;
   const rows = await q<{ id: string; name: string; scenekey: string; width: number; height: number }>`
     select id, name, scenekey, width, height from "ZoneDef" where id = ${id}
   `;
@@ -26,7 +26,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (typeof b.width === 'number') { updates.push(`width = ${'${'}${values.push(b.width) && ''}}`); }
   if (typeof b.height === 'number') { updates.push(`height = ${'${'}${values.push(b.height) && ''}}`); }
   if (updates.length === 0) return NextResponse.json({ ok: false, error: 'no_changes' }, { status: 400 });
-  const { id } = params;
+  const { id } = await params;
   // Build the SQL with parameter placeholders via template tag by reusing q and spreading params
   const rows = await q<{ id: string; name: string; scenekey: string; width: number; height: number }>(
     [
@@ -40,7 +40,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { id } = params;
+  const { id } = await params;
   await q`delete from "ZoneDef" where id = ${id}`;
   return NextResponse.json({ ok: true });
 }

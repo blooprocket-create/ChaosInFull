@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { q } from "@/src/lib/db";
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  const { id } = params;
+  const { id } = await params;
   if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
   // Ownership check
   const owner = await q<{ id: string }>`select id from "Character" where id = ${id} and userid = ${session.userId}`;

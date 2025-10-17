@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
 import { q } from "@/src/lib/db";
 
-type Ctx = { params: { id: string; portalId: string } };
+type Ctx = { params: Promise<{ id: string; portalId: string }> };
 
 export async function PATCH(req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (typeof b.label === 'string') { sets.push(`label = ${'${'}${vals.push(b.label) && ''}}`); }
   if (typeof b.targetZoneId === 'string') { sets.push(`targetzoneid = ${'${'}${vals.push(b.targetZoneId) && ''}}`); }
   if (!sets.length) return NextResponse.json({ ok: false, error: 'no_changes' }, { status: 400 });
-  const { portalId } = params;
+  const { portalId } = await params;
   const rows = await q<{ id: string; zoneid: string; targetzoneid: string; x: number; y: number; radius: number; label: string }>(
     [
       `update "PortalDef" set ${sets.join(', ')} where id = `,
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { portalId } = params;
+  const { portalId } = await params;
   await q`delete from "PortalDef" where id = ${portalId}`;
   return NextResponse.json({ ok: true });
 }

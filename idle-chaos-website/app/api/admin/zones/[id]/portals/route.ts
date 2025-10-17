@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
 import { q } from "@/src/lib/db";
 
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { id } = params;
+  const { id } = await params;
   const rows = await q<{ id: string; zoneid: string; targetzoneid: string; x: number; y: number; radius: number; label: string }>`
     select id, zoneid, targetzoneid, x, y, radius, label from "PortalDef" where zoneid = ${id} order by createdat asc
   `;
@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 
 export async function POST(req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { id } = params;
+  const { id } = await params;
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   if (typeof b.targetZoneId !== 'string') return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 });
   const x = typeof b.x === 'number' ? b.x : 0;
