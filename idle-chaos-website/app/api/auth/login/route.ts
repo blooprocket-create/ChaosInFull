@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/src/lib/prisma";
 import { createSession, verifyPassword } from "@/src/lib/auth";
+import { Prisma } from "@prisma/client";
 
 const schema = z.object({
   emailOrUsername: z.string().min(3).max(255),
@@ -24,7 +25,11 @@ export async function POST(req: Request) {
     if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     await createSession({ userId: user.id, email: user.email });
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
+    if (err instanceof Prisma.PrismaClientInitializationError) {
+      console.error("Prisma init error during login:", err.message);
+      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    }
     console.error("/api/auth/login error:", err);
     return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }

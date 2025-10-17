@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/src/lib/prisma";
 import { hashPassword, createSession } from "@/src/lib/auth";
+import { Prisma } from "@prisma/client";
 
 const schema = z.object({
   email: z.string().email(),
@@ -27,7 +28,17 @@ export async function POST(req: Request) {
     });
     await createSession({ userId: user.id, email: user.email });
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
+    // Common Prisma errors
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2002") {
+        return NextResponse.json({ error: "Email or username already in use" }, { status: 409 });
+      }
+    }
+    if (err instanceof Prisma.PrismaClientInitializationError) {
+      console.error("Prisma init error during signup:", err.message);
+      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+    }
     console.error("/api/auth/signup error:", err);
     return NextResponse.json({ error: "Signup failed" }, { status: 500 });
   }

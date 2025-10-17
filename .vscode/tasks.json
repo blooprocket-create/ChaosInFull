@@ -960,6 +960,17 @@
 				"-Command",
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx prisma generate"
 			]
+		},
+		{
+			"label": "Typecheck and Lint (website)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx eslint . --max-warnings=0; npx tsc -p tsconfig.json --noEmit"
+			]
 		}
 	]
 }
