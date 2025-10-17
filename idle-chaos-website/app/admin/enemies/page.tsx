@@ -11,7 +11,7 @@ export default function AdminEnemies() {
     if (res.ok) {
       const j = await res.json();
       // If damage is missing (old API), default to 5
-      setRows(j.rows.map((r: any) => ({ damage: 5, ...r, ...(typeof r.damage === 'number' ? { damage: r.damage } : {}) })));
+  setRows((j.rows as Enemy[]).map(r => ({ ...r, damage: typeof r.damage === 'number' ? r.damage : 5 })));
     }
   };
   useEffect(() => { load(); }, []);

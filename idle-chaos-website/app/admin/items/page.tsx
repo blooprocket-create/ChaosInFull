@@ -30,11 +30,11 @@ export default function AdminItems() {
       const j = await res.json();
       setRows(
         Array.isArray(j.rows)
-          ? j.rows.map((r: any) => ({
+          ? (j.rows as Item[]).map(r => ({
               ...r,
-              buy: typeof r.buy === 'string' ? parseInt(r.buy, 10) : Number(r.buy) || 0,
-              sell: typeof r.sell === 'string' ? parseInt(r.sell, 10) : Number(r.sell) || 0,
-              maxStack: typeof r.maxStack === 'number' ? r.maxStack : (typeof r.maxstack === 'number' ? r.maxstack : 999),
+              buy: typeof r.buy === 'string' ? parseInt(r.buy as string, 10) : Number(r.buy) || 0,
+              sell: typeof r.sell === 'string' ? parseInt(r.sell as string, 10) : Number(r.sell) || 0,
+              maxStack: typeof r.maxStack === 'number' ? r.maxStack : (typeof (r as { maxstack?: number }).maxstack === 'number' ? (r as { maxstack: number }).maxstack : 999),
             }))
           : []
       );
