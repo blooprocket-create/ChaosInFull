@@ -175,7 +175,11 @@ export async function POST(req: Request) {
       for (const it of rewards) {
         const curr = await q<{ count: number }>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${it.itemid}`;
         const newCount = Math.max(0, (curr[0]?.count ?? 0) + Math.max(1, it.qty));
-        await q`insert into "ItemStack" (characterid, itemkey, count) values (${characterId}, ${it.itemid}, ${newCount}) on conflict (characterid, itemkey) do update set count = excluded.count`;
+        await q`
+          insert into "ItemStack" (id, characterid, itemkey, count)
+          values (concat('is_', substr(md5(random()::text), 1, 16)), ${characterId}, ${it.itemid}, ${newCount})
+          on conflict (characterid, itemkey) do update set count = excluded.count
+        `;
         granted[it.itemid] = (granted[it.itemid] ?? 0) + Math.max(1, it.qty);
       }
     } catch (err: unknown) {
