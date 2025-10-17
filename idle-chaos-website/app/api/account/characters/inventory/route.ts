@@ -12,18 +12,23 @@ export async function POST(req: Request) {
   const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId} limit 1`;
   if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const entries = Object.entries(items);
-  for (const [itemKey, count] of entries) {
-    const safe = Math.max(0, Math.floor(count));
-    if (safe <= 0) {
-      // Delete stack when zero to keep DB clean
-      await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`.catch(() => {});
-    } else {
-      await q`
-        insert into "ItemStack" (characterid, itemkey, count)
-        values (${characterId}, ${itemKey}, ${safe})
-        on conflict (characterid, itemkey) do update set count = excluded.count
-      `;
+  try {
+    for (const [itemKey, count] of entries) {
+      const safe = Math.max(0, Math.floor(count));
+      if (safe <= 0) {
+        // Delete stack when zero to keep DB clean
+        await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`.catch(() => {});
+      } else {
+        await q`
+          insert into "ItemStack" (characterid, itemkey, count)
+          values (${characterId}, ${itemKey}, ${safe})
+          on conflict (characterid, itemkey) do update set count = excluded.count
+        `;
+      }
     }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
   }
   // Return updated snapshot
   const rows = await q<{ itemkey: string; count: number }>`select itemkey, count from "ItemStack" where characterid = ${characterId}`;

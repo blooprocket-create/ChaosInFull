@@ -69,8 +69,14 @@ export async function POST(req: Request) {
       const vx = (value as { x?: unknown }).x;
       if (typeof vx === "number") hintX = vx;
     }
-    const res = room.basicAttack(characterId, hintX);
-  if (res.killed && res.mobId) {
+    let res;
+    try {
+      res = room.basicAttack(characterId, hintX);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ ok: false, error: "combat_error", message }, { status: 500 });
+    }
+    if (res.killed && res.mobId) {
       type Harvested = { templateId: string; rewards: Array<{ characterId: string; exp: number }>; loot: Array<{ itemId: string; qty: number }> };
       const harvested = room.harvestRewardsIfDead(res.mobId) as Harvested | null;
       const rw = harvested ? harvested.rewards : [];
@@ -81,21 +87,21 @@ export async function POST(req: Request) {
   let newExp: number | undefined;
   let newLevel: number | undefined;
   let goldDeltaApplied = 0;
-    if (selfReward) {
-      await awardExp(characterId, selfReward.exp, cookie, req);
-      // After awarding EXP, fetch the updated exp/level from DB for immediate HUD update
-      try {
-        const rows = await (q`
-          select exp, level from "Character" where id = ${characterId} limit 1
-        `);
-        if (rows[0]) { const r = rows[0] as { exp: number; level: number }; newExp = r.exp; newLevel = r.level; }
-      } catch {}
-    }
+      if (selfReward) {
+        await awardExp(characterId, selfReward.exp, cookie, req);
+        // After awarding EXP, fetch the updated exp/level from DB for immediate HUD update
+        try {
+          const rows = await (q`
+            select exp, level from "Character" where id = ${characterId} limit 1
+          `);
+          if (rows[0]) { const r = rows[0] as { exp: number; level: number }; newExp = r.exp; newLevel = r.level; }
+        } catch {}
+      }
       // Minimal gold + loot for killer
       try {
         const killerId = characterId;
-  const killerRows = await q<{ id: string }>`select id from "Character" where id = ${killerId} limit 1`;
-  const killer = killerRows[0];
+const killerRows = await q<{ id: string }>`select id from "Character" where id = ${killerId} limit 1`;
+const killer = killerRows[0];
         if (killer) {
           const baseExp = harvested?.rewards?.find(r=>r.characterId===killerId)?.exp ?? harvested?.rewards?.[0]?.exp ?? 5;
           const goldDelta = harvested?.loot?.length ? Math.min(Math.max(1, Math.floor(baseExp / 2)), 5) : (1 + Math.floor(Math.random() * 3));
@@ -117,7 +123,10 @@ export async function POST(req: Request) {
             }
           }
         }
-      } catch {}
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({ ok: false, error: "loot_error", message }, { status: 500 });
+      }
       // Quest progress hook: if killed a slime, progress tutorial quest by +1 for the killer
       try {
         if (harvested && harvested.templateId === "slime") {

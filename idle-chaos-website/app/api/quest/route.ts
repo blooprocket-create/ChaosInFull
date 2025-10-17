@@ -134,7 +134,12 @@ export async function POST(req: Request) {
     if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
     // Gold
     if ((qrow.rewardgold ?? 0) > 0) {
-      await q`update "Character" set gold = gold + ${qrow.rewardgold ?? 0} where id = ${characterId}`;
+      try {
+        await q`update "Character" set gold = gold + ${qrow.rewardgold ?? 0} where id = ${characterId}`;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
+      }
     }
     // EXP awards via central endpoint (absolute URL + cookies for auth)
     try {
@@ -165,12 +170,17 @@ export async function POST(req: Request) {
     } catch {}
     // Grant item rewards
     const granted: Record<string, number> = {};
-  const rewards = await q<{ itemid: string; qty: number }>`select itemid, qty from "QuestRewardItem" where questid = ${id}`;
-    for (const it of rewards) {
-  const curr = await q<{ count: number }>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${it.itemid}`;
-      const newCount = Math.max(0, (curr[0]?.count ?? 0) + Math.max(1, it.qty));
-      await q`insert into "ItemStack" (characterid, itemkey, count) values (${characterId}, ${it.itemid}, ${newCount}) on conflict (characterid, itemkey) do update set count = excluded.count`;
-      granted[it.itemid] = (granted[it.itemid] ?? 0) + Math.max(1, it.qty);
+    const rewards = await q<{ itemid: string; qty: number }>`select itemid, qty from "QuestRewardItem" where questid = ${id}`;
+    try {
+      for (const it of rewards) {
+        const curr = await q<{ count: number }>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${it.itemid}`;
+        const newCount = Math.max(0, (curr[0]?.count ?? 0) + Math.max(1, it.qty));
+        await q`insert into "ItemStack" (characterid, itemkey, count) values (${characterId}, ${it.itemid}, ${newCount}) on conflict (characterid, itemkey) do update set count = excluded.count`;
+        granted[it.itemid] = (granted[it.itemid] ?? 0) + Math.max(1, it.qty);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ ok: false, error: "loot_error", message }, { status: 500 });
     }
     // Activate next quest in chain if defined
     if (qrow.nextquestid) {
@@ -182,7 +192,12 @@ export async function POST(req: Request) {
       `;
     }
     // Mark claimed
-    await q`update "CharacterQuest" set claimedrewards = true where characterid = ${characterId} and questid = ${id}`;
+    try {
+      await q`update "CharacterQuest" set claimedrewards = true where characterid = ${characterId} and questid = ${id}`;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
+    }
     // Return updated exp/level
   const ch2 = (await q<{ exp: number; level: number; craftingexp: number; craftinglevel: number }>`select exp, level, craftingexp, craftinglevel from "Character" where id = ${characterId}`)[0];
     return NextResponse.json({ ok: true, rewards: { gold: qrow.rewardgold ?? 0, exp: qrow.rewardexp ?? 0, miningExp: qrow.rewardminingexp ?? 0, craftingExp: qrow.rewardcraftingexp ?? 0 }, granted, nextQuest: qrow.nextquestid, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingexp, craftingLevel: ch2?.craftinglevel, claimedRewards: true });
