@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     await createSession({ userId: user.id, email: user.email });
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof Prisma.PrismaClientInitializationError) {
       console.error("Prisma init error during login:", err.message);
       return NextResponse.json({ error: "Database unavailable" }, { status: 503 });

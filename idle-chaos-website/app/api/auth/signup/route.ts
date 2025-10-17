@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     });
     await createSession({ userId: user.id, email: user.email });
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Common Prisma errors
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === "P2002") {

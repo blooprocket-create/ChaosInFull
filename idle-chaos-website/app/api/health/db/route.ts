@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const one = await prisma.$queryRawUnsafe<{ "?column?": number }[]>("SELECT 1");
+    const one = (await prisma.$queryRawUnsafe("SELECT 1")) as Array<Record<string, number>>;
     const userCount = await prisma.user.count().catch(() => -1);
     return NextResponse.json({
       ok: true,
@@ -13,7 +13,8 @@ export async function GET() {
       userCount,
       provider: "postgresql",
     });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: String(err?.message || err) }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
