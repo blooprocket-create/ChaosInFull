@@ -3,6 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 
 type Enemy = { id: string; name: string; level: number; baseHp: number; damage: number; expBase: number; goldMin: number; goldMax: number; tags: string };
 
+const StatPill = ({ label, value }: { label: string; value: number | string }) => (
+  <span className="inline-flex items-center gap-1 rounded bg-zinc-800/70 px-2 py-0.5 text-[11px] uppercase tracking-wide text-gray-200">
+    <span className="font-semibold text-white">{value}</span>
+    <span className="opacity-70">{label}</span>
+  </span>
+);
+
 export default function AdminEnemies() {
   const [rows, setRows] = useState<Enemy[]>([]);
   const [form, setForm] = useState<Enemy>({ id: "", name: "", level: 1, baseHp: 30, damage: 5, expBase: 5, goldMin: 1, goldMax: 3, tags: "" });
@@ -11,7 +18,7 @@ export default function AdminEnemies() {
     if (res.ok) {
       const j = await res.json();
       // If damage is missing (old API), default to 5
-  setRows((j.rows as Enemy[]).map(r => ({ ...r, damage: typeof r.damage === 'number' ? r.damage : 5 })));
+      setRows((j.rows as Enemy[]).map(r => ({ ...r, damage: typeof r.damage === 'number' ? r.damage : 5 })));
     }
   };
   useEffect(() => { load(); }, []);
@@ -104,6 +111,13 @@ export default function AdminEnemies() {
                 <div className="flex items-center justify-between">
                   <div className="font-mono text-xs">{r.id}</div>
                   <button className="btn px-2 py-0.5" onClick={()=>remove(r.id)}>Delete</button>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <StatPill label="LV" value={r.level} />
+                  <StatPill label="HP" value={r.baseHp} />
+                  <StatPill label="DMG" value={r.damage} />
+                  <StatPill label="EXP" value={r.expBase} />
+                  <StatPill label="GOLD" value={`${r.goldMin}-${r.goldMax}`} />
                 </div>
                 <div>
                   <label className="label">Name</label>

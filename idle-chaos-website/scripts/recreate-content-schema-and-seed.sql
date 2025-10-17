@@ -28,7 +28,9 @@ CREATE TABLE "ItemDef" (
   stackable        BOOLEAN NOT NULL DEFAULT TRUE,
   maxstack         INTEGER NOT NULL DEFAULT 999,
   buy              INTEGER NOT NULL DEFAULT 0,
-  sell             INTEGER NOT NULL DEFAULT 0
+  sell             INTEGER NOT NULL DEFAULT 0,
+  createdat        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updatedat        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE "ZoneDef" (
@@ -72,8 +74,10 @@ CREATE TABLE "SpawnConfig" (
   templateid TEXT NOT NULL REFERENCES "EnemyTemplate"(id) ON DELETE CASCADE,
   budget     INTEGER NOT NULL,
   respawnms  INTEGER NOT NULL,
-  slots      JSONB NOT NULL,
-  phasetype  TEXT NOT NULL DEFAULT 'personal'
+  slots      JSONB,
+  phasetype  TEXT NOT NULL DEFAULT 'personal',
+  createdat  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updatedat  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE "NpcDef" (
@@ -114,6 +118,8 @@ CREATE TABLE "PortalDef" (
   y            INTEGER NOT NULL,
   radius       INTEGER NOT NULL,
   label        TEXT NOT NULL DEFAULT '',
+  createdat    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updatedat    TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT portal_unique UNIQUE (zoneid, targetzoneid, x, y)
 );
 
@@ -153,7 +159,8 @@ ON CONFLICT (id) DO UPDATE SET
   stackable = EXCLUDED.stackable,
   maxstack = EXCLUDED.maxstack,
   buy = EXCLUDED.buy,
-  sell = EXCLUDED.sell;
+  sell = EXCLUDED.sell,
+  updatedat = now();
 
 -- Enemy templates
 INSERT INTO "EnemyTemplate" (id, name, level, basehp, damage, expbase, goldmin, goldmax, tags) VALUES
@@ -216,7 +223,8 @@ ON CONFLICT (id) DO UPDATE SET
   budget = EXCLUDED.budget,
   respawnms = EXCLUDED.respawnms,
   slots = EXCLUDED.slots,
-  phasetype = EXCLUDED.phasetype;
+  phasetype = EXCLUDED.phasetype,
+  updatedat = now();
 
 -- Spawns: Slime Meadow
 INSERT INTO "SpawnConfig" (id, zoneid, templateid, budget, respawnms, slots, phasetype) VALUES
@@ -228,7 +236,8 @@ ON CONFLICT (id) DO UPDATE SET
   budget = EXCLUDED.budget,
   respawnms = EXCLUDED.respawnms,
   slots = EXCLUDED.slots,
-  phasetype = EXCLUDED.phasetype;
+  phasetype = EXCLUDED.phasetype,
+  updatedat = now();
 
 -- NPCs
 INSERT INTO "NpcDef" (id, name) VALUES
@@ -268,7 +277,7 @@ UPDATE "Quest" SET requiresquestid = 'tutorial_kill_slimes_5' WHERE id = 'tutori
 
 INSERT INTO "QuestRewardItem" (id, questid, itemid, qty) VALUES
   ('tutorial_kill_slimes_5__copper_bar', 'tutorial_kill_slimes_5', 'copper_bar', 1),
-  ('tutorial_kill_slimes_5__normal_planks', 'tutorial_kill_slimes_5', 'normal_planks', 2)
+  ('tutorial_kill_slimes_5__normal_planks', 'tutorial_kill_slimes_5', 'normal_planks', 1)
 ON CONFLICT (id) DO UPDATE SET itemid = EXCLUDED.itemid, qty = EXCLUDED.qty;
 
 -- Portals
