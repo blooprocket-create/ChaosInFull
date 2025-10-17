@@ -1,15 +1,39 @@
 import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 
 export async function GET() {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const rows = await prisma.itemDef.findMany({ orderBy: { id: "asc" } });
-  const safe = rows.map((r: { id: string; name: string; description: string; rarity: string; stackable: boolean; maxStack: number; buy: bigint; sell: bigint; createdAt: Date; updatedAt: Date; }) => ({
-    ...r,
-    // Serialize BigInt to string for JSON safety
-    buy: String(r.buy),
-    sell: String(r.sell),
+  const rows = await q<{
+    id: string;
+    name: string;
+    description: string | null;
+    rarity: string;
+    stackable: boolean;
+    maxstack: number;
+    buy: string; // numeric as text
+    sell: string; // numeric as text
+    createdat: string;
+    updatedat: string;
+  }>`
+    select id, name, description, rarity, stackable, maxstack,
+           buy::text as buy, sell::text as sell,
+           to_char(createdat, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as createdat,
+           to_char(updatedat, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as updatedat
+    from "ItemDef"
+    order by id asc
+  `;
+  const safe = rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    description: r.description ?? "",
+    rarity: r.rarity,
+    stackable: r.stackable,
+    maxStack: r.maxstack,
+    buy: r.buy,
+    sell: r.sell,
+    createdAt: r.createdat,
+    updatedAt: r.updatedat,
   }));
   return NextResponse.json({ ok: true, rows: safe });
 }
@@ -24,29 +48,39 @@ export async function POST(req: Request) {
   const rarity = typeof b.rarity === 'string' ? b.rarity : 'common';
   const stackable = typeof b.stackable === 'boolean' ? b.stackable : true;
   const maxStack = typeof b.maxStack === 'number' ? b.maxStack : 999;
-  // Accept buy/sell as number or string and store as BigInt
-  const parseBig = (v: unknown): bigint => {
-    try {
-      if (typeof v === 'number') return BigInt(Math.max(0, Math.floor(v)));
-      if (typeof v === 'string' && v.trim() !== '') return BigInt(v);
-    } catch {}
-    return BigInt(0);
+  const parseNumText = (v: unknown): string => {
+    if (typeof v === 'number') return String(Math.max(0, Math.floor(v)));
+    if (typeof v === 'string' && v.trim() !== '') return v;
+    return '0';
   };
-  const buy = parseBig(b.buy);
-  const sell = parseBig(b.sell);
+  const buyTxt = parseNumText(b.buy);
+  const sellTxt = parseNumText(b.sell);
   if (!id || !name) return NextResponse.json({ ok: false, error: "missing_id_or_name" }, { status: 400 });
   if (!/^[-a-z0-9_]+$/i.test(id)) return NextResponse.json({ ok: false, error: "invalid_id_format" }, { status: 400 });
   if (maxStack < 1) return NextResponse.json({ ok: false, error: "invalid_maxStack" }, { status: 400 });
   try {
-  const row = await prisma.itemDef.create({ data: { id, name, description, rarity, stackable, maxStack, buy, sell } });
-  const safe = { ...row, buy: row.buy.toString(), sell: row.sell.toString() };
-  return NextResponse.json({ ok: true, row: safe });
+    const rows = await q<{ id: string; name: string; description: string | null; rarity: string; stackable: boolean; maxstack: number; buy: string; sell: string }>`
+      insert into "ItemDef" (id, name, description, rarity, stackable, maxstack, buy, sell)
+      values (${id}, ${name}, ${description}, ${rarity}, ${stackable}, ${maxStack}, ${buyTxt}::numeric, ${sellTxt}::numeric)
+      returning id, name, description, rarity, stackable, maxstack, buy::text as buy, sell::text as sell
+    `;
+    const r = rows[0];
+    const safe = {
+      id: r.id,
+      name: r.name,
+      description: r.description ?? "",
+      rarity: r.rarity,
+      stackable: r.stackable,
+      maxStack: r.maxstack,
+      buy: r.buy,
+      sell: r.sell,
+    };
+    return NextResponse.json({ ok: true, row: safe });
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string };
-    if (e?.code === 'P2002') {
-      // Unique constraint violation (id already exists)
+    const message = err instanceof Error ? err.message : String(err);
+    if (/duplicate key/i.test(message)) {
       return NextResponse.json({ ok: false, error: 'conflict', message: 'Item id already exists' }, { status: 409 });
     }
-    return NextResponse.json({ ok: false, error: 'db_error', message: e?.message || 'Unknown error' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'db_error', message }, { status: 500 });
   }
 }
