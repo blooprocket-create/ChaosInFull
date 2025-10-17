@@ -9,18 +9,23 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const data = await req.json();
-  const parsed = schema.safeParse(data);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  try {
+    const data = await req.json();
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+    const { emailOrUsername, password } = parsed.data;
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ email: emailOrUsername }, { username: emailOrUsername }] },
+    });
+    if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    const ok = await verifyPassword(password, user.passwordHash);
+    if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    await createSession({ userId: user.id, email: user.email });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("/api/auth/login error:", err);
+    return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }
-  const { emailOrUsername, password } = parsed.data;
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ email: emailOrUsername }, { username: emailOrUsername }] },
-  });
-  if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-  const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-  await createSession({ userId: user.id, email: user.email });
-  return NextResponse.json({ ok: true });
 }

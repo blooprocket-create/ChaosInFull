@@ -10,20 +10,25 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const data = await req.json();
-  const parsed = schema.safeParse(data);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  try {
+    const data = await req.json();
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+    const { email, username, password } = parsed.data;
+    const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
+    if (existing) {
+      return NextResponse.json({ error: "Email or username already in use" }, { status: 409 });
+    }
+    const passwordHash = await hashPassword(password);
+    const user = await prisma.user.create({
+      data: { email, username, passwordHash, stats: { create: {} } },
+    });
+    await createSession({ userId: user.id, email: user.email });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("/api/auth/signup error:", err);
+    return NextResponse.json({ error: "Signup failed" }, { status: 500 });
   }
-  const { email, username, password } = parsed.data;
-  const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
-  if (existing) {
-    return NextResponse.json({ error: "Email or username already in use" }, { status: 409 });
-  }
-  const passwordHash = await hashPassword(password);
-  const user = await prisma.user.create({
-    data: { email, username, passwordHash, stats: { create: {} } },
-  });
-  await createSession({ userId: user.id, email: user.email });
-  return NextResponse.json({ ok: true });
 }
