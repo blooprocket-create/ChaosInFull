@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     const delta = Math.max(0, Math.floor(progressDelta ?? 1));
     const next = Math.min(qrow.objectivecount, cq.progress + delta);
     const status = next >= qrow.objectivecount ? 'COMPLETED' : cq.status;
-    const updated = await q<CharacterQuestRow[]>`
+    const updated = await q<CharacterQuestRow>`
       update "CharacterQuest" set progress = ${next}, status = ${status}
       where characterid = ${characterId} and questid = ${id}
       returning *
@@ -120,14 +120,14 @@ export async function POST(req: Request) {
   }
   if (action === "complete") {
     const id = questId || TUTORIAL_QUEST_ID;
-    const cq = (await q<CharacterQuestRow[]>`select * from "CharacterQuest" where characterid = ${characterId} and questid = ${id}`)[0];
+  const cq = (await q<CharacterQuestRow>`select * from "CharacterQuest" where characterid = ${characterId} and questid = ${id}`)[0];
     if (!cq) return NextResponse.json({ ok: false, error: "not_active" }, { status: 400 });
     if (cq.status !== "COMPLETED") return NextResponse.json({ ok: false, error: "not_ready" }, { status: 400 });
-    if (cq.claimedRewards) return NextResponse.json({ ok: true, alreadyClaimed: true });
+    if (cq.claimedrewards) return NextResponse.json({ ok: true, alreadyClaimed: true });
     // Generic DB-driven rewards
-    const qrow = (await q<(QuestRow & { id: string })[]>`select * from "Quest" where id = ${id}`)[0];
+  const qrow = (await q<QuestRow>`select * from "Quest" where id = ${id}`)[0];
     if (!qrow) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
-    const ch = (await q<{ id: string; userid: string }[]>`select id, userid from "Character" where id = ${characterId}`)[0];
+  const ch = (await q<{ id: string; userid: string }>`select id, userid from "Character" where id = ${characterId}`)[0];
     if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
     // Gold
     if ((qrow.rewardgold ?? 0) > 0) {
@@ -162,9 +162,9 @@ export async function POST(req: Request) {
     } catch {}
     // Grant item rewards
     const granted: Record<string, number> = {};
-    const rewards = await q<{ itemid: string; qty: number }[]>`select itemid, qty from "QuestRewardItem" where questid = ${id}`;
+  const rewards = await q<{ itemid: string; qty: number }>`select itemid, qty from "QuestRewardItem" where questid = ${id}`;
     for (const it of rewards) {
-      const curr = await q<{ count: number }[]>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${it.itemid}`;
+  const curr = await q<{ count: number }>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${it.itemid}`;
       const newCount = Math.max(0, (curr[0]?.count ?? 0) + Math.max(1, it.qty));
       await q`insert into "ItemStack" (characterid, itemkey, count) values (${characterId}, ${it.itemid}, ${newCount}) on conflict (characterid, itemkey) do update set count = excluded.count`;
       granted[it.itemid] = (granted[it.itemid] ?? 0) + Math.max(1, it.qty);
@@ -176,7 +176,7 @@ export async function POST(req: Request) {
     // Mark claimed
     await q`update "CharacterQuest" set claimedrewards = true where characterid = ${characterId} and questid = ${id}`;
     // Return updated exp/level
-    const ch2 = (await q<{ exp: number; level: number; craftingexp: number; craftinglevel: number }[]>`select exp, level, craftingexp, craftinglevel from "Character" where id = ${characterId}`)[0];
+  const ch2 = (await q<{ exp: number; level: number; craftingexp: number; craftinglevel: number }>`select exp, level, craftingexp, craftinglevel from "Character" where id = ${characterId}`)[0];
     return NextResponse.json({ ok: true, rewards: { gold: qrow.rewardgold ?? 0, exp: qrow.rewardexp ?? 0, miningExp: qrow.rewardminingexp ?? 0, craftingExp: qrow.rewardcraftingexp ?? 0 }, granted, nextQuest: qrow.nextquestid, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingexp, craftingLevel: ch2?.craftinglevel, claimedRewards: true });
   }
   return NextResponse.json({ ok: false, error: "unsupported" }, { status: 400 });

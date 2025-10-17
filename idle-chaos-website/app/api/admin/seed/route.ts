@@ -1,93 +1,67 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { assertAdmin } from "@/src/lib/authz";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 import { items as SHOP_ITEMS } from "@/src/data/items";
 
-type PrismaLoose = {
-  itemDef: { upsert: (args: { where: { id: string }; update: Partial<{ name: string; description: string; sell: bigint; buy: bigint }>; create: { id: string; name: string; description: string; sell: bigint; buy: bigint } }) => Promise<void> };
-  npcDef: { upsert: (args: { where: { id: string }; update: Partial<{ name: string }>; create: { id: string; name: string } }) => Promise<void> };
-  quest: { upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; description: string; objectiveType: string; objectiveTarget: string; objectiveCount: number; giverNpcId?: string | null; nextQuestId?: string | null; minLevel?: number; requiresQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number } }) => Promise<void> };
-  questRewardItem: { findFirst: (args: { where: { questId: string; itemId: string } }) => Promise<{ id: string } | null>; create: (args: { data: { questId: string; itemId: string; qty: number } }) => Promise<void> };
-  zoneDef: { upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sceneKey: string } }) => Promise<void> };
-  enemyTemplate: { upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number } }) => Promise<void> };
-  dropTable: { upsert: (args: { where: { id?: string; templateId?: string }; update: Record<string, unknown>; create: { id: string; templateId: string } }) => Promise<{ id: string }> };
-  dropEntry: { findMany: (args: { where: { dropTableId: string; itemId: string } }) => Promise<Array<{ id: string }>>; create: (args: { data: { dropTableId: string; itemId: string; weight: number; minQty: number; maxQty: number } }) => Promise<void> };
-  spawnConfig: { create: (args: { data: { zoneId: string; templateId: string; budget: number; respawnMs: number; slots: number[]; phaseType: string } }) => Promise<void> };
-};
-
-// Items will be sourced from the centralized shop data (src/data/items.ts)
-// to keep prices and names consistent across UI, APIs, and seeds.
-
-const ENEMIES: Array<{ id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number }> = [
-  { id: "slime", name: "Slime", level: 1, baseHp: 30, expBase: 5, goldMin: 1, goldMax: 3 },
-  { id: "slime_epic", name: "Slime (Epic)", level: 3, baseHp: 80, expBase: 12, goldMin: 3, goldMax: 6 },
-  { id: "big_slime", name: "Big Slime", level: 5, baseHp: 160, expBase: 24, goldMin: 4, goldMax: 9 },
-  { id: "big_slime_epic", name: "Big Slime (Epic)", level: 7, baseHp: 260, expBase: 36, goldMin: 6, goldMax: 12 },
-  { id: "boss_slime", name: "Boss Slime", level: 10, baseHp: 500, expBase: 100, goldMin: 15, goldMax: 30 },
+const ENEMIES: Array<{ id: string; name: string; level: number; basehp: number; expbase: number; goldmin: number; goldmax: number }> = [
+  { id: "slime", name: "Slime", level: 1, basehp: 30, expbase: 5, goldmin: 1, goldmax: 3 },
+  { id: "slime_epic", name: "Slime (Epic)", level: 3, basehp: 80, expbase: 12, goldmin: 3, goldmax: 6 },
+  { id: "big_slime", name: "Big Slime", level: 5, basehp: 160, expbase: 24, goldmin: 4, goldmax: 9 },
+  { id: "big_slime_epic", name: "Big Slime (Epic)", level: 7, basehp: 260, expbase: 36, goldmin: 6, goldmax: 12 },
+  { id: "boss_slime", name: "Boss Slime", level: 10, basehp: 500, expbase: 100, goldmin: 15, goldmax: 30 },
 ];
-
-type AfkDelegate = { deleteMany: (args?: { where?: { characterId?: string } }) => Promise<void> };
 
 export async function POST() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const client = prisma as unknown as PrismaLoose;
+
   // Reset AFK combat state for clean local seeds
-  try { await (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState.deleteMany({}); } catch {}
+  await q`delete from "AfkCombatState"`;
+
   // Items
   for (const it of SHOP_ITEMS) {
-    await client.itemDef.upsert({
-      where: { id: it.key },
-      update: { name: it.name, description: "", sell: BigInt(it.sell), buy: BigInt(it.buy) },
-      create: { id: it.key, name: it.name, description: "", sell: BigInt(it.sell), buy: BigInt(it.buy) },
-    });
+    await q`insert into "ItemDef" (id, name, description, rarity, stackable, maxstack, buy, sell)
+            values (${it.key}, ${it.name}, '', 'common', true, 999, ${String(it.buy)}, ${String(it.sell)})
+            on conflict (id) do update set name = excluded.name, description = excluded.description, buy = excluded.buy, sell = excluded.sell`;
   }
   // NPCs
-  await client.npcDef.upsert({ where: { id: "grimsley" }, update: { name: "Grimsley" }, create: { id: "grimsley", name: "Grimsley" } });
-  // Zone and enemies
-  await client.zoneDef.upsert({ where: { id: "Slime" }, update: {}, create: { id: "Slime", name: "Slime Zone", sceneKey: "Slime" } });
-  await client.zoneDef.upsert({ where: { id: "Slime Meadow" }, update: {}, create: { id: "Slime Meadow", name: "Slime Meadow", sceneKey: "Slime" } });
+  await q`insert into "NpcDef" (id, name) values ('grimsley', 'Grimsley') on conflict (id) do update set name = excluded.name`;
+  // Zones
+  await q`insert into "ZoneDef" (id, name, scenekey) values ('Slime', 'Slime Zone', 'Slime') on conflict (id) do nothing`;
+  await q`insert into "ZoneDef" (id, name, scenekey) values ('Slime Meadow', 'Slime Meadow', 'Slime') on conflict (id) do nothing`;
+  // Enemies and drops
   for (const e of ENEMIES) {
-    await client.enemyTemplate.upsert({ where: { id: e.id }, update: {}, create: e });
-    // One drop table per template
+    await q`insert into "EnemyTemplate" (id, name, level, basehp, expbase, goldmin, goldmax)
+            values (${e.id}, ${e.name}, ${e.level}, ${e.basehp}, ${e.expbase}, ${e.goldmin}, ${e.goldmax})
+            on conflict (id) do update set name = excluded.name, level = excluded.level, basehp = excluded.basehp, expbase = excluded.expbase, goldmin = excluded.goldmin, goldmax = excluded.goldmax`;
     const dtId = `${e.id}_drops`;
-    const dt = await client.dropTable.upsert({ where: { templateId: e.id }, update: {}, create: { id: dtId, templateId: e.id } });
-    // Ensure at least Goop drops everywhere
-    const existing = await client.dropEntry.findMany({ where: { dropTableId: dt.id, itemId: "slime_goop" } });
-    if (!existing.length) {
-      await client.dropEntry.create({ data: { dropTableId: dt.id, itemId: "slime_goop", weight: 35, minQty: 1, maxQty: 1 } });
+    await q`insert into "DropTable" (id, templateid) values (${dtId}, ${e.id}) on conflict (templateid) do update set id = excluded.id`;
+    const exists = await q<{ id: string }>`select id from "DropEntry" where droptableid = ${dtId} and itemid = 'slime_goop'`;
+    if (!exists.length) {
+      await q`insert into "DropEntry" (droptableid, itemid, weight, minqty, maxqty) values (${dtId}, 'slime_goop', 35, 1, 1)`;
     }
   }
-  // Spawn config: default personal spawns for regular slime (others available for future variety)
-  await client.spawnConfig.create({ data: { zoneId: "Slime", templateId: "slime", budget: 6, respawnMs: 1200, slots: [100,180,260,340,420], phaseType: "personal" } }).catch(() => {});
-  // Slime Meadow: mix of regular slime, epic slime, and big slime
-  await client.spawnConfig.create({ data: { zoneId: "Slime Meadow", templateId: "slime", budget: 4, respawnMs: 1100, slots: [100,180,260,340,420], phaseType: "personal" } }).catch(() => {});
-  await client.spawnConfig.create({ data: { zoneId: "Slime Meadow", templateId: "slime_epic", budget: 1, respawnMs: 1500, slots: [140,220,300,380,460], phaseType: "personal" } }).catch(() => {});
-  await client.spawnConfig.create({ data: { zoneId: "Slime Meadow", templateId: "big_slime", budget: 1, respawnMs: 2000, slots: [180,260,340,420,500], phaseType: "personal" } }).catch(() => {});
+  // Spawns
+  await q`insert into "SpawnConfig" (zoneid, templateid, budget, respawnms, slots, phasetype) values ('Slime', 'slime', 6, 1200, ${[100,180,260,340,420]}, 'personal')`;
+  await q`insert into "SpawnConfig" (zoneid, templateid, budget, respawnms, slots, phasetype) values ('Slime Meadow', 'slime', 4, 1100, ${[100,180,260,340,420]}, 'personal')`;
+  await q`insert into "SpawnConfig" (zoneid, templateid, budget, respawnms, slots, phasetype) values ('Slime Meadow', 'slime_epic', 1, 1500, ${[140,220,300,380,460]}, 'personal')`;
+  await q`insert into "SpawnConfig" (zoneid, templateid, budget, respawnms, slots, phasetype) values ('Slime Meadow', 'big_slime', 1, 2000, ${[180,260,340,420,500]}, 'personal')`;
   // Quests
-  // Tutorial: Can you punch?
-  await client.quest.upsert({
-    where: { id: "tutorial_kill_slimes_5" },
-    update: { name: "Can you punch?", description: "Kill 5 slimes in the field.", objectiveType: "KILL", objectiveTarget: "slime", objectiveCount: 5, giverNpcId: "grimsley", nextQuestId: "tutorial_craft_copper_dagger", minLevel: 1, requiresQuestId: null, rewardGold: 500, rewardExp: 250 },
-    create: { id: "tutorial_kill_slimes_5", name: "Can you punch?", description: "Kill 5 slimes in the field.", objectiveType: "KILL", objectiveTarget: "slime", objectiveCount: 5, giverNpcId: "grimsley", nextQuestId: "tutorial_craft_copper_dagger", minLevel: 1, requiresQuestId: null, rewardGold: 500, rewardExp: 250 }
-  });
-  // Rewards: copper_bar, plank
-  const rewardItems: Array<{ itemId: string; qty: number }> = [
-    { itemId: "copper_bar", qty: 1 },
-    { itemId: "plank", qty: 1 },
-  ];
-  for (const it of rewardItems) {
-    const exists = await client.questRewardItem.findFirst({ where: { questId: "tutorial_kill_slimes_5", itemId: it.itemId } });
-    if (!exists) await client.questRewardItem.create({ data: { questId: "tutorial_kill_slimes_5", itemId: it.itemId, qty: it.qty } });
+  await q`insert into "Quest" (id, name, description, objectivetype, objectivetarget, objectivecount, givernpcid, nextquestid, minlevel, requiresquestid, rewardgold, rewardexp)
+          values ('tutorial_kill_slimes_5', 'Can you punch?', 'Kill 5 slimes in the field.', 'KILL', 'slime', 5, 'grimsley', 'tutorial_craft_copper_dagger', 1, null, 500, 250)
+          on conflict (id) do update set name = excluded.name, description = excluded.description, objectivetype = excluded.objectivetype, objectivetarget = excluded.objectivetarget, objectivecount = excluded.objectivecount, givernpcid = excluded.givernpcid, nextquestid = excluded.nextquestid, minlevel = excluded.minlevel, requiresquestid = excluded.requiresquestid, rewardgold = excluded.rewardgold, rewardexp = excluded.rewardexp`;
+  const rewards: Array<{ itemid: string; qty: number }> = [ { itemid: 'copper_bar', qty: 1 }, { itemid: 'plank', qty: 1 } ];
+  for (const r of rewards) {
+    const exists = await q<{ id: string }>`select id from "QuestRewardItem" where questid = 'tutorial_kill_slimes_5' and itemid = ${r.itemid}`;
+    if (!exists.length) {
+      await q`insert into "QuestRewardItem" (questid, itemid, qty) values ('tutorial_kill_slimes_5', ${r.itemid}, ${r.qty})`;
+    }
   }
-  // Craft: Can you craft?
-  await client.quest.upsert({
-    where: { id: "tutorial_craft_copper_dagger" },
-    update: { name: "Can you craft?", description: "Craft one copper dagger at the workbench.", objectiveType: "CRAFT", objectiveTarget: "copper_dagger", objectiveCount: 1, giverNpcId: "grimsley", minLevel: 1, requiresQuestId: "tutorial_kill_slimes_5", rewardCraftingExp: 150, rewardExp: 150 },
-    create: { id: "tutorial_craft_copper_dagger", name: "Can you craft?", description: "Craft one copper dagger at the workbench.", objectiveType: "CRAFT", objectiveTarget: "copper_dagger", objectiveCount: 1, giverNpcId: "grimsley", minLevel: 1, requiresQuestId: "tutorial_kill_slimes_5", rewardCraftingExp: 150, rewardExp: 150 }
-  });
+  await q`insert into "Quest" (id, name, description, objectivetype, objectivetarget, objectivecount, givernpcid, minlevel, requiresquestid, rewardcraftingexp, rewardexp)
+          values ('tutorial_craft_copper_dagger', 'Can you craft?', 'Craft one copper dagger at the workbench.', 'CRAFT', 'copper_dagger', 1, 'grimsley', 1, 'tutorial_kill_slimes_5', 150, 150)
+          on conflict (id) do update set name = excluded.name, description = excluded.description, objectivetype = excluded.objectivetype, objectivetarget = excluded.objectivetarget, objectivecount = excluded.objectivecount, givernpcid = excluded.givernpcid, minlevel = excluded.minlevel, requiresquestid = excluded.requiresquestid, rewardcraftingexp = excluded.rewardcraftingexp, rewardexp = excluded.rewardexp`;
 
   return NextResponse.json({ ok: true, seeded: { items: SHOP_ITEMS.length, enemies: ENEMIES.length, npcs: 1, quests: 2, zone: 1 } });
 }

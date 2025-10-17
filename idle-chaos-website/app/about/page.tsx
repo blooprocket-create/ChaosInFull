@@ -42,7 +42,7 @@ export default function AboutPage() {
           <h2 className="text-xl font-semibold blood-underline inline-block">Tech Stack (Why It Loads Fast)</h2>
           <ul className="mt-3 text-gray-300 text-sm list-disc pl-5 space-y-1">
             <li>Next.js 15 + TypeScript + Tailwind: readable, themable, occasionally refactored at 2am</li>
-            <li>Prisma ORM: schema first, fewer “why is this null” moments</li>
+            <li>Neon Postgres + typed SQL: small, fast, and serverless-friendly</li>
             <li>JWT cookie auth: secure enough not to embarrass us publicly</li>
             <li>Phaser: the stage where gravity therapy happens under <span className="text-white/90">/play</span></li>
           </ul>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
-import { sql } from "@/src/lib/db";
+import { q } from "@/src/lib/db";
 import { assertCharacterOwner } from "@/src/lib/ownership";
 
 function getAbsoluteBase(req: Request) {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       const now = new Date();
       const zoneId = zone;
       // Upsert per-character AFK row
-      await sql`
+      await q`
         insert into "AfkCombatState" (id, characterid, zone, auto, startedat, lastsnapshot)
         values (concat('afk_', substr(md5(random()::text), 1, 8)), ${characterId}, ${zoneId}, ${on}, ${now.toISOString()}, ${now.toISOString()})
         on conflict (characterid) do update set auto = excluded.auto, zone = excluded.zone,
@@ -85,30 +85,31 @@ export async function POST(req: Request) {
       await awardExp(characterId, selfReward.exp, cookie, req);
       // After awarding EXP, fetch the updated exp/level from DB for immediate HUD update
       try {
-        const rows = await (sql`
+        const rows = await (q`
           select exp, level from "Character" where id = ${characterId} limit 1
-        ` as unknown as Array<{ exp: number; level: number }>);
-        if (rows[0]) { newExp = rows[0].exp; newLevel = rows[0].level; }
+        `);
+        if (rows[0]) { const r = rows[0] as { exp: number; level: number }; newExp = r.exp; newLevel = r.level; }
       } catch {}
     }
       // Minimal gold + loot for killer
       try {
         const killerId = characterId;
-        const killerRows = await (sql`select id from "Character" where id = ${killerId} limit 1` as unknown as Array<{ id: string }>);
-        const killer = killerRows[0];
+  const killerRows = await q<{ id: string }>`select id from "Character" where id = ${killerId} limit 1`;
+  const killer = killerRows[0];
         if (killer) {
           const baseExp = harvested?.rewards?.find(r=>r.characterId===killerId)?.exp ?? harvested?.rewards?.[0]?.exp ?? 5;
           const goldDelta = harvested?.loot?.length ? Math.min(Math.max(1, Math.floor(baseExp / 2)), 5) : (1 + Math.floor(Math.random() * 3));
-          await sql`update "Character" set gold = gold + ${goldDelta} where id = ${killerId}`.catch(()=>{});
+          await q`update "Character" set gold = gold + ${goldDelta} where id = ${killerId}`.catch(()=>{});
           goldDeltaApplied = goldDelta;
           // Persist each rolled drop
           if (Array.isArray(harvested?.loot)) {
             for (const it of harvested.loot as Array<{ itemId: string; qty: number }>) {
-              const currRows = await (sql`
+              const currRows = await (q`
                 select count from "ItemStack" where characterid = ${killerId} and itemkey = ${it.itemId} limit 1
-              ` as unknown as Array<{ count: number }>);
-              const count = (currRows?.[0]?.count ?? 0) + Math.max(1, it.qty);
-              await sql`
+              `);
+              const c0 = currRows?.[0] as { count?: number } | undefined;
+              const count = (c0?.count ?? 0) + Math.max(1, it.qty);
+              await q`
                 insert into "ItemStack" (id, characterid, itemkey, count)
                 values (concat('is_', substr(md5(random()::text), 1, 8)), ${killerId}, ${it.itemId}, ${count})
                 on conflict (characterid, itemkey) do update set count = ${count}

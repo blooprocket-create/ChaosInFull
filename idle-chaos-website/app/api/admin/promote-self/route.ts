@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -11,7 +11,6 @@ export async function POST(req: Request) {
   const promoteToken = (process.env.PROMOTE_TOKEN || "").trim();
   const hasToken = promoteToken.length > 0 && token === promoteToken;
   if (!hasEmail && !hasToken) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  const client = prisma as unknown as { user: { update: (args: { where: { id: string }; data: { isAdmin: boolean } }) => Promise<void> } };
-  await client.user.update({ where: { id: session.userId }, data: { isAdmin: true } });
+  await q`update "User" set isadmin = true where id = ${session.userId}`;
   return NextResponse.json({ ok: true });
 }

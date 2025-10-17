@@ -1,12 +1,12 @@
 # Chaos In Full - Website
 
-A horror-themed, professional-grade Next.js site for account creation and player stats. Built with Next.js App Router, TypeScript, Tailwind CSS, and Prisma.
+A horror-themed, professional-grade Next.js site for account creation and player stats. Built with Next.js App Router, TypeScript, Tailwind CSS, and Neon (serverless Postgres).
 
 ## Features
 - Landing page with dark/horror style
 - Email/username sign up and login (JWT cookies)
 - Protected dashboard displaying basic player stats
-- Prisma ORM with SQLite (dev) and Postgres (prod)
+- Serverless Postgres (Neon) via a tiny typed SQL helper
 
 ## Getting Started
 
@@ -14,15 +14,15 @@ A horror-themed, professional-grade Next.js site for account creation and player
 	- Duplicate `.env.example` to `.env` and fill `JWT_SECRET`.
 2. Install deps:
 	- `npm install`
-3. Generate Prisma client and create DB:
-	- `npm run prisma:generate`
-	- `npm run prisma:push`
+3. Create database schema and seed (optional):
+	- Set `DATABASE_URL` to your Postgres (Neon) connection string
+	- Start dev and call the admin seed route if needed: POST /api/admin/seed (requires admin)
 4. Run dev server:
 	- `npm run dev` and visit http://localhost:3000
 
 ## Deploy to Vercel
 - Set env vars on Vercel:
-  - `DATABASE_URL` (Postgres recommended)
+	- `DATABASE_URL` (Neon Postgres)
   - `JWT_SECRET`
   - `NEXT_PUBLIC_APP_NAME`
   - `BASE_URL`

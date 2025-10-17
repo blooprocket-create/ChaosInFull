@@ -11,10 +11,9 @@ Env vars (required)
 - ADMIN_EMAILS: comma-separated admin emails
 - BASE_URL: public site base URL (e.g., https://chaos.example.com)
 
-Prisma (Postgres)
-- Locally, you can point DATABASE_URL to Postgres and push:
-  npm run prisma:pg:generate
-  npm run prisma:pg:push
+Database
+- Use Neon (or any Postgres). Set DATABASE_URL accordingly.
+- Schema is managed via code and seed endpoints (e.g., POST /api/admin/seed for local dev with an admin session).
 
 Vercel/Render
 - Configure env vars above.
@@ -22,5 +21,4 @@ Vercel/Render
 - Start command: npm start
 
 Notes
-- The project includes a separate schema for Postgres at prisma/schema.postgres.prisma.
-- Admin seeding endpoints exist at /api/admin/seed (requires a session for an admin user).
+- Admin seeding endpoint exists at /api/admin/seed (requires a session for an admin user).

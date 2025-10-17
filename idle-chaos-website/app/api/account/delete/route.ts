@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
-// Note: Some Prisma versions in editors mis-type TransactionClient; using 'any' for tx to avoid false negatives.
+import { q } from "@/src/lib/db";
 import { getSession, verifyPassword, destroySession } from "@/src/lib/auth";
 
 export async function POST(req: Request) {
@@ -24,7 +23,9 @@ export async function POST(req: Request) {
   }
 
   // Fetch user by session id and verify username + password
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  const user = (await q<{ id: string; email: string; username: string; passwordhash: string }>`
+    select id, email, username, passwordhash from "User" where id = ${session.userId}
+  `)[0];
   if (!user) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   // Require BOTH email and username to match (case-insensitive)
   const typedUser = String(username).trim().toLowerCase();
@@ -35,33 +36,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "identity_mismatch" }, { status: 400 });
   }
 
-  const ok = await verifyPassword(password, user.passwordHash);
+  const ok = await verifyPassword(password, user.passwordhash as unknown as string);
   if (!ok) return NextResponse.json({ ok: false, error: "invalid_password" }, { status: 403 });
 
   // Cascade delete everything related to this user inside a single transaction
-  await prisma.$transaction(async (tx) => {
-    const client = tx as unknown as {
-      character: { findMany: (args: { where: { userId: string }; select: { id: boolean } }) => Promise<Array<{ id: string }>>; deleteMany: (args: { where: { id: { in: string[] } } }) => Promise<unknown> };
-      itemStack: { deleteMany: (args: { where: { characterId: { in: string[] } } }) => Promise<unknown> };
-      craftQueue: { deleteMany: (args: { where: { characterId: { in: string[] } } }) => Promise<unknown> };
-      accountItemStack: { deleteMany: (args: { where: { userId: string } }) => Promise<unknown> };
-      playerStat: { deleteMany: (args: { where: { userId: string } }) => Promise<unknown> };
-      user: { delete: (args: { where: { id: string } }) => Promise<unknown> };
-    };
-    // Collect character IDs for this user
-    const chars: Array<{ id: string }> = await client.character.findMany({ where: { userId: user.id }, select: { id: true } });
-    const charIds: string[] = chars.map((c: { id: string }) => c.id);
-
-    if (charIds.length > 0) {
-      await client.itemStack.deleteMany({ where: { characterId: { in: charIds } } });
-      await client.craftQueue.deleteMany({ where: { characterId: { in: charIds } } });
-      await client.character.deleteMany({ where: { id: { in: charIds } } });
-    }
-
-    await client.accountItemStack.deleteMany({ where: { userId: user.id } });
-    await client.playerStat.deleteMany({ where: { userId: user.id } });
-    await client.user.delete({ where: { id: user.id } });
-  });
+  // Delete related rows; FK constraints may cascade for some tables, but we clear explicitly.
+  await q`delete from "ItemStack" where characterid in (select id from "Character" where userid = ${user.id})`;
+  await q`delete from "CraftQueue" where characterid in (select id from "Character" where userid = ${user.id})`;
+  await q`delete from "CharacterQuest" where characterid in (select id from "Character" where userid = ${user.id})`;
+  await q`update "ChatMessage" set characterid = null where characterid in (select id from "Character" where userid = ${user.id})`;
+  await q`delete from "Character" where userid = ${user.id}`;
+  await q`delete from "AccountItemStack" where userid = ${user.id}`;
+  await q`delete from "PlayerStat" where userid = ${user.id}`;
+  await q`delete from "User" where id = ${user.id}`;
 
   await destroySession();
   return NextResponse.json({ ok: true, message: "account_deleted" });

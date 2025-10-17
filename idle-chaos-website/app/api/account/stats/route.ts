@@ -1,34 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 
-type CharacterLite = {
-  id: string;
-  userId: string;
-  level: number;
-  class: string;
-  miningLevel?: number | null;
-  miningExp?: number | null;
-  woodcuttingLevel?: number | null;
-  woodcuttingExp?: number | null;
-  fishingLevel?: number | null;
-  fishingExp?: number | null;
-  craftingLevel?: number | null;
-  craftingExp?: number | null;
-};
-type PlayerStatLite = {
-  level: number;
-  class: string;
-  exp: number;
-  gold: number;
-  premiumGold?: number;
-  hp: number;
-  mp: number;
-  strength: number;
-  agility: number;
-  intellect: number;
-  luck: number;
-};
 
 export async function GET(req: Request) {
   const session = await getSession();
@@ -37,30 +10,32 @@ export async function GET(req: Request) {
   const characterId = searchParams.get("characterId");
   if (!characterId) return NextResponse.json({ ok: false, error: "missing characterId" }, { status: 400 });
 
-  // Verify character ownership and fetch skill fields
-  const client = prisma as unknown as {
-    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<CharacterLite | null> };
-    user: { findUnique: (args: { where: { id: string }; include: { stats: true } }) => Promise<{ stats: PlayerStatLite | null } | null> };
-    // For per-character gold, extend CharacterLite locally with gold
-    characterGold?: { findUnique: (args: { where: { id: string }; select: { gold: boolean } }) => Promise<{ gold: number } | null> };
-  };
-  const ch = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  // Ownership + character fields
+  const chRows = await q<{
+    id: string; userid: string; level: number; class: string;
+    miningexp: number; mininglevel: number; woodcuttingexp: number; woodcuttinglevel: number;
+    craftingexp: number; craftinglevel: number; fishingexp: number; fishinglevel: number; gold: number;
+  }>`
+    select id, userid, level, class, miningexp, mininglevel, woodcuttingexp, woodcuttinglevel, craftingexp, craftinglevel, fishingexp, fishinglevel, gold
+    from "Character" where id = ${characterId} and userid = ${session.userId}
+  `;
+  const ch = chRows[0];
   if (!ch) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-  const user = await client.user.findUnique({ where: { id: session.userId }, include: { stats: true } });
-  const s: PlayerStatLite | null = user?.stats ?? null;
-  // Fetch per-character gold
-  const cg = await prisma.character.findUnique({ where: { id: characterId }, select: { gold: true } }).catch(() => null as unknown as { gold: number } | null);
+
+  const sRows = await q<{
+    level: number; class: string; exp: number; premiumgold: number; hp: number; mp: number; strength: number; agility: number; intellect: number; luck: number;
+  }>`
+    select level, class, exp, premiumgold, hp, mp, strength, agility, intellect, luck from "PlayerStat" where userid = ${session.userId}
+  `;
+  const s = sRows[0] || null;
+
   const data = {
     base: s ? {
       level: s.level,
       class: s.class,
       exp: s.exp,
-      gold: (cg?.gold ?? 0),
-      premiumGold: ((): number => {
-        const rs = s as unknown as Record<string, unknown>;
-        const v = rs["premiumGold"];
-        return typeof v === "number" ? v : 0;
-      })(),
+      gold: ch.gold,
+      premiumGold: s.premiumgold,
       hp: s.hp,
       mp: s.mp,
       strength: s.strength,
@@ -69,10 +44,10 @@ export async function GET(req: Request) {
       luck: s.luck,
     } : null,
     skills: {
-      mining: { level: ch.miningLevel ?? 1, exp: ch.miningExp ?? 0 },
-      woodcutting: { level: ch.woodcuttingLevel ?? 1, exp: ch.woodcuttingExp ?? 0 },
-      crafting: { level: ch.craftingLevel ?? 1, exp: ch.craftingExp ?? 0 },
-      fishing: { level: ch.fishingLevel ?? 1, exp: ch.fishingExp ?? 0 },
+      mining: { level: ch.mininglevel ?? 1, exp: ch.miningexp ?? 0 },
+      woodcutting: { level: ch.woodcuttinglevel ?? 1, exp: ch.woodcuttingexp ?? 0 },
+      crafting: { level: ch.craftinglevel ?? 1, exp: ch.craftingexp ?? 0 },
+      fishing: { level: ch.fishinglevel ?? 1, exp: ch.fishingexp ?? 0 },
     },
     character: { level: ch.level, class: ch.class },
   };

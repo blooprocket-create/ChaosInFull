@@ -9,11 +9,11 @@ Design
 - Effects: gradient glows, noise, glassmorphism panels, tasteful motion.
 - Typography: Cinzel for display, Roboto Mono for UI accents.
 
-Tech
-- Next.js App Router, TypeScript.
-- Tailwind CSS.
-- Prisma ORM with Postgres (prod) / SQLite (dev).
-- JWT cookies for auth using `jose`.
+ Tech
+ - Next.js App Router, TypeScript.
+ - Tailwind CSS.
+ - Neon Postgres with a small typed SQL helper (no ORM).
+ - JWT cookies for auth using `jose`.
 
 Constraints
 - Use server components for data pages.

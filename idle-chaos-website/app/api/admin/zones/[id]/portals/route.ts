@@ -1,33 +1,31 @@
 import { NextResponse } from "next/server";
 import { assertAdmin } from "@/src/lib/authz";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 
-// Some environments might not have Prisma client typings for PortalDef under prisma.portalDef at build time.
-// Use a loose cast to avoid type errors while keeping the actual calls unchanged.
-const portalClient = prisma as unknown as { portalDef: { findMany: (args: { where: { zoneId: string }, orderBy?: { createdAt: 'asc' | 'desc' } }) => Promise<unknown[]>; create: (args: { data: { zoneId: string; targetZoneId: string; x: number; y: number; radius?: number; label?: string } }) => Promise<unknown> } };
+type Ctx = { params: { id: string } };
 
-type Ctx = { params: Promise<{ id: string }> };
-
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(_req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { id } = await ctx.params;
-  const rows = await portalClient.portalDef.findMany({ where: { zoneId: id }, orderBy: { createdAt: 'asc' } });
+  const { id } = params;
+  const rows = await q<{ id: string; zoneid: string; targetzoneid: string; x: number; y: number; radius: number; label: string }>`
+    select id, zoneid, targetzoneid, x, y, radius, label from "PortalDef" where zoneid = ${id} order by createdat asc
+  `;
   return NextResponse.json({ ok: true, rows });
 }
 
-export async function POST(req: Request, ctx: Ctx) {
+export async function POST(req: Request, { params }: Ctx) {
   try { await assertAdmin(); } catch { return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
-  const { id } = await ctx.params;
+  const { id } = params;
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   if (typeof b.targetZoneId !== 'string') return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 });
-  const data: { zoneId: string; targetZoneId: string; x: number; y: number; radius?: number; label?: string } = {
-    zoneId: id,
-    targetZoneId: b.targetZoneId,
-    x: typeof b.x === 'number' ? b.x : 0,
-    y: typeof b.y === 'number' ? b.y : 0,
-    ...(typeof b.radius === 'number' ? { radius: b.radius } : {}),
-    ...(typeof b.label === 'string' ? { label: b.label } : {}),
-  };
-  const row = await portalClient.portalDef.create({ data });
-  return NextResponse.json({ ok: true, row });
+  const x = typeof b.x === 'number' ? b.x : 0;
+  const y = typeof b.y === 'number' ? b.y : 0;
+  const radius = typeof b.radius === 'number' ? b.radius : 32;
+  const label = typeof b.label === 'string' ? b.label : '';
+  const rows = await q<{ id: string; zoneid: string; targetzoneid: string; x: number; y: number; radius: number; label: string }>`
+    insert into "PortalDef" (zoneid, targetzoneid, x, y, radius, label)
+    values (${id}, ${b.targetZoneId as string}, ${x}, ${y}, ${radius}, ${label})
+    returning id, zoneid, targetzoneid, x, y, radius, label
+  `;
+  return NextResponse.json({ ok: true, row: rows[0] });
 }

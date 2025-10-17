@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 import { getSession } from "@/src/lib/auth";
 
 /*
@@ -43,92 +43,54 @@ export async function POST(req: NextRequest) {
     }
   }
   // Verify character belongs to user
-  // Defensive narrowed typing (Prisma client not regenerated yet)
-  interface CharacterLite { id: string; userId: string; }
-  interface StackLite { id: string; count: number; itemKey?: string; }
-  interface PrismaLite {
-    character: { findUnique: (args: { where: { id: string } }) => Promise<CharacterLite | null> };
-    itemStack: {
-      findUnique: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } } }) => Promise<StackLite | null>;
-      delete: (args: { where: { id: string } }) => Promise<unknown>;
-      update: (args: { where: { id: string }; data: { count: number } }) => Promise<unknown>;
-      upsert: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } }; update: { count: number }; create: { characterId: string; itemKey: string; count: number } }) => Promise<unknown>;
-      findMany: (args: { where: { characterId: string } }) => Promise<Array<{ itemKey: string; count: number }>>;
-    };
-    accountItemStack: {
-      findUnique: (args: { where: { userId_itemKey: { userId: string; itemKey: string } } }) => Promise<StackLite | null>;
-      delete: (args: { where: { id: string } }) => Promise<unknown>;
-      update: (args: { where: { id: string }; data: { count: number } }) => Promise<unknown>;
-      upsert: (args: { where: { userId_itemKey: { userId: string; itemKey: string } }; update: { count: number }; create: { userId: string; itemKey: string; count: number } }) => Promise<unknown>;
-      findMany: (args: { where: { userId: string } }) => Promise<Array<{ itemKey: string; count: number }>>;
-    };
-    $transaction: <T>(fn: (tx: Omit<PrismaLite, '$transaction'>) => Promise<T>) => Promise<T>;
-  }
-  const client = prisma as unknown as PrismaLite;
-  const character = await client.character.findUnique({ where: { id: characterId } });
-  if (!character || character.userId !== session.userId) {
+  const owns = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId}`;
+  if (!owns.length) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   // Load source stacks
-  const [charStack, acctStack] = await Promise.all([
-    client.itemStack.findUnique({ where: { characterId_itemKey: { characterId, itemKey } } }),
-    client.accountItemStack.findUnique({ where: { userId_itemKey: { userId: session.userId, itemKey } } })
-  ]);
+  const charStack = (await q<{ count: number }>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`)[0] ?? { count: 0 };
+  const acctStack = (await q<{ count: number }>`select count from "AccountItemStack" where userid = ${session.userId} and itemkey = ${itemKey}`)[0] ?? { count: 0 };
   if (direction === "toStorage") {
     const available = charStack?.count ?? 0;
     if (available <= 0) return NextResponse.json({ error: "No items" }, { status: 400 });
     if (count == null) count = available;
     // Clamp to available
     if (count > available) count = available;
-  await client.$transaction(async (tx) => {
-      // decrement / delete character stack
-      const amt = count ?? available;
-      if (available - amt <= 0) {
-        if (charStack) await tx.itemStack.delete({ where: { id: charStack.id } });
-      } else {
-        await tx.itemStack.update({ where: { id: charStack!.id }, data: { count: available - amt } });
-      }
-      // upsert account stack
-      const acctCount = acctStack?.count ?? 0;
-      const newCount = acctCount + amt;
-      await tx.accountItemStack.upsert({
-        where: { userId_itemKey: { userId: session.userId, itemKey } },
-        update: { count: newCount },
-        create: { userId: session.userId, itemKey, count: newCount }
-      });
-    });
+    const amt = count ?? available;
+    // decrement or delete character stack
+    if (available - amt <= 0) {
+      await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
+    } else {
+      await q`update "ItemStack" set count = ${available - amt} where characterid = ${characterId} and itemkey = ${itemKey}`;
+    }
+    // upsert account stack
+    const newCount = (acctStack?.count ?? 0) + amt;
+    await q`insert into "AccountItemStack" (userid, itemkey, count) values (${session.userId}, ${itemKey}, ${newCount})
+            on conflict (userid, itemkey) do update set count = excluded.count`;
   } else {
     const available = acctStack?.count ?? 0;
     if (available <= 0) return NextResponse.json({ error: "No items" }, { status: 400 });
     if (count == null) count = available;
     // Clamp to available
     if (count > available) count = available;
-  await client.$transaction(async (tx) => {
-      // decrement / delete account stack
-      const amt = count ?? available;
-      if (available - amt <= 0) {
-        if (acctStack) await tx.accountItemStack.delete({ where: { id: acctStack.id } });
-      } else {
-        await tx.accountItemStack.update({ where: { id: acctStack!.id }, data: { count: available - amt } });
-      }
-      // upsert character stack
-      const charCount = charStack?.count ?? 0;
-      const newCount = charCount + amt;
-      await tx.itemStack.upsert({
-        where: { characterId_itemKey: { characterId, itemKey } },
-        update: { count: newCount },
-        create: { characterId, itemKey, count: newCount }
-      });
-    });
+    const amt = count ?? available;
+    // decrement or delete account stack
+    if (available - amt <= 0) {
+      await q`delete from "AccountItemStack" where userid = ${session.userId} and itemkey = ${itemKey}`;
+    } else {
+      await q`update "AccountItemStack" set count = ${available - amt} where userid = ${session.userId} and itemkey = ${itemKey}`;
+    }
+    // upsert character stack
+    const newCount = (charStack?.count ?? 0) + amt;
+    await q`insert into "ItemStack" (characterid, itemkey, count) values (${characterId}, ${itemKey}, ${newCount})
+            on conflict (characterid, itemkey) do update set count = excluded.count`;
   }
   // Return updated snapshot
-  const [newCharStacks, newAcctStacks] = await Promise.all([
-    client.itemStack.findMany({ where: { characterId } }),
-    client.accountItemStack.findMany({ where: { userId: session.userId } })
-  ]);
+  const newCharStacks = await q<{ itemkey: string; count: number }>`select itemkey, count from "ItemStack" where characterid = ${characterId}`;
+  const newAcctStacks = await q<{ itemkey: string; count: number }>`select itemkey, count from "AccountItemStack" where userid = ${session.userId}`;
   const inv: Record<string, number> = {};
-  for (const s of newCharStacks) inv[s.itemKey] = s.count;
+  for (const s of newCharStacks) inv[s.itemkey] = s.count;
   const storage: Record<string, number> = {};
-  for (const s of newAcctStacks) storage[s.itemKey] = s.count;
+  for (const s of newAcctStacks) storage[s.itemkey] = s.count;
   return NextResponse.json({ inventory: inv, storage });
 }

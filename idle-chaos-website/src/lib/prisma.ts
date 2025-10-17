@@ -1,18 +1,7 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+// Prisma has been removed from this project.
+// This stub exists to prevent unresolved imports during transition.
+// Do not use. Switch to the typed SQL helper in src/lib/db.ts (`q<T>` with Neon Postgres).
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-
-const url = process.env.DATABASE_URL;
-const baseOptions: Prisma.PrismaClientOptions = {
-	...(process.env.NODE_ENV !== "production" ? { log: ["error", "warn"] } : {}),
-	...(url ? { datasources: { db: { url } } } : {}),
-};
-
-if (process.env.NODE_ENV !== "production") {
-	const prefix = url ? url.slice(0, 16) : "(no DATABASE_URL)";
-	console.log(`[prisma] initializing client (provider=postgresql) urlPrefix=${prefix}`);
-}
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient(baseOptions);
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma: never = (() => {
+  throw new Error("Prisma has been removed. Use src/lib/db.ts (q<T>) with Neon Postgres instead.");
+})();

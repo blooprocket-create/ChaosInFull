@@ -41,12 +41,6 @@ export async function POST(req: Request) {
   if (hasFurnace) updateData.furnace = furnace ?? null;
   if (hasWorkbench) updateData.workbench = workbench ?? null;
   if (hasSawmill) updateData.sawmill = sawmill ?? null;
-  const createData: { characterId: string; furnace: FurnaceQueue | null; workbench: WorkbenchQueue | null; sawmill: SawmillQueue | null } = {
-    characterId,
-    furnace: hasFurnace ? (furnace ?? null) : null,
-    workbench: hasWorkbench ? (workbench ?? null) : null,
-    sawmill: hasSawmill ? (sawmill ?? null) : null,
-  };
   await q`
     insert into "CraftQueue" (characterid, furnace, workbench, sawmill)
     values (${characterId}, ${hasFurnace ? (furnace ?? null) : null}::jsonb, ${hasWorkbench ? (workbench ?? null) : null}::jsonb, ${hasSawmill ? (sawmill ?? null) : null}::jsonb)

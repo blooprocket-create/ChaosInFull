@@ -17,7 +17,7 @@ export const patchNotes: PatchNote[] = [
       "Inventory overhaul: fixed-slot grid UI + split stack modal (partial moves)",
       "Shop upgrade: batch buy/sell in one transaction; gold tracked per character",
       "Zero-pruning: stacks at 0 are deleted server-side to keep DB clean",
-      "Deployment ready: Postgres schema, Prisma postinstall, Vercel config + envs"
+  "Deployment ready: Postgres schema, Neon connection, Vercel config + envs"
     ],
     notes: [
       "Centralized rarity mapping and colors; consistent across admin and UI",
@@ -26,10 +26,10 @@ export const patchNotes: PatchNote[] = [
       "Inventory sort/filter controls added (view-only for now)",
       "Shop uses bulk endpoints; client toasts and validations added",
       "Character.gold is the single source of truth for gold changes from shop",
-      "Prisma schema migrated: ItemDef.buy/sell are BigInt to prevent overflow",
+  "DB schema migrated: ItemDef.buy/sell are numeric to prevent overflow",
       "APIs serialize BigInt safely when returning JSON",
       "Seed endpoint now sources items from src/data/items to keep prices consistent",
-      "Postgres-specific Prisma schema added; generate on build for Vercel",
+  "Serverless Postgres via Neon; remove Prisma runtime",
       "Added vercel.json and deployment docs; .env.example updated for Postgres",
       "General cleanup: removed any types in routes, corrected Next.js route params typing"
     ]

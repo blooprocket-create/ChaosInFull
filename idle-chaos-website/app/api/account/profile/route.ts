@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 import { getSession } from "@/src/lib/auth";
 
 export async function POST(req: Request) {
@@ -10,13 +10,11 @@ export async function POST(req: Request) {
   if (username.length < 3 || username.length > 32) {
     return NextResponse.json({ error: "Name must be 3-32 characters" }, { status: 400 });
   }
-  try {
-    await prisma.user.update({ where: { id: session.userId }, data: { username } });
-    return NextResponse.json({ ok: true, message: "Display name updated" });
-  } catch (e) {
-    if (typeof e === 'object' && e && 'code' in e && (e as { code?: string }).code === "P2002") {
-      return NextResponse.json({ error: "Name is taken" }, { status: 400 });
-    }
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
-  }
+  // Enforce uniqueness by checking case-insensitively
+  const dup = await q<{ exists: boolean }>`
+    select exists(select 1 from "User" where lower(username) = lower(${username}) and id <> ${session.userId}) as exists
+  `;
+  if (dup[0]?.exists) return NextResponse.json({ error: "Name is taken" }, { status: 400 });
+  await q`update "User" set username = ${username} where id = ${session.userId}`;
+  return NextResponse.json({ ok: true, message: "Display name updated" });
 }
