@@ -12,10 +12,10 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   username     String   @unique
-  passwordHash String
-  isAdmin      Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  passwordHash String   @map("passwordhash")
+  isAdmin      Boolean  @default(false) @map("isadmin")
+  createdAt    DateTime @default(now()) @map("createdat")
+  updatedAt    DateTime @updatedAt @map("updatedat")
   stats        PlayerStat?
   characters   Character[]
   accountItemStacks AccountItemStack[]
@@ -25,25 +25,25 @@ model User {
 model PlayerStat {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id])
-  userId    String   @unique
+  userId    String   @unique @map("userid")
   level     Int      @default(1)
   class     String   @default("Beginner")
   exp       Int      @default(0)
   gold      Int      @default(0)
-  premiumGold Int    @default(0)
+  premiumGold Int    @default(0) @map("premiumgold")
   hp        Int      @default(100)
   mp        Int      @default(50)
   strength  Int      @default(1)
   agility   Int      @default(1)
   intellect Int      @default(1)
   luck      Int      @default(1)
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @map("updatedat")
 }
 
 model Character {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id])
-  userId    String
+  userId    String   @map("userid")
   name      String
   class     String   @default("Beginner")
   gender    Gender
@@ -51,19 +51,19 @@ model Character {
   level     Int      @default(1)
   exp       Int      @default(0)
   gold      Int      @default(0)
-  miningExp Int      @default(0)
-  miningLevel Int    @default(1)
-  woodcuttingExp Int   @default(0)
-  woodcuttingLevel Int @default(1)
-  craftingExp Int      @default(0)
-  craftingLevel Int    @default(1)
-  fishingExp Int       @default(0)
-  fishingLevel Int     @default(1)
-  seenWelcome Boolean @default(false)
-  lastScene  String   @default("Town")
-  lastSeenAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  miningExp Int      @default(0) @map("miningexp")
+  miningLevel Int    @default(1) @map("mininglevel")
+  woodcuttingExp Int   @default(0) @map("woodcuttingexp")
+  woodcuttingLevel Int @default(1) @map("woodcuttinglevel")
+  craftingExp Int      @default(0) @map("craftingexp")
+  craftingLevel Int    @default(1) @map("craftinglevel")
+  fishingExp Int       @default(0) @map("fishingexp")
+  fishingLevel Int     @default(1) @map("fishinglevel")
+  seenWelcome Boolean @default(false) @map("seenwelcome")
+  lastScene  String   @default("Town") @map("lastscene")
+  lastSeenAt DateTime @default(now()) @map("lastseenat")
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
   itemStacks ItemStack[]
   craftQueue CraftQueue?
   chatMessages ChatMessage[]
@@ -75,41 +75,41 @@ model Character {
 model ItemStack {
   id           String   @id @default(cuid())
   character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  characterId  String
-  itemKey      String
+  characterId  String   @map("characterid")
+  itemKey      String   @map("itemkey")
   count        Int      @default(0)
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime @updatedAt @map("updatedat")
   @@unique([characterId, itemKey])
 }
 
 model CraftQueue {
   id           String    @id @default(cuid())
   character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  characterId  String    @unique
+  characterId  String    @unique @map("characterid")
   furnace      Json?
   workbench    Json?
   sawmill      Json?
-  updatedAt    DateTime  @updatedAt
+  updatedAt    DateTime  @updatedAt @map("updatedat")
 }
 
 model AccountItemStack {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  itemKey   String
+  userId    String   @map("userid")
+  itemKey   String   @map("itemkey")
   count     Int      @default(0)
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @map("updatedat")
   @@unique([userId, itemKey])
 }
 
 model ChatMessage {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id])
-  userId    String
+  userId    String   @map("userid")
   character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
-  characterId String?
+  characterId String? @map("characterid")
   text      String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("createdat")
   // Optional zone/scene for scoping later
   scene     String   @default("Town")
 }
@@ -119,24 +119,24 @@ model Quest {
   id              String   @id
   name            String
   description     String
-  objectiveType   String   // e.g. "KILL"
-  objectiveTarget String   // e.g. "slime"
-  objectiveCount  Int      // e.g. 5
+  objectiveType   String   @map("objectivetype") // e.g. "KILL"
+  objectiveTarget String   @map("objectivetarget") // e.g. "slime"
+  objectiveCount  Int      @map("objectivecount") // e.g. 5
   // Optional: NPC that gives/accepts this quest
   giverNpc       NpcDef?  @relation(fields: [giverNpcId], references: [id])
-  giverNpcId     String?
+  giverNpcId     String?  @map("givernpcid")
   // Optional: next quest in chain
-  nextQuestId    String?
+  nextQuestId    String?  @map("nextquestid")
   // Acceptance requirements
-  minLevel          Int      @default(1)
-  requiresQuestId   String?
+  minLevel          Int      @default(1) @map("minlevel")
+  requiresQuestId   String?  @map("requiresquestid")
   // Rewards
-  rewardGold         Int      @default(0)
-  rewardExp          Int      @default(0)
-  rewardMiningExp    Int      @default(0)
-  rewardCraftingExp  Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  rewardGold         Int      @default(0) @map("rewardgold")
+  rewardExp          Int      @default(0) @map("rewardexp")
+  rewardMiningExp    Int      @default(0) @map("rewardminingexp")
+  rewardCraftingExp  Int      @default(0) @map("rewardcraftingexp")
+  createdAt       DateTime @default(now()) @map("createdat")
+  updatedAt       DateTime @updatedAt @map("updatedat")
   characterQuests CharacterQuest[]
   rewardItems     QuestRewardItem[]
 }
@@ -144,15 +144,15 @@ model Quest {
 model CharacterQuest {
   id           String    @id @default(cuid())
   character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  characterId  String
+  characterId  String   @map("characterid")
   quest        Quest     @relation(fields: [questId], references: [id])
-  questId      String
+  questId      String   @map("questid")
   status       QuestStatus @default(ACTIVE)
   progress     Int       @default(0)
   // Whether the player has claimed the rewards for this quest (for hand-in steps)
-  claimedRewards Boolean  @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  claimedRewards Boolean  @default(false) @map("claimedrewards")
+  createdAt    DateTime  @default(now()) @map("createdat")
+  updatedAt    DateTime  @updatedAt @map("updatedat")
   @@unique([characterId, questId])
 }
 
@@ -183,11 +183,11 @@ model ItemDef {
   description String  @default("")
   rarity      String  @default("common")
   stackable   Boolean @default(true)
-  maxStack    Int     @default(999)
+  maxStack    Int     @default(999) @map("maxstack")
   buy         BigInt  @default(0)
   sell        BigInt  @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("createdat")
+  updatedAt   DateTime @updatedAt @map("updatedat")
   drops       DropEntry[]
   questRewards QuestRewardItem[] @relation("ItemToQuestRewards")
 }
@@ -196,47 +196,47 @@ model EnemyTemplate {
   id        String  @id // e.g., "slime"
   name      String
   level     Int     @default(1)
-  baseHp    Int     @default(30)
-  expBase   Int     @default(5)
-  goldMin   Int     @default(1)
-  goldMax   Int     @default(3)
+  baseHp    Int     @default(30) @map("basehp")
+  expBase   Int     @default(5) @map("expbase")
+  goldMin   Int     @default(1) @map("goldmin")
+  goldMax   Int     @default(3) @map("goldmax")
   tags      String  @default("") // CSV or JSON-encoded if needed
   // Relations
   dropTable DropTable?   @relation("TemplateToDropTable")
   spawns    SpawnConfig[] @relation("TemplateToSpawns")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
 }
 
 model DropTable {
   id         String @id // e.g., "slime_default"
   template   EnemyTemplate @relation("TemplateToDropTable", fields: [templateId], references: [id])
-  templateId String @unique
+  templateId String @unique @map("templateid")
   entries    DropEntry[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("createdat")
+  updatedAt  DateTime @updatedAt @map("updatedat")
 }
 
 model DropEntry {
   id          String   @id @default(cuid())
   dropTable   DropTable @relation(fields: [dropTableId], references: [id])
-  dropTableId String
+  dropTableId String   @map("droptableid")
   item        ItemDef  @relation(fields: [itemId], references: [id])
-  itemId      String
+  itemId      String   @map("itemid")
   weight      Int      @default(1)
-  minQty      Int      @default(1)
-  maxQty      Int      @default(1)
-  uniqueRoll  Boolean  @default(false)
+  minQty      Int      @default(1) @map("minqty")
+  maxQty      Int      @default(1) @map("maxqty")
+  uniqueRoll  Boolean  @default(false) @map("uniqueroll")
 }
 
 model ZoneDef {
   id        String @id // e.g., "Slime"
   name      String
-  sceneKey  String // e.g., "Slime"
+  sceneKey  String @map("scenekey") // e.g., "Slime"
   width     Int    @default(800)
   height    Int    @default(600)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
   spawns    SpawnConfig[]
   portals   PortalDef[]
   // Opposite side of the "PortalTarget" relation from PortalDef.targetZone
@@ -246,36 +246,36 @@ model ZoneDef {
 model SpawnConfig {
   id         String @id @default(cuid())
   zone       ZoneDef @relation(fields: [zoneId], references: [id])
-  zoneId     String
+  zoneId     String @map("zoneid")
   template   EnemyTemplate @relation("TemplateToSpawns", fields: [templateId], references: [id])
-  templateId String
+  templateId String @map("templateid")
   budget     Int    @default(6)
-  respawnMs  Int    @default(1200)
+  respawnMs  Int    @default(1200) @map("respawnms")
   slots      Json?  // e.g., [100,180,260,340,420]
-  phaseType  String @default("personal")
+  phaseType  String @default("personal") @map("phasetype")
 }
 
 // Links two zones via a portal placed at (x,y) within the source zone
 model PortalDef {
   id           String  @id @default(cuid())
   zone         ZoneDef @relation(fields: [zoneId], references: [id])
-  zoneId       String
+  zoneId       String  @map("zoneid")
   targetZone   ZoneDef @relation("PortalTarget", fields: [targetZoneId], references: [id])
-  targetZoneId String
+  targetZoneId String  @map("targetzoneid")
   x            Int
   y            Int
   radius       Int     @default(32)
   label        String  @default("")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @map("createdat")
+  updatedAt    DateTime @updatedAt @map("updatedat")
 }
 
 // NPC definitions (quest givers, shopkeepers, etc.)
 model NpcDef {
   id        String @id // e.g., "grimsley"
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("createdat")
+  updatedAt DateTime @updatedAt @map("updatedat")
   quests    Quest[]
 }
 
@@ -283,9 +283,9 @@ model NpcDef {
 model QuestRewardItem {
   id        String  @id @default(cuid())
   quest     Quest   @relation(fields: [questId], references: [id])
-  questId   String
+  questId   String  @map("questid")
   item      ItemDef @relation("ItemToQuestRewards", fields: [itemId], references: [id])
-  itemId    String
+  itemId    String  @map("itemid")
   qty       Int     @default(1)
 }
 
@@ -293,14 +293,14 @@ model QuestRewardItem {
 model AfkCombatState {
   id            String    @id @default(cuid())
   character     Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  characterId   String    @unique
+  characterId   String    @unique @map("characterid")
   zone          String
   auto          Boolean   @default(false)
-  startedAt     DateTime?
-  lastSnapshot  DateTime?
-  pendingLoot   Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  startedAt     DateTime? @map("startedat")
+  lastSnapshot  DateTime? @map("lastsnapshot")
+  pendingLoot   Json?     @map("pendingloot")
+  createdAt     DateTime  @default(now()) @map("createdat")
+  updatedAt     DateTime  @updatedAt @map("updatedat")
 }
 
 // Admin-managed Patch Notes
@@ -311,6 +311,6 @@ model PatchNote {
   title      String
   highlights Json     // string[]
   notes      Json?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("createdat")
+  updatedAt  DateTime @updatedAt @map("updatedat")
 }

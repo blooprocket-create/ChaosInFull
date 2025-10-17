@@ -22,5 +22,6 @@ export async function GET() {
     startsWithPostgres: startsWith,
     hasSSLParam: hasSSL,
     redacted: raw ? redact(raw) : null,
+    prefix: raw ? raw.slice(0, 16) : null
   });
 }

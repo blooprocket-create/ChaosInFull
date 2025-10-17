@@ -982,6 +982,50 @@
 				"-Command",
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx eslint app/api/auth/login/route.ts app/api/auth/signup/route.ts app/api/health/db/route.ts --max-warnings=0"
 			]
+		},
+		{
+			"label": "Prisma DB Push (Neon)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx prisma db push --accept-data-loss"
+			]
+		},
+		{
+			"label": "Prisma DB Push (schema.postgres.prisma)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run prisma:pg:push --silent"
+			]
+		},
+		{
+			"label": "Prisma Generate (after mapping)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx prisma generate"
+			]
+		},
+		{
+			"label": "Prisma Validate (after mapping)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npx prisma validate"
+			]
 		}
 	]
 }
