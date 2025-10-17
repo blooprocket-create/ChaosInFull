@@ -1,16 +1,19 @@
 import { patchNotes as staticNotes } from "@/src/data/patchNotes";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 export const metadata = { title: "News • Chaos In Full", description: "Development dispatches and patch notes.", openGraph: { title: "Chaos In Full News", images: ["/og/news.png"] } };
 
 export default async function NewsPage() {
   // Load patch notes from DB; merge with static notes (dedupe by version)
   let patchNotes = staticNotes;
   try {
-    const client = prisma as unknown as { patchNote: { findMany: (args: { orderBy: Array<{ date?: "asc" | "desc"; version?: "asc" | "desc" }> }) => Promise<Array<{ date: string | Date; version: string; title: string; highlights: unknown; notes?: unknown }> > } };
-    const rows = await client.patchNote.findMany({ orderBy: [{ date: "desc" }, { version: "desc" }] });
+    const rows = await (sql`
+      select to_char(date, 'YYYY-MM-DD') as date, version, title, highlights, notes
+      from "PatchNote"
+      order by date desc, version desc
+    ` as unknown as Array<{ date: string; version: string; title: string; highlights: unknown; notes?: unknown }>);
     if (Array.isArray(rows) && rows.length) {
       const dbNotes = rows.map(r => ({
-        date: (typeof r.date === 'string' ? r.date : new Date(r.date).toISOString().slice(0,10)),
+        date: r.date,
         version: r.version,
         title: r.title,
         highlights: Array.isArray(r.highlights) ? (r.highlights as string[]) : [],

@@ -1,4 +1,4 @@
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 
 class HttpError extends Error {
   status: number;
@@ -10,9 +10,12 @@ class HttpError extends Error {
 }
 
 export async function assertCharacterOwner(userId: string, characterId: string) {
-  const ch = await prisma.character.findUnique({ where: { id: characterId } });
-  if (!ch || ch.userId !== userId) {
+  const rows = await (sql`
+    select userid from "Character" where id = ${characterId} limit 1
+  ` as unknown as Array<{ userid: string }>);
+  const ch = rows[0];
+  if (!ch || ch.userid !== userId) {
     throw new HttpError(403, "forbidden");
   }
-  return ch;
+  return { id: characterId, userId: ch.userid };
 }

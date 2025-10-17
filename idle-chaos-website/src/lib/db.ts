@@ -17,3 +17,8 @@ export type UserRow = {
   passwordhash: string;
   isadmin: boolean;
 };
+
+// Typed helper for row-shaping with Neon SQL
+// Usage: const rows = await q<MyType>`select ...`;
+export const q = <T = any>(strings: TemplateStringsArray, ...params: any[]) =>
+  sql(strings, ...params) as unknown as Promise<T[]>;

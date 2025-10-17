@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 import { assertCharacterOwner } from "@/src/lib/ownership";
-
-type AfkState = { characterId: string; zone: string | null; auto: boolean; lastSnapshot: Date | null; startedAt: Date | null };
-type AfkDelegate = {
-  upsert: (args: { where: { characterId: string }; update: Partial<Pick<AfkState, "zone" | "auto" | "lastSnapshot" | "startedAt">>; create: AfkState }) => Promise<void>;
-};
 
 function getAbsoluteBase(req: Request) {
   // Prefer NEXT_PUBLIC_BASE_URL if absolute, else origin header, else http://localhost fallback
@@ -59,12 +54,12 @@ export async function POST(req: Request) {
       const now = new Date();
       const zoneId = zone;
       // Upsert per-character AFK row
-      const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
-      await afk.upsert({
-        where: { characterId: characterId },
-        update: { auto: on, zone: zoneId, ...(on ? { startedAt: now } : { lastSnapshot: now }) },
-        create: { characterId: characterId, zone: zoneId, auto: on, startedAt: now, lastSnapshot: now },
-      });
+      await sql`
+        insert into "AfkCombatState" (id, characterid, zone, auto, startedat, lastsnapshot)
+        values (concat('afk_', substr(md5(random()::text), 1, 8)), ${characterId}, ${zoneId}, ${on}, ${now.toISOString()}, ${now.toISOString()})
+        on conflict (characterid) do update set auto = excluded.auto, zone = excluded.zone,
+          startedat = ${on ? now.toISOString() : null}, lastsnapshot = ${!on ? now.toISOString() : null}
+      `;
     } catch {}
     return NextResponse.json({ ok: true });
   }
@@ -90,30 +85,34 @@ export async function POST(req: Request) {
       await awardExp(characterId, selfReward.exp, cookie, req);
       // After awarding EXP, fetch the updated exp/level from DB for immediate HUD update
       try {
-        const ch2 = await prisma.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true } });
-        if (ch2) { newExp = ch2.exp; newLevel = ch2.level; }
+        const rows = await (sql`
+          select exp, level from "Character" where id = ${characterId} limit 1
+        ` as unknown as Array<{ exp: number; level: number }>);
+        if (rows[0]) { newExp = rows[0].exp; newLevel = rows[0].level; }
       } catch {}
     }
       // Minimal gold + loot for killer
       try {
         const killerId = characterId;
-        const client = prisma as unknown as {
-          character: { findUnique: (args: { where: { id: string } }) => Promise<{ id: string; userId: string } | null> };
-          playerStat: { findUnique: (args: { where: { userId: string } }) => Promise<{ gold: number } | null>; update: (args: { where: { userId: string }; data: { gold: number } }) => Promise<void>; create?: (args: { data: { userId: string; gold: number } }) => Promise<void> };
-          itemStack: { findUnique: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } } }) => Promise<{ count: number } | null>; upsert: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } }; update: { count: number }; create: { characterId: string; itemKey: string; count: number } }) => Promise<void> };
-        };
-        const killer = await client.character.findUnique({ where: { id: killerId } });
+        const killerRows = await (sql`select id from "Character" where id = ${killerId} limit 1` as unknown as Array<{ id: string }>);
+        const killer = killerRows[0];
         if (killer) {
           const baseExp = harvested?.rewards?.find(r=>r.characterId===killerId)?.exp ?? harvested?.rewards?.[0]?.exp ?? 5;
           const goldDelta = harvested?.loot?.length ? Math.min(Math.max(1, Math.floor(baseExp / 2)), 5) : (1 + Math.floor(Math.random() * 3));
-          await prisma.character.update({ where: { id: killerId }, data: { gold: { increment: goldDelta } } }).catch(()=>{});
+          await sql`update "Character" set gold = gold + ${goldDelta} where id = ${killerId}`.catch(()=>{});
           goldDeltaApplied = goldDelta;
           // Persist each rolled drop
           if (Array.isArray(harvested?.loot)) {
             for (const it of harvested.loot as Array<{ itemId: string; qty: number }>) {
-              const curr = await client.itemStack.findUnique({ where: { characterId_itemKey: { characterId: killerId, itemKey: it.itemId } } });
-              const count = (curr?.count ?? 0) + Math.max(1, it.qty);
-              await client.itemStack.upsert({ where: { characterId_itemKey: { characterId: killerId, itemKey: it.itemId } }, update: { count }, create: { characterId: killerId, itemKey: it.itemId, count } });
+              const currRows = await (sql`
+                select count from "ItemStack" where characterid = ${killerId} and itemkey = ${it.itemId} limit 1
+              ` as unknown as Array<{ count: number }>);
+              const count = (currRows?.[0]?.count ?? 0) + Math.max(1, it.qty);
+              await sql`
+                insert into "ItemStack" (id, characterid, itemkey, count)
+                values (concat('is_', substr(md5(random()::text), 1, 8)), ${killerId}, ${it.itemId}, ${count})
+                on conflict (characterid, itemkey) do update set count = ${count}
+              `;
             }
           }
         }

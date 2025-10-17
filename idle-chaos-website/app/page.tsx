@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { patchNotes as staticNotes } from "@/src/data/patchNotes";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 import BloodLinkButton from "@/src/components/BloodLinkButton";
 import FlickerOnView from "@/src/components/FlickerOnView";
 import EventsCarousel from "@/src/components/EventsCarousel";
@@ -11,9 +11,15 @@ export const metadata = { title: "Chaos In Full • Idle RPG", description: "A d
 export default async function Home() {
   let latest = staticNotes[0];
   try {
-    const client = prisma as unknown as { patchNote: { findMany: (args: { take: number; orderBy: Array<{ date?: "asc" | "desc"; version?: "asc" | "desc" }> }) => Promise<Array<{ date: string | Date; version: string; title: string }> > } };
-    const rows = await client.patchNote.findMany({ take: 1, orderBy: [{ date: "desc" }, { version: "desc" }] });
-    if (rows.length) { latest = { date: (typeof rows[0].date === 'string' ? rows[0].date : new Date(rows[0].date).toISOString().slice(0,10)), version: rows[0].version, title: rows[0].title, highlights: [], notes: [] }; }
+    const rows = await (sql`
+      select to_char(date, 'YYYY-MM-DD') as date, version, title
+      from "PatchNote"
+      order by date desc, version desc
+      limit 1
+    ` as unknown as Array<{ date: string; version: string; title: string }>);
+    if (rows.length) {
+      latest = { date: rows[0].date, version: rows[0].version, title: rows[0].title, highlights: [], notes: [] };
+    }
   } catch {}
   return (
     <>

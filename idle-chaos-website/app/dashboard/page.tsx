@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 import LogoutButton from "@/src/components/LogoutButton";
 import CharacterDashboardCard, { CharacterSummary } from "@/src/components/CharacterDashboardCard";
 import { taglines } from "@/src/data/flavor";
@@ -8,23 +8,50 @@ import { taglines } from "@/src/data/flavor";
 export default async function Dashboard() {
   const session = await getSession();
   if (!session) redirect("/login");
-  const user = await prisma.user.findUnique({ where: { id: session.userId }, include: { stats: true } });
+  const users = await (sql`
+    select u.id, u.createdat, ps.gold, ps.premiumgold
+    from "User" u
+    left join "PlayerStat" ps on ps.userid = u.id
+    where u.id = ${session.userId}
+    limit 1
+  ` as unknown as Array<{ id: string; createdat: string; gold: number; premiumgold: number }>);
+  const user = users[0];
   if (!user) redirect("/login");
-  // Fetch characters via direct prisma (defensive cast) including skill levels & scene fields
-  const charsRaw = await (prisma as unknown as { character: { findMany: (args: { where: { userId: string }; orderBy: { createdAt: "asc" | "desc" } }) => Promise<Array<{ id: string; name: string; class: string; level: number; miningLevel: number; woodcuttingLevel: number; craftingLevel: number; fishingLevel: number; lastScene: string; lastSeenAt: Date }> > } }).character.findMany({ where: { userId: session.userId }, orderBy: { createdAt: "asc" } });
+  const charsRaw = await (sql`
+    select id, name, class, level,
+           mininglevel, woodcuttinglevel, craftinglevel, fishinglevel,
+           lastscene, lastseenat
+    from "Character"
+    where userid = ${session.userId}
+    order by createdat asc
+  ` as unknown as Array<{
+    id: string; name: string; class: string; level: number;
+    mininglevel: number; woodcuttinglevel: number; craftinglevel: number; fishinglevel: number;
+    lastscene: string; lastseenat: string;
+  }>);
   const now = Date.now();
-  const characters: CharacterSummary[] = charsRaw.map(c => ({ ...c, afkMs: Math.max(0, now - new Date(c.lastSeenAt).getTime()) }));
-  const s = user.stats!;
+  const characters: CharacterSummary[] = charsRaw.map(c => ({
+    id: c.id,
+    name: c.name,
+    class: c.class,
+    level: c.level,
+    miningLevel: c.mininglevel,
+    woodcuttingLevel: c.woodcuttinglevel,
+    craftingLevel: c.craftinglevel,
+    fishingLevel: c.fishinglevel,
+    lastScene: c.lastscene,
+    afkMs: Math.max(0, now - new Date(c.lastseenat).getTime()),
+  }));
   return (
     <section className="mx-auto max-w-5xl px-4 py-12">
   <h1 className="text-3xl font-bold">{taglines.dashboardHeader}</h1>
   <p className="mt-2 text-gray-400 text-sm">{taglines.dashboardSubtitle}</p>
       <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[ 
-          ["Gold", s.gold],
-          ["Premium Gold", (s as unknown as { premiumGold?: number }).premiumGold ?? 0],
+          ["Gold", user.gold ?? 0],
+          ["Premium Gold", user.premiumgold ?? 0],
           ["Characters", characters.length],
-          ["Member Since", user.createdAt.toLocaleDateString?.() ?? new Date(user.createdAt).toLocaleDateString()],
+          ["Member Since", new Date(user.createdat).toLocaleDateString()],
         ].map(([k, v]) => (
           <div key={String(k)} className="rounded border border-white/10 bg-black/40 p-4">
             <div className="text-xs uppercase text-gray-400">{k}</div>

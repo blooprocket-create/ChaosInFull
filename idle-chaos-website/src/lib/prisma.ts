@@ -10,7 +10,6 @@ const baseOptions: Prisma.PrismaClientOptions = {
 
 if (process.env.NODE_ENV !== "production") {
 	const prefix = url ? url.slice(0, 16) : "(no DATABASE_URL)";
-	// eslint-disable-next-line no-console
 	console.log(`[prisma] initializing client (provider=postgresql) urlPrefix=${prefix}`);
 }
 

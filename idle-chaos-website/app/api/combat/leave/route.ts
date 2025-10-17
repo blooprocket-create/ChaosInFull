@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
 import { assertCharacterOwner } from "@/src/lib/ownership";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -17,9 +17,9 @@ export async function POST(req: Request) {
   const room = getZoneRoom(zone);
   room.leave(characterId);
   try {
-    type AfkDelegate = { update: (args: { where: { characterId: string }; data: { lastSnapshot: Date; auto: boolean } }) => Promise<void> };
-    const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
-    await afk.update({ where: { characterId }, data: { lastSnapshot: new Date(), auto: false } });
+    await sql`
+      update "AfkCombatState" set lastsnapshot = now(), auto = false where characterid = ${characterId}
+    `;
   } catch {}
   return NextResponse.json({ ok: true });
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { getZoneRoom } from "@/src/server/rooms/zoneRoom";
 import { assertCharacterOwner } from "@/src/lib/ownership";
-import { prisma } from "@/src/lib/prisma";
+import { sql } from "@/src/lib/db";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -17,12 +17,14 @@ export async function POST(req: Request) {
   const snap = room.snapshot(characterId);
   // If AFK was previously on, refresh startedAt to now when rejoining
   try {
-    type AfkState = { auto: boolean } | null;
-    type AfkDelegate = { findUnique: (args: { where: { characterId: string } }) => Promise<AfkState>; update: (args: { where: { characterId: string }; data: { startedAt: Date } }) => Promise<void> };
-    const afk = (prisma as unknown as { afkCombatState: AfkDelegate }).afkCombatState;
-    const state = await afk.findUnique({ where: { characterId } });
+    const rows = await sql`
+      select auto from "AfkCombatState" where characterid = ${characterId} limit 1
+    ` as unknown as Array<{ auto: boolean }>;
+    const state = rows[0];
     if (state?.auto) {
-      await afk.update({ where: { characterId }, data: { startedAt: new Date() } });
+      await sql`
+        update "AfkCombatState" set startedat = now() where characterid = ${characterId}
+      `;
     }
   } catch {}
   return NextResponse.json({ ok: true, phaseId: ps.phaseId, snapshot: snap });

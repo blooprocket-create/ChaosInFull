@@ -1,32 +1,9 @@
 // In-memory ZoneRoom manager. Authoritative for combat state in this MVP.
-import { prisma } from "@/src/lib/prisma";
-// Local minimal types to avoid `any` while not depending on generated Prisma types at build-time
-type DropEntryRow = { itemId: string; weight: number; minQty: number; maxQty: number };
-type EnemyTemplateRow = { id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number; dropTable?: { id: string; entries?: DropEntryRow[] } | null };
-type SpawnConfigRow = { templateId: string; budget: number; respawnMs: number; slots: unknown; phaseType: string };
-type PrismaLoose = {
-  zoneDef: {
-    findUnique: (args: { where: { id: string }; include?: { spawns: boolean } }) => Promise<{ id: string; spawns?: SpawnConfigRow[] } | null>;
-    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sceneKey: string } }) => Promise<void>;
-  };
-  enemyTemplate: {
-    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; level: number; baseHp: number; expBase: number; goldMin: number; goldMax: number } }) => Promise<void>;
-    findMany: (args: { include: { dropTable: { include: { entries: boolean } } } }) => Promise<EnemyTemplateRow[]>;
-  };
-  dropTable: {
-    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; templateId: string } }) => Promise<void>;
-  };
-  itemDef: {
-    upsert: (args: { where: { id: string }; update: Record<string, unknown>; create: { id: string; name: string; sell: bigint; description: string } }) => Promise<void>;
-  };
-  dropEntry: {
-    findMany: (args: { where: { dropTableId: string; itemId: string } }) => Promise<Array<{ id: string }>>;
-    create: (args: { data: { dropTableId: string; itemId: string; weight: number; minQty: number; maxQty: number } }) => Promise<void>;
-  };
-  spawnConfig: {
-    create: (args: { data: { zoneId: string; templateId: string; budget: number; respawnMs: number; slots: number[]; phaseType: string } }) => Promise<void>;
-  };
-};
+import { sql } from "@/src/lib/db";
+// Local minimal types to avoid `any`
+type DropEntryRow = { itemid: string; weight: number; minqty: number; maxqty: number };
+type EnemyTemplateRow = { id: string; name: string; level: number; basehp: number; expbase: number; goldmin: number; goldmax: number; droptableid?: string | null };
+type SpawnConfigRow = { templateid: string; budget: number; respawnms: number; slots: unknown; phasetype: string };
 // Not clustered; single-process only. For production, move to a real server + shared store.
 
 export type PhaseType = "personal" | "party" | "event";
@@ -129,16 +106,25 @@ class ZoneRoom {
     const ps = this.players.get(charId); if (!ps) return;
     try {
       // Load character for class/userId
-      const ch = await prisma.character.findUnique({ where: { id: charId }, select: { userId: true, class: true, level: true, id: true } });
+      const chRows = await (sql`
+        select userid, class, level from "Character" where id = ${charId} limit 1
+      ` as unknown as Array<{ userid: string; class: string; level: number }>);
+      const ch = chRows[0];
       if (!ch) return;
-      const stats = await prisma.playerStat.findUnique({ where: { userId: ch.userId }, select: { strength: true, agility: true, intellect: true, luck: true } });
+      const statRows = await (sql`
+        select strength, agility, intellect, luck from "PlayerStat" where userid = ${ch.userid} limit 1
+      ` as unknown as Array<{ strength: number; agility: number; intellect: number; luck: number }>);
+      const stats = statRows[0];
       const cls = (ch.class || "Beginner").toLowerCase();
       const main = cls.includes("horror") ? (stats?.strength ?? 1)
                  : cls.includes("occult") ? (stats?.intellect ?? 1)
                  : cls.includes("shade") ? (stats?.agility ?? 1)
                  : (stats?.luck ?? 1);
       // Basic weapon bonus: if the player has a copper dagger, add a small damage bonus
-      const hasDagger = !!(await prisma.itemStack.findUnique({ where: { characterId_itemKey: { characterId: charId, itemKey: "copper_dagger" } }, select: { count: true } }))?.count;
+      const hasRows = await (sql`
+        select count from "ItemStack" where characterid = ${charId} and itemkey = 'copper_dagger' limit 1
+      ` as unknown as Array<{ count: number } | undefined>);
+      const hasDagger = !!(hasRows?.[0]?.count);
       const weaponBonus = hasDagger ? 3 : 1; // 1 if bare hands, +3 if dagger present
       // Level scaling keeps early damage near previous static 8
       const levelBonus = Math.floor((ch.level ?? 1) / 2);
@@ -150,30 +136,66 @@ class ZoneRoom {
 
   private async loadContent() {
     if (this.contentLoaded) return;
-  const client = prisma as unknown as PrismaLoose;
-  const zone = await client.zoneDef.findUnique({ where: { id: this.zone }, include: { spawns: true } }).catch(()=>null);
+    let zoneRows: Array<{ id: string }> = [];
+    try {
+      zoneRows = await (sql`
+        select id from "ZoneDef" where id = ${this.zone} limit 1
+      ` as unknown as Array<{ id: string }>);
+    } catch { zoneRows = []; }
+    const zone = zoneRows[0] ?? null;
     if (!zone) {
       // Fallback: create defaults for Slime zone
-  await client.zoneDef.upsert({ where: { id: this.zone }, update: {}, create: { id: this.zone, name: `${this.zone} Zone`, sceneKey: this.zone } });
-  await client.enemyTemplate.upsert({ where: { id: "slime" }, update: {}, create: { id: "slime", name: "Slime", level: 1, baseHp: 30, expBase: 5, goldMin: 1, goldMax: 3 } });
-  await client.dropTable.upsert({ where: { id: "slime_default" }, update: {}, create: { id: "slime_default", templateId: "slime" } });
-  await client.itemDef.upsert({ where: { id: "slime_goop" }, update: {}, create: { id: "slime_goop", name: "Slime Goop", sell: BigInt(1), description: "Jiggly residue" } });
-      // Ensure an entry exists (id is cuid, skip if exists)
-      const entries = await client.dropEntry.findMany({ where: { dropTableId: "slime_default", itemId: "slime_goop" } });
-      if (!entries.length) {
-        await client.dropEntry.create({ data: { dropTableId: "slime_default", itemId: "slime_goop", weight: 35, minQty: 1, maxQty: 1 } });
+      await sql`
+        insert into "ZoneDef" (id, name, scenekey) values (${this.zone}, ${`${this.zone} Zone`}, ${this.zone})
+        on conflict (id) do nothing
+      `;
+      await sql`
+        insert into "EnemyTemplate" (id, name, level, basehp, expbase, goldmin, goldmax)
+        values ('slime', 'Slime', 1, 30, 5, 1, 3)
+        on conflict (id) do nothing
+      `;
+      await sql`
+        insert into "DropTable" (id, templateid) values ('slime_default', 'slime')
+        on conflict (id) do nothing
+      `;
+      await sql`
+        insert into "ItemDef" (id, name, sell, description)
+        values ('slime_goop', 'Slime Goop', 1, 'Jiggly residue')
+        on conflict (id) do nothing
+      `;
+      const entryRows = await (sql`
+        select id from "DropEntry" where droptableid = 'slime_default' and itemid = 'slime_goop' limit 1
+      ` as unknown as Array<{ id: string }>);
+      if (!entryRows.length) {
+        await sql`
+          insert into "DropEntry" (id, droptableid, itemid, weight, minqty, maxqty)
+          values (concat('de_', substr(md5(random()::text), 1, 8)), 'slime_default', 'slime_goop', 35, 1, 1)
+        `;
       }
-      await client.spawnConfig.create({ data: { zoneId: this.zone, templateId: "slime", budget: 6, respawnMs: 1200, slots: [100,180,260,340,420], phaseType: "personal" } }).catch(()=>{});
+      await sql`
+        insert into "SpawnConfig" (id, zoneid, templateid, budget, respawnms, slots, phasetype)
+        values (concat('sp_', substr(md5(random()::text), 1, 8)), ${this.zone}, 'slime', 6, 1200, '[100,180,260,340,420]'::jsonb, 'personal')
+        on conflict do nothing
+      `;
     }
-    const z = await client.zoneDef.findUnique({ where: { id: this.zone }, include: { spawns: true } });
-    const spawns = (z?.spawns as SpawnConfigRow[]) ?? [];
-    this.spawnCfg = spawns.map(s => ({ templateId: s.templateId, budget: s.budget, respawnMs: s.respawnMs, slots: (Array.isArray(s.slots) ? (s.slots as number[]) : [100,180,260,340,420]), phaseType: ((s.phaseType || "personal") as PhaseType) }));
-    const tpls = await client.enemyTemplate.findMany({ include: { dropTable: { include: { entries: true } } } });
-    for (const t of tpls) {
-      const tpl = t as EnemyTemplateRow;
-      this.templates.set(tpl.id, { id: tpl.id, name: tpl.name, level: tpl.level ?? 1, baseHp: tpl.baseHp, expBase: tpl.expBase, goldMin: tpl.goldMin, goldMax: tpl.goldMax, dropTableId: tpl.dropTable?.id ?? null });
-      if (tpl.dropTable?.entries && tpl.dropTable.entries.length) {
-        this.drops.set(tpl.dropTable.id, tpl.dropTable.entries.map((e: DropEntryRow) => ({ itemId: e.itemId, weight: e.weight, minQty: e.minQty, maxQty: e.maxQty })));
+    const spawnRows = await (sql`
+      select templateid, budget, respawnms, slots, phasetype from "SpawnConfig" where zoneid = ${this.zone}
+    ` as unknown as SpawnConfigRow[]);
+    this.spawnCfg = spawnRows.map(s => ({ templateId: s.templateid, budget: s.budget, respawnMs: s.respawnms, slots: (Array.isArray(s.slots) ? (s.slots as number[]) : [100,180,260,340,420]), phaseType: ((s.phasetype || "personal") as PhaseType) }));
+    const tpls = await (sql`
+      select et.id, et.name, et.level, et.basehp, et.expbase, et.goldmin, et.goldmax, dt.id as droptableid
+      from "EnemyTemplate" et
+      left join "DropTable" dt on dt.templateid = et.id
+    ` as unknown as Array<EnemyTemplateRow>);
+    for (const tpl of tpls) {
+      this.templates.set(tpl.id, { id: tpl.id, name: tpl.name, level: tpl.level ?? 1, baseHp: tpl.basehp, expBase: tpl.expbase, goldMin: tpl.goldmin, goldMax: tpl.goldmax, dropTableId: tpl.droptableid ?? null });
+      if (tpl.droptableid) {
+        const entries = await (sql`
+          select itemid, weight, minqty, maxqty from "DropEntry" where droptableid = ${tpl.droptableid}
+        ` as unknown as Array<DropEntryRow>);
+        if (entries.length) {
+          this.drops.set(tpl.droptableid, entries.map((e) => ({ itemId: e.itemid, weight: e.weight, minQty: e.minqty, maxQty: e.maxqty })));
+        }
       }
     }
     this.contentLoaded = true;

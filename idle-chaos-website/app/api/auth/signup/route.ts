@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sql } from "@/src/lib/db";
+import { q } from "@/src/lib/db";
 import { hashPassword, createSession } from "@/src/lib/auth";
 
 const schema = z.object({
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     const { email, username, password } = parsed.data;
-    const dup = await sql<{ exists: boolean }[]>`
+    const dup = await q<{ exists: boolean }>`
       select exists(
         select 1 from "User" where email = ${email} or username = ${username}
       ) as exists
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email or username already in use" }, { status: 409 });
     }
     const passwordHash = await hashPassword(password);
-    const rows = await sql<{ id: string; email: string }[]>`
+    const rows = await q<{ id: string; email: string }>`
       with ins as (
         insert into "User" (id, email, username, passwordhash, isadmin)
         values (gen_random_uuid()::text, ${email}, ${username}, ${passwordHash}, false)

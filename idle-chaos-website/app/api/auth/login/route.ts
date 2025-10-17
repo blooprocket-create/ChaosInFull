@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sql, UserRow } from "@/src/lib/db";
+import { q, UserRow } from "@/src/lib/db";
 import { createSession, verifyPassword } from "@/src/lib/auth";
 
 const schema = z.object({
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     const { emailOrUsername, password } = parsed.data;
-    const rows = await sql<UserRow[]>`
+    const rows = await q<UserRow>`
       select id, email, username, passwordhash, isadmin
       from "User"
       where email = ${emailOrUsername} or username = ${emailOrUsername}
