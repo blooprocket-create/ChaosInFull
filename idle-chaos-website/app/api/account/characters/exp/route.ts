@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 
 // Increment character EXP fields (character exp and/or miningExp)
 export async function POST(req: Request) {
@@ -18,8 +18,12 @@ export async function POST(req: Request) {
   const miningDelta = typeof miningExp === "number" ? clamp(miningExp) : 0;
   const craftingDelta = typeof craftingExp === "number" ? clamp(craftingExp) : 0;
 
-  // Fetch character with ownership check using generated Prisma types
-  const ch = await prisma.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  // Fetch character with ownership + current exp/levels
+  const rows = await q<{ id: string; userid: string; level: number; exp: number; miningexp: number; mininglevel: number; craftingexp: number; craftinglevel: number }>`
+    select id, userid, level, exp, miningexp, mininglevel, craftingexp, craftinglevel from "Character"
+    where id = ${characterId} and userid = ${session.userId}
+  `;
+  const ch = rows[0];
   if (!ch) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
 
   // Geometric growth thresholds
@@ -29,15 +33,15 @@ export async function POST(req: Request) {
 
   // XP rate multipliers that scale faster at high levels
   const charMult = 1 + Math.pow(Math.max(1, ch.level) - 1, 1.2) / 30; // grows with level
-  const mineMult = 1 + Math.pow(Math.max(1, ch.miningLevel ?? 1) - 1, 1.2) / 25; // grows with miningLevel
-  const craftMult = 1 + Math.pow(Math.max(1, ch.craftingLevel ?? 1) - 1, 1.2) / 25;
+  const mineMult = 1 + Math.pow(Math.max(1, ch.mininglevel ?? 1) - 1, 1.2) / 25; // grows with miningLevel
+  const craftMult = 1 + Math.pow(Math.max(1, ch.craftinglevel ?? 1) - 1, 1.2) / 25;
 
   let newCharExp = ch.exp + Math.floor(expDelta * charMult);
-  let newMineExp = ch.miningExp + Math.floor(miningDelta * mineMult);
-  let newCraftExp = ch.craftingExp + Math.floor(craftingDelta * craftMult);
+  let newMineExp = ch.miningexp + Math.floor(miningDelta * mineMult);
+  let newCraftExp = ch.craftingexp + Math.floor(craftingDelta * craftMult);
   let newLevel = ch.level;
-  let newMiningLevel = ch.miningLevel ?? 1;
-  let newCraftingLevel = ch.craftingLevel ?? 1;
+  let newMiningLevel = ch.mininglevel ?? 1;
+  let newCraftingLevel = ch.craftinglevel ?? 1;
 
   // Apply character level-ups
   let charReqNeeded = charReq(newLevel);
@@ -68,10 +72,16 @@ export async function POST(req: Request) {
     if (newCraftingLevel > 999) { newCraftExp = 0; break; }
   }
 
-  await prisma.character.update({
-    where: { id: ch.id },
-    data: { exp: newCharExp, level: newLevel, miningExp: newMineExp, miningLevel: newMiningLevel, craftingExp: newCraftExp, craftingLevel: newCraftingLevel },
-  });
+  await q`
+    update "Character" set
+      exp = ${newCharExp},
+      level = ${newLevel},
+      miningexp = ${newMineExp},
+      mininglevel = ${newMiningLevel},
+      craftingexp = ${newCraftExp},
+      craftinglevel = ${newCraftingLevel}
+    where id = ${ch.id}
+  `;
 
   return NextResponse.json({ ok: true, level: newLevel, exp: newCharExp, miningLevel: newMiningLevel, miningExp: newMineExp, craftingLevel: newCraftingLevel, craftingExp: newCraftExp });
 }

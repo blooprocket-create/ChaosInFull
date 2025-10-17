@@ -1,112 +1,37 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { prisma } from "@/src/lib/prisma";
-// Avoid importing Prisma types directly in this environment; use narrowed shapes below
+import { q } from "@/src/lib/db";
 
 // Tutorial quest constants
 const TUTORIAL_QUEST_ID = "tutorial_kill_slimes_5";
 const CRAFT_DAGGER_QUEST_ID = "tutorial_craft_copper_dagger";
 
-type QuestRow = { id: string; name: string; description: string; objectiveType: string; objectiveTarget: string; objectiveCount: number; nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null };
-type CharacterQuestRow = { characterId: string; questId: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; claimedRewards?: boolean };
-const client = prisma as unknown as {
-  npcDef: {
-    upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string }>; create: { id: string; name: string } }) => Promise<{ id: string; name: string }>;
-  };
-  itemDef: {
-    upsert: (args: { where: { id: string }; update: Record<string, never> | Partial<{ name: string; description?: string; sell?: bigint }> ; create: { id: string; name: string; description?: string; sell?: bigint } }) => Promise<void>;
-  };
-  quest: {
-    findUnique: (args: { where: { id: string }; include?: { rewardItems?: boolean } }) => Promise<(QuestRow & { rewardItems?: Array<{ itemId: string; qty: number }> }) | null>;
-    create: (args: { data: QuestRow & Partial<{ nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }> }) => Promise<QuestRow>;
-    upsert: (args: { where: { id: string }; update: Partial<QuestRow & { nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }>; create: QuestRow & Partial<{ nextQuestId?: string | null; rewardGold?: number; rewardExp?: number; rewardMiningExp?: number; rewardCraftingExp?: number; minLevel?: number; requiresQuestId?: string | null; giverNpcId?: string | null }> }) => Promise<QuestRow>;
-  };
-  characterQuest: {
-    findMany: (args: { where: { characterId: string }; include: { quest: boolean } }) => Promise<Array<CharacterQuestRow & { quest: QuestRow }>>;
-    upsert: (args: { where: { characterId_questId: { characterId: string; questId: string } }; update: Partial<CharacterQuestRow>; create: { characterId: string; questId: string; status: string; progress: number } }) => Promise<CharacterQuestRow>;
-    findUnique: (args: { where: { characterId_questId: { characterId: string; questId: string } } }) => Promise<(CharacterQuestRow & { claimedRewards?: boolean }) | null>;
-    update: (args: { where: { characterId_questId: { characterId: string; questId: string } }; data: Partial<CharacterQuestRow> & { claimedRewards?: boolean } }) => Promise<CharacterQuestRow>;
-    delete: (args: { where: { characterId_questId: { characterId: string; questId: string } } }) => Promise<void>;
-  };
-  character: {
-  findUnique: (args: { where: { id: string }; select?: { id?: boolean; userId?: boolean; exp?: boolean; level?: boolean; craftingExp?: boolean; craftingLevel?: boolean } }) => Promise<{ id?: string; userId?: string; exp?: number; level?: number; craftingExp?: number; craftingLevel?: number } | null>;
-    update: (args: { where: { id: string }; data: { exp?: { increment: number }; craftingExp?: { increment: number }; gold?: { increment: number } } }) => Promise<void>;
-  };
-  playerStat: {
-    findUnique: (args: { where: { userId: string } }) => Promise<{ gold: number } | null>;
-    update: (args: { where: { userId: string }; data: { gold: number } }) => Promise<void>;
-    create?: (args: { data: { userId: string; gold: number } }) => Promise<void>;
-  };
-  questRewardItem: {
-    findFirst: (args: { where: { questId: string; itemId: string } }) => Promise<{ id: string } | null>;
-    create: (args: { data: { questId: string; itemId: string; qty: number } }) => Promise<void>;
-  };
-  itemStack: {
-    findUnique: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } } }) => Promise<{ count: number } | null>;
-    upsert: (args: { where: { characterId_itemKey: { characterId: string; itemKey: string } }; update: { count: number }; create: { characterId: string; itemKey: string; count: number } }) => Promise<void>;
-  };
-};
+type QuestRow = { id: string; name: string; description: string; objectivetarget: string; objectivetype: string; objectivecount: number; nextquestid: string | null; rewardgold: number; rewardexp: number; rewardminingexp: number; rewardcraftingexp: number; minlevel: number; requiresquestid: string | null };
+type CharacterQuestRow = { characterid: string; questid: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; claimedrewards: boolean };
 
 async function ensureTutorialQuest() {
-  // Seed Grimsley NPC
-  const grimsley = await client.npcDef.upsert({ where: { id: "grimsley" }, update: {}, create: { id: "grimsley", name: "Grimsley" } });
-  // Ensure core quest reward items exist in ItemDef
-  const requiredItems: Array<{ id: string; name: string; sell?: number }> = [
-    { id: "copper_bar", name: "Copper Bar", sell: 8 },
-    { id: "plank", name: "Plank", sell: 4 },
-  ];
-  for (const it of requiredItems) {
-    await client.itemDef.upsert({ where: { id: it.id }, update: {}, create: { id: it.id, name: it.name, sell: BigInt(it.sell ?? 0) } });
-  }
-  // Seed tutorial quest with DB-driven rewards and next quest link
-  const q = await client.quest.upsert({
-    where: { id: TUTORIAL_QUEST_ID },
-    update: { name: "Can you punch?", description: "Kill 5 slimes in the field.", giverNpcId: grimsley.id, nextQuestId: CRAFT_DAGGER_QUEST_ID, rewardGold: 500, rewardExp: 250, minLevel: 1, requiresQuestId: null },
-    create: {
-      id: TUTORIAL_QUEST_ID,
-      name: "Can you punch?",
-      description: "Kill 5 slimes in the field.",
-      objectiveType: "KILL",
-      objectiveTarget: "slime",
-      objectiveCount: 5,
-      giverNpcId: grimsley.id,
-      nextQuestId: CRAFT_DAGGER_QUEST_ID,
-      rewardGold: 500,
-      rewardExp: 250,
-      minLevel: 1,
-      requiresQuestId: null,
-    }
-  });
-  // Reward items: 1x copper_bar and 1x plank
-  const items: Array<{ itemId: string; qty: number }> = [
-    { itemId: "copper_bar", qty: 1 },
-    { itemId: "plank", qty: 1 },
-  ];
-  for (const it of items) {
-    const exists = await client.questRewardItem.findFirst({ where: { questId: q.id, itemId: it.itemId } });
-    if (!exists) await client.questRewardItem.create({ data: { questId: q.id, itemId: it.itemId, qty: it.qty } });
-  }
+  // Upsert Grimsley NPC
+  await q`insert into "NpcDef" (id, name) values ('grimsley', 'Grimsley') on conflict (id) do update set name = excluded.name`;
+  // Ensure core items exist
+  await q`insert into "ItemDef" (id, name, sell) values ('copper_bar','Copper Bar', 8), ('plank','Plank', 4) on conflict (id) do nothing`;
+  // Upsert quest
+  await q`insert into "Quest" (id, name, description, objectivetype, objectivetarget, objectivecount, givernpcid, nextquestid, rewardgold, rewardexp, minlevel)
+           values (${TUTORIAL_QUEST_ID}, 'Can you punch?', 'Kill 5 slimes in the field.', 'KILL', 'slime', 5, 'grimsley', ${CRAFT_DAGGER_QUEST_ID}, 500, 250, 1)
+           on conflict (id) do update set name = excluded.name, description = excluded.description, givernpcid = excluded.givernpcid, nextquestid = excluded.nextquestid, rewardgold = excluded.rewardgold, rewardexp = excluded.rewardexp, minlevel = excluded.minlevel`;
+  // Reward items
+  await q`insert into "QuestRewardItem" (id, questid, itemid, qty)
+           values (${TUTORIAL_QUEST_ID + "__copper_bar"}, ${TUTORIAL_QUEST_ID}, 'copper_bar', 1)
+           on conflict (id) do nothing`;
+  await q`insert into "QuestRewardItem" (id, questid, itemid, qty)
+           values (${TUTORIAL_QUEST_ID + "__plank"}, ${TUTORIAL_QUEST_ID}, 'plank', 1)
+           on conflict (id) do nothing`;
 }
 
 async function ensureCraftDaggerQuest() {
-  // Ensure dagger reward item exists for downstream quest progression
-  await client.itemDef.upsert({ where: { id: "copper_dagger" }, update: {}, create: { id: "copper_dagger", name: "Copper Dagger", sell: BigInt(16) } });
-  await client.quest.upsert({
-    where: { id: CRAFT_DAGGER_QUEST_ID },
-    update: { name: "Can you craft?", description: "Craft one copper dagger at the workbench.", rewardCraftingExp: 150, rewardExp: 150, requiresQuestId: TUTORIAL_QUEST_ID, minLevel: 1 },
-    create: {
-      id: CRAFT_DAGGER_QUEST_ID,
-      name: "Can you craft?",
-      description: "Craft one copper dagger at the workbench.",
-      objectiveType: "CRAFT",
-      objectiveTarget: "copper_dagger",
-      objectiveCount: 1,
-      rewardCraftingExp: 150,
-      rewardExp: 150,
-      requiresQuestId: TUTORIAL_QUEST_ID,
-      minLevel: 1,
-    }
-  });
+  await q`insert into "ItemDef" (id, name, sell) values ('copper_dagger','Copper Dagger', 16) on conflict (id) do nothing`;
+  await q`insert into "Quest" (id, name, description, objectivetype, objectivetarget, objectivecount, rewardcraftingexp, rewardexp, requiresquestid, minlevel)
+           values (${CRAFT_DAGGER_QUEST_ID}, 'Can you craft?', 'Craft one copper dagger at the workbench.', 'CRAFT', 'copper_dagger', 1, 150, 150, ${TUTORIAL_QUEST_ID}, 1)
+           on conflict (id) do update set name = excluded.name, description = excluded.description, rewardcraftingexp = excluded.rewardcraftingexp, rewardexp = excluded.rewardexp, requiresquestid = excluded.requiresquestid, minlevel = excluded.minlevel`;
 }
 
 export async function GET(req: Request) {
@@ -116,11 +41,23 @@ export async function GET(req: Request) {
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   await ensureTutorialQuest();
   await ensureCraftDaggerQuest();
-  const cq = await client.characterQuest.findMany({ where: { characterId }, include: { quest: true } });
-  // Make tutorial available if not present
-  const hasTutorial = (cq as Array<CharacterQuestRow & { quest: QuestRow }>).some((c) => c.questId === TUTORIAL_QUEST_ID);
-  const hasCraft = (cq as Array<CharacterQuestRow & { quest: QuestRow }>).some((c) => c.questId === CRAFT_DAGGER_QUEST_ID);
-  return NextResponse.json({ ok: true, characterQuests: cq, tutorialAvailable: !hasTutorial, craftAvailable: !hasCraft });
+  const cq = await q<CharacterQuestRow & QuestRow>`
+    select cq.characterid, cq.questid, cq.status, cq.progress, cq.claimedrewards,
+           q.id, q.name, q.description, q.objectivetype, q.objectivetarget, q.objectivecount,
+           q.nextquestid, q.rewardgold, q.rewardexp, q.rewardminingexp, q.rewardcraftingexp, q.minlevel, q.requiresquestid
+    from "CharacterQuest" cq join "Quest" q on q.id = cq.questid
+    where cq.characterid = ${characterId}
+  `;
+  const shaped = cq.map(c => ({
+    questId: c.questid,
+    status: c.status,
+    progress: c.progress,
+    claimedRewards: c.claimedrewards,
+    quest: { id: c.id, name: c.name, description: c.description, objectiveCount: c.objectivecount }
+  }));
+  const hasTutorial = cq.some(c => c.questid === TUTORIAL_QUEST_ID);
+  const hasCraft = cq.some(c => c.questid === CRAFT_DAGGER_QUEST_ID);
+  return NextResponse.json({ ok: true, characterQuests: shaped, tutorialAvailable: !hasTutorial, craftAvailable: !hasCraft });
 }
 
 export async function POST(req: Request) {
@@ -134,62 +71,67 @@ export async function POST(req: Request) {
   if (action === "accept") {
     const id = questId || TUTORIAL_QUEST_ID;
     // Validate acceptance requirements: quest exists, min level, previous quest completion if required
-    const q = await client.quest.findUnique({ where: { id } });
-    if (!q) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
+  const qr = await q<QuestRow>`select * from "Quest" where id = ${id}`;
+  const qrow = qr[0];
+    if (!qrow) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
     // Character level check
-    const ch = await client.character.findUnique({ where: { id: characterId }, select: { id: true, level: true } });
+  const ch = await q<{ level: number }>`select level from "Character" where id = ${characterId}`;
     if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
     const reasons: string[] = [];
-    const minLevel = q.minLevel ?? 1;
-    if ((ch.level ?? 1) < minLevel) reasons.push(`Requires level ${minLevel}`);
+    const minLevel = qrow.minlevel ?? 1;
+  if ((ch[0]?.level ?? 1) < minLevel) reasons.push(`Requires level ${minLevel}`);
     // Previous quest requirement
-    if (q.requiresQuestId) {
-      const rq = await client.characterQuest.findUnique({ where: { characterId_questId: { characterId, questId: q.requiresQuestId } } });
-      if (!rq || rq.status !== "COMPLETED") reasons.push("Requires previous quest completion");
+    if (qrow.requiresquestid) {
+  const rq = await q<CharacterQuestRow>`select * from "CharacterQuest" where characterid = ${characterId} and questid = ${qrow.requiresquestid}`;
+  if (!rq[0] || rq[0].status !== "COMPLETED") reasons.push("Requires previous quest completion");
     }
     if (reasons.length > 0) {
       return NextResponse.json({ ok: false, locked: true, reasons }, { status: 400 });
     }
     // Upsert as ACTIVE (even if already AVAILABLE)
-    const cq = await client.characterQuest.upsert({
-      where: { characterId_questId: { characterId, questId: id } },
-      update: { status: "ACTIVE" },
-      create: { characterId, questId: id, status: "ACTIVE", progress: 0 }
-    });
-    return NextResponse.json({ ok: true, characterQuest: cq });
+    const up = await q<CharacterQuestRow>`
+      insert into "CharacterQuest" (characterid, questid, status, progress)
+      values (${characterId}, ${id}, 'ACTIVE', 0)
+      on conflict (characterid, questid) do update set status = 'ACTIVE'
+      returning *
+    `;
+    return NextResponse.json({ ok: true, characterQuest: up[0] });
   }
   if (action === "progress") {
     const id = questId || TUTORIAL_QUEST_ID;
-    const q = await client.quest.findUnique({ where: { id } });
-    if (!q) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-    const cq = await client.characterQuest.findUnique({ where: { characterId_questId: { characterId, questId: id } } });
+  const qrow = (await q<QuestRow>`select * from "Quest" where id = ${id}`)[0];
+    if (!qrow) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  const cq = (await q<CharacterQuestRow>`select * from "CharacterQuest" where characterid = ${characterId} and questid = ${id}`)[0];
     if (!cq) return NextResponse.json({ ok: false, error: "not_active" }, { status: 400 });
     const delta = Math.max(0, Math.floor(progressDelta ?? 1));
-    const next = Math.min(q.objectiveCount, cq.progress + delta);
-    const status = next >= q.objectiveCount ? "COMPLETED" : cq.status;
-    const updated = await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { progress: next, status } });
-    return NextResponse.json({ ok: true, characterQuest: updated });
+    const next = Math.min(qrow.objectivecount, cq.progress + delta);
+    const status = next >= qrow.objectivecount ? 'COMPLETED' : cq.status;
+    const updated = await q<CharacterQuestRow[]>`
+      update "CharacterQuest" set progress = ${next}, status = ${status}
+      where characterid = ${characterId} and questid = ${id}
+      returning *
+    `;
+    return NextResponse.json({ ok: true, characterQuest: updated[0] });
   }
   if (action === "abandon") {
     const id = questId || TUTORIAL_QUEST_ID;
-    // Remove the characterQuest row to allow re-accepting later
-    await client.characterQuest.delete({ where: { characterId_questId: { characterId, questId: id } } }).catch(() => {});
+    await q`delete from "CharacterQuest" where characterid = ${characterId} and questid = ${id}`;
     return NextResponse.json({ ok: true });
   }
   if (action === "complete") {
     const id = questId || TUTORIAL_QUEST_ID;
-    const cq = await client.characterQuest.findUnique({ where: { characterId_questId: { characterId, questId: id } } });
+    const cq = (await q<CharacterQuestRow[]>`select * from "CharacterQuest" where characterid = ${characterId} and questid = ${id}`)[0];
     if (!cq) return NextResponse.json({ ok: false, error: "not_active" }, { status: 400 });
     if (cq.status !== "COMPLETED") return NextResponse.json({ ok: false, error: "not_ready" }, { status: 400 });
     if (cq.claimedRewards) return NextResponse.json({ ok: true, alreadyClaimed: true });
     // Generic DB-driven rewards
-  const q = await client.quest.findUnique({ where: { id }, include: { rewardItems: true } });
-    if (!q) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
-  const ch = await client.character.findUnique({ where: { id: characterId }, select: { id: true, userId: true } });
+    const qrow = (await q<(QuestRow & { id: string })[]>`select * from "Quest" where id = ${id}`)[0];
+    if (!qrow) return NextResponse.json({ ok: false, error: "quest_not_found" }, { status: 404 });
+    const ch = (await q<{ id: string; userid: string }[]>`select id, userid from "Character" where id = ${characterId}`)[0];
     if (!ch) return NextResponse.json({ ok: false, error: "no_char" }, { status: 400 });
     // Gold
-    if ((q.rewardGold ?? 0) > 0) {
-      await client.character.update({ where: { id: characterId }, data: { gold: { increment: q.rewardGold ?? 0 } } });
+    if ((qrow.rewardgold ?? 0) > 0) {
+      await q`update "Character" set gold = gold + ${qrow.rewardgold ?? 0} where id = ${characterId}`;
     }
     // EXP awards via central endpoint (absolute URL + cookies for auth)
     try {
@@ -215,26 +157,27 @@ export async function POST(req: Request) {
       await fetch(`${origin}/api/account/characters/exp`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
-        body: JSON.stringify({ characterId, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 })
+        body: JSON.stringify({ characterId, exp: qrow.rewardexp ?? 0, miningExp: qrow.rewardminingexp ?? 0, craftingExp: qrow.rewardcraftingexp ?? 0 })
       });
     } catch {}
     // Grant item rewards
     const granted: Record<string, number> = {};
-    for (const it of (q.rewardItems || [])) {
-      const curr = await client.itemStack.findUnique({ where: { characterId_itemKey: { characterId, itemKey: it.itemId } } });
-      const newCount = Math.max(0, (curr?.count ?? 0) + Math.max(1, it.qty));
-      await client.itemStack.upsert({ where: { characterId_itemKey: { characterId, itemKey: it.itemId } }, update: { count: newCount }, create: { characterId, itemKey: it.itemId, count: newCount } });
-      granted[it.itemId] = (granted[it.itemId] ?? 0) + Math.max(1, it.qty);
+    const rewards = await q<{ itemid: string; qty: number }[]>`select itemid, qty from "QuestRewardItem" where questid = ${id}`;
+    for (const it of rewards) {
+      const curr = await q<{ count: number }[]>`select count from "ItemStack" where characterid = ${characterId} and itemkey = ${it.itemid}`;
+      const newCount = Math.max(0, (curr[0]?.count ?? 0) + Math.max(1, it.qty));
+      await q`insert into "ItemStack" (characterid, itemkey, count) values (${characterId}, ${it.itemid}, ${newCount}) on conflict (characterid, itemkey) do update set count = excluded.count`;
+      granted[it.itemid] = (granted[it.itemid] ?? 0) + Math.max(1, it.qty);
     }
     // Activate next quest in chain if defined
-    if (q.nextQuestId) {
-      await client.characterQuest.upsert({ where: { characterId_questId: { characterId, questId: q.nextQuestId } }, update: { status: "ACTIVE" }, create: { characterId, questId: q.nextQuestId, status: "ACTIVE", progress: 0 } });
+    if (qrow.nextquestid) {
+      await q`insert into "CharacterQuest" (characterid, questid, status, progress) values (${characterId}, ${qrow.nextquestid}, 'ACTIVE', 0) on conflict (characterid, questid) do update set status = 'ACTIVE'`;
     }
     // Mark claimed
-  await client.characterQuest.update({ where: { characterId_questId: { characterId, questId: id } }, data: { claimedRewards: true } });
+    await q`update "CharacterQuest" set claimedrewards = true where characterid = ${characterId} and questid = ${id}`;
     // Return updated exp/level
-  const ch2 = await client.character.findUnique({ where: { id: characterId }, select: { exp: true, level: true, craftingExp: true, craftingLevel: true } });
-  return NextResponse.json({ ok: true, rewards: { gold: q.rewardGold ?? 0, exp: q.rewardExp ?? 0, miningExp: q.rewardMiningExp ?? 0, craftingExp: q.rewardCraftingExp ?? 0 }, granted, nextQuest: q.nextQuestId, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingExp, craftingLevel: ch2?.craftingLevel, claimedRewards: true });
+    const ch2 = (await q<{ exp: number; level: number; craftingexp: number; craftinglevel: number }[]>`select exp, level, craftingexp, craftinglevel from "Character" where id = ${characterId}`)[0];
+    return NextResponse.json({ ok: true, rewards: { gold: qrow.rewardgold ?? 0, exp: qrow.rewardexp ?? 0, miningExp: qrow.rewardminingexp ?? 0, craftingExp: qrow.rewardcraftingexp ?? 0 }, granted, nextQuest: qrow.nextquestid, exp: ch2?.exp, level: ch2?.level, craftingExp: ch2?.craftingexp, craftingLevel: ch2?.craftinglevel, claimedRewards: true });
   }
   return NextResponse.json({ ok: false, error: "unsupported" }, { status: 400 });
 }

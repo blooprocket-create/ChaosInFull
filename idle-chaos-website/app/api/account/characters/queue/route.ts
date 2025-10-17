@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
+import { q } from "@/src/lib/db";
 import { getSession } from "@/src/lib/auth";
 
 type FurnaceQueue = { recipe: "copper" | "bronze"; eta: number; startedAt: number; remaining: number; per: number; total: number };
@@ -12,17 +12,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const characterId = searchParams.get("characterId") || undefined;
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
-  const client = prisma as unknown as {
-    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
-    craftQueue: {
-      findUnique: (args: { where: { characterId: string } }) => Promise<{ furnace: FurnaceQueue | null; workbench: WorkbenchQueue | null; sawmill: SawmillQueue | null } | null>;
-      upsert: (args: { where: { characterId: string }; update: { furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null }; create: { characterId: string; furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null } }) => Promise<unknown>;
-    };
-  };
-  const owner = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId}`;
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-  const row = await client.craftQueue.findUnique({ where: { characterId } });
-  return NextResponse.json({ ok: true, furnace: row?.furnace ?? null, workbench: row?.workbench ?? null, sawmill: row?.sawmill ?? null });
+  const row = await q<{ furnace: unknown | null; workbench: unknown | null; sawmill: unknown | null }>`
+    select furnace, workbench, sawmill from "CraftQueue" where characterid = ${characterId}
+  `;
+  const r = row[0];
+  return NextResponse.json({ ok: true, furnace: (r?.furnace as FurnaceQueue | null) ?? null, workbench: (r?.workbench as WorkbenchQueue | null) ?? null, sawmill: (r?.sawmill as SawmillQueue | null) ?? null });
 }
 
 export async function POST(req: Request) {
@@ -39,13 +35,7 @@ export async function POST(req: Request) {
   const hasFurnace = Object.prototype.hasOwnProperty.call(body, "furnace");
   const hasWorkbench = Object.prototype.hasOwnProperty.call(body, "workbench");
   const hasSawmill = Object.prototype.hasOwnProperty.call(body, "sawmill");
-  const client = prisma as unknown as {
-    character: { findFirst: (args: { where: { id: string; userId: string } }) => Promise<unknown> };
-    craftQueue: {
-      upsert: (args: { where: { characterId: string }; update: { furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null }; create: { characterId: string; furnace: FurnaceQueue | null; workbench: WorkbenchQueue | null; sawmill: SawmillQueue | null } }) => Promise<unknown>;
-    };
-  };
-  const owner = await client.character.findFirst({ where: { id: characterId, userId: session.userId } });
+  const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId}`;
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const updateData: { furnace?: FurnaceQueue | null; workbench?: WorkbenchQueue | null; sawmill?: SawmillQueue | null } = {};
   if (hasFurnace) updateData.furnace = furnace ?? null;
@@ -57,10 +47,13 @@ export async function POST(req: Request) {
     workbench: hasWorkbench ? (workbench ?? null) : null,
     sawmill: hasSawmill ? (sawmill ?? null) : null,
   };
-  await client.craftQueue.upsert({
-    where: { characterId },
-    update: updateData,
-    create: createData,
-  });
+  await q`
+    insert into "CraftQueue" (characterid, furnace, workbench, sawmill)
+    values (${characterId}, ${hasFurnace ? (furnace ?? null) : null}::jsonb, ${hasWorkbench ? (workbench ?? null) : null}::jsonb, ${hasSawmill ? (sawmill ?? null) : null}::jsonb)
+    on conflict (characterid) do update set
+      furnace = coalesce(excluded.furnace, "CraftQueue".furnace),
+      workbench = coalesce(excluded.workbench, "CraftQueue".workbench),
+      sawmill = coalesce(excluded.sawmill, "CraftQueue".sawmill)
+  `;
   return NextResponse.json({ ok: true });
 }
