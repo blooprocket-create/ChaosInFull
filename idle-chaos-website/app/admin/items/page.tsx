@@ -97,9 +97,9 @@ export default function AdminItems() {
     } else {
       let msg = "Failed to create item";
       try {
-        const j = await res.json();
-        if (j?.message) msg = j.message;
-        else if (j?.error) msg = j.error;
+        const j = (await res.json()) as { error?: unknown; message?: unknown };
+        if (typeof j.message === "string") msg = j.message;
+        else if (typeof j.error === "string") msg = j.error;
       } catch {}
       setCreateError(msg);
       notify(msg);

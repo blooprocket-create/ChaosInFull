@@ -25,6 +25,10 @@ export async function POST(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     await ensurePgcrypto();
+    const owners = await q<{ id: string }>`select id from "User" where id = ${session.userId} limit 1`;
+    if (!owners[0]) {
+      return NextResponse.json({ error: "Account not found. Please log out and log back in." }, { status: 409 });
+    }
     const form = await req.formData();
     const name = String(form.get("name") || "").trim();
     const gender = String(form.get("gender") || "Male");
