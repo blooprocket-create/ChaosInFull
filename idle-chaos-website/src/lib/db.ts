@@ -20,5 +20,15 @@ export type UserRow = {
 
 // Typed helper for row-shaping with Neon SQL
 // Usage: const rows = await q<MyType>`select ...`;
-export const q = <T = any>(strings: TemplateStringsArray, ...params: any[]) =>
-  sql(strings, ...params) as unknown as Promise<T[]>;
+export type RowObject = Record<string, unknown>;
+
+export function q<T extends RowObject = RowObject>(
+  strings: TemplateStringsArray,
+  ...params: unknown[]
+): Promise<T[]> {
+  const sqlFn = sql as unknown as (
+    s: TemplateStringsArray,
+    ...p: unknown[]
+  ) => Promise<unknown>;
+  return sqlFn(strings, ...params) as Promise<T[]>;
+}
