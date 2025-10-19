@@ -1,4 +1,59 @@
 // Shared furnace helper functions to centralize smelting UI and logic for Town and Cave
+
+// Create a furnace sprite on the provided scene at x,y and register the burn animation
+export function createFurnace(scene, x, y) {
+    if (!scene) return null;
+    // ensure spritesheet loaded; create animation once
+    try {
+        if (!scene.anims.exists('furnace_burn')) {
+            const tex = scene.textures.get('furnace');
+            let endFrame = 3;
+            if (tex && tex.frames) {
+                const numericFrames = Object.keys(tex.frames).map(k => { const n = Number(k); return Number.isFinite(n) ? n : null; }).filter(n => n != null);
+                if (numericFrames && numericFrames.length) endFrame = Math.max(...numericFrames);
+            }
+            const startFrame = 1;
+            if (endFrame >= startFrame) scene.anims.create({ key: 'furnace_burn', frames: scene.anims.generateFrameNumbers('furnace', { start: startFrame, end: endFrame }), frameRate: 6, repeat: -1 });
+        }
+    } catch (e) { /* ignore animation creation errors */ }
+    try {
+        const spr = scene.add.sprite(x, y, 'furnace', 0).setOrigin(0.5).setDepth(1.5);
+        // store reference for shared helpers
+        scene.furnace = spr;
+        // ensure idle frame
+        try { setFurnaceFlame(scene, false); } catch (e) {}
+        return spr;
+    } catch (e) { return null; }
+}
+
+export function setFurnaceFlame(scene, active) {
+    if (!scene) return;
+    const f = scene.furnace || scene._furnace || null;
+    if (!f) return;
+    if (active) {
+        // ensure animation exists (create on-demand if possible)
+        try {
+            if (!scene.anims.exists('furnace_burn')) {
+                const tex = scene.textures.get('furnace');
+                let endFrame = 3;
+                if (tex && tex.frames) {
+                    const numericFrames = Object.keys(tex.frames).map(k => { const n = Number(k); return Number.isFinite(n) ? n : null; }).filter(n => n != null);
+                    if (numericFrames && numericFrames.length) endFrame = Math.max(...numericFrames);
+                }
+                const startFrame = 1;
+                if (endFrame >= startFrame) scene.anims.create({ key: 'furnace_burn', frames: scene.anims.generateFrameNumbers('furnace', { start: startFrame, end: endFrame }), frameRate: 6, repeat: -1 });
+            }
+        } catch (e) { console.warn('Could not create furnace_burn animation', e); }
+        try {
+            if (!scene.anims.exists('furnace_burn')) {
+                console.warn('furnace_burn animation not found for furnace');
+            }
+            f.play('furnace_burn', true);
+        } catch (e) { console.warn('Could not play furnace animation', e); }
+    } else {
+        try { if (f.anims) f.anims.stop(); if (f.setFrame) f.setFrame(0); } catch (e) {}
+    }
+}
 export function openFurnaceModal(scene) {
     if (!scene) return;
     // reuse implementation previously duplicated in scenes but operate on passed-in scene
@@ -84,7 +139,8 @@ export function closeFurnaceModal(scene) {
     if (!scene) return;
     if (scene._furnaceModal && scene._furnaceModal.parentNode) scene._furnaceModal.parentNode.removeChild(scene._furnaceModal);
     scene._furnaceModal = null;
-    if (scene._furnaceIndicator && !scene.smeltingActive) scene._furnaceIndicator.setVisible(false);
+    // ensure furnace animation stopped when closing modal if not smelting
+    try { setFurnaceFlame(scene, false); } catch (e) {}
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
@@ -146,7 +202,7 @@ export function startContinuousSmelting(scene, recipeId) {
     scene._smeltType = recipeId;
     scene._smeltingEvent = scene.time.addEvent({ delay: scene.smeltingInterval, callback: attemptSmelt, callbackScope: scene, args: [recipeId], loop: true });
     scene._showToast('Started smelting ' + (recipe.name || recipeId));
-    if (scene._furnaceIndicator) scene._furnaceIndicator.setVisible(true);
+    try { setFurnaceFlame(scene, true); } catch (e) {}
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
     refreshFurnaceModal(scene);
 }
@@ -157,7 +213,7 @@ export function stopContinuousSmelting(scene) {
     if (scene._smeltingEvent) { scene._smeltingEvent.remove(false); scene._smeltingEvent = null; }
     scene._showToast('Smelting stopped');
     scene._smeltType = null;
-    if (scene._furnaceIndicator) scene._furnaceIndicator.setVisible(false);
+    try { setFurnaceFlame(scene, false); } catch (e) {}
     refreshFurnaceModal(scene);
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }

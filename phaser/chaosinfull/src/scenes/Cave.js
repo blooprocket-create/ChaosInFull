@@ -66,13 +66,11 @@ export class Cave extends Phaser.Scene {
     // Furnace in cave (convenience) - moved to left side to avoid overlapping copper node
     const furnaceX = 120;
     const furnaceY = platformY - 70;
-    this.furnace = this.add.rectangle(furnaceX, furnaceY, 56, 56, 0x6b4b2f, 1).setDepth(1.5);
-    this.tweens.add({ targets: this.furnace, scale: { from: 1, to: 1.06 }, yoyo: true, repeat: -1, duration: 1200, ease: 'Sine.easeInOut' });
+    // create furnace via shared helper (centralized)
+    try { if (window && window.__furnace_shared && window.__furnace_shared.createFurnace) { window.__furnace_shared.createFurnace(this, furnaceX, furnaceY); } else { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); this._setFurnaceFlame(false); } } catch (e) { try { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); this._setFurnaceFlame(false); } catch(_) {} }
     this.furnacePrompt = this.add.text(furnaceX, furnaceY - 60, '[E] Use Furnace', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
     this.furnacePrompt.setVisible(false);
-    // furnace active indicator
-    this._furnaceIndicator = this.add.text(furnaceX, furnaceY - 40, '🔥', { fontSize: '20px' }).setOrigin(0.5).setDepth(2);
-    this._furnaceIndicator.setVisible(false);
+    // furnace animation will indicate active state (no separate emoji indicator)
     // smithing skill
     if (!this.char.smithing) this.char.smithing = { level: 1, exp: 0, expToLevel: 100 };
 
@@ -96,6 +94,39 @@ export class Cave extends Phaser.Scene {
         // Toast container
         this._toastContainer = null;
 
+        // Debug button to quickly toggle furnace animation (only in dev/test)
+        try {
+            const btn = document.createElement('button');
+            btn.id = 'debug-furnace-toggle';
+            btn.textContent = 'Toggle Furnace Anim';
+            btn.style.position = 'fixed';
+            btn.style.right = '14px';
+            btn.style.top = '14px';
+            btn.style.zIndex = '999';
+            btn.style.padding = '8px 10px';
+            btn.style.background = '#222';
+            btn.style.color = '#fff';
+            btn.style.border = '1px solid #444';
+            btn.style.borderRadius = '6px';
+            btn.style.cursor = 'pointer';
+            btn.onclick = () => {
+                try {
+                    const scene = this;
+                    // toggle based on smeltingActive or current sprite anim state
+                    const playing = (scene.furnace && scene.furnace.anims && scene.furnace.anims.isPlaying) || false;
+                    if (playing) {
+                        try { if (window && window.__furnace_shared && window.__furnace_shared.setFurnaceFlame) window.__furnace_shared.setFurnaceFlame(scene, false); else if (scene._setFurnaceFlame) scene._setFurnaceFlame(false); } catch(e) {}
+                        console.log('Debug: stopped furnace animation');
+                    } else {
+                        try { if (window && window.__furnace_shared && window.__furnace_shared.setFurnaceFlame) window.__furnace_shared.setFurnaceFlame(scene, true); else if (scene._setFurnaceFlame) scene._setFurnaceFlame(true); } catch(e) {}
+                        console.log('Debug: started furnace animation');
+                    }
+                } catch (e) { console.log('Debug toggle error', e); }
+            };
+            document.body.appendChild(btn);
+            this._debugFurnaceBtn = btn;
+        } catch (e) {}
+
         // cleanup on shutdown
         this.events.once('shutdown', () => {
             this._destroyHUD();
@@ -109,9 +140,13 @@ export class Cave extends Phaser.Scene {
             // cleanup furnace modal if present
             if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
             this._furnaceModal = null;
+            // ensure furnace animation stopped
+            try { this._setFurnaceFlame(false); } catch(e) {}
             // stop any smelting events
             if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
             this._closeInventoryModal();
+            // remove debug button if present
+            try { if (this._debugFurnaceBtn && this._debugFurnaceBtn.parentNode) this._debugFurnaceBtn.parentNode.removeChild(this._debugFurnaceBtn); this._debugFurnaceBtn = null; } catch(e) {}
         });
     }
 
@@ -330,8 +365,8 @@ export class Cave extends Phaser.Scene {
     _closeCaveFurnaceModal() {
         if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
         this._furnaceModal = null;
-        // Only hide the indicator if smelting is not active; keep it visible during background smelting
-        if (this._furnaceIndicator && !this.smeltingActive) this._furnaceIndicator.setVisible(false);
+    // Ensure furnace animation is stopped when the modal closes if not smelting
+    try { if (!this.smeltingActive && this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
@@ -394,10 +429,12 @@ export class Cave extends Phaser.Scene {
         this._smeltType = type;
     // set activity flag so HUD shows smithing
     try { if (this.char) this.char.activity = 'smithing'; } catch(e) {}
+        // start furnace flame
+        try { this._setFurnaceFlame(true); } catch(e) {}
         // schedule-first: wait interval, then call _attemptSmelt
         this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: this._attemptSmelt, callbackScope: this, args: [type], loop: true });
         this._showToast('Started smelting ' + (recipe.name || type));
-        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(true);
+    try { if (this._setFurnaceFlame) this._setFurnaceFlame(true); } catch(e) {}
         // show smithing HUD and refresh modal
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
         this._refreshCaveFurnaceModal();
@@ -409,7 +446,9 @@ export class Cave extends Phaser.Scene {
         if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
         this._showToast('Smelting stopped');
         this._smeltType = null;
-        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+    // stop furnace flame
+    try { this._setFurnaceFlame(false); } catch(e) {}
+    try { if (this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
         try { if (this.char) this.char.activity = null; } catch(e) {}
         this._refreshCaveFurnaceModal();
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
@@ -471,6 +510,17 @@ export class Cave extends Phaser.Scene {
         // Avoid recreating HUD every tick; refresh modal and inventory UI only
         this._refreshCaveFurnaceModal();
         if (this._inventoryModal) this._refreshInventoryModal();
+    }
+
+    _setFurnaceFlame(active) {
+        if (!this.furnace) return;
+        if (active) {
+            if (!this.anims.exists('furnace_burn')) console.warn('furnace_burn animation not found for furnace');
+            try { this.furnace.play('furnace_burn', true); } catch (e) { console.warn('Could not play furnace animation', e); }
+        } else {
+            if (this.furnace.anims) this.furnace.anims.stop();
+            if (this.furnace.setFrame) this.furnace.setFrame(0);
+        }
     }
 
     _hideMiningIndicator() {

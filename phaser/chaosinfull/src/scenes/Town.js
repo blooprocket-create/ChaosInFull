@@ -119,13 +119,12 @@ export class Town extends Phaser.Scene {
     // Furnace on right side (combine ores into bars)
     const furnaceX = this.scale.width - 120;
     const furnaceY = platformY - 70;
-    this.furnace = this.add.rectangle(furnaceX, furnaceY, 56, 56, 0x8b4b0f, 1).setDepth(1.5);
-    this.tweens.add({ targets: this.furnace, scale: { from: 1, to: 1.06 }, yoyo: true, repeat: -1, duration: 1200, ease: 'Sine.easeInOut' });
+    // animation only needs to be registered once; choose end frame dynamically based on loaded texture
+        // create furnace sprite via shared helper
+        try { if (window && window.__furnace_shared && window.__furnace_shared.createFurnace) { window.__furnace_shared.createFurnace(this, furnaceX, furnaceY); } else { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); this._setFurnaceFlame(false); } } catch (e) { try { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); this._setFurnaceFlame(false); } catch(_) {} }
     this.furnacePrompt = this.add.text(furnaceX, furnaceY - 60, '[E] Use Furnace', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
     this.furnacePrompt.setVisible(false);
-    // furnace active indicator (hidden until smelting starts)
-    this._furnaceIndicator = this.add.text(furnaceX, furnaceY - 40, '🔥', { fontSize: '20px' }).setOrigin(0.5).setDepth(2);
-    this._furnaceIndicator.setVisible(false);
+    // furnace animation will indicate active state (no separate emoji indicator)
     // separate workbench indicator
     const workbenchX = centerX + 120;
     const workbenchY = furnaceY + 6;
@@ -164,6 +163,8 @@ export class Town extends Phaser.Scene {
             window.removeEventListener('resize', this._fogResizeHandler);
             // cleanup furnace modal and toasts
             this._closeFurnaceModal();
+            // ensure furnace animation stopped
+            try { this._setFurnaceFlame(false); } catch(e) {}
             this._closeWorkbenchModal();
             this._closeInventoryModal();
             this._clearToasts();
@@ -519,9 +520,8 @@ export class Town extends Phaser.Scene {
     _closeFurnaceModal() {
         if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
         this._furnaceModal = null;
-        // restore HUD display and hide furnace indicator
-        // Keep the indicator visible if smelting is still active; only hide when smelting has stopped
-        if (this._furnaceIndicator && !this.smeltingActive) this._furnaceIndicator.setVisible(false);
+    // restore HUD display and ensure furnace animation is stopped if not smelting
+    try { if (!this.smeltingActive && this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
         try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
     // Start continuous smelting of a given recipe ('copper' or 'bronze')
@@ -539,12 +539,14 @@ export class Town extends Phaser.Scene {
         if (!ok) { this._showToast('Missing materials'); return; }
         this.smeltingActive = true;
         this._smeltType = recipeId;
+    // start furnace flame animation
+    try { this._setFurnaceFlame(true); } catch (e) {}
     // mark activity as smithing so HUD shows smithing progress
     try { if (this.char) this.char.activity = 'smithing'; } catch(e) {}
         // schedule-first: wait interval before first smelt
         this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: this._attemptSmelt, callbackScope: this, args: [recipeId], loop: true });
         this._showToast('Started smelting ' + (recipe.name || recipeId));
-        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(true);
+    try { if (this._setFurnaceFlame) this._setFurnaceFlame(true); } catch(e) {}
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
         this._refreshFurnaceModal();
     }
@@ -554,11 +556,30 @@ export class Town extends Phaser.Scene {
         if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
         this._showToast('Smelting stopped');
         this._smeltType = null;
-        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+    // stop furnace flame animation
+    try { this._setFurnaceFlame(false); } catch (e) {}
+    try { if (this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
     try { if (this.char) this.char.activity = null; } catch(e) {}
         this._refreshFurnaceModal();
         // HUD revert
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
+    }
+
+    _setFurnaceFlame(active) {
+        if (!this.furnace) return;
+        if (active) {
+            if (!this.anims.exists('furnace_burn')) {
+                console.warn('furnace_burn animation not found for furnace');
+            }
+            try {
+                this.furnace.play('furnace_burn', true);
+            } catch (e) {
+                console.warn('Could not play furnace animation', e);
+            }
+        } else {
+            if (this.furnace.anims) this.furnace.anims.stop();
+            if (this.furnace.setFrame) this.furnace.setFrame(0);
+        }
     }
     // Attempt a single smelt of specified type. Shows toast for each produced bar and persists.
     _attemptSmelt(recipeId) {
