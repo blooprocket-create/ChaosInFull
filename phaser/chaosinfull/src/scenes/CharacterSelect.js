@@ -1,5 +1,8 @@
 // Phaser is loaded globally from CDN
 
+import { createAtmosphericOverlays } from './shared/overlays.js';
+import { saveUser, iterUsers, saveJson } from './shared/storage.js';
+
 export class CharacterSelect extends Phaser.Scene {
     constructor() {
         super('CharacterSelect');
@@ -18,220 +21,35 @@ export class CharacterSelect extends Phaser.Scene {
             const cfog = document.getElementById('cave-hud'); if (cfog && cfog.parentNode) cfog.parentNode.removeChild(cfog);
         } catch (e) { /* ignore cleanup errors */ }
 
-        // --- Overlay creation order: fog, embers, shadow, vignette ---
-        // 1. Fog overlay
-        const fogCanvas = document.createElement('canvas');
-        fogCanvas.id = 'fog-canvas';
-        fogCanvas.width = window.innerWidth;
-        fogCanvas.height = window.innerHeight;
-        fogCanvas.style.position = 'fixed';
-        fogCanvas.style.left = '0';
-        fogCanvas.style.top = '0';
-        fogCanvas.style.width = '100vw';
-        fogCanvas.style.height = '100vh';
-        fogCanvas.style.pointerEvents = 'none';
-        fogCanvas.style.zIndex = '50';
-        document.body.appendChild(fogCanvas);
-        const fogCtx = fogCanvas.getContext('2d');
-        const fogParticles = [];
-        const fogColors = ['rgba(255,255,255,0.18)', 'rgba(200,200,255,0.15)', 'rgba(180,180,200,0.13)'];
-        for (let i = 0; i < 220; i++) {
-            fogParticles.push({
-                x: Math.random() * fogCanvas.width,
-                y: Math.random() * fogCanvas.height,
-                r: 40 + Math.random() * 60,
-                vx: 0.14 + Math.random() * 0.22,
-                vy: -0.06 + Math.random() * 0.14,
-                alpha: 0.13 + Math.random() * 0.12,
-                color: fogColors[Math.floor(Math.random() * fogColors.length)]
-            });
-        }
-
-        // 2. Ember overlay
-        const emberCanvas = document.createElement('canvas');
-        emberCanvas.id = 'ember-canvas';
-        emberCanvas.width = window.innerWidth;
-        emberCanvas.height = window.innerHeight;
-        emberCanvas.style.position = 'fixed';
-        emberCanvas.style.left = '0';
-        emberCanvas.style.top = '0';
-        emberCanvas.style.width = '100vw';
-        emberCanvas.style.height = '100vh';
-        emberCanvas.style.pointerEvents = 'none';
-        emberCanvas.style.zIndex = '60';
-        document.body.appendChild(emberCanvas);
-        const emberCtx = emberCanvas.getContext('2d');
-        const embers = [];
-        for (let i = 0; i < 600; i++) {
-            embers.push({
-                x: Math.random() * emberCanvas.width,
-                y: Math.random() * emberCanvas.height,
-                r: 0.5 + Math.random() * 1,
-                alpha: 0.5 + Math.random() * 0.3,
-                dx: (Math.random() - 0.5) * 1.2,
-                dy: -0.6 - Math.random() * 1.2,
-                color: 'rgba(255,80,0,0.8)'
-            });
-        }
-
-        // 3. Shadow overlay
-        const shadowCanvas = document.createElement('canvas');
-        shadowCanvas.id = 'shadow-canvas';
-        shadowCanvas.width = window.innerWidth;
-        shadowCanvas.height = window.innerHeight;
-        shadowCanvas.style.position = 'fixed';
-        shadowCanvas.style.left = '0';
-        shadowCanvas.style.top = '0';
-        shadowCanvas.style.width = '100vw';
-        shadowCanvas.style.height = '100vh';
-        shadowCanvas.style.pointerEvents = 'none';
-        shadowCanvas.style.zIndex = '70';
-        document.body.appendChild(shadowCanvas);
-        const sctx = shadowCanvas.getContext('2d');
-        let shadowX = -300;
-        let shadowY = shadowCanvas.height * 0.7;
-
-        // 4. Vignette overlay
-        const vignetteCanvas = document.createElement('canvas');
-        vignetteCanvas.id = 'vignette-canvas';
-        vignetteCanvas.width = window.innerWidth;
-        vignetteCanvas.height = window.innerHeight;
-        vignetteCanvas.style.position = 'fixed';
-        vignetteCanvas.style.left = '0';
-        vignetteCanvas.style.top = '0';
-        vignetteCanvas.style.width = '100vw';
-        vignetteCanvas.style.height = '100vh';
-        vignetteCanvas.style.pointerEvents = 'none';
-        vignetteCanvas.style.zIndex = '80';
-        document.body.appendChild(vignetteCanvas);
-        const vctx = vignetteCanvas.getContext('2d');
-        let vignetteTime = 0;
-        let breathPeriod = 6 + Math.random() * 2;
-        let breathIntensity = 0.45 + Math.random() * 0.25;
-
-        // Animation loop for all overlays
-        function animateOverlays() {
-            // Fog
-            fogCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-            for (const p of fogParticles) {
-                fogCtx.beginPath();
-                fogCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                fogCtx.fillStyle = p.color;
-                fogCtx.globalAlpha = p.alpha;
-                fogCtx.fill();
-                fogCtx.globalAlpha = 1;
-                p.x += p.vx;
-                p.y += p.vy;
-                if (p.x - p.r > fogCanvas.width) p.x = -p.r;
-                if (p.y + p.r < 0) p.y = fogCanvas.height + p.r;
-            }
-
-            // Embers
-            emberCtx.clearRect(0, 0, emberCanvas.width, emberCanvas.height);
-            embers.forEach(e => {
-                let fadeLimit = 0.65 + Math.random() * 0.15;
-                let fade = Math.max(0, Math.min(1, (e.y / (emberCanvas.height * fadeLimit))));
-                emberCtx.beginPath();
-                emberCtx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
-                emberCtx.fillStyle = e.color;
-                emberCtx.globalAlpha = e.alpha * fade;
-                emberCtx.shadowColor = 'orange';
-                emberCtx.shadowBlur = 8;
-                emberCtx.fill();
-                emberCtx.globalAlpha = 1;
-                e.x += e.dx;
-                e.y += e.dy;
-                if (e.y < -10 || e.x < -10 || e.x > emberCanvas.width + 10) {
-                    e.x = Math.random() * emberCanvas.width;
-                    e.y = emberCanvas.height + 10;
-                }
-            });
-
-            // Shadow
-            sctx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-            sctx.save();
-            sctx.globalAlpha = 0.22 + 0.13 * Math.abs(Math.sin(Date.now()/4000));
-            sctx.filter = 'blur(12px)';
-            sctx.beginPath();
-            sctx.ellipse(shadowX, shadowY, 120, 260, 0, 0, Math.PI * 2);
-            sctx.fillStyle = '#0a0106';
-            sctx.fill();
-            sctx.restore();
-            shadowX += 0.10;
-            if (shadowX > shadowCanvas.width + 300) shadowX = -300;
-
-            // Vignette
-            vignetteTime += 1/60;
-            if (Math.random() < 0.002) {
-                breathPeriod = 6 + Math.random() * 2;
-                breathIntensity = 0.45 + Math.random() * 0.25;
-            }
-            const phase = Math.sin((vignetteTime / breathPeriod) * Math.PI * 2);
-            const alpha = breathIntensity + 0.45 * Math.abs(phase);
-            vctx.clearRect(0, 0, vignetteCanvas.width, vignetteCanvas.height);
-            const grad = vctx.createRadialGradient(
-                vignetteCanvas.width / 2,
-                vignetteCanvas.height / 2,
-                Math.min(vignetteCanvas.width, vignetteCanvas.height) / 2.2,
-                vignetteCanvas.width / 2,
-                vignetteCanvas.height / 2,
-                Math.max(vignetteCanvas.width, vignetteCanvas.height) / 1.1
-            );
-            grad.addColorStop(0, 'rgba(0,0,0,0)');
-            grad.addColorStop(0.7, `rgba(30,0,20,${alpha})`);
-            grad.addColorStop(1, `rgba(0,0,0,${alpha + 0.38})`);
-            vctx.fillStyle = grad;
-            vctx.fillRect(0, 0, vignetteCanvas.width, vignetteCanvas.height);
-
-            requestAnimationFrame(animateOverlays);
-        }
-        animateOverlays();
-
-        // Resize all overlays on window resize
-        window.addEventListener('resize', () => {
-            fogCanvas.width = window.innerWidth;
-            fogCanvas.height = window.innerHeight;
-            emberCanvas.width = window.innerWidth;
-            emberCanvas.height = window.innerHeight;
-            shadowCanvas.width = window.innerWidth;
-            shadowCanvas.height = window.innerHeight;
-            vignetteCanvas.width = window.innerWidth;
-            vignetteCanvas.height = window.innerHeight;
-            shadowY = shadowCanvas.height * 0.7;
-        });
+        this._atmosphere = createAtmosphericOverlays(this, { idPrefix: 'charselect', zIndexBase: 50 });
+        this._cleanupCallbacks = [];
 
         // Hide Phaser canvas while character select is active
         const gameContainer = document.getElementById('game-container');
         if (gameContainer) gameContainer.style.display = 'none';
 
-        // Load account details
+                // Load account details
         let username = '';
         let userObj = null;
-        // Try to get last logged in user (from login scene)
-        for (let key in localStorage) {
-            if (key.startsWith('cif_user_')) {
-                const obj = JSON.parse(localStorage.getItem(key));
-                if (obj && obj.loggedIn) {
+
+        iterUsers((key, obj) => {
+            if (userObj || !obj) return;
+            if (obj.loggedIn) {
+                username = obj.username;
+                userObj = obj;
+            }
+        });
+
+        if (!userObj) {
+            iterUsers((key, obj) => {
+                if (!userObj && obj) {
                     username = obj.username;
                     userObj = obj;
-                    break;
                 }
-            }
-        }
-        // If not found, fallback to last used (or prompt)
-        if (!userObj) {
-            // Could use a global or pass from login...
-            // For now, try to get the first user
-            for (let key in localStorage) {
-                if (key.startsWith('cif_user_')) {
-                    userObj = JSON.parse(localStorage.getItem(key));
-                    username = userObj.username;
-                    break;
-                }
-            }
+            });
         }
 
-        // UUID helper (v4) for character ids
+// UUID helper (v4) for character ids
         function uuidv4() {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                 const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -250,7 +68,7 @@ export class CharacterSelect extends Phaser.Scene {
                         changed = true;
                     }
                 }
-                if (changed) localStorage.setItem('cif_user_' + (userObj.username || username), JSON.stringify(userObj));
+                if (changed) saveUser(userObj.username || username, userObj);
             }
         } catch (e) { /* ignore migration errors */ }
 
@@ -377,7 +195,7 @@ export class CharacterSelect extends Phaser.Scene {
                 </div>
                 <div id="carousel-scroll-indicator" style="position:absolute;left:0;bottom:0;width:100%;height:6px;background:rgba(40,20,40,0.5);border-radius:3px;overflow:hidden;">
                     <div id="carousel-scroll-thumb" style="height:100%;width:80px;background:linear-gradient(90deg,#e44,#a00);border-radius:3px;transition:width 0.2s;"></div>
-                    <div id="carousel-scroll-thumb" style="height:100%;width:40px;background:linear-gradient(90deg,rgba(228,68,68,0.7),rgba(160,0,0,0.7));border-radius:2px;transition:width 0.3s cubic-bezier(.77,0,.175,1), transform 0.3s cubic-bezier(.77,0,.175,1);"></div>
+                    <div class="carousel-scroll-glow" style="height:100%;width:40px;background:linear-gradient(90deg,rgba(228,68,68,0.7),rgba(160,0,0,0.7));border-radius:2px;transition:width 0.3s cubic-bezier(.77,0,.175,1), transform 0.3s cubic-bezier(.77,0,.175,1);"></div>
                 </div>
             </div>
             <button id="logout-btn" style="margin-top:32px;padding:12px 32px;font-size:1.1em;border-radius:10px;background:linear-gradient(90deg,#222 40%,#444 100%);color:#fff;border:none;box-shadow:0 0 4px #ff3300,0 0 2px #fff inset;cursor:pointer;">Log Out</button>
@@ -388,33 +206,36 @@ export class CharacterSelect extends Phaser.Scene {
         setTimeout(() => {
             const row = document.getElementById('character-cards-row');
             const thumb = document.getElementById('carousel-scroll-thumb');
-            function updateScrollThumb() {
-                if (!row || !thumb) return;
+            if (!row || !thumb) return;
+            const updateScrollThumb = () => {
                 const visible = row.offsetWidth;
                 const total = row.scrollWidth;
                 const scrollLeft = row.scrollLeft;
-                const percent = visible / total;
+                const percent = total > 0 ? visible / total : 1;
                 const thumbWidth = Math.max(visible * percent, 60);
                 const maxScroll = total - visible;
                 const left = maxScroll > 0 ? (scrollLeft / maxScroll) * (visible - thumbWidth) : 0;
                 thumb.style.width = thumbWidth + 'px';
                 thumb.style.transform = `translateX(${left}px)`;
-            }
+            };
             row.addEventListener('scroll', updateScrollThumb);
             window.addEventListener('resize', updateScrollThumb);
+            this._cleanupCallbacks.push(() => row.removeEventListener('scroll', updateScrollThumb));
+            this._cleanupCallbacks.push(() => window.removeEventListener('resize', updateScrollThumb));
             updateScrollThumb();
         }, 100);
         // Enable mouse wheel horizontal scrolling for carousel
         setTimeout(() => {
             const row = document.getElementById('character-cards-row');
-            if (row) {
-                row.addEventListener('wheel', function(e) {
-                    if (e.deltaY !== 0) {
-                        e.preventDefault();
-                        row.scrollLeft += e.deltaY;
-                    }
-                }, { passive: false });
-            }
+            if (!row) return;
+            const wheelHandler = (e) => {
+                if (e.deltaY !== 0) {
+                    e.preventDefault();
+                    row.scrollLeft += e.deltaY;
+                }
+            };
+            row.addEventListener('wheel', wheelHandler, { passive: false });
+            this._cleanupCallbacks.push(() => row.removeEventListener('wheel', wheelHandler));
         }, 100);
         // Modal logic
         function showModal(contentHtml) {
@@ -586,7 +407,7 @@ export class CharacterSelect extends Phaser.Scene {
                                     }
                                     if (!replaced) userObj.characters.push(char);
                                 }
-                                localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
+                                saveUser(username, userObj);
                             }
                             // If the character has a saved lastLocation, jump there
                             const last = (char && char.lastLocation) ? char.lastLocation : null;
@@ -599,7 +420,7 @@ export class CharacterSelect extends Phaser.Scene {
                         };
                         document.getElementById('delete-char-btn').onclick = () => {
                                 userObj.characters[idx] = undefined;
-                                localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
+                                saveUser(username, userObj);
                                 document.getElementById('char-modal-bg').style.display = 'none';
                                 setTimeout(() => {
                                     this.scene.restart();
@@ -673,19 +494,19 @@ export class CharacterSelect extends Phaser.Scene {
                             }
                             // Check for duplicate names across all users (case-insensitive)
                             const lcName = name.toLowerCase();
-                            for (let key in localStorage) {
-                                if (!key.startsWith('cif_user_')) continue;
-                                try {
-                                    const obj = JSON.parse(localStorage.getItem(key));
-                                    if (obj && obj.characters) {
-                                        for (const c of obj.characters) {
-                                            if (c && c.name && c.name.toLowerCase() === lcName) {
-                                                errorDiv.textContent = 'That name is already taken.';
-                                                return;
-                                            }
-                                        }
+                            let nameTaken = false;
+                            iterUsers((key, obj) => {
+                                if (nameTaken || !obj || !Array.isArray(obj.characters)) return;
+                                for (const c of obj.characters) {
+                                    if (c && c.name && c.name.toLowerCase() === lcName) {
+                                        nameTaken = true;
+                                        break;
                                     }
-                                } catch (e) { /* ignore parse errors */ }
+                                }
+                            });
+                            if (nameTaken) {
+                                errorDiv.textContent = 'That name is already taken.';
+                                return;
                             }
                             if (!race) {
                                 errorDiv.textContent = 'Select a race.';
@@ -712,7 +533,7 @@ export class CharacterSelect extends Phaser.Scene {
                             // attach starting equipment entry so the play scene can add the item to inventory/equip
                             if (starterItemId) newChar.startingEquipment = [ { id: starterItemId, qty: 1 } ];
                             userObj.characters[idx] = newChar;
-                            localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
+                            saveUser(username, userObj);
                             errorDiv.textContent = '';
                             document.getElementById('char-modal-bg').style.display = 'none';
                             // Refresh character cards without leaving scene
@@ -726,26 +547,28 @@ export class CharacterSelect extends Phaser.Scene {
         });
         // Logout button event
         document.getElementById('logout-btn').onclick = () => {
-            // Optionally clear loggedIn flag
-            for (let key in localStorage) {
-                if (key.startsWith('cif_user_')) {
-                    let obj = JSON.parse(localStorage.getItem(key));
-                    if (obj && obj.loggedIn) {
-                        obj.loggedIn = false;
-                        localStorage.setItem(key, JSON.stringify(obj));
-                    }
+            iterUsers((key, obj) => {
+                if (obj && obj.loggedIn) {
+                    obj.loggedIn = false;
+                    saveJson(key, obj);
                 }
-            }
+            });
             this.scene.start('Login');
             if (container.parentNode) container.remove();
         };
 
         // Remove overlays and container on scene shutdown
         this.events.once('shutdown', () => {
-            if (emberCanvas.parentNode) emberCanvas.remove();
-            if (shadowCanvas.parentNode) shadowCanvas.remove();
-            if (vignetteCanvas.parentNode) vignetteCanvas.remove();
-            if (fogCanvas.parentNode) fogCanvas.remove();
+            if (this._cleanupCallbacks) {
+                for (const fn of this._cleanupCallbacks) {
+                    try { fn(); } catch (e) { /* ignore */ }
+                }
+                this._cleanupCallbacks = [];
+            }
+            if (this._atmosphere && this._atmosphere.destroy) {
+                this._atmosphere.destroy();
+                this._atmosphere = null;
+            }
             if (container.parentNode) container.remove();
             if (gameContainer) gameContainer.style.display = '';
         });
