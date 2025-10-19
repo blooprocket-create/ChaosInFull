@@ -16,15 +16,17 @@ export class Cave extends Phaser.Scene {
 
         this.add.text(400, 32, 'The Cave', { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
 
-    // Player spawn
-    this.player = this.physics.add.sprite(400, 420, 'dude');
+    // Player spawn (allow restoring last position via spawnX/spawnY)
+    const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || 400;
+    const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || 420;
+    this.player = this.physics.add.sprite(spawnX, spawnY, 'dude');
     this.player.setCollideWorldBounds(true);
     this.player.body.setSize(20, 40);
     this.player.body.setOffset(6, 8);
 
-    // Platform for the cave (player and nodes land on this)
-    const platformY = 520;
-    const platform = this.add.rectangle(400, platformY, 800, 64, 0x443322, 1);
+    // Platform for the cave (match Town platform level)
+    const platformY = 570;
+    const platform = this.add.rectangle(400, platformY, 800, 60, 0x443322, 1);
     platform.setDepth(1);
     this.physics.add.existing(platform, true);
     this.physics.add.collider(this.player, platform);
@@ -52,12 +54,17 @@ export class Cave extends Phaser.Scene {
         this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.portalPrompt.setVisible(false);
 
-    // Mining node for testing: place it on the platform so it sits naturally
-    const nodeX = 520;
-    const nodeRadius = 28;
-    const platformTop = platformY - (64 / 2);
-    const nodeY = platformTop - nodeRadius; // sits on top of the platform
-    this._createMiningNode(nodeX, nodeY);
+    // Mining nodes for testing: place them on the platform so they sit naturally
+    const platformTop = platformY - (60 / 2);
+    // tin (easier) on left-center
+    this._createMiningNode(460, platformTop - 28, 'tin');
+    // copper (harder) on right-center
+    this._createMiningNode(580, platformTop - 28, 'copper');
+
+    // continuous mining state
+    this.miningActive = false;
+    this._miningEvent = null;
+    this.miningInterval = 3500; // ms between swings (tweakable)
 
         // Toast container
         this._toastContainer = null;
@@ -66,6 +73,11 @@ export class Cave extends Phaser.Scene {
         this.events.once('shutdown', () => {
             this._destroyHUD();
             this._clearToasts();
+            // cleanup mining indicator if present
+            if (this._miningIndicator && this._miningIndicator.parent) {
+                this._miningIndicator.destroy();
+                this._miningIndicator = null;
+            }
         });
     }
 
@@ -135,11 +147,51 @@ export class Cave extends Phaser.Scene {
     }
 
     // --- Mining node creation ---
-    _createMiningNode(x, y) {
-        this.miningNode = this.add.circle(x, y, 28, 0x8a7766, 1).setDepth(1.2);
-        this.miningNodePrompt = this.add.text(x, y - 60, '[E] Mine', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.miningNodePrompt.setVisible(false);
-        this.miningCooldown = 0;
+    // create a mining node of a given type ('tin' or 'copper')
+    _createMiningNode(x, y, type = 'copper') {
+        if (!this.miningNodes) this.miningNodes = [];
+        const config = {
+            tin: { color: 0x9bb7c9, baseChance: 0.45, item: { id: 'tin_ore', name: 'Tin Ore' }, label: 'Tin' },
+            copper: { color: 0x8a7766, baseChance: 0.35, item: { id: 'copper_ore', name: 'Copper Ore' }, label: 'Copper' }
+        };
+        const cfg = config[type] || config.copper;
+        const node = {};
+        node.type = type;
+        node.x = x; node.y = y; node.r = 28;
+        node.baseChance = cfg.baseChance;
+        node.item = cfg.item;
+        node.color = cfg.color;
+        node.label = cfg.label;
+        node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
+        node.prompt = this.add.text(x, y - 60, `[E] Mine ${node.label}`, { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        node.prompt.setVisible(false);
+        this.miningNodes.push(node);
+        return node;
+    }
+
+    // visual feedback for mining swings
+    _playMiningSwingEffect(node, success) {
+        if (!node) return;
+        // scale the node sprite briefly
+        if (node.sprite) this.tweens.add({ targets: node.sprite, scale: { from: 1, to: 1.12 }, yoyo: true, duration: 180, ease: 'Sine.easeOut' });
+        // particle burst
+        const color = success ? 0xffcc66 : 0x999999;
+        const x = node.x;
+        const y = node.y - 6;
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2) * (i / 8) + (Math.random() - 0.5) * 0.6;
+            const speed = 30 + Math.random() * 60;
+            const px = this.add.circle(x, y, 2 + Math.random() * 2, color).setDepth(2.5);
+            this.tweens.add({
+                targets: px,
+                x: x + Math.cos(angle) * speed,
+                y: y + Math.sin(angle) * speed - 10,
+                alpha: { from: 1, to: 0 },
+                scale: { from: 1, to: 0.6 },
+                duration: 700 + Math.random() * 300,
+                onComplete: () => { if (px && px.destroy) px.destroy(); }
+            });
+        }
     }
 
     // --- Toasts ---
@@ -175,6 +227,19 @@ export class Cave extends Phaser.Scene {
         this._toastContainer = null;
     }
 
+    _showMiningIndicator() {
+        if (this._miningIndicator) return;
+        const footOffset = (this.player.displayHeight || 48) / 2 + 8;
+        this._miningIndicator = this.add.text(this.player.x, this.player.y + footOffset, 'Mining...', { fontSize: '16px', color: '#ffd27a', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 4 } }).setOrigin(0.5, 0).setDepth(3);
+    }
+
+    _hideMiningIndicator() {
+        if (this._miningIndicator) {
+            this._miningIndicator.destroy();
+            this._miningIndicator = null;
+        }
+    }
+
     // Persist mining and inventory changes to localStorage (by name match)
     _persistCharacter(username) {
         if (!username || !this.char) return;
@@ -182,14 +247,25 @@ export class Cave extends Phaser.Scene {
             const key = 'cif_user_' + username;
             const userObj = JSON.parse(localStorage.getItem(key));
             if (userObj && userObj.characters) {
+                let found = false;
                 for (let i = 0; i < userObj.characters.length; i++) {
-                    if (userObj.characters[i] && userObj.characters[i].name === this.char.name) {
+                    const uc = userObj.characters[i];
+                    if (!uc) continue;
+                    if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
                         userObj.characters[i].mining = this.char.mining;
                         userObj.characters[i].inventory = this.char.inventory;
-                        localStorage.setItem(key, JSON.stringify(userObj));
+                        found = true;
                         break;
                     }
                 }
+                if (!found) {
+                    // fallback: try to add/update by name if no id match
+                    for (let i = 0; i < userObj.characters.length; i++) {
+                        if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
+                    }
+                    if (!found) userObj.characters.push(this.char);
+                }
+                localStorage.setItem(key, JSON.stringify(userObj));
             }
         } catch (e) { console.warn('Could not persist character', e); }
     }
@@ -209,44 +285,112 @@ export class Cave extends Phaser.Scene {
                 this.portalPrompt.setVisible(true);
                 if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                     const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                    this._persistCharacter(username);
+                    // persist inventory/mining and set lastLocation to Town with current position
+                    try {
+                        const key = 'cif_user_' + username;
+                        const userObj = JSON.parse(localStorage.getItem(key));
+                        if (userObj && userObj.characters) {
+                            for (let i = 0; i < userObj.characters.length; i++) {
+                                const uc = userObj.characters[i];
+                                if (!uc) continue;
+                                // match by id if available, fallback to name
+                                if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
+                                    userObj.characters[i].mining = this.char.mining;
+                                    userObj.characters[i].inventory = this.char.inventory;
+                                    userObj.characters[i].lastLocation = { scene: 'Town', x: this.player.x, y: this.player.y };
+                                    localStorage.setItem(key, JSON.stringify(userObj));
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) { console.warn('Could not persist lastLocation', e); }
                     this.scene.start('Town', { character: this.char, username: username });
                 }
             } else { this.portalPrompt.setVisible(false); }
         }
 
-        // mining node interaction
-        if (this.miningNode) {
-            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.miningNode.x, this.miningNode.y);
-            if (dist <= 56) {
-                this.miningNodePrompt.setVisible(true);
-                if (Phaser.Input.Keyboard.JustDown(this.keys.interact) && (!this.miningCooldown || time - this.miningCooldown > 600)) {
-                    this.miningCooldown = time;
-                    this._attemptMine();
+        // mining node interaction (support multiple nodes)
+        if (this.miningNodes && this.miningNodes.length) {
+            let nearest = null;
+            let nearestDist = 9999;
+            for (const node of this.miningNodes) {
+                const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, node.x, node.y);
+                if (dist < nearestDist) { nearestDist = dist; nearest = node; }
+                node.prompt.setVisible(dist <= 56);
+            }
+            // if nearest is within range, allow mining
+            if (nearest && nearestDist <= 56) {
+                // start continuous mining on E press targeting this node
+                if (Phaser.Input.Keyboard.JustDown(this.keys.interact) && !this.miningActive) {
+                    this._activeNode = nearest;
+                    this._startContinuousMining();
                 }
             } else {
-                this.miningNodePrompt.setVisible(false);
+                // no node nearby, hide prompts and stop mining
+                this._activeNode = null;
+                if (this.miningActive) this._stopContinuousMining();
+            }
+        }
+
+        // if player starts moving while mining, stop continuous mining
+        if (this.miningActive) {
+            const moved = this.keys.left.isDown || this.keys.right.isDown || this.keys.up.isDown || this.keys.down.isDown || Math.abs(this.player.body.velocity.x) > 1 || Math.abs(this.player.body.velocity.y) > 1;
+            if (moved) this._stopContinuousMining();
+            // reposition mining indicator above player
+            if (this._miningIndicator) {
+                const footOffset = (this.player.displayHeight || 48) / 2 + 8;
+                this._miningIndicator.x = this.player.x;
+                this._miningIndicator.y = this.player.y + footOffset;
             }
         }
     }
 
     // Mining attempt logic: success grants 15 exp + item, failure 5 exp
     _attemptMine() {
+        const node = this._activeNode;
+        if (!node) return;
         const mining = this.char.mining || { level: 1, exp: 0, expToLevel: 100 };
         const str = (this.char.stats && this.char.stats.str) || 0;
-        // chance formula: base 0.35 + 0.03*mining.level + 0.015*str, clamped
-        let chance = 0.35 + 0.03 * (mining.level || 1) + 0.015 * str;
-        chance = Math.max(0.05, Math.min(0.9, chance));
+        // chance formula: node.baseChance + 0.02*mining.level + 0.01*str, clamped
+        let chance = (node.baseChance || 0.35) + 0.02 * (mining.level || 1) + 0.01 * str;
+    // lower bound only; allow chance to exceed 1.0 so multiplier can grow with level/str
+    chance = Math.max(0.05, chance);
         const gotOre = Math.random() < chance;
         if (gotOre) {
-            // award item
+            // multiplier based on efficiency relative to node.baseChance
+            const base = node.baseChance || 0.35;
+            const multiplier = Math.max(1, Math.floor(chance / base));
+            // award node-specific item (stack qty) and report per-swing gain
             this.char.inventory = this.char.inventory || [];
-            this.char.inventory.push({ id: 'ore', name: 'Ore', qty: 1 });
-            mining.exp = (mining.exp || 0) + 15;
-            this._showToast('You mined ore! (+15 mining XP)');
+            let found = null;
+            for (let it of this.char.inventory) { if (it && it.id === node.item.id) { found = it; break; } }
+            let prevQty = 0;
+            let newQty = 0;
+            if (found) {
+                prevQty = found.qty || 0;
+                newQty = prevQty + multiplier;
+                found.qty = newQty;
+            } else {
+                this.char.inventory.push({ id: node.item.id, name: node.item.name, qty: multiplier });
+                found = this.char.inventory[this.char.inventory.length - 1];
+                prevQty = 0;
+                newQty = multiplier;
+            }
+            const delta = newQty - prevQty;
+            // grant mining XP scaled by multiplier (keep per-ore XP reasonable)
+            mining.exp = (mining.exp || 0) + (15 * multiplier);
+            // show toast with per-swing amount and item name
+            this._showToast(`You mined ${delta}x ${node.item.name}! (+${15 * multiplier} mining XP)`);
+            // visual effect scaled by multiplier
+            this._playMiningSwingEffect(node, true);
+            if (multiplier > 1 && node.sprite) {
+                // extra pulse to emphasize multi-ore
+                this.tweens.add({ targets: node.sprite, scale: { from: 1.12, to: 1.25 }, yoyo: true, duration: 220, ease: 'Sine.easeOut' });
+            }
         } else {
             mining.exp = (mining.exp || 0) + 5;
             this._showToast('You swing and find nothing. (+5 mining XP)');
+            this._playMiningSwingEffect(node, false);
         }
 
         // check level up
@@ -266,5 +410,26 @@ export class Cave extends Phaser.Scene {
         // update HUD (simple re-render of HUD element)
         this._destroyHUD();
         this._createHUD();
+    }
+
+    // Start continuous mining: attempt immediately and then repeatedly until stopped
+    _startContinuousMining() {
+        if (this.miningActive) return;
+        this.miningActive = true;
+        // immediate first swing
+        this._attemptMine();
+        // repeat every 600ms
+        this._miningEvent = this.time.addEvent({ delay: this.miningInterval, callback: this._attemptMine, callbackScope: this, loop: true });
+        // show mining indicator
+        this._showMiningIndicator();
+    }
+
+    _stopContinuousMining() {
+        this.miningActive = false;
+        if (this._miningEvent) {
+            this._miningEvent.remove(false);
+            this._miningEvent = null;
+        }
+        this._hideMiningIndicator();
     }
 }

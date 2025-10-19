@@ -23,8 +23,10 @@ export class Town extends Phaser.Scene {
         platform.setDepth(1);
         this.physics.add.existing(platform, true);
 
-        // Player
-        this.player = this.physics.add.sprite(400, 500, 'dude');
+    // Player (allow restoring last position via spawnX/spawnY)
+    const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || 400;
+    const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || 500;
+    this.player = this.physics.add.sprite(spawnX, spawnY, 'dude');
         this.player.setDepth(2);
         this.player.setCollideWorldBounds(true);
         this.player.body.setSize(20, 40);
@@ -202,13 +204,23 @@ export class Town extends Phaser.Scene {
             const key = 'cif_user_' + username;
             const userObj = JSON.parse(localStorage.getItem(key));
             if (userObj && userObj.characters) {
+                let found = false;
                 for (let i = 0; i < userObj.characters.length; i++) {
-                    if (userObj.characters[i] && userObj.characters[i].name === this.char.name) {
+                    const uc = userObj.characters[i];
+                    if (!uc) continue;
+                    if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
                         userObj.characters[i].mining = this.char.mining;
-                        localStorage.setItem(key, JSON.stringify(userObj));
+                        found = true;
                         break;
                     }
                 }
+                if (!found) {
+                    for (let i = 0; i < userObj.characters.length; i++) {
+                        if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
+                    }
+                    if (!found) userObj.characters.push(this.char);
+                }
+                localStorage.setItem(key, JSON.stringify(userObj));
             }
         } catch (e) {
             console.warn('Could not persist mining skill', e);
@@ -248,7 +260,31 @@ export class Town extends Phaser.Scene {
                 this.portalPrompt.setVisible(true);
                 if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                     const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                    this._persistMiningForActiveChar(username);
+                    // persist mining and mark lastLocation as Cave (store scene and optional position)
+                    try {
+                        const key = 'cif_user_' + username;
+                        const userObj = JSON.parse(localStorage.getItem(key));
+                        if (userObj && userObj.characters) {
+                            let found = false;
+                            for (let i = 0; i < userObj.characters.length; i++) {
+                                const uc = userObj.characters[i];
+                                if (!uc) continue;
+                                if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
+                                    userObj.characters[i].mining = this.char.mining;
+                                    userObj.characters[i].lastLocation = { scene: 'Cave', x: this.player.x, y: this.player.y };
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                for (let i = 0; i < userObj.characters.length; i++) {
+                                    if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
+                                }
+                                if (!found) userObj.characters.push(this.char);
+                            }
+                            localStorage.setItem(key, JSON.stringify(userObj));
+                        }
+                    } catch (e) { console.warn('Could not persist lastLocation', e); }
                     this.scene.start('Cave', { character: this.char, username: username });
                 }
             } else {

@@ -219,6 +219,29 @@ export class CharacterSelect extends Phaser.Scene {
             }
         }
 
+        // UUID helper (v4) for character ids
+        function uuidv4() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // Migrate existing characters: ensure each has an id
+        try {
+            if (userObj && userObj.characters && Array.isArray(userObj.characters)) {
+                let changed = false;
+                for (let i = 0; i < userObj.characters.length; i++) {
+                    const c = userObj.characters[i];
+                    if (c && !c.id) {
+                        c.id = uuidv4();
+                        changed = true;
+                    }
+                }
+                if (changed) localStorage.setItem('cif_user_' + (userObj.username || username), JSON.stringify(userObj));
+            }
+        } catch (e) { /* ignore migration errors */ }
+
         // Create HTML for character select
         const container = document.createElement('div');
         container.id = 'character-select-container';
@@ -445,10 +468,15 @@ export class CharacterSelect extends Phaser.Scene {
                         int: (char.stats && char.stats.int) || 0,
                         luk: (char.stats && char.stats.luk) || 0
                     };
+                    // Show lastLocation info if present
+                    const last = (char && char.lastLocation) ? char.lastLocation : null;
+                    const lastStr = last && last.scene ? `${last.scene} (${Math.round(last.x||0)}, ${Math.round(last.y||0)})` : 'None';
+                    const lastPlayedStr = (char && char.lastPlayed) ? new Date(char.lastPlayed).toLocaleString() : 'Never';
                     showModal(`
                         <h2 style='color:#fff;font-size:1.5em;margin-bottom:12px;'>${char.name}</h2>
                         <div style='color:#ccc;margin-bottom:8px;'>Level: ${char.level || 1}</div>
                         <div style='color:#ccc;margin-bottom:8px;'>Race: ${char.race || 'Unknown'}</div>
+                        <div style='color:#ccc;margin-bottom:8px;'>Last: ${lastStr}</div>
                         <div style='color:#eee;margin-bottom:12px;display:flex;flex-direction:row;gap:24px;justify-content:center;'>
                             <div style='display:flex;flex-direction:column;gap:8px;'>
                                 <span style='font-weight:bold;width:100%;text-align:center;margin-bottom:4px;'>Vitals</span>
@@ -465,18 +493,47 @@ export class CharacterSelect extends Phaser.Scene {
                                 <span class='stat-pill' style='background:#222;color:#cc66ff;padding:6px 16px;border-radius:16px;font-size:1em;'>LUK: ${baseStats.luk}</span>
                             </div>
                         </div>
+                        <div style='color:#bbb;margin-top:6px;margin-bottom:10px;font-size:0.9em;'>Last played: ${lastPlayedStr}</div>
                         <button id='play-char-btn' style='padding:10px 28px;font-size:1.1em;border-radius:10px;background:linear-gradient(90deg,#222 40%,#444 100%);color:#fff;border:none;box-shadow:0 0 4px #ff3300,0 0 2px #fff inset;cursor:pointer;margin-bottom:12px;'>Play</button>
                         <button id='delete-char-btn' style='padding:8px 24px;font-size:1em;border-radius:10px;background:linear-gradient(90deg,#444 40%,#222 100%);color:#fff;border:none;box-shadow:0 0 4px #ff3300,0 0 2px #fff inset;cursor:pointer;'>Delete</button>
                     `);
                     setTimeout(() => {
                         document.getElementById('play-char-btn').onclick = () => {
-                            // Start Town scene with selected character
+                            // Start last saved scene for this character if present
                             document.getElementById('char-modal-bg').style.display = 'none';
                             // Ensure mining skill exists on the character and persist
                             if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
-                            userObj.characters[idx] = char;
-                            localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
-                            this.scene.start('Town', { character: char, username });
+                            // update lastPlayed timestamp
+                            char.lastPlayed = Date.now();
+                            // find by id and replace (migrate older name-based entries if necessary)
+                            if (userObj && userObj.characters) {
+                                let replaced = false;
+                                for (let j = 0; j < userObj.characters.length; j++) {
+                                    const uc = userObj.characters[j];
+                                    if (!uc) continue;
+                                    if ((uc.id && char.id && uc.id === char.id) || (!uc.id && uc.name === char.name)) {
+                                        userObj.characters[j] = char;
+                                        replaced = true;
+                                        break;
+                                    }
+                                }
+                                if (!replaced) {
+                                    // fallback: push into first empty slot
+                                    for (let j = 0; j < 7; j++) {
+                                        if (!userObj.characters[j]) { userObj.characters[j] = char; replaced = true; break; }
+                                    }
+                                    if (!replaced) userObj.characters.push(char);
+                                }
+                                localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
+                            }
+                            // If the character has a saved lastLocation, jump there
+                            const last = (char && char.lastLocation) ? char.lastLocation : null;
+                            if (last && last.scene) {
+                                // Pass along stored position as well
+                                this.scene.start(last.scene, { character: char, username, spawnX: last.x, spawnY: last.y });
+                            } else {
+                                this.scene.start('Town', { character: char, username });
+                            }
                         };
                         document.getElementById('delete-char-btn').onclick = () => {
                                 userObj.characters[idx] = undefined;
@@ -519,6 +576,22 @@ export class CharacterSelect extends Phaser.Scene {
                                 errorDiv.textContent = 'Enter a name.';
                                 return;
                             }
+                            // Check for duplicate names across all users (case-insensitive)
+                            const lcName = name.toLowerCase();
+                            for (let key in localStorage) {
+                                if (!key.startsWith('cif_user_')) continue;
+                                try {
+                                    const obj = JSON.parse(localStorage.getItem(key));
+                                    if (obj && obj.characters) {
+                                        for (const c of obj.characters) {
+                                            if (c && c.name && c.name.toLowerCase() === lcName) {
+                                                errorDiv.textContent = 'That name is already taken.';
+                                                return;
+                                            }
+                                        }
+                                    }
+                                } catch (e) { /* ignore parse errors */ }
+                            }
                             if (!race) {
                                 errorDiv.textContent = 'Select a race.';
                                 return;
@@ -539,9 +612,10 @@ export class CharacterSelect extends Phaser.Scene {
                             if (weapon === 'Staff') stats.int += 3;
                             if (weapon === 'Dagger') stats.agi += 3;
                             if (weapon === 'Dice') stats.luk += 3;
-                            // Save character to userObj
+                            // Save character to userObj (assign unique id)
                             if (!userObj.characters) userObj.characters = [];
-                            userObj.characters[idx] = { name, race, weapon, stats, level: 1 };
+                            const newChar = { id: uuidv4(), name, race, weapon, stats, level: 1 };
+                            userObj.characters[idx] = newChar;
                             localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
                             errorDiv.textContent = '';
                             document.getElementById('char-modal-bg').style.display = 'none';
