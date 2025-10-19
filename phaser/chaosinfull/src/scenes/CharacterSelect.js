@@ -619,14 +619,20 @@ export class CharacterSelect extends Phaser.Scene {
                             if (race === 'Elf')   { stats.str = 1; stats.int = 3; stats.agi = 3; stats.luk = 1; }
                             if (race === 'Demonoid') { stats.str = 3; stats.int = 2; stats.agi = 1; stats.luk = 2; }
                             if (race === 'Angel') { stats.str = 1; stats.int = 3; stats.agi = 2; stats.luk = 3; }
-                            // Weapon bonuses
-                            if (weapon === 'Sword') stats.str += 3;
-                            if (weapon === 'Staff') stats.int += 3;
-                            if (weapon === 'Dagger') stats.agi += 3;
-                            if (weapon === 'Dice in a Bag') stats.luk += 3;
+                            // Weapon bonuses are now applied only when the item is equipped.
+                            // Do not modify base stats here. Starter items will be added to
+                            // the newChar.startingEquipment and Town will auto-equip on first login.
                             // Save character to userObj (assign unique id)
                             if (!userObj.characters) userObj.characters = [];
+                            // Map selected starting weapon to an item id defined in ITEM_DEFS
+                            let starterItemId = null;
+                            if (weapon === 'Sword') starterItemId = 'starter_sword';
+                            if (weapon === 'Staff') starterItemId = 'starter_staff';
+                            if (weapon === 'Dagger') starterItemId = 'starter_dagger';
+                            if (weapon === 'Dice in a Bag' || weapon === 'Dice') starterItemId = 'starter_dice';
                             const newChar = { id: uuidv4(), name, race, weapon, stats, level: 1 };
+                            // attach starting equipment entry so the play scene can add the item to inventory/equip
+                            if (starterItemId) newChar.startingEquipment = [ { id: starterItemId, qty: 1 } ];
                             userObj.characters[idx] = newChar;
                             localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
                             errorDiv.textContent = '';

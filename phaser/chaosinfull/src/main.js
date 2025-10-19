@@ -4,6 +4,8 @@ import { Game } from './scenes/Game.js';
 import { Start } from './scenes/Start.js';
 import { Town } from './scenes/Town.js';
 import { Cave } from './scenes/Cave.js';
+import { ITEM_DEFS } from './data/items.js';
+import { RECIPE_DEFS } from './data/recipes.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -36,4 +38,7 @@ const config = {
 }
 
 new Phaser.Game(config);
+// expose item defs for quick lookup in scenes
+if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;
+if (typeof window !== 'undefined') window.RECIPE_DEFS = RECIPE_DEFS;
             

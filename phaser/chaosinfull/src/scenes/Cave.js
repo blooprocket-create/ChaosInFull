@@ -25,6 +25,8 @@ export class Cave extends Phaser.Scene {
     const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || centerX;
     const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || (platformY - 70);
     this.player = this.physics.add.sprite(spawnX, spawnY, 'dude');
+    // ensure player is rendered above nodes, furnace and portal
+    this.player.setDepth(2);
     this.player.setCollideWorldBounds(true);
     this.player.body.setSize(20, 40);
     this.player.body.setOffset(6, 8);
@@ -33,13 +35,13 @@ export class Cave extends Phaser.Scene {
     this.physics.add.existing(platform, true);
     this.physics.add.collider(this.player, platform);
 
-        // Animations (reuse frames if not already created)
-        if (!this.anims.exists('left')) this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
-        if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
-        if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
+    // Animations (create only if not already registered to avoid duplicate key errors)
+    if (!this.anims.exists('left')) this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
+    if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
+    if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
 
-        // Input: WASD + E
-        this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E });
+    // Input: WASD + E + I (inventory)
+    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I });
 
         // Character data from scene settings
         this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
@@ -73,7 +75,7 @@ export class Cave extends Phaser.Scene {
     // Smelting state
     this.smeltingActive = false;
     this._smeltingEvent = null;
-    this.smeltingInterval = 3500;
+    this.smeltingInterval = 2800;
 
     // Mining nodes for testing: place them on the platform so they sit naturally
     const platformTop = platformY - (60 / 2);
@@ -85,7 +87,7 @@ export class Cave extends Phaser.Scene {
     // continuous mining state
     this.miningActive = false;
     this._miningEvent = null;
-    this.miningInterval = 3500; // ms between swings (tweakable)
+    this.miningInterval = 2800; // ms between swings (tweakable)
 
         // Toast container
         this._toastContainer = null;
@@ -104,7 +106,58 @@ export class Cave extends Phaser.Scene {
             this._furnaceModal = null;
             // stop any smelting events
             if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
+            this._closeInventoryModal();
         });
+    }
+
+    // Inventory modal for Cave
+    _openInventoryModal() {
+        if (this._inventoryModal) return;
+        const inv = this.char.inventory || [];
+        const modal = document.createElement('div');
+        modal.id = 'inventory-modal';
+        modal.style.position = 'fixed';
+        modal.style.left = '50%';
+        modal.style.top = '50%';
+        modal.style.transform = 'translate(-50%,-50%)';
+        modal.style.zIndex = '230';
+        modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
+        modal.style.padding = '12px';
+        modal.style.borderRadius = '12px';
+        modal.style.color = '#fff';
+        modal.style.minWidth = '360px';
+        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Inventory</strong><button id='inv-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='inv-items' style='display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto;'></div>`;
+        document.body.appendChild(modal);
+        this._inventoryModal = modal;
+        document.getElementById('inv-close').onclick = () => this._closeInventoryModal();
+        this._refreshInventoryModal();
+    }
+
+    _closeInventoryModal() {
+        if (this._inventoryModal && this._inventoryModal.parentNode) this._inventoryModal.parentNode.removeChild(this._inventoryModal);
+        this._inventoryModal = null;
+    }
+
+    _refreshInventoryModal() {
+        if (!this._inventoryModal) return;
+        const container = document.getElementById('inv-items');
+        if (!container) return;
+        container.innerHTML = '';
+        const inv = this.char.inventory || [];
+        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : null;
+        for (const it of inv) {
+            if (!it) continue;
+            const def = defs && defs[it.id];
+            const name = it.name || (def && def.name) || it.id;
+            const qty = it.qty || 1;
+            const meta = [];
+            if (def && def.weapon) meta.push('Weapon ' + (def.damage ? def.damage.join('-') : ''));
+            if (def && def.stackable) meta.push('Stackable'); else meta.push('Unique');
+            const el = document.createElement('div');
+            el.style.display = 'flex'; el.style.justifyContent = 'space-between'; el.style.padding = '6px'; el.style.background = 'rgba(255,255,255,0.02)'; el.style.borderRadius = '8px';
+            el.innerHTML = `<div><strong>${name}</strong><div style='font-size:0.85em;color:#ccc;'>${meta.join(' • ')}</div></div><div style='text-align:right'>${qty}</div>`;
+            container.appendChild(el);
+        }
     }
 
     // HUD copied/adapted from Town (without mining bar)
@@ -289,7 +342,7 @@ export class Cave extends Phaser.Scene {
                 <strong>Furnace</strong>
                 <button id='cave-furnace-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button>
             </div>
-            <div style='margin-bottom:8px;'>Inventory: Copper Ore: <span id='cave-furnace-copper-qty'>${copperOreQty}</span> — Tin Ore: <span id='cave-furnace-tin-qty'>${tinOreQty}</span></div>
+            <div style='margin-bottom:8px;'>Smelt ores into bars here. Open your Inventory (I) to view quantities.</span></div>
             <div style='display:flex;flex-direction:column;gap:8px;'>
                 <button id='cave-smelt-copper' style='padding:8px;background:#6b4f3a;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Smelt Copper Bar (2x Copper Ore)</button>
                 <button id='cave-smelt-bronze' style='padding:8px;background:#7a5f3a;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Smelt Bronze (1x Copper Ore + 1x Tin Ore)</button>
@@ -313,13 +366,15 @@ export class Cave extends Phaser.Scene {
         const btnCopper = document.getElementById('cave-smelt-copper');
         const btnBronze = document.getElementById('cave-smelt-bronze');
         if (btnCopper) btnCopper.onclick = () => {
-            if (this.smeltingActive) { if (this._smeltType === 'copper') this._stopContinuousSmelting(); else this._showToast('Already smelting ' + this._smeltType); }
-            else this._startContinuousSmelting('copper');
+            const recipeId = 'copper_bar';
+            if (this.smeltingActive) { if (this._smeltType === recipeId) this._stopContinuousSmelting(); else this._showToast('Already smelting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._smeltType] ? (window.RECIPE_DEFS[this._smeltType].name || this._smeltType) : this._smeltType)); }
+            else this._startContinuousSmelting(recipeId);
             updateDisplay(); this._refreshCaveFurnaceModal();
         };
         if (btnBronze) btnBronze.onclick = () => {
-            if (this.smeltingActive) { if (this._smeltType === 'bronze') this._stopContinuousSmelting(); else this._showToast('Already smelting ' + this._smeltType); }
-            else this._startContinuousSmelting('bronze');
+            const recipeId = 'bronze_bar';
+            if (this.smeltingActive) { if (this._smeltType === recipeId) this._stopContinuousSmelting(); else this._showToast('Already smelting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._smeltType] ? (window.RECIPE_DEFS[this._smeltType].name || this._smeltType) : this._smeltType)); }
+            else this._startContinuousSmelting(recipeId);
             updateDisplay(); this._refreshCaveFurnaceModal();
         };
 
@@ -331,8 +386,8 @@ export class Cave extends Phaser.Scene {
     _closeCaveFurnaceModal() {
         if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
         this._furnaceModal = null;
-        // hide indicator and revert HUD display to mining
-        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+        // Only hide the indicator if smelting is not active; keep it visible during background smelting
+        if (this._furnaceIndicator && !this.smeltingActive) this._furnaceIndicator.setVisible(false);
         this._destroyHUD(); this._createHUD();
     }
 
@@ -340,39 +395,39 @@ export class Cave extends Phaser.Scene {
         if (!this._furnaceModal) return;
         const inv = this.char.inventory || [];
         const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-        const copperOreQty = findQty('copper_ore');
-        const tinOreQty = findQty('tin_ore');
-        const elC = document.getElementById('cave-furnace-copper-qty'); if (elC) elC.textContent = copperOreQty;
-        const elT = document.getElementById('cave-furnace-tin-qty'); if (elT) elT.textContent = tinOreQty;
+        const elC = document.getElementById('cave-furnace-copper-qty');
+        const elT = document.getElementById('cave-furnace-tin-qty');
+        if (elC) elC.textContent = findQty('copper_ore');
+        if (elT) elT.textContent = findQty('tin_ore');
         const btnCopper = document.getElementById('cave-smelt-copper');
         const btnBronze = document.getElementById('cave-smelt-bronze');
+        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
+        const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        const copperRecipe = recipes['copper_bar'];
+        const bronzeRecipe = recipes['bronze_bar'];
+        const buildLabel = (r) => {
+            if (!r) return '';
+            try {
+                return 'Smelt ' + (r.name || r.id) + ' (' + (r.requires || []).map(req => ((items[req.id] && items[req.id].name) || req.id) + (req.qty && req.qty > 1 ? ' x' + req.qty : '')).join(' + ') + ')';
+            } catch (e) { return 'Smelt ' + (r.name || r.id); }
+        };
         if (btnCopper) {
-            if (this.smeltingActive && this._smeltType === 'copper') { btnCopper.textContent = 'Stop Smelting Copper'; btnCopper.style.background = '#aa4422'; }
-            else { btnCopper.textContent = 'Smelt Copper Bar (2x Copper Ore)'; btnCopper.style.background = '#6b4f3a'; }
-            btnCopper.disabled = this.smeltingActive && this._smeltType !== 'copper'; btnCopper.style.opacity = btnCopper.disabled ? '0.6' : '1';
-            // ensure handler is bound (rebind in case DOM handlers were lost)
+            if (this.smeltingActive && this._smeltType === 'copper_bar') { btnCopper.textContent = 'Stop Smelting ' + (copperRecipe && copperRecipe.name ? copperRecipe.name : 'Copper'); btnCopper.style.background = '#aa4422'; }
+            else { btnCopper.textContent = buildLabel(copperRecipe) || 'Smelt Copper Bar'; btnCopper.style.background = '#6b4f3a'; }
+            btnCopper.disabled = this.smeltingActive && this._smeltType !== 'copper_bar'; btnCopper.style.opacity = btnCopper.disabled ? '0.6' : '1';
             btnCopper.onclick = () => {
-                if (this.smeltingActive) {
-                    if (this._smeltType === 'copper') this._stopContinuousSmelting();
-                    else this._showToast('Already smelting ' + this._smeltType);
-                } else {
-                    this._startContinuousSmelting('copper');
-                }
+                if (this.smeltingActive) { if (this._smeltType === 'copper_bar') this._stopContinuousSmelting(); else this._showToast('Already smelting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._smeltType] ? (window.RECIPE_DEFS[this._smeltType].name || this._smeltType) : this._smeltType)); }
+                else this._startContinuousSmelting('copper_bar');
                 this._refreshCaveFurnaceModal();
             };
         }
         if (btnBronze) {
-            if (this.smeltingActive && this._smeltType === 'bronze') { btnBronze.textContent = 'Stop Smelting Bronze'; btnBronze.style.background = '#aa4422'; }
-            else { btnBronze.textContent = 'Smelt Bronze (1x Copper Ore + 1x Tin Ore)'; btnBronze.style.background = '#7a5f3a'; }
-            btnBronze.disabled = this.smeltingActive && this._smeltType !== 'bronze'; btnBronze.style.opacity = btnBronze.disabled ? '0.6' : '1';
-            // rebind handler to keep toggle working
+            if (this.smeltingActive && this._smeltType === 'bronze_bar') { btnBronze.textContent = 'Stop Smelting ' + (bronzeRecipe && bronzeRecipe.name ? bronzeRecipe.name : 'Bronze'); btnBronze.style.background = '#aa4422'; }
+            else { btnBronze.textContent = buildLabel(bronzeRecipe) || 'Smelt Bronze'; btnBronze.style.background = '#7a5f3a'; }
+            btnBronze.disabled = this.smeltingActive && this._smeltType !== 'bronze_bar'; btnBronze.style.opacity = btnBronze.disabled ? '0.6' : '1';
             btnBronze.onclick = () => {
-                if (this.smeltingActive) {
-                    if (this._smeltType === 'bronze') this._stopContinuousSmelting();
-                    else this._showToast('Already smelting ' + this._smeltType);
-                } else {
-                    this._startContinuousSmelting('bronze');
-                }
+                if (this.smeltingActive) { if (this._smeltType === 'bronze_bar') this._stopContinuousSmelting(); else this._showToast('Already smelting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._smeltType] ? (window.RECIPE_DEFS[this._smeltType].name || this._smeltType) : this._smeltType)); }
+                else this._startContinuousSmelting('bronze_bar');
                 this._refreshCaveFurnaceModal();
             };
         }
@@ -381,15 +436,23 @@ export class Cave extends Phaser.Scene {
     // Reuse same smelting control methods as Town but ensure they exist in Cave
     _startContinuousSmelting(type) {
         if (this.smeltingActive) return;
+        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
+        const recipe = recipes[type];
+        if (!recipe) { this._showToast('Unknown recipe'); return; }
+        // quick requirement check before scheduling
+        const inv = this.char.inventory || [];
+        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
+        let ok = true;
+        for (const req of (recipe.requires || [])) { if (findQty(req.id) < (req.qty || 1)) { ok = false; break; } }
+        if (!ok) { this._showToast('Missing materials'); return; }
+
         this.smeltingActive = true;
         this._smeltType = type;
-        this._attemptSmelt(type);
-        // only create repeating event if immediate attempt didn't stop smelting (materials available)
-        if (this.smeltingActive) {
-            this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: () => this._attemptSmelt(type), callbackScope: this, loop: true });
-        }
-        this._showToast('Started smelting ' + (type === 'copper' ? 'Copper Bars' : 'Bronze'));
+        // schedule-first: wait interval, then call _attemptSmelt
+        this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: this._attemptSmelt, callbackScope: this, args: [type], loop: true });
+        this._showToast('Started smelting ' + (recipe.name || type));
         if (this._furnaceIndicator) this._furnaceIndicator.setVisible(true);
+        // show smithing HUD and refresh modal
         this._destroyHUD(); this._createHUD();
         this._refreshCaveFurnaceModal();
     }
@@ -405,34 +468,45 @@ export class Cave extends Phaser.Scene {
         this._destroyHUD(); this._createHUD();
     }
 
-    _attemptSmelt(type) {
+    _attemptSmelt(recipeId) {
         const inv = this.char.inventory = this.char.inventory || [];
         const find = (id) => inv.find(x => x && x.id === id);
-        const copper = find('copper_ore');
-        const tin = find('tin_ore');
+        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
+        const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        const recipe = recipes[recipeId];
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        if (type === 'copper') {
-            const have = (copper && copper.qty) || 0;
-            if (have < 2) { this._stopContinuousSmelting(); this._showToast('Out of Copper Ore'); return; }
-            copper.qty -= 2; if (copper.qty <= 0) inv.splice(inv.indexOf(copper), 1);
-            let bar = find('copper_bar'); if (bar) bar.qty = (bar.qty || 0) + 1; else inv.push({ id: 'copper_bar', name: 'Copper Bar', qty: 1 });
-            const newQty = (find('copper_bar') && find('copper_bar').qty) || 1;
-            this._showToast(`Smelted 1x Copper Bar! (${newQty} total)`);
-            // smithing xp
-            this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-            this.char.smithing.exp = (this.char.smithing.exp || 0) + 12;
-        } else if (type === 'bronze') {
-            const haveC = (copper && copper.qty) || 0;
-            const haveT = (tin && tin.qty) || 0;
-            if (haveC < 1 || haveT < 1) { this._stopContinuousSmelting(); this._showToast('Out of materials for Bronze'); return; }
-            copper.qty -= 1; if (copper.qty <= 0) inv.splice(inv.indexOf(copper), 1);
-            tin.qty -= 1; if (tin.qty <= 0) inv.splice(inv.indexOf(tin), 1);
-            let b = find('bronze_bar'); if (b) b.qty = (b.qty || 0) + 1; else inv.push({ id: 'bronze_bar', name: 'Bronze Bar', qty: 1 });
-            const newQty = (find('bronze_bar') && find('bronze_bar').qty) || 1;
-            this._showToast(`Smelted 1x Bronze! (${newQty} total)`);
-            this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-            this.char.smithing.exp = (this.char.smithing.exp || 0) + 15;
+        if (!recipe) { this._stopContinuousSmelting(); this._showToast('Unknown recipe'); return; }
+        // check requirements
+        for (const req of (recipe.requires || [])) {
+            const have = (find(req.id) && find(req.id).qty) || 0;
+            if (have < (req.qty || 1)) {
+                this._stopContinuousSmelting();
+                this._showToast('Out of materials for ' + (recipe.name || recipeId));
+                return;
+            }
         }
+        // consume materials
+        for (const req of (recipe.requires || [])) {
+            const it = find(req.id);
+            if (it) {
+                it.qty -= (req.qty || 1);
+                if (it.qty <= 0) inv.splice(inv.indexOf(it), 1);
+            }
+        }
+        // give product
+        const prodId = recipe.id || recipeId;
+        const prodDef = items && items[prodId];
+        if (prodDef && prodDef.stackable) {
+            let ex = find(prodId);
+            if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
+        } else {
+            inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
+        }
+        const newQty = (find(prodId) && find(prodId).qty) || 1;
+        this._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);
+        // award smithing XP
+        this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+        this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
         if (this.char.smithing) {
             while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
                 this.char.smithing.exp -= this.char.smithing.expToLevel;
@@ -442,8 +516,9 @@ export class Cave extends Phaser.Scene {
             }
         }
         this._persistCharacter((this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null);
-        this._destroyHUD(); this._createHUD();
+        // Avoid recreating HUD every tick; refresh modal and inventory UI only
         this._refreshCaveFurnaceModal();
+        if (this._inventoryModal) this._refreshInventoryModal();
     }
 
     _hideMiningIndicator() {
@@ -481,6 +556,8 @@ export class Cave extends Phaser.Scene {
                 localStorage.setItem(key, JSON.stringify(userObj));
             }
         } catch (e) { console.warn('Could not persist character', e); }
+        // Refresh inventory modal if open so changes appear immediately
+        try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }
 
     update(time, delta) {
@@ -532,7 +609,13 @@ export class Cave extends Phaser.Scene {
                 }
             } else {
                 this.furnacePrompt.setVisible(false);
+                if (this._furnaceModal) this._closeCaveFurnaceModal();
             }
+        }
+
+        // Inventory toggle (I)
+        if (Phaser.Input.Keyboard.JustDown(this.keys.inventory)) {
+            if (this._inventoryModal) this._closeInventoryModal(); else this._openInventoryModal();
         }
 
         // mining node interaction (support multiple nodes)
@@ -642,9 +725,7 @@ export class Cave extends Phaser.Scene {
     _startContinuousMining() {
         if (this.miningActive) return;
         this.miningActive = true;
-        // immediate first swing
-        this._attemptMine();
-        // repeat every 600ms
+        // schedule-first: wait miningInterval before first attempt
         this._miningEvent = this.time.addEvent({ delay: this.miningInterval, callback: this._attemptMine, callbackScope: this, loop: true });
         // show mining indicator
         this._showMiningIndicator();
