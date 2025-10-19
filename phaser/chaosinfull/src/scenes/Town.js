@@ -116,6 +116,14 @@ export class Town extends Phaser.Scene {
         this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.portalPrompt.setVisible(false);
 
+    // Portal to Inner Field near the forge
+    const fieldPortalX = this.scale.width - 220;
+    const fieldPortalY = platformY - 70;
+    this.fieldPortal = this.add.circle(fieldPortalX, fieldPortalY, 26, 0x44aa88, 0.9).setDepth(1.5);
+        this.tweens.add({ targets: this.fieldPortal, scale: { from: 1, to: 1.1 }, yoyo: true, repeat: -1, duration: 1000, ease: 'Sine.easeInOut' });
+        this.fieldPortalPrompt = this.add.text(fieldPortalX, fieldPortalY - 60, '[E] Inner Field', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        this.fieldPortalPrompt.setVisible(false);
+
     // Furnace on right side (combine ores into bars)
     const furnaceX = this.scale.width - 120;
     const furnaceY = platformY - 70;
@@ -1040,6 +1048,43 @@ export class Town extends Phaser.Scene {
             }
         }
 
+        if (this.fieldPortal) {
+            const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.fieldPortal.x, this.fieldPortal.y);
+            if (fdist <= 56) {
+                this.fieldPortalPrompt.setVisible(true);
+                if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                    const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+                    try {
+                        const key = 'cif_user_' + username;
+                        const userObj = JSON.parse(localStorage.getItem(key));
+                        if (userObj && userObj.characters) {
+                            let found = false;
+                            for (let i = 0; i < userObj.characters.length; i++) {
+                                const uc = userObj.characters[i];
+                                if (!uc) continue;
+                                if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
+                                    userObj.characters[i] = this.char;
+                                    userObj.characters[i].lastLocation = { scene: 'InnerField', x: this.player.x, y: this.player.y };
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                for (let i = 0; i < userObj.characters.length; i++) {
+                                    if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
+                                }
+                                if (!found) userObj.characters.push(this.char);
+                            }
+                            localStorage.setItem(key, JSON.stringify(userObj));
+                        }
+                    } catch (e) { console.warn('Could not persist lastLocation (inner field)', e); }
+                    this.scene.start('InnerField', { character: this.char, username: username });
+                }
+            } else {
+                this.fieldPortalPrompt.setVisible(false);
+            }
+        }
+
         // Furnace interaction: proximity + E to open smelting UI
         if (this.furnace) {
             const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.furnace.x, this.furnace.y);
@@ -1165,4 +1210,3 @@ export class Town extends Phaser.Scene {
         }
     }
 }
-

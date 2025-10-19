@@ -4,10 +4,12 @@ import { Game } from './scenes/Game.js';
 import { Start } from './scenes/Start.js';
 import { Town } from './scenes/Town.js';
 import { Cave } from './scenes/Cave.js';
+import { InnerField } from './scenes/InnerField.js';
 import { ITEM_DEFS } from './data/items.js';
 import { RECIPE_DEFS } from './data/recipes.js';
 import { RACE_DEFS } from './data/races.js';
 import { CLASS_DEFS } from './data/classes.js';
+import { ENEMY_DEFS } from './data/enemies.js';
 import * as SharedUI from './scenes/shared/ui.js';
 import * as furnaceShared from './scenes/shared/furnace.js';
 import * as hudShared from './scenes/shared/hud.js';
@@ -35,7 +37,8 @@ const config = {
         Game,
         Start,
         Town,
-        Cave
+        Cave,
+        InnerField
     ],
     scale: {
         mode: Phaser.Scale.FIT,
@@ -47,6 +50,7 @@ if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;
 if (typeof window !== 'undefined') window.RECIPE_DEFS = RECIPE_DEFS;
 if (typeof window !== 'undefined') window.RACE_DEFS = RACE_DEFS;
 if (typeof window !== 'undefined') window.CLASS_DEFS = CLASS_DEFS;
+if (typeof window !== 'undefined') window.ENEMY_DEFS = ENEMY_DEFS;
 // expose shared UI helpers for legacy scenes to call
 if (typeof window !== 'undefined') window.__shared_ui = SharedUI;
 if (typeof window !== 'undefined') window.__furnace_shared = furnaceShared;
