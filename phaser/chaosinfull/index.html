@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Chaos in Full</title>
+        <style>
+            /* Reset CSS: Please avoid making changes here unless you know what you're doing :) */
+            *,
+            *::before,
+            *::after {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+    
+            html, body {
+                width: 800px !important;
+                height: 600px !important;
+                min-width: 800px !important;
+                min-height: 600px !important;
+                max-width: 800px !important;
+                max-height: 600px !important;
+                overflow: hidden;
+            }
+    
+            body {
+                line-height: 1;
+                font-family: Arial, sans-serif;
+                background-color: #040218;
+            }
+    
+            ol, ul {
+                list-style: none;
+            }
+    
+            img, video {
+                max-width: 100%;
+                height: auto;
+                display: block;
+            }
+    
+            a {
+                text-decoration: none;
+                color: inherit;
+            }
+            #game-container, canvas {
+                width: 800px !important;
+                height: 600px !important;
+                min-width: 800px !important;
+                min-height: 600px !important;
+                max-width: 800px !important;
+                max-height: 600px !important;
+                display: block;
+                position: fixed;
+                top: 0;
+                left: 0;
+                margin: 0;
+                padding: 0;
+                background: transparent;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="game-container"></div>
+        <script src="./phaser.js"></script>
+        <script type="module" src="./src/main.js"></script>
+    </body>
+    </html>
