@@ -40,13 +40,15 @@ export class Cave extends Phaser.Scene {
     if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
     if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
 
-    // Input: WASD + E + I (inventory)
-    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I });
+    // Input: WASD + E + I (inventory) + U (equipment) + X (stats)
+    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I, equip: Phaser.Input.Keyboard.KeyCodes.U, stats: Phaser.Input.Keyboard.KeyCodes.X });
 
-        // Character data from scene settings
-        this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
+    // Character data from scene settings
+    this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
         if (!this.char.mining) this.char.mining = { level: 1, exp: 0, expToLevel: 100 };
         if (!this.char.inventory) this.char.inventory = [];
+    // Reconcile equipment bonuses through shared helper so UI shows effective stats
+    try { if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses(this); } catch (e) { /* ignore */ }
 
         // HUD (same condensed HUD as Town, without mining bar)
         this._createHUD();
@@ -110,65 +112,36 @@ export class Cave extends Phaser.Scene {
         });
     }
 
-    // Inventory modal for Cave
-    _openInventoryModal() {
-        if (this._inventoryModal) return;
-        const inv = this.char.inventory || [];
-        const modal = document.createElement('div');
-        modal.id = 'inventory-modal';
-        modal.style.position = 'fixed';
-        modal.style.left = '50%';
-        modal.style.top = '50%';
-        modal.style.transform = 'translate(-50%,-50%)';
-        modal.style.zIndex = '230';
-        modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
-        modal.style.padding = '12px';
-        modal.style.borderRadius = '12px';
-        modal.style.color = '#fff';
-        modal.style.minWidth = '360px';
-        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Inventory</strong><button id='inv-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='inv-items' style='display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto;'></div>`;
-        document.body.appendChild(modal);
-        this._inventoryModal = modal;
-        document.getElementById('inv-close').onclick = () => this._closeInventoryModal();
-        this._refreshInventoryModal();
+    // Inventory modal is centralized in shared UI; thin wrappers kept for compatibility
+    _openInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.openInventoryModal) return window.__shared_ui.openInventoryModal(this); }
+    _closeInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.closeInventoryModal) return window.__shared_ui.closeInventoryModal(this); }
+    _refreshInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal) return window.__shared_ui.refreshInventoryModal(this); }
+
+    // Equipment modal is centralized; thin wrappers route to shared helpers
+    _openEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.openEquipmentModal) return window.__shared_ui.openEquipmentModal(this); }
+    _closeEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.closeEquipmentModal) return window.__shared_ui.closeEquipmentModal(this); }
+    _refreshEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.refreshEquipmentModal) return window.__shared_ui.refreshEquipmentModal(this); }
+
+    // Equip an item from inventory to the appropriate slot (weapon/armor)
+    _equipItemFromInventory(itemId) {
+        if (window && window.__shared_ui && window.__shared_ui.equipItemFromInventory) return window.__shared_ui.equipItemFromInventory(this, itemId);
     }
 
-    _closeInventoryModal() {
-        if (this._inventoryModal && this._inventoryModal.parentNode) this._inventoryModal.parentNode.removeChild(this._inventoryModal);
-        this._inventoryModal = null;
-    }
-
-    _refreshInventoryModal() {
-        if (!this._inventoryModal) return;
-        const container = document.getElementById('inv-items');
-        if (!container) return;
-        container.innerHTML = '';
-        const inv = this.char.inventory || [];
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : null;
-        for (const it of inv) {
-            if (!it) continue;
-            const def = defs && defs[it.id];
-            const name = it.name || (def && def.name) || it.id;
-            const qty = it.qty || 1;
-            const meta = [];
-            if (def && def.weapon) meta.push('Weapon ' + (def.damage ? def.damage.join('-') : ''));
-            if (def && def.stackable) meta.push('Stackable'); else meta.push('Unique');
-            const el = document.createElement('div');
-            el.style.display = 'flex'; el.style.justifyContent = 'space-between'; el.style.padding = '6px'; el.style.background = 'rgba(255,255,255,0.02)'; el.style.borderRadius = '8px';
-            el.innerHTML = `<div><strong>${name}</strong><div style='font-size:0.85em;color:#ccc;'>${meta.join(' • ')}</div></div><div style='text-align:right'>${qty}</div>`;
-            container.appendChild(el);
-        }
-    }
+    _unequipItem(slot) { if (window && window.__shared_ui && window.__shared_ui.unequipItem) return window.__shared_ui.unequipItem(this, slot); }
+    _applyEquipmentBonuses(eq) { if (window && window.__shared_ui && window.__shared_ui.applyEquipmentBonuses) return window.__shared_ui.applyEquipmentBonuses(this, eq); }
+    _removeEquipmentBonuses(eq) { if (window && window.__shared_ui && window.__shared_ui.removeEquipmentBonuses) return window.__shared_ui.removeEquipmentBonuses(this, eq); }
 
     // HUD copied/adapted from Town (without mining bar)
     _createHUD() {
         const char = this.char || {};
         const name = char.name || 'Character';
         const level = char.level || 1;
-        const maxhp = char.maxhp || (100 + level * 10 + ((char.stats && char.stats.str) || 0) * 10);
-        const hp = char.hp || maxhp;
-        const maxmana = char.maxmana || (50 + level * 5 + ((char.stats && char.stats.int) || 0) * 10);
-        const mana = char.mana || maxmana;
+    let eff = { str:0,int:0,agi:0,luk:0,defense:0 };
+    try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(char); } catch(e) { /* ignore */ }
+    const maxhp = char.maxhp || (100 + level * 10 + ((eff.str || 0) * 10));
+    const hp = char.hp || maxhp;
+    const maxmana = char.maxmana || (50 + level * 5 + ((eff.int || 0) * 10));
+    const mana = char.mana || maxmana;
     const exp = char.exp || 0;
     const expToLevel = char.expToLevel || 100;
     const mining = char.mining || { level: 1, exp: 0, expToLevel: 100 };
@@ -317,6 +290,8 @@ export class Cave extends Phaser.Scene {
 
     // --- Furnace modal for Cave (smelting UI) ---
     _openFurnaceModal() {
+        // Delegate to shared furnace helper if present
+        try { if (window && window.__furnace_shared && window.__furnace_shared.openFurnaceModal) { window.__furnace_shared.openFurnaceModal(this); return; } } catch (e) { /* ignore */ }
         if (this._furnaceModal) return;
         const inv = this.char.inventory || [];
         const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
@@ -504,9 +479,11 @@ export class Cave extends Phaser.Scene {
         }
         const newQty = (find(prodId) && find(prodId).qty) || 1;
         this._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);
-        // award smithing XP
-        this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-        this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
+    // award smithing XP
+    this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+    this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
+    // refresh stats modal if open (smithing xp shown in skills)
+    try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
         if (this.char.smithing) {
             while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
                 this.char.smithing.exp -= this.char.smithing.expToLevel;
@@ -615,7 +592,25 @@ export class Cave extends Phaser.Scene {
 
         // Inventory toggle (I)
         if (Phaser.Input.Keyboard.JustDown(this.keys.inventory)) {
-            if (this._inventoryModal) this._closeInventoryModal(); else this._openInventoryModal();
+            if (window && window.__shared_ui) {
+                if (this._inventoryModal) window.__shared_ui.closeInventoryModal(this); else window.__shared_ui.openInventoryModal(this);
+            } else {
+                if (this._inventoryModal) this._closeInventoryModal(); else this._openInventoryModal();
+            }
+        }
+        // Equipment toggle (U)
+        if (Phaser.Input.Keyboard.JustDown(this.keys.equip)) {
+            if (window && window.__shared_ui) {
+                if (this._equipmentModal) window.__shared_ui.closeEquipmentModal(this); else window.__shared_ui.openEquipmentModal(this);
+            } else {
+                if (this._equipmentModal) this._closeEquipmentModal(); else this._openEquipmentModal();
+            }
+        }
+        // Stats toggle (X)
+        if (this.keys.stats && Phaser.Input.Keyboard.JustDown(this.keys.stats)) {
+            if (window && window.__shared_ui) {
+                if (this._statsModal) window.__shared_ui.closeStatsModal(this); else window.__shared_ui.openStatsModal(this);
+            }
         }
 
         // mining node interaction (support multiple nodes)
@@ -688,6 +683,8 @@ export class Cave extends Phaser.Scene {
             const delta = newQty - prevQty;
             // grant mining XP scaled by multiplier (keep per-ore XP reasonable)
             mining.exp = (mining.exp || 0) + (15 * multiplier);
+            // refresh stats modal if open (mining XP affects skills display)
+            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
             // show toast with per-swing amount and item name
             this._showToast(`You mined ${delta}x ${node.item.name}! (+${15 * multiplier} mining XP)`);
             // visual effect scaled by multiplier
@@ -700,6 +697,7 @@ export class Cave extends Phaser.Scene {
             mining.exp = (mining.exp || 0) + 5;
             this._showToast('You swing and find nothing. (+5 mining XP)');
             this._playMiningSwingEffect(node, false);
+            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
         }
 
         // check level up
@@ -708,6 +706,7 @@ export class Cave extends Phaser.Scene {
             mining.level = (mining.level || 1) + 1;
             mining.expToLevel = Math.floor(mining.expToLevel * 1.25);
             this._showToast('Mining level up! L' + mining.level, 2200);
+            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
         }
 
         this.char.mining = mining;

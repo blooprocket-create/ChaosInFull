@@ -270,12 +270,15 @@ export class CharacterSelect extends Phaser.Scene {
         container.style.backdropFilter = 'none';
         container.style.zIndex = '100';
 
-        // Character cards
+        // Character cards (include small stat summary if present)
         let characterCards = '';
         let characters = (userObj && userObj.characters) ? userObj.characters : [];
         for (let i = 0; i < 7; i++) {
             if (characters[i]) {
-                characterCards += `<div class="char-card">${characters[i].name}</div>`;
+                const c = characters[i];
+                let statSummary = '';
+                try { const s = c.stats || {}; statSummary = `<div style='font-size:0.6em;margin-top:6px;color:#ddd;'>STR:${s.str||0} INT:${s.int||0} AGI:${s.agi||0} LUK:${s.luk||0}</div>`; } catch(e){}
+                characterCards += `<div class="char-card">${c.name}${statSummary}</div>`;
             } else {
                 characterCards += `<div class="char-card empty">+</div>`;
             }
@@ -563,22 +566,55 @@ export class CharacterSelect extends Phaser.Scene {
                         <input id='new-char-name' type='text' placeholder='Name' style='margin-bottom:12px;padding:8px 12px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;width:180px;text-align:center;'>
                         <select id='new-char-race' style='margin-bottom:12px;padding:8px 12px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;width:180px;'>
                             <option value='' disabled selected>Race</option>
-                            <option value='Human'>Human</option>
-                            <option value='Elf'>Elf</option>
-                            <option value='Demonoid'>Demonoid</option>
-                            <option value='Angel'>Angel</option>
                         </select>
                         <select id='new-char-weapon' style='margin-bottom:12px;padding:8px 12px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;width:180px;'>
                             <option value='' disabled selected>Starting Weapon</option>
-                            <option value='Sword'>Sword (+3 STR)</option>
-                            <option value='Staff'>Staff (+3 INT)</option>
-                            <option value='Dagger'>Dagger (+3 AGI)</option>
-                            <option value='Dice'>Dice in a Bag (+3 LUK)</option>
                         </select>
+                        <div id='new-char-stats-preview' style='margin-top:8px;color:#ddd;font-size:0.95em;min-height:26px;'></div>
                         <button id='create-char-btn' style='padding:10px 28px;font-size:1.1em;border-radius:10px;background:linear-gradient(90deg,#222 40%,#444 100%);color:#fff;border:none;box-shadow:0 0 4px #ff3300,0 0 2px #fff inset;cursor:pointer;'>Create</button>
                         <div id='char-create-error' style='color:#ff3300;margin-top:8px;min-height:24px;'></div>
                     `);
                     setTimeout(() => {
+                        // Populate race options and live preview
+                        try {
+                            const raceSelect = document.getElementById('new-char-race');
+                            const defs = (window && window.RACE_DEFS) ? window.RACE_DEFS : {};
+                            for (const k in defs) {
+                                const opt = document.createElement('option'); opt.value = k; opt.textContent = (defs[k] && defs[k].name) || k; raceSelect.appendChild(opt);
+                            }
+                            const previewEl = document.getElementById('new-char-stats-preview');
+                            // Populate starter weapon options from ITEM_DEFS (starter_* keys)
+                            try {
+                                const weaponSelect = document.getElementById('new-char-weapon');
+                                const idefs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+                                for (const idk of Object.keys(idefs)) {
+                                    if (idk.startsWith('starter_')) {
+                                        const d = idefs[idk];
+                                        const opt = document.createElement('option'); opt.value = idk; opt.textContent = (d && d.name) ? `${d.name} ${d.statBonus ? '(' + Object.keys(d.statBonus).map(k=>'+'+d.statBonus[k]+' '+k.toUpperCase()).join(',') + ')' : ''}` : idk; weaponSelect.appendChild(opt);
+                                    }
+                                }
+                            } catch (e) { /* ignore */ }
+                            function updatePreview() {
+                                const selRace = document.getElementById('new-char-race').value;
+                                const selWeapon = document.getElementById('new-char-weapon').value;
+                                // build a temp char object to compute effective stats (base race + class + starter weapon if selected)
+                                let tempChar = { stats: { str:0,int:0,agi:0,luk:0 }, equipment: {}, class: 'beginner' };
+                                try { const defs2 = (window && window.RACE_DEFS) ? window.RACE_DEFS : {}; if (defs2 && defs2[selRace] && defs2[selRace].base) tempChar.stats = Object.assign({}, defs2[selRace].base); } catch(e) {}
+                                // treat selected weapon as equipped if chosen
+                                if (selWeapon) tempChar.equipment = { weapon: { id: selWeapon, name: (window && window.ITEM_DEFS && window.ITEM_DEFS[selWeapon] && window.ITEM_DEFS[selWeapon].name) || selWeapon } };
+                                try {
+                                    if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses({ char: tempChar });
+                                    const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(tempChar) : tempChar.stats;
+                                    previewEl.textContent = `STR:${eff.str}  INT:${eff.int}  AGI:${eff.agi}  LUK:${eff.luk}`;
+                                } catch (e) {
+                                    // fallback to base display
+                                    previewEl.textContent = `STR:${tempChar.stats.str}  INT:${tempChar.stats.int}  AGI:${tempChar.stats.agi}  LUK:${tempChar.stats.luk}`;
+                                }
+                            }
+                            document.getElementById('new-char-race').onchange = updatePreview;
+                            document.getElementById('new-char-weapon').onchange = updatePreview;
+                        } catch (e) { /* ignore */ }
+
                         document.getElementById('create-char-btn').onclick = () => {
                             const name = document.getElementById('new-char-name').value.trim();
                             const race = document.getElementById('new-char-race').value;
@@ -612,25 +648,20 @@ export class CharacterSelect extends Phaser.Scene {
                                 errorDiv.textContent = 'Select a starting weapon.';
                                 return;
                             }
-                            // Set base stats by race and weapon
+                            // Set base stats by race from data-driven defs
                             let stats = { str: 0, int: 0, agi: 0, luk: 0 };
-                            // Race bonuses
-                            if (race === 'Human') { stats.str = 2; stats.int = 2; stats.agi = 2; stats.luk = 2; }
-                            if (race === 'Elf')   { stats.str = 1; stats.int = 3; stats.agi = 3; stats.luk = 1; }
-                            if (race === 'Demonoid') { stats.str = 3; stats.int = 2; stats.agi = 1; stats.luk = 2; }
-                            if (race === 'Angel') { stats.str = 1; stats.int = 3; stats.agi = 2; stats.luk = 3; }
+                            try {
+                                const defs = (window && window.RACE_DEFS) ? window.RACE_DEFS : {};
+                                if (defs && defs[race] && defs[race].base) stats = Object.assign({}, defs[race].base);
+                            } catch (e) { /* ignore */ }
                             // Weapon bonuses are now applied only when the item is equipped.
                             // Do not modify base stats here. Starter items will be added to
                             // the newChar.startingEquipment and Town will auto-equip on first login.
                             // Save character to userObj (assign unique id)
                             if (!userObj.characters) userObj.characters = [];
-                            // Map selected starting weapon to an item id defined in ITEM_DEFS
-                            let starterItemId = null;
-                            if (weapon === 'Sword') starterItemId = 'starter_sword';
-                            if (weapon === 'Staff') starterItemId = 'starter_staff';
-                            if (weapon === 'Dagger') starterItemId = 'starter_dagger';
-                            if (weapon === 'Dice in a Bag' || weapon === 'Dice') starterItemId = 'starter_dice';
-                            const newChar = { id: uuidv4(), name, race, weapon, stats, level: 1 };
+                            // The select now returns an item id for starter weapon (e.g., 'starter_sword')
+                            const starterItemId = weapon;
+                            const newChar = { id: uuidv4(), name, race, weapon: starterItemId, stats, level: 1, class: 'beginner' };
                             // attach starting equipment entry so the play scene can add the item to inventory/equip
                             if (starterItemId) newChar.startingEquipment = [ { id: starterItemId, qty: 1 } ];
                             userObj.characters[idx] = newChar;

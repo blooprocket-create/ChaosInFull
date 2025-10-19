@@ -43,8 +43,8 @@ export class Town extends Phaser.Scene {
     if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
     if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
 
-        // Input (WASD + E + I inventory + U equipment)
-    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I, equip: Phaser.Input.Keyboard.KeyCodes.U });
+        // Input (WASD + E + I inventory + U equipment + X stats)
+    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I, equip: Phaser.Input.Keyboard.KeyCodes.U, stats: Phaser.Input.Keyboard.KeyCodes.X });
 
         // Character data
         const char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
@@ -53,39 +53,19 @@ export class Town extends Phaser.Scene {
     // equipment slots
     if (!char.equipment) char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null };
         this.char = char;
-        // Ensure equipment bonuses bucket exists and reconcile any saved equipment
-        if (!this.char._equipBonuses) this.char._equipBonuses = { str: 0, int: 0, agi: 0, luk: 0, defense: 0 };
-        // Recompute equipment bonuses from saved equipment (idempotent)
+        // Reconcile equipment bonuses using shared helper (centralized)
         try {
-            const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-            const equip = this.char.equipment || {};
-            // reset
-            this.char._equipBonuses = { str: 0, int: 0, agi: 0, luk: 0, defense: 0 };
-            for (const slot of Object.keys(equip || {})) {
-                const eq = equip[slot];
-                if (!eq || !eq.id) continue;
-                const def = defs[eq.id];
-                if (!def) continue;
-                if (def.statBonus) {
-                    for (const k of Object.keys(def.statBonus)) {
-                        this.char._equipBonuses[k] = (this.char._equipBonuses[k] || 0) + def.statBonus[k];
-                    }
-                }
-                if (def.defense) this.char._equipBonuses.defense = (this.char._equipBonuses.defense || 0) + def.defense;
-            }
-            // If char.stats exists and appears to include equipment bonuses, try to remove them so base stats are stored in char.stats
-            // Heuristic: if any equip bonus non-zero and char.stats has those keys, subtract equip bonuses once
+            if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses(this);
+            // If char.stats appears to include equipment bonuses historically stored, subtract equip bonuses once
             if (this.char.stats) {
-                const sb = this.char._equipBonuses;
+                const sb = this.char._equipBonuses || { str:0,int:0,agi:0,luk:0 };
                 let subtract = false;
                 for (const k of ['str','int','agi','luk']) if ((sb[k] || 0) !== 0 && (this.char.stats[k] || 0) >= (sb[k] || 0)) subtract = true;
                 if (subtract) {
-                    for (const k of ['str','int','agi','luk']) { this.char.stats[k] = (this.char.stats[k] || 0) - (this.char._equipBonuses[k] || 0); }
-                    // defense handled via defenseBonus field historically
-                    this.char.defenseBonus = (this.char.defenseBonus || 0) - (this.char._equipBonuses.defense || 0);
+                    for (const k of ['str','int','agi','luk']) { this.char.stats[k] = (this.char.stats[k] || 0) - (sb[k] || 0); }
+                    this.char.defenseBonus = (this.char.defenseBonus || 0) - ((this.char._equipBonuses && this.char._equipBonuses.defense) || 0);
                 }
             }
-
         } catch (e) { /* ignore */ }
 
         // If the character was just created with startingEquipment, add those items to inventory once
@@ -120,13 +100,13 @@ export class Town extends Phaser.Scene {
                                   (defs && defs['starter_dagger'] && inv.find(x => x && x.id === 'starter_dagger') ? 'starter_dagger' :
                                   (defs && defs['starter_dice'] && inv.find(x => x && x.id === 'starter_dice') ? 'starter_dice' : null)));
                     if (starter && !this.char.equipment) this.char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null };
-                    if (starter && !this.char.equipment.weapon) {
+                        if (starter && !this.char.equipment.weapon) {
                         // remove one from inventory (unique starter so just remove the entry)
                         const idx = inv.findIndex(x => x && x.id === starter);
                         if (idx !== -1) inv.splice(idx, 1);
                         this.char.equipment.weapon = { id: starter, name: (defs && defs[starter] && defs[starter].name) || starter };
                         // apply equipment bonuses so stats reflect equipped starter immediately
-                        try { this._applyEquipmentBonuses(this.char.equipment.weapon); } catch (e) { /* ignore */ }
+                        try { if (window && window.__shared_ui && window.__shared_ui.applyEquipmentBonuses) window.__shared_ui.applyEquipmentBonuses(this, this.char.equipment.weapon); } catch (e) { /* ignore */ }
                         this._persistCharacter(username);
                         // refresh HUD to reflect new vitals
                         this._destroyHUD(); this._createHUD();
@@ -404,8 +384,10 @@ export class Town extends Phaser.Scene {
             inv.push({ id: recipeId, name: (def && def.name) || recipe.name, qty: 1 });
         }
         // smithing xp
-        this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-        this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
+    this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+    this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
+    // refresh stats modal if open (smithing xp shown in skills)
+    try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
         while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
             this.char.smithing.exp -= this.char.smithing.expToLevel;
             this.char.smithing.level = (this.char.smithing.level || 1) + 1;
@@ -420,147 +402,19 @@ export class Town extends Phaser.Scene {
     if (this._inventoryModal) this._refreshInventoryModal();
     }
 
-    // Inventory UI for Town
-    _openInventoryModal() {
-        if (this._inventoryModal) return;
-        const inv = this.char.inventory || [];
-        const modal = document.createElement('div');
-        modal.id = 'inventory-modal';
-        modal.style.position = 'fixed';
-        modal.style.left = '50%';
-        modal.style.top = '50%';
-        modal.style.transform = 'translate(-50%,-50%)';
-        modal.style.zIndex = '230';
-        modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
-        modal.style.padding = '12px';
-        modal.style.borderRadius = '12px';
-        modal.style.color = '#fff';
-        modal.style.minWidth = '360px';
-        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Inventory</strong><button id='inv-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='inv-items' style='display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto;'></div>`;
-        document.body.appendChild(modal);
-        this._inventoryModal = modal;
-        document.getElementById('inv-close').onclick = () => this._closeInventoryModal();
-        this._refreshInventoryModal();
-    }
+    // Inventory modal is centralized in shared UI; keep wrappers for compatibility
+    _openInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.openInventoryModal) return window.__shared_ui.openInventoryModal(this); }
+    _closeInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.closeInventoryModal) return window.__shared_ui.closeInventoryModal(this); }
+    _refreshInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal) return window.__shared_ui.refreshInventoryModal(this); }
 
-    _closeInventoryModal() {
-        if (this._inventoryModal && this._inventoryModal.parentNode) this._inventoryModal.parentNode.removeChild(this._inventoryModal);
-        this._inventoryModal = null;
-    }
-
-    _refreshInventoryModal() {
-        if (!this._inventoryModal) return;
-        const container = document.getElementById('inv-items');
-        if (!container) return;
-        container.innerHTML = '';
-        const inv = this.char.inventory || [];
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : null;
-        for (const it of inv) {
-            if (!it) continue;
-            const def = defs && defs[it.id];
-            const name = it.name || (def && def.name) || it.id;
-            const qty = it.qty || 1;
-            const meta = [];
-            if (def && def.weapon) meta.push('Weapon ' + (def.damage ? def.damage.join('-') : ''));
-            if (def && def.stackable) meta.push('Stackable'); else meta.push('Unique');
-            const el = document.createElement('div');
-            el.style.display = 'flex'; el.style.justifyContent = 'space-between'; el.style.padding = '6px'; el.style.background = 'rgba(255,255,255,0.02)'; el.style.borderRadius = '8px';
-            el.innerHTML = `<div><strong>${name}</strong><div style='font-size:0.85em;color:#ccc;'>${meta.join(' • ')}</div></div><div style='text-align:right'>${qty}</div>`;
-            // Equip/Unequip button for equippable items
-            if (defs && defs[it.id] && (defs[it.id].weapon || defs[it.id].armor)) {
-                const btn = document.createElement('button'); btn.style.marginLeft = '8px'; btn.style.padding = '6px 8px'; btn.style.border = 'none'; btn.style.borderRadius = '6px'; btn.style.cursor = 'pointer';
-                // if item currently equipped, show Unequip
-                const equippedSlots = Object.keys(this.char.equipment || {}).filter(s => this.char.equipment && this.char.equipment[s] && this.char.equipment[s].id === it.id);
-                if (equippedSlots.length > 0) {
-                    btn.textContent = 'Unequip';
-                    btn.onclick = () => { this._unequipItem(equippedSlots[0]); };
-                } else {
-                    btn.textContent = 'Equip';
-                    btn.onclick = () => { this._equipItemFromInventory(it.id); };
-                }
-                const right = el.querySelector('div[style*="text-align:right"]');
-                if (right) right.appendChild(btn);
-            }
-            container.appendChild(el);
-        }
-    }
-
-    // Equip an item from inventory to the appropriate slot (weapon/armor)
-    _equipItemFromInventory(itemId) {
-        const inv = this.char.inventory = this.char.inventory || [];
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const def = defs[itemId];
-        if (!def) { this._showToast('Unknown item'); return; }
-        // choose slot
-        let slot = null;
-        if (def.weapon) slot = 'weapon';
-        else if (def.armor) slot = 'armor';
-        else { this._showToast('Cannot equip this item'); return; }
-        // remove one instance from inventory
-        const idx = inv.findIndex(x => x && x.id === itemId);
-        if (idx === -1) { this._showToast('Item not in inventory'); return; }
-        const it = inv[idx];
-        if (it.qty && it.qty > 1) { it.qty -= 1; } else { inv.splice(idx, 1); }
-        // if slot occupied, move existing equipped item back to inventory
-        if (!this.char.equipment) this.char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null };
-        const prev = this.char.equipment[slot];
-        if (prev) {
-            this.char.inventory.push({ id: prev.id, name: prev.name, qty: 1 });
-            this._removeEquipmentBonuses(prev);
-        }
-        // equip
-        this.char.equipment[slot] = { id: itemId, name: def.name || itemId };
-        this._applyEquipmentBonuses(this.char.equipment[slot]);
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        this._persistCharacter(username);
-        this._refreshInventoryModal();
-        this._destroyHUD(); this._createHUD();
-    }
-
-    _unequipItem(slot) {
-        if (!this.char.equipment) return;
-        const eq = this.char.equipment[slot];
-        if (!eq) return;
-        // remove bonuses
-        this._removeEquipmentBonuses(eq);
-        // add back to inventory
-        this.char.inventory = this.char.inventory || [];
-        this.char.inventory.push({ id: eq.id, name: eq.name, qty: 1 });
-        this.char.equipment[slot] = null;
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        this._persistCharacter(username);
-        this._refreshInventoryModal();
-        this._destroyHUD(); this._createHUD();
-    }
-
-    _applyEquipmentBonuses(eq) {
-        if (!eq || !eq.id) return;
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const def = defs[eq.id];
-        if (!def) return;
-        // apply statBonus into an equipment bonus bucket (idempotent)
-        if (!this.char._equipBonuses) this.char._equipBonuses = { str:0, int:0, agi:0, luk:0, defense:0 };
-        if (def.statBonus) {
-            for (const k of Object.keys(def.statBonus)) {
-                this.char._equipBonuses[k] = (this.char._equipBonuses[k] || 0) + def.statBonus[k];
-            }
-        }
-        if (def.defense) this.char._equipBonuses.defense = (this.char._equipBonuses.defense || 0) + def.defense;
-    }
-
-    _removeEquipmentBonuses(eq) {
-        if (!eq || !eq.id) return;
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const def = defs[eq.id];
-        if (!def) return;
-        if (!this.char._equipBonuses) this.char._equipBonuses = { str:0, int:0, agi:0, luk:0, defense:0 };
-        if (def.statBonus) {
-            for (const k of Object.keys(def.statBonus)) {
-                this.char._equipBonuses[k] = (this.char._equipBonuses[k] || 0) - def.statBonus[k];
-            }
-        }
-        if (def.defense) this.char._equipBonuses.defense = (this.char._equipBonuses.defense || 0) - def.defense;
-    }
+    // Equipment functions delegate to shared UI/helpers
+    _openEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.openEquipmentModal) return window.__shared_ui.openEquipmentModal(this); }
+    _closeEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.closeEquipmentModal) return window.__shared_ui.closeEquipmentModal(this); }
+    _refreshEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.refreshEquipmentModal) return window.__shared_ui.refreshEquipmentModal(this); }
+    _equipItemFromInventory(itemId) { if (window && window.__shared_ui && window.__shared_ui.equipItemFromInventory) return window.__shared_ui.equipItemFromInventory(this, itemId); }
+    _unequipItem(slot) { if (window && window.__shared_ui && window.__shared_ui.unequipItem) return window.__shared_ui.unequipItem(this, slot); }
+    _applyEquipmentBonuses(eq) { if (window && window.__shared_ui && window.__shared_ui.applyEquipmentBonuses) return window.__shared_ui.applyEquipmentBonuses(this, eq); }
+    _removeEquipmentBonuses(eq) { if (window && window.__shared_ui && window.__shared_ui.removeEquipmentBonuses) return window.__shared_ui.removeEquipmentBonuses(this, eq); }
 
     // --- Toasts (small copy of Cave's toast helper) ---
     _showToast(text, timeout = 1600) {
@@ -784,6 +638,7 @@ export class Town extends Phaser.Scene {
                 this.char.smithing.level = (this.char.smithing.level || 1) + 1;
                 this.char.smithing.expToLevel = Math.floor(this.char.smithing.expToLevel * 1.25);
                 this._showToast('Smithing level up! L' + this.char.smithing.level, 1800);
+                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
             }
         }
         // persist and refresh modal/inventory only; avoid re-creating HUD each tick
@@ -850,8 +705,8 @@ export class Town extends Phaser.Scene {
                     const uc = userObj.characters[i];
                     if (!uc) continue;
                     if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                        userObj.characters[i].mining = this.char.mining;
-                        userObj.characters[i].inventory = this.char.inventory;
+                        // Replace the stored character object with the full current character state
+                        userObj.characters[i] = this.char;
                         found = true;
                         break;
                     }
@@ -1079,15 +934,12 @@ export class Town extends Phaser.Scene {
         const char = this.char || {};
         const name = char.name || 'Character';
         const level = char.level || 1;
-    // compute derived vitals using base stats plus equipment stat bonuses
-    const baseStats = Object.assign({}, (char.stats || { str: 0, int: 0, agi: 0, luk: 0 }));
-    const equipBonuses = (char._equipBonuses) ? char._equipBonuses : { str:0, int:0, agi:0, luk:0, defense:0 };
-    const effectiveStats = { str: (baseStats.str || 0) + (equipBonuses.str || 0), int: (baseStats.int || 0) + (equipBonuses.int || 0), agi: (baseStats.agi || 0) + (equipBonuses.agi || 0), luk: (baseStats.luk || 0) + (equipBonuses.luk || 0) };
-    // defenseBonus applied from equipment bonuses
-    const defenseBonus = (char.defenseBonus || 0) + (equipBonuses.defense || 0);
-    const maxhp = char.maxhp || (100 + level * 10 + ((effectiveStats.str || 0) * 10));
+    // compute derived vitals using centralized effective stats (base + equipment)
+    let eff = { str:0,int:0,agi:0,luk:0,defense:0 };
+    try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(char); } catch (e) { /* fallback */ }
+    const maxhp = char.maxhp || (100 + level * 10 + ((eff.str || 0) * 10));
     const hp = char.hp || maxhp;
-    const maxmana = char.maxmana || (50 + level * 5 + ((effectiveStats.int || 0) * 10));
+    const maxmana = char.maxmana || (50 + level * 5 + ((eff.int || 0) * 10));
     const mana = char.mana || maxmana;
         const exp = char.exp || 0;
         const expToLevel = char.expToLevel || 100;
@@ -1291,11 +1143,25 @@ export class Town extends Phaser.Scene {
 
         // Inventory toggle (I)
         if (Phaser.Input.Keyboard.JustDown(this.keys.inventory)) {
-            if (this._inventoryModal) this._closeInventoryModal(); else this._openInventoryModal();
+            if (window && window.__shared_ui) {
+                if (this._inventoryModal) window.__shared_ui.closeInventoryModal(this); else window.__shared_ui.openInventoryModal(this);
+            } else {
+                if (this._inventoryModal) this._closeInventoryModal(); else this._openInventoryModal();
+            }
         }
         // Equipment toggle (U)
         if (Phaser.Input.Keyboard.JustDown(this.keys.equip)) {
-            if (this._equipmentModal) this._closeEquipmentModal(); else this._openEquipmentModal();
+            if (window && window.__shared_ui) {
+                if (this._equipmentModal) window.__shared_ui.closeEquipmentModal(this); else window.__shared_ui.openEquipmentModal(this);
+            } else {
+                if (this._equipmentModal) this._closeEquipmentModal(); else this._openEquipmentModal();
+            }
+        }
+        // Stats toggle (X)
+        if (this.keys.stats && Phaser.Input.Keyboard.JustDown(this.keys.stats)) {
+            if (window && window.__shared_ui) {
+                if (this._statsModal) window.__shared_ui.closeStatsModal(this); else window.__shared_ui.openStatsModal(this);
+            }
         }
     }
 
@@ -1338,7 +1204,15 @@ export class Town extends Phaser.Scene {
         for (const s of slots) {
             const eq = equip[s];
             const el = document.createElement('div'); el.style.display='flex'; el.style.justifyContent='space-between'; el.style.alignItems='center'; el.style.padding='6px'; el.style.background='rgba(255,255,255,0.02)'; el.style.borderRadius='8px';
-            const left = document.createElement('div'); left.innerHTML = `<strong>${s.toUpperCase()}</strong><div style='font-size:0.85em;color:#ccc;'>${eq && defs[eq.id] ? defs[eq.id].name : (eq ? eq.name : 'Empty')}</div>`;
+            const left = document.createElement('div');
+            const eqName = eq && defs[eq.id] ? defs[eq.id].name : (eq ? eq.name : 'Empty');
+            let eqBonus = '';
+            if (eq && defs && defs[eq.id] && defs[eq.id].statBonus) {
+                const parts = [];
+                for (const k of Object.keys(defs[eq.id].statBonus)) parts.push('+' + defs[eq.id].statBonus[k] + ' ' + k.toUpperCase());
+                eqBonus = parts.join(' • ');
+            }
+            left.innerHTML = `<strong>${s.toUpperCase()}</strong><div style='font-size:0.85em;color:#ccc;'>${eqName}${eqBonus ? ' • ' + eqBonus : ''}</div>`;
             const right = document.createElement('div');
             if (eq) {
                 const btn = document.createElement('button'); btn.textContent = 'Unequip'; btn.style.padding='6px 8px'; btn.style.border='none'; btn.style.borderRadius='6px'; btn.style.cursor='pointer';
