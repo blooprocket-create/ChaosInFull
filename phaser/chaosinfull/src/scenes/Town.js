@@ -11,6 +11,8 @@ export class Town extends Phaser.Scene {
     preload() {
     // Load assets
     this.load.image('town_bg', 'assets/town_bg.png');
+    // dude.png is a spritesheet. Assuming frame size 32x48 (standard Phaser example)
+    this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
     }
 
     create() {
@@ -23,14 +25,42 @@ export class Town extends Phaser.Scene {
         bg.setDepth(0);
 
         // Add platform (simple rectangle for now)
-        const platform = this.add.rectangle(400, 550, 600, 40, 0x222222, 0.8);
-        platform.setStrokeStyle(4, 0xa00);
-        platform.setDepth(1);
+    const platform = this.add.rectangle(400, 570, 800, 60, 0x222222, 0.8);
+    platform.setStrokeStyle(4, 0xa00);
+    platform.setDepth(1);
+    // Enable physics on platform
+    this.physics.add.existing(platform, true); // true => static body
 
-        // Add character sprite
-        const character = this.add.sprite(400, 500, 'character');
-        character.setDisplaySize(64, 64);
-        character.setDepth(2);
+        // Add player sprite with Arcade physics
+        this.player = this.physics.add.sprite(400, 500, 'dude');
+        this.player.setDepth(2);
+        this.player.setCollideWorldBounds(true);
+        this.player.body.setSize(20, 40).setOffset(6, 8);
+
+        // Collide player with platform
+        this.physics.add.collider(this.player, platform);
+
+        // Create animations (idle, left, right)
+        this.anims.create({
+            key: 'left',
+            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
+            frameRate: 10,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'turn',
+            frames: [ { key: 'dude', frame: 4 } ],
+            frameRate: 20
+        });
+        this.anims.create({
+            key: 'right',
+            frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        // Input
+        this.cursors = this.input.keyboard.createCursorKeys();
 
         // Get character data from scene start
         const char = this.sys.settings.data?.character;
@@ -101,6 +131,28 @@ export class Town extends Phaser.Scene {
         this.events.once('shutdown', () => {
             if (hud.parentNode) hud.remove();
         });
+        
+        // Update loop handled in scene update
+    }
+
+    update(time, delta) {
+        if (!this.player || !this.cursors) return;
+        const speed = 180;
+        if (this.cursors.left.isDown) {
+            this.player.setVelocityX(-speed);
+            this.player.anims.play('left', true);
+        } else if (this.cursors.right.isDown) {
+            this.player.setVelocityX(speed);
+            this.player.anims.play('right', true);
+        } else {
+            this.player.setVelocityX(0);
+            this.player.anims.play('turn');
+        }
+
+        // Jump
+        if (this.cursors.up.isDown && this.player.body.blocked.down) {
+            this.player.setVelocityY(-380);
+        }
     }
 
 }

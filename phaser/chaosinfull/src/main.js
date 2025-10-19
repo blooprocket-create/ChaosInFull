@@ -13,6 +13,13 @@ const config = {
     height: 600,
     backgroundColor: '#000000',
     pixelArt: false,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 600 },
+            debug: false
+        }
+    },
     scene: [
         Login,
         CharacterSelect,
