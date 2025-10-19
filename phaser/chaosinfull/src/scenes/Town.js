@@ -4,6 +4,7 @@ export class Town extends Phaser.Scene {
     preload() {
         this.load.image('town_bg', 'assets/town_bg.png');
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('furnace', 'assets/furnace.png', { frameWidth: 64, frameHeight: 96 });
     }
     create() {
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
