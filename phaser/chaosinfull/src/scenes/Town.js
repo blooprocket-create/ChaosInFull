@@ -966,7 +966,7 @@ export class Town extends Phaser.Scene {
                                 if (!uc) continue;
                                 if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
                                     userObj.characters[i].mining = this.char.mining;
-                                    userObj.characters[i].lastLocation = { scene: 'Cave', x: this.player.x, y: this.player.y };
+                                    userObj.characters[i].lastLocation = { scene: 'Cave', x: this.player.x, y: (this.portal ? this.portal.y : this.player.y) };
                                     found = true;
                                     break;
                                 }
@@ -980,7 +980,7 @@ export class Town extends Phaser.Scene {
                             localStorage.setItem(key, JSON.stringify(userObj));
                         }
                     } catch (e) { console.warn('Could not persist lastLocation', e); }
-                    this.scene.start('Cave', { character: this.char, username: username, spawnX: this.scale.width - 140, spawnY: cavePortalY });
+                    this.scene.start('Cave', { character: this.char, username: username, spawnX: this.scale.width - 140, spawnY: this.portal ? this.portal.y : (this.scale.height - 120) });
                 }
             } else {
                 this.portalPrompt.setVisible(false);
@@ -1002,7 +1002,7 @@ export class Town extends Phaser.Scene {
                                 if (!uc) continue;
                                 if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
                                     userObj.characters[i] = this.char;
-                                    userObj.characters[i].lastLocation = { scene: 'InnerField', x: this.player.x, y: this.player.y };
+                                    userObj.characters[i].lastLocation = { scene: 'InnerField', x: this.player.x, y: (this.fieldPortal ? this.fieldPortal.y : this.player.y) };
                                     found = true;
                                     break;
                                 }
@@ -1016,7 +1016,7 @@ export class Town extends Phaser.Scene {
                             localStorage.setItem(key, JSON.stringify(userObj));
                         }
                     } catch (e) { console.warn('Could not persist lastLocation (inner field)', e); }
-                    this.scene.start('InnerField', { character: this.char, username: username, spawnX: Math.max(80, this.scale.width * 0.12), spawnY: fieldPortalY });
+                    this.scene.start('InnerField', { character: this.char, username: username, spawnX: Math.max(80, this.scale.width * 0.12), spawnY: this.fieldPortal ? this.fieldPortal.y : (this.scale.height - 120) });
                 }
             } else {
                 this.fieldPortalPrompt.setVisible(false);

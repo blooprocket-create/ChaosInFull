@@ -12,8 +12,9 @@ export class InnerField extends Phaser.Scene {
 
     create() {
         this.enemyDefs = (window && window.ENEMY_DEFS) ? window.ENEMY_DEFS : {};
-        this.username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const dataChar = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
+        const sceneData = (this.sys && this.sys.settings && this.sys.settings.data) || {};
+        this.username = sceneData.username || null;
+        const dataChar = sceneData.character || {};
         this.char = dataChar || {};
         if (!this.char.inventory) this.char.inventory = [];
         if (!this.char.equipment) this.char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null };
@@ -29,9 +30,10 @@ export class InnerField extends Phaser.Scene {
         const platformY = this.scale.height - (platformHeight / 2);
         const platform = this.add.rectangle(this.scale.width / 2, platformY, this.scale.width, platformHeight, 0x222222, 0.85).setDepth(1);
         this.physics.add.existing(platform, true);
+        this.ground = platform;
 
-        const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || (this.scale.width / 2);
-        const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || (platformY - 70);
+        const spawnX = (sceneData.spawnX !== undefined && sceneData.spawnX !== null) ? sceneData.spawnX : Math.max(80, this.scale.width * 0.12);
+        const spawnY = (sceneData.spawnY !== undefined && sceneData.spawnY !== null) ? sceneData.spawnY : (platformY - 70);
 
         this.player = this.physics.add.sprite(spawnX, spawnY, 'dude');
         this.player.setDepth(2);
@@ -49,8 +51,14 @@ export class InnerField extends Phaser.Scene {
         this.attackCooldown = 520;
         this.attackRange = 68;
         this.nextAttackTime = 0;
+        this.autoAttack = false;
+        this.autoToggleKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+        this.autoIndicator = this.add.text(16, 16, 'Auto: OFF (R)', { fontSize: '16px', color: '#ffd27a', fontFamily: 'UnifrakturCook, cursive' }).setDepth(5).setScrollFactor(0);
+        this.damageLayer = this.add.layer();
+        this.damageLayer.setDepth(6);
 
         this._createHUD();
+        this._createPlayerHealthBar();
 
         this.enemies = this.physics.add.group();
         this.spawnPoints = this._buildSpawnPoints(platformY - 70);
@@ -66,7 +74,6 @@ export class InnerField extends Phaser.Scene {
         this._updateHUD();
 
         this.events.once('shutdown', () => this.shutdown());
-        this.events.once('destroy', () => this.destroy());
     }
 
     update() {
@@ -88,11 +95,21 @@ export class InnerField extends Phaser.Scene {
             this.player.setVelocityY(-400);
         }
 
+        if (Phaser.Input.Keyboard.JustDown(this.autoToggleKey)) {
+            this._toggleAutoAttack();
+        }
+
         if (Phaser.Input.Keyboard.JustDown(this.attackKey)) {
             this._tryAttack();
         }
 
         this._updateEnemiesAI();
+        if (this.autoAttack && this.time.now >= this.nextAttackTime) {
+            const target = this._getEnemyInRange(this.attackRange);
+            if (target) this._tryAttack(true, target);
+        }
+        this._updatePlayerHealthBar();
+
         this._checkReturnPortal();
     }
 
@@ -118,6 +135,7 @@ export class InnerField extends Phaser.Scene {
             const distance = Phaser.Math.Distance.Between(player.x, player.y, enemy.x, enemy.y);
             if (distance > 500) {
                 enemy.setVelocityX(0);
+                this._updateEnemyBarPosition(enemy);
                 return;
             }
             if (distance > def.attackRange) {
@@ -132,36 +150,40 @@ export class InnerField extends Phaser.Scene {
                     const mitigated = Math.max(1, dmg - Math.floor(playerDefense / 2));
                     this.char.hp = Math.max(0, (this.char.hp || this.char.maxhp) - mitigated);
                     this._updateHUD();
-                    this._showToast(`The ${def.name} hits you for ${mitigated} damage!`);
+                    this._updatePlayerHealthBar();
+                    this._showDamageNumber(this.player.x, this.player.y - 28, `-${mitigated}`, '#ff5555');
                     if (this.char.hp <= 0) {
                         this._onPlayerDown();
                     }
                 }
             }
+            this._updateEnemyBarPosition(enemy);
         });
     }
 
-    _tryAttack() {
+    _tryAttack(silentMiss = false, preferredTarget = null) {
         if (this.time.now < this.nextAttackTime) return;
         this.nextAttackTime = this.time.now + this.attackCooldown;
         const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : { str: 0 };
         const strength = (effStats && effStats.str) || 0;
         const baseDamage = Phaser.Math.Between(6, 10) + strength * 2;
         let hitSomething = false;
-        this.enemies.children.iterate((enemy) => {
+        const targets = preferredTarget ? [preferredTarget] : this.enemies.getChildren();
+        targets.forEach((enemy) => {
             if (!enemy || !enemy.getData('alive')) return;
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
             if (dist <= this.attackRange) {
                 hitSomething = true;
                 const hp = enemy.getData('hp') - baseDamage;
                 enemy.setData('hp', hp);
-                this._showToast(`You strike the ${this.enemyDefs[enemy.getData('defId')].name} for ${baseDamage}!`, 1100);
+                this._showDamageNumber(enemy.x, enemy.y - 42, `-${baseDamage}`, '#ffee66');
+                this._updateEnemyHealthBar(enemy);
                 if (hp <= 0) {
                     this._handleEnemyDeath(enemy);
                 }
             }
         });
-        if (!hitSomething) {
+        if (!hitSomething && !silentMiss) {
             this._showToast('Your attack hits nothing...', 900);
         }
     }
@@ -169,6 +191,7 @@ export class InnerField extends Phaser.Scene {
     _handleEnemyDeath(enemy) {
         const def = this.enemyDefs[enemy.getData('defId')];
         enemy.setData('alive', false);
+        this._detachEnemyBars(enemy);
         enemy.disableBody(true, true);
         const spawn = enemy.getData('spawn');
         if (spawn) spawn.active = null;
@@ -239,7 +262,7 @@ export class InnerField extends Phaser.Scene {
             callback: () => {
                 this.char.hp = this.char.maxhp;
                 this._persistCharacter(this.username);
-                this.scene.start('Town', { character: this.char, username: this.username, spawnX: this.scale.width * 0.2, spawnY: this.scale.height - 120 });
+                this.scene.start('Town', { character: this.char, username: this.username, spawnX: 120, spawnY: this.scale.height - 100 });
             }
         });
     }
@@ -252,7 +275,7 @@ export class InnerField extends Phaser.Scene {
             if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                 this.char.lastLocation = { scene: 'InnerField', x: this.player.x, y: this.player.y };
                 this._persistCharacter(this.username);
-                this.scene.start('Town', { character: this.char, username: this.username, spawnX: this.scale.width * 0.8, spawnY: this.scale.height - 120 });
+                this.scene.start('Town', { character: this.char, username: this.username, spawnX: this.scale.width - 220, spawnY: this.scale.height - 100 });
             }
         } else {
             this.returnPrompt.setVisible(false);
@@ -352,10 +375,15 @@ export class InnerField extends Phaser.Scene {
         this._persistCharacter(this.username);
         this._destroyHUD();
         this._clearToasts();
+        if (this.damageLayer) { this.damageLayer.destroy(); this.damageLayer = null; }
+        if (this.autoIndicator) { this.autoIndicator.destroy(); this.autoIndicator = null; }
+        if (this.playerHpBar) { this.playerHpBar.destroy(); this.playerHpBar = null; }
+        if (this.playerHpBarBg) { this.playerHpBarBg.destroy(); this.playerHpBarBg = null; }
     }
 
     destroy() {
         this.shutdown();
+        super.destroy();
     }
 
     _spawnEnemy(spawn) {
@@ -376,7 +404,89 @@ export class InnerField extends Phaser.Scene {
         enemy.setData('nextAttack', 0);
         this.enemies.add(enemy);
         if (this.ground) this.physics.add.collider(enemy, this.ground);
+        this._attachEnemyBars(enemy);
         spawn.active = enemy;
+    }
+
+    _toggleAutoAttack() {
+        this.autoAttack = !this.autoAttack;
+        const stateText = this.autoAttack ? 'Auto: ON (R)' : 'Auto: OFF (R)';
+        if (this.autoIndicator) {
+            this.autoIndicator.setText(stateText);
+            this.autoIndicator.setColor(this.autoAttack ? '#66ff88' : '#ffd27a');
+        }
+        this._showToast(this.autoAttack ? 'Auto combat enabled' : 'Auto combat disabled', 1000);
+    }
+
+    _getEnemyInRange(range) {
+        return this.enemies.getChildren().find(enemy => enemy && enemy.getData('alive') && Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) <= range);
+    }
+
+    _createPlayerHealthBar() {
+        const width = 70;
+        const height = 8;
+        this.playerHpBarBg = this.add.rectangle(0, 0, width, height, 0x000000, 0.55).setDepth(4);
+        this.playerHpBar = this.add.rectangle(0, 0, width, height, 0xff4444).setDepth(4);
+        this.playerHpBar.fullWidth = width;
+        this.playerHpBarBg.setOrigin(0.5);
+        this.playerHpBar.setOrigin(0.5);
+        this._updatePlayerHealthBar();
+    }
+
+    _updatePlayerHealthBar() {
+        if (!this.playerHpBar || !this.player) return;
+        const ratio = Math.max(0, Math.min(1, (this.char.hp || 0) / (this.char.maxhp || 1)));
+        this.playerHpBar.displayWidth = (this.playerHpBar.fullWidth || 70) * ratio;
+        this.playerHpBarBg.setPosition(this.player.x, this.player.y - 60);
+        this.playerHpBar.setPosition(this.player.x, this.player.y - 60);
+    }
+
+    _attachEnemyBars(enemy) {
+        const width = 50;
+        const height = 6;
+        enemy.healthBarBg = this.add.rectangle(enemy.x, enemy.y - 50, width, height, 0x000000, 0.55).setDepth(3);
+        enemy.healthBar = this.add.rectangle(enemy.x, enemy.y - 50, width, height, 0xff5555).setDepth(3);
+        enemy.healthBar.fullWidth = width;
+        enemy.healthBarBg.setOrigin(0.5);
+        enemy.healthBar.setOrigin(0.5);
+        this._updateEnemyHealthBar(enemy);
+        this._updateEnemyBarPosition(enemy);
+    }
+
+    _updateEnemyHealthBar(enemy) {
+        if (!enemy.healthBar) return;
+        const hp = Math.max(0, enemy.getData('hp'));
+        const maxhp = Math.max(1, enemy.getData('maxhp'));
+        const ratio = Math.max(0, Math.min(1, hp / maxhp));
+        enemy.healthBar.displayWidth = (enemy.healthBar.fullWidth || 50) * ratio;
+    }
+
+    _updateEnemyBarPosition(enemy) {
+        if (!enemy.healthBarBg) return;
+        const y = enemy.y - 50;
+        enemy.healthBarBg.setPosition(enemy.x, y);
+        if (enemy.healthBar) enemy.healthBar.setPosition(enemy.x, y);
+    }
+
+    _detachEnemyBars(enemy) {
+        if (enemy.healthBar) enemy.healthBar.destroy();
+        if (enemy.healthBarBg) enemy.healthBarBg.destroy();
+        enemy.healthBar = null;
+        enemy.healthBarBg = null;
+    }
+
+    _showDamageNumber(x, y, text, color = '#ffffff') {
+        if (!this.damageLayer) return;
+        const label = this.add.text(x, y, text, { fontSize: '18px', color, fontFamily: 'UnifrakturCook, cursive' }).setOrigin(0.5).setDepth(6);
+        this.damageLayer.add(label);
+        this.tweens.add({
+            targets: label,
+            y: y - 30,
+            alpha: 0,
+            duration: 600,
+            ease: 'Cubic.easeOut',
+            onComplete: () => label.destroy()
+        });
     }
 }
 
