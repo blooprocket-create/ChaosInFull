@@ -19,7 +19,9 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
 export function openInventoryModal(scene) {
     if (!scene) return;
     if (scene._inventoryModal) return;
-    const inv = scene.char.inventory || [];
+    const char = scene.char = scene.char || {};
+    if (!Array.isArray(char.inventory)) char.inventory = [];
+    const inv = char.inventory;
     const modal = document.createElement('div');
     modal.id = 'inventory-modal';
     modal.style.position = 'fixed';
@@ -98,6 +100,8 @@ export function refreshInventoryModal(scene) {
 // Equipment modal
 export function openEquipmentModal(scene) {
     if (!scene) return;
+    const char = scene.char = scene.char || {};
+    if (!char.equipment) char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null };
     if (scene._equipmentModal) return;
     const modal = document.createElement('div');
     modal.id = 'equipment-modal';
@@ -162,6 +166,10 @@ export function refreshEquipmentModal(scene) {
 // Stats modal
 export function openStatsModal(scene) {
     if (!scene) return;
+    const char = scene.char = scene.char || {};
+    if (!char.stats) char.stats = { str:0,int:0,agi:0,luk:0 };
+    if (!char.mining) char.mining = { level:1, exp:0, expToLevel:100 };
+    if (!char.smithing) char.smithing = { level:1, exp:0, expToLevel:100 };
     if (scene._statsModal) return;
     const modal = document.createElement('div');
     modal.id = 'stats-modal';

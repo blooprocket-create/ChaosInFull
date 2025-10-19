@@ -2,8 +2,7 @@
 
 import { createAtmosphericOverlays } from './shared/overlays.js';
 import { loadUser, saveUser, iterUsers } from './shared/storage.js';
-
-const BACKGROUND_URL = "https://getwallpapers.com/wallpaper/full/4/2/d/39736.jpg";
+import { applyDefaultBackground, captureBodyStyle, restoreBodyStyle } from './shared/theme.js';
 
 export class Login extends Phaser.Scene {
     constructor() {
@@ -19,16 +18,8 @@ export class Login extends Phaser.Scene {
             gameContainer.style.display = 'none';
         }
 
-        this._previousBodyStyle = {
-            background: document.body.style.background,
-            backgroundSize: document.body.style.backgroundSize,
-            backgroundAttachment: document.body.style.backgroundAttachment,
-            overflow: document.body.style.overflow,
-        };
-        document.body.style.background = `#1a1026 url('${BACKGROUND_URL}') no-repeat center center fixed`;
-        document.body.style.backgroundSize = 'cover';
-        document.body.style.backgroundAttachment = 'fixed';
-        document.body.style.overflow = 'hidden';
+        this._previousBodyStyle = captureBodyStyle();
+        applyDefaultBackground();
 
         const container = document.createElement('div');
         container.id = 'login-container';
@@ -92,6 +83,10 @@ export class Login extends Phaser.Scene {
                     width: 400px;
                     height: 400px;
                     background: radial-gradient(circle, rgba(110,40,150,0.35) 0%, rgba(20,20,30,0) 65%);
+                }
+                #login-box::before,
+                #login-box::after {
+                    pointer-events: none;
                 }
                 #login-box h1 {
                     font-family: 'UnifrakturCook', cursive;
@@ -250,10 +245,7 @@ export class Login extends Phaser.Scene {
             this._gameContainer = null;
         }
         if (this._previousBodyStyle) {
-            document.body.style.background = this._previousBodyStyle.background;
-            document.body.style.backgroundSize = this._previousBodyStyle.backgroundSize;
-            document.body.style.backgroundAttachment = this._previousBodyStyle.backgroundAttachment;
-            document.body.style.overflow = this._previousBodyStyle.overflow;
+            restoreBodyStyle(this._previousBodyStyle);
             this._previousBodyStyle = null;
         }
     }

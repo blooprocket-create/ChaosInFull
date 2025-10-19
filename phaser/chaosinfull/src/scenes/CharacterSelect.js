@@ -2,6 +2,7 @@
 
 import { createAtmosphericOverlays } from './shared/overlays.js';
 import { saveUser, iterUsers, saveJson } from './shared/storage.js';
+import { applyDefaultBackground, captureBodyStyle, restoreBodyStyle } from './shared/theme.js';
 
 export class CharacterSelect extends Phaser.Scene {
     constructor() {
@@ -23,10 +24,16 @@ export class CharacterSelect extends Phaser.Scene {
 
         this._atmosphere = createAtmosphericOverlays(this, { idPrefix: 'charselect', zIndexBase: 50 });
         this._cleanupCallbacks = [];
+        this._previousBodyStyle = captureBodyStyle();
+        applyDefaultBackground();
 
         // Hide Phaser canvas while character select is active
         const gameContainer = document.getElementById('game-container');
-        if (gameContainer) gameContainer.style.display = 'none';
+        if (gameContainer) {
+            this._previousGameDisplay = gameContainer.style.display;
+            gameContainer.style.display = 'none';
+        }
+
 
                 // Load account details
         let username = '';
@@ -202,6 +209,8 @@ export class CharacterSelect extends Phaser.Scene {
             <div id="char-modal-bg" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(10,10,20,0.7);z-index:200;justify-content:center;align-items:center;"></div>
         `;
         document.body.appendChild(container);
+        this._container = container;
+        this._gameContainer = gameContainer;
         // Subtle scroll indicator logic
         setTimeout(() => {
             const row = document.getElementById('character-cards-row');
@@ -553,24 +562,39 @@ export class CharacterSelect extends Phaser.Scene {
                     saveJson(key, obj);
                 }
             });
+            this._cleanupDom();
             this.scene.start('Login');
-            if (container.parentNode) container.remove();
         };
 
         // Remove overlays and container on scene shutdown
         this.events.once('shutdown', () => {
-            if (this._cleanupCallbacks) {
-                for (const fn of this._cleanupCallbacks) {
-                    try { fn(); } catch (e) { /* ignore */ }
-                }
-                this._cleanupCallbacks = [];
-            }
-            if (this._atmosphere && this._atmosphere.destroy) {
-                this._atmosphere.destroy();
-                this._atmosphere = null;
-            }
-            if (container.parentNode) container.remove();
-            if (gameContainer) gameContainer.style.display = '';
+            this._cleanupDom();
         });
+    }
+
+    _cleanupDom() {
+        if (this._cleanupCallbacks && this._cleanupCallbacks.length) {
+            for (const fn of this._cleanupCallbacks) {
+                try { fn(); } catch (e) { /* ignore */ }
+            }
+            this._cleanupCallbacks = [];
+        }
+        if (this._atmosphere && this._atmosphere.destroy) {
+            this._atmosphere.destroy();
+            this._atmosphere = null;
+        }
+        if (this._container && this._container.parentNode) {
+            this._container.parentNode.removeChild(this._container);
+        }
+        this._container = null;
+        if (this._gameContainer) {
+            this._gameContainer.style.display = this._previousGameDisplay || '';
+            this._gameContainer = null;
+        }
+        this._previousGameDisplay = undefined;
+        if (this._previousBodyStyle) {
+            restoreBodyStyle(this._previousBodyStyle);
+            this._previousBodyStyle = null;
+        }
     }
 }

@@ -92,6 +92,9 @@ export function createHUD(scene) {
             scene.scene.start('CharacterSelect');
         };
     }, 0);
+
+    try { updateHUD(scene); } catch (e) { /* ignore initial HUD update errors */ }
+    return hud;
 }
 
 export function updateHUD(scene) {

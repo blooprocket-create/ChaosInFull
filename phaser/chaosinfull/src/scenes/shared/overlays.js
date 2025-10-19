@@ -97,18 +97,20 @@ export function createAtmosphericOverlays(scene, opts = {}) {
         });
     }
 
+    const emberFadeStart = 0.65;
+    const emberFadeEnd = 0.9;
+    const spawnEmber = () => ({
+        x: Math.random() * canvases.ember.width,
+        y: canvases.ember.height + Math.random() * (canvases.ember.height * 0.25),
+        r: 0.5 + Math.random() * 1,
+        alpha: 0.5 + Math.random() * 0.3,
+        dx: (Math.random() - 0.5) * 1.2,
+        dy: -0.6 - Math.random() * 1.2,
+        color: 'rgba(255,80,0,0.8)',
+    });
+
     const embers = [];
-    for (let i = 0; i < config.emberCount; i++) {
-        embers.push({
-            x: Math.random() * canvases.ember.width,
-            y: Math.random() * canvases.ember.height,
-            r: 0.5 + Math.random() * 1,
-            alpha: 0.5 + Math.random() * 0.3,
-            dx: (Math.random() - 0.5) * 1.2,
-            dy: -0.6 - Math.random() * 1.2,
-            color: 'rgba(255,80,0,0.8)',
-        });
-    }
+    for (let i = 0; i < config.emberCount; i++) embers.push(spawnEmber());
 
     let shadowX = -300;
     let shadowY = canvases.shadow.height * 0.7;
@@ -138,22 +140,27 @@ export function createAtmosphericOverlays(scene, opts = {}) {
         // Embers
         if (emberCtx) {
             emberCtx.clearRect(0, 0, canvases.ember.width, canvases.ember.height);
-            embers.forEach((e) => {
-                const fadeLimit = 0.25;
-                const fade = Math.max(0, 1 - Math.max(0, (e.y / (canvases.ember.height * fadeLimit))));
+            embers.forEach((e, idx) => {
+                const normalized = Math.max(0, Math.min(1, 1 - (e.y / canvases.ember.height)));
+                let fadeMultiplier = 1;
+                if (normalized >= emberFadeStart) {
+                    const range = Math.max(0.0001, emberFadeEnd - emberFadeStart);
+                    const t = Math.min(1, (normalized - emberFadeStart) / range);
+                    fadeMultiplier = 1 - t;
+                }
+                fadeMultiplier = Math.max(0, Math.min(1, fadeMultiplier));
                 emberCtx.beginPath();
                 emberCtx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
                 emberCtx.fillStyle = e.color;
-                emberCtx.globalAlpha = e.alpha * fade;
+                emberCtx.globalAlpha = e.alpha * fadeMultiplier;
                 emberCtx.shadowColor = 'orange';
                 emberCtx.shadowBlur = 8;
                 emberCtx.fill();
                 emberCtx.globalAlpha = 1;
                 e.x += e.dx;
                 e.y += e.dy;
-                if (e.y < -10 || e.x < -10 || e.x > canvases.ember.width + 10) {
-                    e.x = Math.random() * canvases.ember.width;
-                    e.y = canvases.ember.height + 10;
+                if (e.y < -20 || e.x < -10 || e.x > canvases.ember.width + 10) {
+                    embers[idx] = spawnEmber();
                 }
             });
         }
