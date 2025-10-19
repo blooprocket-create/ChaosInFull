@@ -22,7 +22,7 @@ export class Cave extends Phaser.Scene {
     // Player spawn (allow restoring last position via spawnX/spawnY)
     const platformHeight = 60;
     const platformY = this.scale.height - (platformHeight / 2);
-    const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || centerX;
+    const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || Math.max(80, this.scale.width * 0.12);
     const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || (platformY - 70);
     this.player = this.physics.add.sprite(spawnX, spawnY, 'dude');
     // ensure player is rendered above nodes, furnace and portal
@@ -514,7 +514,7 @@ export class Cave extends Phaser.Scene {
                             }
                         }
                     } catch (e) { console.warn('Could not persist lastLocation', e); }
-                    this.scene.start('Town', { character: this.char, username: username });
+                    this.scene.start('Town', { character: this.char, username: username, spawnX: 120, spawnY: this.portal ? this.portal.y : (this.scale.height - 120) });
                 }
             } else { this.portalPrompt.setVisible(false); }
         }
