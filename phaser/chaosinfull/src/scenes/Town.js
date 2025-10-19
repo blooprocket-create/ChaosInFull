@@ -1,103 +1,166 @@
-// "Every great game begins with a single scene. Let's make this one unforgettable!"
+// Clean Town scene implementation
 export class Town extends Phaser.Scene {
-    constructor() {
-        super('Town');
-    }
-
-    init() {
-        // Initialize scene
-    }
+    constructor() { super('Town'); }
 
     preload() {
-    // Load assets
-    this.load.image('town_bg', 'assets/town_bg.png');
-    // dude.png is a spritesheet. Assuming frame size 32x48 (standard Phaser example)
-    this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.image('town_bg', 'assets/town_bg.png');
+        this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
     }
 
     create() {
-        // Remove default black background
         this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
 
-        // Add background image, scaled to fill
+        // Fog overlay (DOM canvas below HUD)
+        this._createFog();
+
+        // Background and platform
         const bg = this.add.image(400, 300, 'town_bg');
         bg.setDisplaySize(800, 600);
         bg.setDepth(0);
 
-        // Add platform (simple rectangle for now)
-    const platform = this.add.rectangle(400, 570, 800, 60, 0x222222, 0.8);
-    platform.setStrokeStyle(4, 0xa00);
-    platform.setDepth(1);
-    // Enable physics on platform
-    this.physics.add.existing(platform, true); // true => static body
+        const platform = this.add.rectangle(400, 570, 800, 60, 0x222222, 0.8);
+        platform.setStrokeStyle(4, 0xa00);
+        platform.setDepth(1);
+        this.physics.add.existing(platform, true);
 
-        // Add player sprite with Arcade physics
+        // Player
         this.player = this.physics.add.sprite(400, 500, 'dude');
         this.player.setDepth(2);
         this.player.setCollideWorldBounds(true);
-        this.player.body.setSize(20, 40).setOffset(6, 8);
-
-        // Collide player with platform
+        this.player.body.setSize(20, 40);
+        this.player.body.setOffset(6, 8);
         this.physics.add.collider(this.player, platform);
 
-        // Create animations (idle, left, right)
-        this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
-            frameRate: 10,
-            repeat: -1
-        });
-        this.anims.create({
-            key: 'turn',
-            frames: [ { key: 'dude', frame: 4 } ],
-            frameRate: 20
-        });
-        this.anims.create({
-            key: 'right',
-            frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
-            frameRate: 10,
-            repeat: -1
-        });
+        // Animations
+        this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
+        this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
+        this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
 
-        // Input
-        this.cursors = this.input.keyboard.createCursorKeys();
+        // Input (WASD + E)
+        this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E });
 
-        // Get character data from scene start
-        const char = this.sys.settings.data?.character;
-        const name = char?.name || 'Character';
-        const level = char?.level || 1;
-        const maxhp = char?.maxhp || (100 + level * 10 + ((char?.stats?.str || 0) * 10));
-        const hp = char?.hp || maxhp;
-        const maxmana = char?.maxmana || (50 + level * 5 + ((char?.stats?.int || 0) * 10));
-        const mana = char?.mana || maxmana;
-        const exp = char?.exp || 0;
-        const expToLevel = char?.expToLevel || 100;
+        // Character data
+        const char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
+        if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
+        this.char = char;
 
-        // Minimal HUD
-        const hud = document.createElement('div');
-        hud.id = 'town-hud';
-        hud.style.position = 'fixed';
-        hud.style.top = '8px';
-        hud.style.left = '8px';
-        hud.style.transform = '';
-        hud.style.width = '200px';
-        hud.style.padding = '8px 8px 8px 8px';
-        hud.style.zIndex = '100';
-        hud.style.pointerEvents = 'none';
-        hud.style.display = 'flex';
-        hud.style.flexDirection = 'column';
-        hud.style.alignItems = 'flex-start';
-        hud.style.justifyContent = 'flex-start';
-        hud.style.background = 'rgba(20,10,30,0.55)';
-        hud.style.backdropFilter = 'blur(8px)';
-        hud.style.boxShadow = '0 0 48px 0 #111, 0 0 0 2px #a00 inset';
-        hud.style.borderRadius = '16px';
-        hud.style.fontFamily = 'UnifrakturCook, cursive';
-        hud.style.color = '#eee';
-        hud.innerHTML = `
+        // HUD
+        this._createHUD();
+
+        // Portal on left
+        const portalX = 80;
+        const portalY = 500;
+        this.portal = this.add.circle(portalX, portalY, 28, 0x6644aa, 0.9).setDepth(1.5);
+        this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
+        this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        this.portalPrompt.setVisible(false);
+
+        // cleanup on shutdown
+        this._fogResizeHandler = () => {
+            if (this.fogCanvas) {
+                this.fogCanvas.width = window.innerWidth;
+                this.fogCanvas.height = window.innerHeight;
+            }
+        };
+        window.addEventListener('resize', this._fogResizeHandler);
+
+        this.events.once('shutdown', () => {
+            this._destroyHUD();
+            this._stopFog();
+            window.removeEventListener('resize', this._fogResizeHandler);
+        });
+    }
+
+    // --- Fog helpers ---
+    _createFog() {
+        this.fogCanvas = document.createElement('canvas');
+        this.fogCanvas.id = 'town-fog-canvas';
+        this.fogCanvas.width = window.innerWidth;
+        this.fogCanvas.height = window.innerHeight;
+        this.fogCanvas.style.position = 'fixed';
+        this.fogCanvas.style.left = '0';
+        this.fogCanvas.style.top = '0';
+        this.fogCanvas.style.width = '100vw';
+        this.fogCanvas.style.height = '100vh';
+        this.fogCanvas.style.pointerEvents = 'none';
+        this.fogCanvas.style.zIndex = '99'; // below HUD (100)
+        document.body.appendChild(this.fogCanvas);
+        this.fogCtx = this.fogCanvas.getContext('2d');
+        this.fogParticles = [];
+        for (let i = 0; i < 120; i++) {
+            this.fogParticles.push({ x: Math.random() * this.fogCanvas.width, y: Math.random() * this.fogCanvas.height, r: 30 + Math.random() * 80, vx: 0.08 + Math.random() * 0.2, vy: -0.02 + Math.random() * 0.06, alpha: 0.06 + Math.random() * 0.12 });
+        }
+        this._startFog();
+    }
+
+    _startFog() {
+        const that = this;
+        function loop() {
+            if (!that.fogCtx) return;
+            that.fogCtx.clearRect(0, 0, that.fogCanvas.width, that.fogCanvas.height);
+            for (let p of that.fogParticles) {
+                that.fogCtx.beginPath();
+                that.fogCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                that.fogCtx.fillStyle = 'rgba(200,180,200,0.12)';
+                that.fogCtx.globalAlpha = p.alpha;
+                that.fogCtx.fill();
+                that.fogCtx.globalAlpha = 1;
+                p.x += p.vx; p.y += p.vy;
+                if (p.x - p.r > that.fogCanvas.width) p.x = -p.r;
+                if (p.y + p.r < 0) p.y = that.fogCanvas.height + p.r;
+            }
+            that._fogRaf = requestAnimationFrame(loop);
+        }
+        this._fogRaf = requestAnimationFrame(loop);
+    }
+
+    _stopFog() {
+        if (this._fogRaf) {
+            cancelAnimationFrame(this._fogRaf);
+            this._fogRaf = null;
+        }
+        if (this.fogCanvas && this.fogCanvas.parentNode) {
+            this.fogCanvas.parentNode.removeChild(this.fogCanvas);
+            this.fogCanvas = null;
+            this.fogCtx = null;
+        }
+    }
+
+    // --- HUD helpers ---
+    _createHUD() {
+        const char = this.char || {};
+        const name = char.name || 'Character';
+        const level = char.level || 1;
+        const maxhp = char.maxhp || (100 + level * 10 + ((char.stats && char.stats.str) || 0) * 10);
+        const hp = char.hp || maxhp;
+        const maxmana = char.maxmana || (50 + level * 5 + ((char.stats && char.stats.int) || 0) * 10);
+        const mana = char.mana || maxmana;
+        const exp = char.exp || 0;
+        const expToLevel = char.expToLevel || 100;
+        const mining = char.mining || { level: 1, exp: 0, expToLevel: 100 };
+
+        this.hud = document.createElement('div');
+        this.hud.id = 'town-hud';
+        this.hud.style.position = 'fixed';
+        this.hud.style.top = '8px';
+        this.hud.style.left = '8px';
+        this.hud.style.width = '200px';
+        this.hud.style.padding = '8px';
+        this.hud.style.zIndex = '100';
+        this.hud.style.pointerEvents = 'none';
+        this.hud.style.display = 'flex';
+        this.hud.style.flexDirection = 'column';
+        this.hud.style.alignItems = 'flex-start';
+        this.hud.style.background = 'rgba(20,10,30,0.55)';
+        this.hud.style.backdropFilter = 'blur(8px)';
+        this.hud.style.borderRadius = '16px';
+        this.hud.style.color = '#eee';
+        this.hud.style.fontFamily = 'UnifrakturCook, cursive';
+
+        this.hud.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
                 <span style="font-size:1em; font-weight:700; color:#e44; letter-spacing:1px;">${name} <span style='color:#fff; font-size:0.9em;'>- Lv ${level}</span></span>
-                <button id="hud-charselect-btn" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.8em; padding:2px 6px; margin-left:8px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85; transition:background 0.2s;">⇦</button>
+                <button id="hud-charselect-btn" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.8em; padding:2px 6px; margin-left:8px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85;">⇦</button>
             </div>
             <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
                 <div style="height:12px; background:#2a0a16; border-radius:6px; overflow:hidden; position:relative;">
@@ -112,36 +175,61 @@ export class Town extends Phaser.Scene {
                     <div style="height:100%; width:${Math.max(0, Math.min(100, (exp / expToLevel) * 100))}%; background:#ee4; border-radius:6px; position:absolute; left:0; top:0;"></div>
                     <span style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">${exp}/${expToLevel}</span>
                 </div>
+                <!-- Mining bar removed per request: mining tracked in data only -->
             </div>
         `;
-        document.body.appendChild(hud);
 
-        // Add event for tiny character select button
+        document.body.appendChild(this.hud);
+
+        // attach click handler to button (allow pointer events only on the button)
         setTimeout(() => {
             const btn = document.getElementById('hud-charselect-btn');
             if (btn) {
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.scene.start('CharacterSelect');
-                };
+                btn.onclick = (e) => { e.stopPropagation(); this.scene.start('CharacterSelect'); };
             }
         }, 0);
-
-        // Remove HUD on scene shutdown
-        this.events.once('shutdown', () => {
-            if (hud.parentNode) hud.remove();
-        });
-        
-        // Update loop handled in scene update
     }
 
-    update(time, delta) {
-        if (!this.player || !this.cursors) return;
+    _destroyHUD() {
+        if (this.hud && this.hud.parentNode) this.hud.parentNode.removeChild(this.hud);
+        this.hud = null;
+    }
+
+    // Persist mining skill to localStorage (finds char by name)
+    _persistMiningForActiveChar(username) {
+        if (!username || !this.char) return;
+        try {
+            const key = 'cif_user_' + username;
+            const userObj = JSON.parse(localStorage.getItem(key));
+            if (userObj && userObj.characters) {
+                for (let i = 0; i < userObj.characters.length; i++) {
+                    if (userObj.characters[i] && userObj.characters[i].name === this.char.name) {
+                        userObj.characters[i].mining = this.char.mining;
+                        localStorage.setItem(key, JSON.stringify(userObj));
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not persist mining skill', e);
+        }
+    }
+
+    _stopFog() {
+        if (this._fogRaf) cancelAnimationFrame(this._fogRaf);
+        this._fogRaf = null;
+        if (this.fogCanvas && this.fogCanvas.parentNode) this.fogCanvas.parentNode.removeChild(this.fogCanvas);
+        this.fogCanvas = null;
+        this.fogCtx = null;
+    }
+
+    update() {
+        if (!this.player || !this.keys) return;
         const speed = 180;
-        if (this.cursors.left.isDown) {
+        if (this.keys.left.isDown) {
             this.player.setVelocityX(-speed);
             this.player.anims.play('left', true);
-        } else if (this.cursors.right.isDown) {
+        } else if (this.keys.right.isDown) {
             this.player.setVelocityX(speed);
             this.player.anims.play('right', true);
         } else {
@@ -149,10 +237,24 @@ export class Town extends Phaser.Scene {
             this.player.anims.play('turn');
         }
 
-        // Jump
-        if (this.cursors.up.isDown && this.player.body.blocked.down) {
+        if (this.keys.up.isDown && this.player.body.blocked.down) {
             this.player.setVelocityY(-380);
         }
-    }
 
+        // Portal interaction: proximity + E to enter
+        if (this.portal) {
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.portal.x, this.portal.y);
+            if (dist <= 56) {
+                this.portalPrompt.setVisible(true);
+                if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                    const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+                    this._persistMiningForActiveChar(username);
+                    this.scene.start('Cave', { character: this.char, username: username });
+                }
+            } else {
+                this.portalPrompt.setVisible(false);
+            }
+        }
+    }
 }
+

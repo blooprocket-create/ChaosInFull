@@ -472,6 +472,10 @@ export class CharacterSelect extends Phaser.Scene {
                         document.getElementById('play-char-btn').onclick = () => {
                             // Start Town scene with selected character
                             document.getElementById('char-modal-bg').style.display = 'none';
+                            // Ensure mining skill exists on the character and persist
+                            if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
+                            userObj.characters[idx] = char;
+                            localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
                             this.scene.start('Town', { character: char, username });
                         };
                         document.getElementById('delete-char-btn').onclick = () => {

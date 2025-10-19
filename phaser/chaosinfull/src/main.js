@@ -3,6 +3,7 @@ import { CharacterSelect } from './scenes/CharacterSelect.js';
 import { Game } from './scenes/Game.js';
 import { Start } from './scenes/Start.js';
 import { Town } from './scenes/Town.js';
+import { Cave } from './scenes/Cave.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -26,6 +27,7 @@ const config = {
         Game,
         Start,
         Town
+        ,Cave
     ],
     scale: {
         mode: Phaser.Scale.FIT,
