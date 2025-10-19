@@ -52,6 +52,7 @@ export class Cave extends Phaser.Scene {
 
         // HUD (same condensed HUD as Town, without mining bar)
     if (window && window.__hud_shared && window.__hud_shared.createHUD) window.__hud_shared.createHUD(this); else this._createHUD();
+    this._startSafeZoneRegen();
 
     // Right-side portal to return to Town; requires proximity + E
         const portalX = this.scale.width - 80;
@@ -98,6 +99,7 @@ export class Cave extends Phaser.Scene {
         this.events.once('shutdown', () => {
             this._destroyHUD();
             this._clearToasts();
+            this._stopSafeZoneRegen();
             // cleanup mining indicator if present
             if (this._miningIndicator && this._miningIndicator.parent) {
                 this._miningIndicator.destroy();
@@ -113,6 +115,35 @@ export class Cave extends Phaser.Scene {
     }
 
     // Inventory modal is centralized in shared UI; thin wrappers kept for compatibility
+    _startSafeZoneRegen() {
+        const regenDelay = 1800;
+        if (this.safeRegenEvent) this.safeRegenEvent.remove(false);
+        this.safeRegenEvent = this.time.addEvent({ delay: regenDelay, loop: true, callback: this._tickSafeZoneRegen, callbackScope: this });
+    }
+
+    _stopSafeZoneRegen() {
+        if (this.safeRegenEvent) {
+            this.safeRegenEvent.remove(false);
+            this.safeRegenEvent = null;
+        }
+    }
+
+    _tickSafeZoneRegen() {
+        if (!this.char) return;
+        const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : { str: 0 };
+        const strength = (effStats && effStats.str) || 0;
+        const level = this.char.level || 1;
+        const estimatedMax = 100 + level * 10 + ((strength || 0) * 10);
+        const maxhp = Math.max(this.char.maxhp || estimatedMax, 1);
+        this.char.maxhp = maxhp;
+        const currentHp = Math.max(0, this.char.hp != null ? this.char.hp : maxhp);
+        if (currentHp >= maxhp) return;
+        const amount = Math.max(1, Math.floor(strength / 2) + 2);
+        this.char.hp = Math.min(maxhp, currentHp + amount);
+        this._updateHUD();
+    }
+
+
     _openInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.openInventoryModal) return window.__shared_ui.openInventoryModal(this); }
     _closeInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.closeInventoryModal) return window.__shared_ui.closeInventoryModal(this); }
     _refreshInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal) return window.__shared_ui.refreshInventoryModal(this); }

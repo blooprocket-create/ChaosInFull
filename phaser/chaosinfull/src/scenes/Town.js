@@ -9,6 +9,8 @@ export class Town extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
     // Fog overlay (DOM canvas below HUD)
     this._createFog();
+
+    this._startSafeZoneRegen();
     // responsive layout values
     const centerX = this.scale.width / 2;
     const centerY = this.scale.height / 2;
@@ -165,6 +167,7 @@ export class Town extends Phaser.Scene {
             this._closeInventoryModal();
             this._clearToasts();
             if (this._workbenchIndicator && this._workbenchIndicator.destroy) { this._workbenchIndicator.destroy(); this._workbenchIndicator = null; }
+            this._stopSafeZoneRegen();
         });
     }
     // --- Workbench (crafting) ---
@@ -883,55 +886,50 @@ export class Town extends Phaser.Scene {
             this.fogCtx = null;
         }
     }
+
+    _startSafeZoneRegen() {
+        const regenDelay = 1800;
+        if (this.safeRegenEvent) this.safeRegenEvent.remove(false);
+        this.safeRegenEvent = this.time.addEvent({ delay: regenDelay, loop: true, callback: this._tickSafeZoneRegen, callbackScope: this });
+    }
+
+    _stopSafeZoneRegen() {
+        if (this.safeRegenEvent) {
+            this.safeRegenEvent.remove(false);
+            this.safeRegenEvent = null;
+        }
+    }
+
+    _tickSafeZoneRegen() {
+        if (!this.char) return;
+        const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : { str: 0 };
+        const strength = (effStats && effStats.str) || 0;
+        const level = this.char.level || 1;
+        const estimatedMax = 100 + level * 10 + ((strength || 0) * 10);
+        const maxhp = Math.max(this.char.maxhp || estimatedMax, 1);
+        this.char.maxhp = maxhp;
+        const currentHp = Math.max(0, this.char.hp != null ? this.char.hp : maxhp);
+        if (currentHp >= maxhp) return;
+        const amount = Math.max(1, Math.floor(strength / 2) + 2);
+        this.char.hp = Math.min(maxhp, currentHp + amount);
+        this._updateHUD();
+    }
+
     // --- HUD helpers ---
     _createHUD() {
         if (window && window.__hud_shared && window.__hud_shared.createHUD) return window.__hud_shared.createHUD(this);
     }
+
     _destroyHUD() {
         if (window && window.__hud_shared && window.__hud_shared.destroyHUD) return window.__hud_shared.destroyHUD(this);
     }
+
     _updateHUD() {
         if (window && window.__hud_shared && window.__hud_shared.updateHUD) return window.__hud_shared.updateHUD(this);
-        // fallback: recreate if update not available
-        try { return this._destroyHUD(); } catch(e) {}
-        try { return this._createHUD(); } catch(e) {}
+        try { return this._destroyHUD(); } catch (e) {}
+        try { return this._createHUD(); } catch (e) {}
     }
-    // Persist mining skill to localStorage (finds char by name)
-    _persistMiningForActiveChar(username) {
-        if (!username || !this.char) return;
-        try {
-            const key = 'cif_user_' + username;
-            const userObj = JSON.parse(localStorage.getItem(key));
-            if (userObj && userObj.characters) {
-                let found = false;
-                for (let i = 0; i < userObj.characters.length; i++) {
-                    const uc = userObj.characters[i];
-                    if (!uc) continue;
-                    if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                        userObj.characters[i].mining = this.char.mining;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    for (let i = 0; i < userObj.characters.length; i++) {
-                        if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
-                    }
-                    if (!found) userObj.characters.push(this.char);
-                }
-                localStorage.setItem(key, JSON.stringify(userObj));
-            }
-        } catch (e) {
-            console.warn('Could not persist mining skill', e);
-        }
-    }
-    _stopFog() {
-        if (this._fogRaf) cancelAnimationFrame(this._fogRaf);
-        this._fogRaf = null;
-        if (this.fogCanvas && this.fogCanvas.parentNode) this.fogCanvas.parentNode.removeChild(this.fogCanvas);
-        this.fogCanvas = null;
-        this.fogCtx = null;
-    }
+
     update() {
         if (!this.player || !this.keys) return;
         const speed = 180;
@@ -987,6 +985,7 @@ export class Town extends Phaser.Scene {
             }
         }
         if (this.fieldPortal) {
+            const portalY = (this.fieldPortal && this.fieldPortal.y) || (this.fieldPortalPos && this.fieldPortalPos.y) || (this.scale.height - 120);
             const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.fieldPortal.x, this.fieldPortal.y);
             if (fdist <= 56) {
                 this.fieldPortalPrompt.setVisible(true);
@@ -1002,7 +1001,7 @@ export class Town extends Phaser.Scene {
                                 if (!uc) continue;
                                 if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
                                     userObj.characters[i] = this.char;
-                                    userObj.characters[i].lastLocation = { scene: 'InnerField', x: this.player.x, y: (this.fieldPortal ? this.fieldPortal.y : this.player.y) };
+                                    userObj.characters[i].lastLocation = { scene: 'InnerField', x: this.player.x, y: portalY };
                                     found = true;
                                     break;
                                 }
@@ -1016,7 +1015,7 @@ export class Town extends Phaser.Scene {
                             localStorage.setItem(key, JSON.stringify(userObj));
                         }
                     } catch (e) { console.warn('Could not persist lastLocation (inner field)', e); }
-                    this.scene.start('InnerField', { character: this.char, username: username, spawnX: Math.max(80, this.scale.width * 0.12), spawnY: this.fieldPortal ? this.fieldPortal.y : (this.scale.height - 120) });
+                    this.scene.start('InnerField', { character: this.char, username: username, spawnX: Math.max(80, this.scale.width * 0.12), spawnY: portalY });
                 }
             } else {
                 this.fieldPortalPrompt.setVisible(false);
