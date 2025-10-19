@@ -11,22 +11,24 @@ export class Cave extends Phaser.Scene {
 
     create() {
         this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
-        const bg = this.add.image(400, 300, 'cave_bg');
-        bg.setDisplaySize(800, 600);
+        // responsive centers
+        const centerX = this.scale.width / 2;
+        const centerY = this.scale.height / 2;
+        const bg = this.add.image(centerX, centerY, 'cave_bg');
+        bg.setDisplaySize(this.scale.width, this.scale.height);
 
-        this.add.text(400, 32, 'The Cave', { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
+        this.add.text(centerX, 32, 'The Cave', { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
 
     // Player spawn (allow restoring last position via spawnX/spawnY)
-    const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || 400;
-    const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || 420;
+    const platformHeight = 60;
+    const platformY = this.scale.height - (platformHeight / 2);
+    const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || centerX;
+    const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || (platformY - 70);
     this.player = this.physics.add.sprite(spawnX, spawnY, 'dude');
     this.player.setCollideWorldBounds(true);
     this.player.body.setSize(20, 40);
     this.player.body.setOffset(6, 8);
-
-    // Platform for the cave (match Town platform level)
-    const platformY = 570;
-    const platform = this.add.rectangle(400, platformY, 800, 60, 0x443322, 1);
+    const platform = this.add.rectangle(centerX, platformY, this.scale.width, platformHeight, 0x443322, 1);
     platform.setDepth(1);
     this.physics.add.existing(platform, true);
     this.physics.add.collider(this.player, platform);
@@ -48,11 +50,30 @@ export class Cave extends Phaser.Scene {
         this._createHUD();
 
     // Right-side portal to return to Town; requires proximity + E
-        const portalX = 720, portalY = 500;
+        const portalX = this.scale.width - 80;
+        const portalY = platformY - 70;
         this.portal = this.add.circle(portalX, portalY, 28, 0x2266aa, 0.9).setDepth(1.5);
         this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
         this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.portalPrompt.setVisible(false);
+
+    // Furnace in cave (convenience) - moved to left side to avoid overlapping copper node
+    const furnaceX = 120;
+    const furnaceY = platformY - 70;
+    this.furnace = this.add.rectangle(furnaceX, furnaceY, 56, 56, 0x6b4b2f, 1).setDepth(1.5);
+    this.tweens.add({ targets: this.furnace, scale: { from: 1, to: 1.06 }, yoyo: true, repeat: -1, duration: 1200, ease: 'Sine.easeInOut' });
+    this.furnacePrompt = this.add.text(furnaceX, furnaceY - 60, '[E] Use Furnace', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+    this.furnacePrompt.setVisible(false);
+    // furnace active indicator
+    this._furnaceIndicator = this.add.text(furnaceX, furnaceY - 40, '🔥', { fontSize: '20px' }).setOrigin(0.5).setDepth(2);
+    this._furnaceIndicator.setVisible(false);
+    // smithing skill
+    if (!this.char.smithing) this.char.smithing = { level: 1, exp: 0, expToLevel: 100 };
+
+    // Smelting state
+    this.smeltingActive = false;
+    this._smeltingEvent = null;
+    this.smeltingInterval = 3500;
 
     // Mining nodes for testing: place them on the platform so they sit naturally
     const platformTop = platformY - (60 / 2);
@@ -78,6 +99,11 @@ export class Cave extends Phaser.Scene {
                 this._miningIndicator.destroy();
                 this._miningIndicator = null;
             }
+            // cleanup furnace modal if present
+            if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
+            this._furnaceModal = null;
+            // stop any smelting events
+            if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
         });
     }
 
@@ -90,8 +116,11 @@ export class Cave extends Phaser.Scene {
         const hp = char.hp || maxhp;
         const maxmana = char.maxmana || (50 + level * 5 + ((char.stats && char.stats.int) || 0) * 10);
         const mana = char.mana || maxmana;
-        const exp = char.exp || 0;
-        const expToLevel = char.expToLevel || 100;
+    const exp = char.exp || 0;
+    const expToLevel = char.expToLevel || 100;
+    const mining = char.mining || { level: 1, exp: 0, expToLevel: 100 };
+    const smithing = char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+    const showSmithing = (!!this.smeltingActive) || (!!this._furnaceModal);
 
         this.hud = document.createElement('div');
         this.hud.id = 'cave-hud';
@@ -127,8 +156,8 @@ export class Cave extends Phaser.Scene {
                 </div>
                 <!-- Replace class EXP with mining EXP while in the cave -->
                 <div style="height:12px; background:#222a18; border-radius:6px; overflow:hidden; position:relative;">
-                    <div style="height:100%; width:${Math.max(0, Math.min(100, ((char.mining && char.mining.exp) || 0) / ((char.mining && char.mining.expToLevel) || 100) * 100))}%; background:#9b7; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                    <span style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">Mining L${(char.mining && char.mining.level) || 1} ${(char.mining && char.mining.exp) || 0}/${(char.mining && char.mining.expToLevel) || 100}</span>
+                    <div style="height:100%; width:${showSmithing ? Math.max(0, Math.min(100, (smithing.exp / smithing.expToLevel) * 100)) : Math.max(0, Math.min(100, ((char.mining && char.mining.exp) || 0) / ((char.mining && char.mining.expToLevel) || 100) * 100))}%; background:#9b7; border-radius:6px; position:absolute; left:0; top:0;"></div>
+                    <span style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">${showSmithing ? ('Smithing L' + smithing.level + ' ' + (smithing.exp || 0) + '/' + (smithing.expToLevel || 100)) : ('Mining L' + ((char.mining && char.mining.level) || 1) + ' ' + ((char.mining && char.mining.exp) || 0) + '/' + ((char.mining && char.mining.expToLevel) || 100))}</span>
                 </div>
             </div>
         `;
@@ -233,6 +262,190 @@ export class Cave extends Phaser.Scene {
         this._miningIndicator = this.add.text(this.player.x, this.player.y + footOffset, 'Mining...', { fontSize: '16px', color: '#ffd27a', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 4 } }).setOrigin(0.5, 0).setDepth(3);
     }
 
+    // --- Furnace modal for Cave (smelting UI) ---
+    _openFurnaceModal() {
+        if (this._furnaceModal) return;
+        const inv = this.char.inventory || [];
+        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
+        const copperOreQty = findQty('copper_ore');
+        const tinOreQty = findQty('tin_ore');
+
+        const modal = document.createElement('div');
+        modal.id = 'cave-furnace-modal';
+        modal.style.position = 'fixed';
+        modal.style.left = '50%';
+        modal.style.top = '50%';
+        modal.style.transform = 'translate(-50%,-50%)';
+        modal.style.zIndex = '220';
+        modal.style.background = 'linear-gradient(135deg,#241b2a 0%, #0f0b14 100%)';
+        modal.style.padding = '18px';
+        modal.style.borderRadius = '12px';
+        modal.style.color = '#eee';
+        modal.style.fontFamily = 'UnifrakturCook, cursive';
+        modal.style.minWidth = '300px';
+
+        modal.innerHTML = `
+            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>
+                <strong>Furnace</strong>
+                <button id='cave-furnace-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button>
+            </div>
+            <div style='margin-bottom:8px;'>Inventory: Copper Ore: <span id='cave-furnace-copper-qty'>${copperOreQty}</span> — Tin Ore: <span id='cave-furnace-tin-qty'>${tinOreQty}</span></div>
+            <div style='display:flex;flex-direction:column;gap:8px;'>
+                <button id='cave-smelt-copper' style='padding:8px;background:#6b4f3a;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Smelt Copper Bar (2x Copper Ore)</button>
+                <button id='cave-smelt-bronze' style='padding:8px;background:#7a5f3a;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Smelt Bronze (1x Copper Ore + 1x Tin Ore)</button>
+            </div>
+            <div id='cave-furnace-msg' style='color:#ffcc99;margin-top:8px;min-height:18px;'></div>
+        `;
+        document.body.appendChild(modal);
+        this._furnaceModal = modal;
+
+        document.getElementById('cave-furnace-close').onclick = () => this._closeCaveFurnaceModal();
+
+        const updateDisplay = () => {
+            const inv = this.char.inventory || [];
+            const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
+            const copperOreQty = findQty('copper_ore');
+            const tinOreQty = findQty('tin_ore');
+            const elC = document.getElementById('cave-furnace-copper-qty'); if (elC) elC.textContent = copperOreQty;
+            const elT = document.getElementById('cave-furnace-tin-qty'); if (elT) elT.textContent = tinOreQty;
+        };
+
+        const btnCopper = document.getElementById('cave-smelt-copper');
+        const btnBronze = document.getElementById('cave-smelt-bronze');
+        if (btnCopper) btnCopper.onclick = () => {
+            if (this.smeltingActive) { if (this._smeltType === 'copper') this._stopContinuousSmelting(); else this._showToast('Already smelting ' + this._smeltType); }
+            else this._startContinuousSmelting('copper');
+            updateDisplay(); this._refreshCaveFurnaceModal();
+        };
+        if (btnBronze) btnBronze.onclick = () => {
+            if (this.smeltingActive) { if (this._smeltType === 'bronze') this._stopContinuousSmelting(); else this._showToast('Already smelting ' + this._smeltType); }
+            else this._startContinuousSmelting('bronze');
+            updateDisplay(); this._refreshCaveFurnaceModal();
+        };
+
+        this._refreshCaveFurnaceModal();
+        // HUD switch to smithing
+        this._destroyHUD(); this._createHUD();
+    }
+
+    _closeCaveFurnaceModal() {
+        if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
+        this._furnaceModal = null;
+        // hide indicator and revert HUD display to mining
+        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+        this._destroyHUD(); this._createHUD();
+    }
+
+    _refreshCaveFurnaceModal() {
+        if (!this._furnaceModal) return;
+        const inv = this.char.inventory || [];
+        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
+        const copperOreQty = findQty('copper_ore');
+        const tinOreQty = findQty('tin_ore');
+        const elC = document.getElementById('cave-furnace-copper-qty'); if (elC) elC.textContent = copperOreQty;
+        const elT = document.getElementById('cave-furnace-tin-qty'); if (elT) elT.textContent = tinOreQty;
+        const btnCopper = document.getElementById('cave-smelt-copper');
+        const btnBronze = document.getElementById('cave-smelt-bronze');
+        if (btnCopper) {
+            if (this.smeltingActive && this._smeltType === 'copper') { btnCopper.textContent = 'Stop Smelting Copper'; btnCopper.style.background = '#aa4422'; }
+            else { btnCopper.textContent = 'Smelt Copper Bar (2x Copper Ore)'; btnCopper.style.background = '#6b4f3a'; }
+            btnCopper.disabled = this.smeltingActive && this._smeltType !== 'copper'; btnCopper.style.opacity = btnCopper.disabled ? '0.6' : '1';
+            // ensure handler is bound (rebind in case DOM handlers were lost)
+            btnCopper.onclick = () => {
+                if (this.smeltingActive) {
+                    if (this._smeltType === 'copper') this._stopContinuousSmelting();
+                    else this._showToast('Already smelting ' + this._smeltType);
+                } else {
+                    this._startContinuousSmelting('copper');
+                }
+                this._refreshCaveFurnaceModal();
+            };
+        }
+        if (btnBronze) {
+            if (this.smeltingActive && this._smeltType === 'bronze') { btnBronze.textContent = 'Stop Smelting Bronze'; btnBronze.style.background = '#aa4422'; }
+            else { btnBronze.textContent = 'Smelt Bronze (1x Copper Ore + 1x Tin Ore)'; btnBronze.style.background = '#7a5f3a'; }
+            btnBronze.disabled = this.smeltingActive && this._smeltType !== 'bronze'; btnBronze.style.opacity = btnBronze.disabled ? '0.6' : '1';
+            // rebind handler to keep toggle working
+            btnBronze.onclick = () => {
+                if (this.smeltingActive) {
+                    if (this._smeltType === 'bronze') this._stopContinuousSmelting();
+                    else this._showToast('Already smelting ' + this._smeltType);
+                } else {
+                    this._startContinuousSmelting('bronze');
+                }
+                this._refreshCaveFurnaceModal();
+            };
+        }
+    }
+
+    // Reuse same smelting control methods as Town but ensure they exist in Cave
+    _startContinuousSmelting(type) {
+        if (this.smeltingActive) return;
+        this.smeltingActive = true;
+        this._smeltType = type;
+        this._attemptSmelt(type);
+        // only create repeating event if immediate attempt didn't stop smelting (materials available)
+        if (this.smeltingActive) {
+            this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: () => this._attemptSmelt(type), callbackScope: this, loop: true });
+        }
+        this._showToast('Started smelting ' + (type === 'copper' ? 'Copper Bars' : 'Bronze'));
+        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(true);
+        this._destroyHUD(); this._createHUD();
+        this._refreshCaveFurnaceModal();
+    }
+
+    _stopContinuousSmelting() {
+        if (!this.smeltingActive) return;
+        this.smeltingActive = false;
+        if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
+        this._showToast('Smelting stopped');
+        this._smeltType = null;
+        if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+        this._refreshCaveFurnaceModal();
+        this._destroyHUD(); this._createHUD();
+    }
+
+    _attemptSmelt(type) {
+        const inv = this.char.inventory = this.char.inventory || [];
+        const find = (id) => inv.find(x => x && x.id === id);
+        const copper = find('copper_ore');
+        const tin = find('tin_ore');
+        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+        if (type === 'copper') {
+            const have = (copper && copper.qty) || 0;
+            if (have < 2) { this._stopContinuousSmelting(); this._showToast('Out of Copper Ore'); return; }
+            copper.qty -= 2; if (copper.qty <= 0) inv.splice(inv.indexOf(copper), 1);
+            let bar = find('copper_bar'); if (bar) bar.qty = (bar.qty || 0) + 1; else inv.push({ id: 'copper_bar', name: 'Copper Bar', qty: 1 });
+            const newQty = (find('copper_bar') && find('copper_bar').qty) || 1;
+            this._showToast(`Smelted 1x Copper Bar! (${newQty} total)`);
+            // smithing xp
+            this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+            this.char.smithing.exp = (this.char.smithing.exp || 0) + 12;
+        } else if (type === 'bronze') {
+            const haveC = (copper && copper.qty) || 0;
+            const haveT = (tin && tin.qty) || 0;
+            if (haveC < 1 || haveT < 1) { this._stopContinuousSmelting(); this._showToast('Out of materials for Bronze'); return; }
+            copper.qty -= 1; if (copper.qty <= 0) inv.splice(inv.indexOf(copper), 1);
+            tin.qty -= 1; if (tin.qty <= 0) inv.splice(inv.indexOf(tin), 1);
+            let b = find('bronze_bar'); if (b) b.qty = (b.qty || 0) + 1; else inv.push({ id: 'bronze_bar', name: 'Bronze Bar', qty: 1 });
+            const newQty = (find('bronze_bar') && find('bronze_bar').qty) || 1;
+            this._showToast(`Smelted 1x Bronze! (${newQty} total)`);
+            this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+            this.char.smithing.exp = (this.char.smithing.exp || 0) + 15;
+        }
+        if (this.char.smithing) {
+            while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
+                this.char.smithing.exp -= this.char.smithing.expToLevel;
+                this.char.smithing.level = (this.char.smithing.level || 1) + 1;
+                this.char.smithing.expToLevel = Math.floor(this.char.smithing.expToLevel * 1.25);
+                this._showToast('Smithing level up! L' + this.char.smithing.level, 1800);
+            }
+        }
+        this._persistCharacter((this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null);
+        this._destroyHUD(); this._createHUD();
+        this._refreshCaveFurnaceModal();
+    }
+
     _hideMiningIndicator() {
         if (this._miningIndicator) {
             this._miningIndicator.destroy();
@@ -307,6 +520,19 @@ export class Cave extends Phaser.Scene {
                     this.scene.start('Town', { character: this.char, username: username });
                 }
             } else { this.portalPrompt.setVisible(false); }
+        }
+
+        // furnace interaction (show prompt + open modal)
+        if (this.furnace) {
+            const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.furnace.x, this.furnace.y);
+            if (fdist <= 56) {
+                this.furnacePrompt.setVisible(true);
+                if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                    this._openFurnaceModal();
+                }
+            } else {
+                this.furnacePrompt.setVisible(false);
+            }
         }
 
         // mining node interaction (support multiple nodes)

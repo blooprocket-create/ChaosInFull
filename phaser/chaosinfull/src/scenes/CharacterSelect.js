@@ -6,6 +6,18 @@ export class CharacterSelect extends Phaser.Scene {
     }
 
     create() {
+        // Cleanup any HUD/modal elements left by scenes so CharacterSelect is clean
+        try {
+            const huds = ['town-hud','cave-hud'];
+            for (const id of huds) { const h = document.getElementById(id); if (h && h.parentNode) h.parentNode.removeChild(h); }
+            const modals = ['furnace-modal','cave-furnace-modal'];
+            for (const id of modals) { const m = document.getElementById(id); if (m && m.parentNode) m.parentNode.removeChild(m); }
+            const toast = document.getElementById('toast-container'); if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+            const fog = document.getElementById('town-fog-canvas'); if (fog && fog.parentNode) fog.parentNode.removeChild(fog);
+            // Also remove cave fog/canvas ids if present
+            const cfog = document.getElementById('cave-hud'); if (cfog && cfog.parentNode) cfog.parentNode.removeChild(cfog);
+        } catch (e) { /* ignore cleanup errors */ }
+
         // --- Overlay creation order: fog, embers, shadow, vignette ---
         // 1. Fog overlay
         const fogCanvas = document.createElement('canvas');
@@ -561,7 +573,7 @@ export class CharacterSelect extends Phaser.Scene {
                             <option value='Sword'>Sword (+3 STR)</option>
                             <option value='Staff'>Staff (+3 INT)</option>
                             <option value='Dagger'>Dagger (+3 AGI)</option>
-                            <option value='Dice'>Dice (+3 LUK)</option>
+                            <option value='Dice'>Dice in a Bag (+3 LUK)</option>
                         </select>
                         <button id='create-char-btn' style='padding:10px 28px;font-size:1.1em;border-radius:10px;background:linear-gradient(90deg,#222 40%,#444 100%);color:#fff;border:none;box-shadow:0 0 4px #ff3300,0 0 2px #fff inset;cursor:pointer;'>Create</button>
                         <div id='char-create-error' style='color:#ff3300;margin-top:8px;min-height:24px;'></div>
@@ -611,7 +623,7 @@ export class CharacterSelect extends Phaser.Scene {
                             if (weapon === 'Sword') stats.str += 3;
                             if (weapon === 'Staff') stats.int += 3;
                             if (weapon === 'Dagger') stats.agi += 3;
-                            if (weapon === 'Dice') stats.luk += 3;
+                            if (weapon === 'Dice in a Bag') stats.luk += 3;
                             // Save character to userObj (assign unique id)
                             if (!userObj.characters) userObj.characters = [];
                             const newChar = { id: uuidv4(), name, race, weapon, stats, level: 1 };
