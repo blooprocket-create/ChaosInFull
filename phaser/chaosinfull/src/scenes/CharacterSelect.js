@@ -276,9 +276,15 @@ export class CharacterSelect extends Phaser.Scene {
         for (let i = 0; i < 7; i++) {
             if (characters[i]) {
                 const c = characters[i];
-                let statSummary = '';
-                try { const s = c.stats || {}; statSummary = `<div style='font-size:0.6em;margin-top:6px;color:#ddd;'>STR:${s.str||0} INT:${s.int||0} AGI:${s.agi||0} LUK:${s.luk||0}</div>`; } catch(e){}
-                characterCards += `<div class="char-card">${c.name}${statSummary}</div>`;
+                // Compute effective stats (race + class + equipment) without mutating stored character
+                let eff = { str:0,int:0,agi:0,luk:0 };
+                try {
+                    const tempChar = { stats: Object.assign({}, (c.stats || { str:0,int:0,agi:0,luk:0 })), equipment: (c.equipment || {}), class: (c.class || 'beginner') };
+                    if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses({ char: tempChar });
+                    if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(tempChar);
+                } catch (e) { /* fallback to base stats */ try { const s = c.stats || {}; eff = { str:s.str||0,int:s.int||0,agi:s.agi||0,luk:s.luk||0 }; } catch(e){} }
+                const statSummary = `<div class='stat-pill small' title='STR'>STR:<span class='pill-value'>${eff.str}</span></div> <div class='stat-pill small' title='INT'>INT:<span class='pill-value'>${eff.int}</span></div> <div class='stat-pill small' title='AGI'>AGI:<span class='pill-value'>${eff.agi}</span></div> <div class='stat-pill small' title='LUK'>LUK:<span class='pill-value'>${eff.luk}</span></div>`;
+                characterCards += `<div class="char-card"><div class='char-card-inner'><div class='char-name'>${c.name}</div><div class='stat-summary'>${statSummary}</div></div></div>`;
             } else {
                 characterCards += `<div class="char-card empty">+</div>`;
             }
@@ -303,6 +309,20 @@ export class CharacterSelect extends Phaser.Scene {
                     flex: 0 0 auto;
                     transition: background 0.7s cubic-bezier(.77,0,.175,1), border-color 0.7s cubic-bezier(.77,0,.175,1), transform 0.7s cubic-bezier(.77,0,.175,1);
                 }
+                .char-card-inner {
+                    display:flex;
+                    flex-direction:column;
+                    align-items:center;
+                    justify-content:center;
+                    text-align:center;
+                    padding:6px;
+                    width:100%;
+                    box-sizing:border-box;
+                }
+                .char-card .char-name { font-size:1.1em; line-height:1.05em; }
+                .char-card .stat-summary { font-size:0.65em; color:#ddd; margin-top:6px; word-break:break-word; white-space:normal; }
+                .char-card .stat-pill.small { display:inline-flex; align-items:center; gap:6px; padding:3px 5px; border-radius:10px; background:rgba(255,255,255,0.03); color:#fff; margin:2px; }
+                .char-card .stat-pill.small .pill-value { color:#ffd27a; margin-left:5px; font-weight:700; font-size:0.9em; }
                 .char-card:hover {
                     box-shadow: none;
                     background: rgba(60,10,30,0.85);

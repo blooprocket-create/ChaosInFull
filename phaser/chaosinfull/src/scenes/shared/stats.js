@@ -33,18 +33,25 @@ export function checkClassLevelUps(scene) {
         char.exp -= char.expToLevel;
         char.level = (char.level || 1) + 1;
         char.expToLevel = Math.floor(char.expToLevel * 1.25);
-        // apply race-based stat growth on level up
-        const race = (char.race || 'Human');
-        const growth = {
-            Human:   { str: 1, int: 1, agi: 1, luk: 1 },
-            Elf:     { str: 0, int: 2, agi: 2, luk: 0 },
-            Demonoid:{ str: 2, int: 1, agi: 0, luk: 1 },
-            Angel:   { str: 0, int: 2, agi: 1, luk: 2 }
-        };
-        const g = growth[race] || growth['Human'];
+        // apply race+class per-level growth on level up (use data-driven defs when available)
+        const raceKey = (char.race || 'Human');
+        const classKey = (char.class || 'beginner');
+        const rdefs = (window && window.RACE_DEFS) ? window.RACE_DEFS : {};
+        const cdefs = (window && window.CLASS_DEFS) ? window.CLASS_DEFS : {};
+        const racePer = (rdefs && rdefs[raceKey] && rdefs[raceKey].perLevel) ? rdefs[raceKey].perLevel : { str:1, int:1, agi:1, luk:1 };
+        const classPer = (cdefs && cdefs[classKey] && cdefs[classKey].perLevel) ? cdefs[classKey].perLevel : { str:0, int:0, agi:0, luk:0 };
         if (!char.stats) char.stats = { str:0,int:0,agi:0,luk:0 };
-        for (const k of Object.keys(g)) {
-            char.stats[k] = (char.stats[k] || 0) + (g[k] || 0);
+        // sum race and class per-level values and round to nearest integer for applied growth
+        const keys = ['str','int','agi','luk'];
+        for (const k of keys) {
+            const add = (racePer[k] || 0) + (classPer[k] || 0);
+            // allow fractional accumulation: store fractional leftover in a temporary field
+            const fracKey = `_frac_${k}`;
+            char[fracKey] = char[fracKey] || 0;
+            const totalAdd = char[fracKey] + add;
+            const toApply = Math.floor(totalAdd + 0.000001); // apply integer portion
+            char[fracKey] = totalAdd - toApply; // keep remainder
+            char.stats[k] = (char.stats[k] || 0) + toApply;
         }
         // recalc defense base if present
         char.defenseBonus = char.defenseBonus || 0;

@@ -931,76 +931,11 @@ export class Town extends Phaser.Scene {
 
     // --- HUD helpers ---
     _createHUD() {
-        const char = this.char || {};
-        const name = char.name || 'Character';
-        const level = char.level || 1;
-    // compute derived vitals using centralized effective stats (base + equipment)
-    let eff = { str:0,int:0,agi:0,luk:0,defense:0 };
-    try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(char); } catch (e) { /* fallback */ }
-    const maxhp = char.maxhp || (100 + level * 10 + ((eff.str || 0) * 10));
-    const hp = char.hp || maxhp;
-    const maxmana = char.maxmana || (50 + level * 5 + ((eff.int || 0) * 10));
-    const mana = char.mana || maxmana;
-        const exp = char.exp || 0;
-        const expToLevel = char.expToLevel || 100;
-    const mining = char.mining || { level: 1, exp: 0, expToLevel: 100 };
-    const smithing = char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-    // show smithing bar when furnace modal is open or smelting active, or when workbench is open/active
-    const showSmithing = (!!this.smeltingActive) || (!!this._furnaceModal) || (!!this.craftingActive) || (!!this._workbenchModal);
-
-        this.hud = document.createElement('div');
-        this.hud.id = 'town-hud';
-        this.hud.style.position = 'fixed';
-        this.hud.style.top = '8px';
-        this.hud.style.left = '8px';
-        this.hud.style.width = '200px';
-        this.hud.style.padding = '8px';
-        this.hud.style.zIndex = '100';
-    // Allow pointer events on the HUD container so controls like the charselect button receive clicks.
-    this.hud.style.pointerEvents = 'auto';
-        this.hud.style.display = 'flex';
-        this.hud.style.flexDirection = 'column';
-        this.hud.style.alignItems = 'flex-start';
-        this.hud.style.background = 'rgba(20,10,30,0.55)';
-        this.hud.style.backdropFilter = 'blur(8px)';
-        this.hud.style.borderRadius = '16px';
-        this.hud.style.color = '#eee';
-        this.hud.style.fontFamily = 'UnifrakturCook, cursive';
-
-        this.hud.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
-                <span style="font-size:1em; font-weight:700; color:#e44; letter-spacing:1px;">${name} <span style='color:#fff; font-size:0.9em;'>- Lv ${level}</span></span>
-                <button id="hud-charselect-btn" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.8em; padding:2px 6px; margin-left:8px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85;">⇦</button>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
-                <div style="height:12px; background:#2a0a16; border-radius:6px; overflow:hidden; position:relative;">
-                    <div style="height:100%; width:${Math.max(0, Math.min(100, (hp / maxhp) * 100))}%; background:#e44; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                    <span style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">${hp}/${maxhp}</span>
-                </div>
-                <div style="height:12px; background:#181a2a; border-radius:6px; overflow:hidden; position:relative;">
-                    <div style="height:100%; width:${Math.max(0, Math.min(100, (mana / maxmana) * 100))}%; background:#44e; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                    <span style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">${mana}/${maxmana}</span>
-                </div>
-                <div style="height:12px; background:#222a18; border-radius:6px; overflow:hidden; position:relative;">
-                    <div style="height:100%; width:${showSmithing ? Math.max(0, Math.min(100, (smithing.exp / smithing.expToLevel) * 100)) : Math.max(0, Math.min(100, (exp / expToLevel) * 100))}%; background:#ee4; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                    <span style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">${showSmithing ? (smithing.exp + '/' + smithing.expToLevel + ' (Smithing L' + smithing.level + ')') : (exp + '/' + expToLevel)}</span>
-                </div>
-                <!-- Mining bar removed per request: mining tracked in data only -->
-            </div>
-        `;
-
-        document.body.appendChild(this.hud);
-
-        // attach click handler to the character-select button immediately
-        const btn = document.getElementById('hud-charselect-btn');
-        if (btn) {
-            btn.onclick = (e) => { e.stopPropagation(); this.scene.start('CharacterSelect'); };
-        }
+        if (window && window.__hud_shared && window.__hud_shared.createHUD) return window.__hud_shared.createHUD(this);
     }
 
     _destroyHUD() {
-        if (this.hud && this.hud.parentNode) this.hud.parentNode.removeChild(this.hud);
-        this.hud = null;
+        if (window && window.__hud_shared && window.__hud_shared.destroyHUD) return window.__hud_shared.destroyHUD(this);
     }
 
     // Persist mining skill to localStorage (finds char by name)

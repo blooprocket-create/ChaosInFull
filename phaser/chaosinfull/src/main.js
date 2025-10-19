@@ -10,6 +10,7 @@ import { RACE_DEFS } from './data/races.js';
 import { CLASS_DEFS } from './data/classes.js';
 import * as SharedUI from './scenes/shared/ui.js';
 import * as furnaceShared from './scenes/shared/furnace.js';
+import * as hudShared from './scenes/shared/hud.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -50,4 +51,5 @@ if (typeof window !== 'undefined') window.CLASS_DEFS = CLASS_DEFS;
 // expose shared UI helpers for legacy scenes to call
 if (typeof window !== 'undefined') window.__shared_ui = SharedUI;
 if (typeof window !== 'undefined') window.__furnace_shared = furnaceShared;
+if (typeof window !== 'undefined') window.__hud_shared = hudShared;
             
