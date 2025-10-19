@@ -1,25 +1,20 @@
 // Clean Town scene implementation
 export class Town extends Phaser.Scene {
     constructor() { super('Town'); }
-
     preload() {
         this.load.image('town_bg', 'assets/town_bg.png');
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
     }
-
     create() {
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
-
     // Fog overlay (DOM canvas below HUD)
     this._createFog();
-
     // responsive layout values
     const centerX = this.scale.width / 2;
     const centerY = this.scale.height / 2;
     const bg = this.add.image(centerX, centerY, 'town_bg');
     bg.setDisplaySize(this.scale.width, this.scale.height);
     bg.setDepth(0);
-
     // platform aligned to bottom of scene (height 60)
     const platformHeight = 60;
     const platformY = this.scale.height - (platformHeight / 2);
@@ -27,7 +22,6 @@ export class Town extends Phaser.Scene {
     platform.setStrokeStyle(4, 0xa00);
     platform.setDepth(1);
     this.physics.add.existing(platform, true);
-
     // Player (allow restoring last position via spawnX/spawnY)
     const spawnX = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnX) || centerX;
     const spawnY = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.spawnY) || (platformY - 70);
@@ -37,15 +31,12 @@ export class Town extends Phaser.Scene {
         this.player.body.setSize(20, 40);
         this.player.body.setOffset(6, 8);
         this.physics.add.collider(this.player, platform);
-
     // Animations (create only if not already registered to avoid duplicate key errors)
     if (!this.anims.exists('left')) this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
     if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
     if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
-
         // Input (WASD + E + I + U + X) - centralized
     if (window && window.__shared_keys && window.__shared_keys.attachCommonKeys) this.keys = window.__shared_keys.attachCommonKeys(this);
-
         // Character data
         const char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
         if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
@@ -57,7 +48,6 @@ export class Town extends Phaser.Scene {
         try {
             if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses(this);
         } catch (e) { /* ignore */ }
-
         // If the character was just created with startingEquipment, add those items to inventory once
         try {
             const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
@@ -104,18 +94,17 @@ export class Town extends Phaser.Scene {
                 } catch (e) { /* ignore auto-equip errors */ }
             }
         } catch (e) { /* ignore starting equipment apply errors */ }
-
         // HUD
         this._createHUD();
-
     // Portal on left
-    const portalX = 80;
-    const portalY = platformY - 70;
-    this.portal = this.add.circle(portalX, portalY, 28, 0x6644aa, 0.9).setDepth(1.5);
+    const cavePortalX = 80;
+    const cavePortalY = platformY - 70;
+    this.portal = this.add.circle(cavePortalX, cavePortalY, 28, 0x6644aa, 0.9).setDepth(1.5);
         this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
-        this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        this.portalPrompt = this.add.text(cavePortalX, cavePortalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.portalPrompt.setVisible(false);
-
+        this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
+        this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
     // Portal to Inner Field near the forge
     const fieldPortalX = this.scale.width - 220;
     const fieldPortalY = platformY - 70;
@@ -123,7 +112,7 @@ export class Town extends Phaser.Scene {
         this.tweens.add({ targets: this.fieldPortal, scale: { from: 1, to: 1.1 }, yoyo: true, repeat: -1, duration: 1000, ease: 'Sine.easeInOut' });
         this.fieldPortalPrompt = this.add.text(fieldPortalX, fieldPortalY - 60, '[E] Inner Field', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.fieldPortalPrompt.setVisible(false);
-
+        this.fieldPortalPos = { x: fieldPortalX, y: fieldPortalY };
     // Furnace on right side (combine ores into bars)
     const furnaceX = this.scale.width - 120;
     const furnaceY = platformY - 70;
@@ -135,13 +124,15 @@ export class Town extends Phaser.Scene {
     this._furnaceIndicator = this.add.text(furnaceX, furnaceY - 40, '🔥', { fontSize: '20px' }).setOrigin(0.5).setDepth(2);
     this._furnaceIndicator.setVisible(false);
     // separate workbench indicator
-    this._workbenchIndicator = this.add.text(furnaceX - 120, furnaceY - 28, '⚒️', { fontSize: '18px' }).setOrigin(0.5).setDepth(2);
+    const workbenchX = centerX + 120;
+    const workbenchY = furnaceY + 6;
+    this._workbenchIndicator = this.add.text(workbenchX, workbenchY - 28, '⚒️', { fontSize: '18px' }).setOrigin(0.5).setDepth(2);
     this._workbenchIndicator.setVisible(false);
     // create and place workbench slightly left of the furnace
-    this._createWorkbench(furnaceX - 120, furnaceY + 6);
+    this._createWorkbench(workbenchX, workbenchY);
     // storage chest (shared across account)
-    const chestX = furnaceX - 260;
-    const chestY = furnaceY + 6;
+    const chestX = workbenchX - 200;
+    const chestY = workbenchY;
     this.storageChest = this.add.rectangle(chestX, chestY, 48, 40, 0x443366, 1).setDepth(1.5);
     this.storageChestPrompt = this.add.text(chestX, chestY - 48, '[E] Open Storage', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
     this.storageChestPrompt.setVisible(false);
@@ -156,7 +147,6 @@ export class Town extends Phaser.Scene {
     this._craftingEvent = null;
     this._craftType = null;
     this.craftingInterval = 2800; // ms per craft (same pace as smelting)
-
         // cleanup on shutdown
         this._fogResizeHandler = () => {
             if (this.fogCanvas) {
@@ -165,7 +155,6 @@ export class Town extends Phaser.Scene {
             }
         };
         window.addEventListener('resize', this._fogResizeHandler);
-
         this.events.once('shutdown', () => {
             this._destroyHUD();
             this._stopFog();
@@ -178,7 +167,6 @@ export class Town extends Phaser.Scene {
             if (this._workbenchIndicator && this._workbenchIndicator.destroy) { this._workbenchIndicator.destroy(); this._workbenchIndicator = null; }
         });
     }
-
     // --- Workbench (crafting) ---
     // Place a workbench in the town near the furnace
     _createWorkbench(x, y) {
@@ -186,7 +174,6 @@ export class Town extends Phaser.Scene {
         this.workbenchPrompt = this.add.text(x, y - 48, '[E] Use Workbench', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.workbenchPrompt.setVisible(false);
     }
-
     _openWorkbenchModal() {
         if (this._workbenchModal) return;
         const inv = this.char.inventory || [];
@@ -205,7 +192,6 @@ export class Town extends Phaser.Scene {
         modal.style.color = '#eee';
         modal.style.fontFamily = 'UnifrakturCook, cursive';
         modal.style.minWidth = '360px';
-
         const head = document.createElement('div');
         head.style.display = 'flex'; head.style.justifyContent = 'space-between'; head.style.alignItems = 'center'; head.style.marginBottom = '8px';
         head.innerHTML = `<strong>Workbench</strong>`;
@@ -214,9 +200,7 @@ export class Town extends Phaser.Scene {
         closeBtn.style.background = '#222'; closeBtn.style.color = '#fff'; closeBtn.style.border = 'none'; closeBtn.style.padding = '6px 10px'; closeBtn.style.borderRadius = '6px'; closeBtn.style.cursor = 'pointer';
         head.appendChild(closeBtn);
         modal.appendChild(head);
-
         const desc = document.createElement('div'); desc.style.marginBottom = '8px'; desc.textContent = 'Craft items at the workbench. Requires bars produced from the furnace.'; modal.appendChild(desc);
-
         const list = document.createElement('div'); list.style.display = 'flex'; list.style.flexDirection = 'column'; list.style.gap = '8px';
         // generate buttons for recipes that use the workbench
         for (const k of Object.keys(recipes || {})) {
@@ -246,24 +230,19 @@ export class Town extends Phaser.Scene {
             list.appendChild(btn);
         }
         modal.appendChild(list);
-
         const msg = document.createElement('div'); msg.id = 'workbench-msg'; msg.style.color = '#ffcc99'; msg.style.marginTop = '8px'; msg.style.minHeight = '18px'; modal.appendChild(msg);
-
         document.body.appendChild(modal);
         this._workbenchModal = modal;
         closeBtn.onclick = () => this._closeWorkbenchModal();
-
         this._refreshWorkbenchModal();
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     _closeWorkbenchModal() {
         if (this._workbenchModal && this._workbenchModal.parentNode) this._workbenchModal.parentNode.removeChild(this._workbenchModal);
         this._workbenchModal = null;
         // HUD revert
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     _refreshWorkbenchModal() {
         if (!this._workbenchModal) return;
         const inv = this.char.inventory || [];
@@ -298,7 +277,6 @@ export class Town extends Phaser.Scene {
             }
         });
     }
-
     _startContinuousCrafting(recipeId) {
         if (this.craftingActive) return;
         const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
@@ -314,7 +292,6 @@ export class Town extends Phaser.Scene {
             if (findQty(req.id) < (req.qty || 1)) { ok = false; break; }
         }
         if (!ok) { this._showToast('Missing materials'); return; }
-
         this.craftingActive = true;
         this._craftType = recipeId;
     // set activity for HUD to show smithing bar
@@ -328,7 +305,6 @@ export class Town extends Phaser.Scene {
         }
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     _stopContinuousCrafting() {
         if (!this.craftingActive) return;
         this.craftingActive = false;
@@ -341,7 +317,6 @@ export class Town extends Phaser.Scene {
         // avoid re-creating HUD in tight loops; recreate once on stop
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     _attemptCraft(recipeId) {
         const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
         const recipe = recipes[recipeId];
@@ -403,12 +378,10 @@ export class Town extends Phaser.Scene {
     if (this._workbenchModal) this._refreshWorkbenchModal();
     if (this._inventoryModal) this._refreshInventoryModal();
     }
-
     // Inventory modal is centralized in shared UI; keep wrappers for compatibility
     _openInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.openInventoryModal) return window.__shared_ui.openInventoryModal(this); }
     _closeInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.closeInventoryModal) return window.__shared_ui.closeInventoryModal(this); }
     _refreshInventoryModal() { if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal) return window.__shared_ui.refreshInventoryModal(this); }
-
     // Equipment functions delegate to shared UI/helpers
     _openEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.openEquipmentModal) return window.__shared_ui.openEquipmentModal(this); }
     _closeEquipmentModal() { if (window && window.__shared_ui && window.__shared_ui.closeEquipmentModal) return window.__shared_ui.closeEquipmentModal(this); }
@@ -417,7 +390,6 @@ export class Town extends Phaser.Scene {
     _unequipItem(slot) { if (window && window.__shared_ui && window.__shared_ui.unequipItem) return window.__shared_ui.unequipItem(this, slot); }
     _applyEquipmentBonuses(eq) { if (window && window.__shared_ui && window.__shared_ui.applyEquipmentBonuses) return window.__shared_ui.applyEquipmentBonuses(this, eq); }
     _removeEquipmentBonuses(eq) { if (window && window.__shared_ui && window.__shared_ui.removeEquipmentBonuses) return window.__shared_ui.removeEquipmentBonuses(this, eq); }
-
     // --- Toasts (small copy of Cave's toast helper) ---
     _showToast(text, timeout = 1600) {
         if (!this._toastContainer) {
@@ -445,12 +417,10 @@ export class Town extends Phaser.Scene {
         requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
         setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(6px)'; setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220); }, timeout);
     }
-
     _clearToasts() {
         if (this._toastContainer && this._toastContainer.parentNode) this._toastContainer.parentNode.removeChild(this._toastContainer);
         this._toastContainer = null;
     }
-
     // --- Furnace modal UI ---
     _openFurnaceModal() {
         if (this._furnaceModal) return;
@@ -459,7 +429,6 @@ export class Town extends Phaser.Scene {
         const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
         const copperOreQty = findQty('copper_ore');
         const tinOreQty = findQty('tin_ore');
-
         const modal = document.createElement('div');
         modal.id = 'furnace-modal';
         modal.style.position = 'fixed';
@@ -473,7 +442,6 @@ export class Town extends Phaser.Scene {
         modal.style.color = '#eee';
         modal.style.fontFamily = 'UnifrakturCook, cursive';
         modal.style.minWidth = '300px';
-
         modal.innerHTML = `
             <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>
                 <strong>Furnace</strong>
@@ -488,10 +456,8 @@ export class Town extends Phaser.Scene {
         `;
         document.body.appendChild(modal);
         this._furnaceModal = modal;
-
         const close = document.getElementById('furnace-close');
         if (close) close.onclick = () => this._closeFurnaceModal();
-
         const updateDisplay = () => {
             const inv = this.char.inventory || [];
             const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
@@ -500,7 +466,6 @@ export class Town extends Phaser.Scene {
             const elC = document.getElementById('furnace-copper-qty'); if (elC) elC.textContent = copperOreQty;
             const elT = document.getElementById('furnace-tin-qty'); if (elT) elT.textContent = tinOreQty;
         };
-
         // recipe toggle buttons (start/stop). only one recipe can run at a time
         const btnCopper = document.getElementById('smelt-copper');
         const btnBronze = document.getElementById('smelt-bronze');
@@ -547,7 +512,6 @@ export class Town extends Phaser.Scene {
         // HUD should reflect smithing while furnace modal is open
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     _closeFurnaceModal() {
         if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
         this._furnaceModal = null;
@@ -556,7 +520,6 @@ export class Town extends Phaser.Scene {
         if (this._furnaceIndicator && !this.smeltingActive) this._furnaceIndicator.setVisible(false);
         try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     // Start continuous smelting of a given recipe ('copper' or 'bronze')
     _startContinuousSmelting(recipeId) {
         if (this.smeltingActive) return;
@@ -570,7 +533,6 @@ export class Town extends Phaser.Scene {
         let ok = true;
         for (const req of (recipe.requires || [])) { if (findQty(req.id) < (req.qty || 1)) { ok = false; break; } }
         if (!ok) { this._showToast('Missing materials'); return; }
-
         this.smeltingActive = true;
         this._smeltType = recipeId;
     // mark activity as smithing so HUD shows smithing progress
@@ -582,7 +544,6 @@ export class Town extends Phaser.Scene {
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
         this._refreshFurnaceModal();
     }
-
     _stopContinuousSmelting() {
         if (!this.smeltingActive) return;
         this.smeltingActive = false;
@@ -595,7 +556,6 @@ export class Town extends Phaser.Scene {
         // HUD revert
     try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
-
     // Attempt a single smelt of specified type. Shows toast for each produced bar and persists.
     _attemptSmelt(recipeId) {
         const inv = this.char.inventory = this.char.inventory || [];
@@ -654,7 +614,6 @@ export class Town extends Phaser.Scene {
         this._refreshFurnaceModal();
         if (this._inventoryModal) this._refreshInventoryModal();
     }
-
     _refreshFurnaceModal() {
         if (!this._furnaceModal) return;
         const inv = this.char.inventory || [];
@@ -700,7 +659,6 @@ export class Town extends Phaser.Scene {
             btnBronze.style.opacity = btnBronze.disabled ? '0.6' : '1';
         }
     }
-
     // Persist character (inventory/mining/etc) by id or fallback to name
     _persistCharacter(username) {
         if (!username || !this.char) return;
@@ -731,7 +689,6 @@ export class Town extends Phaser.Scene {
         // If the inventory modal is open, refresh it so UI updates live after changes
         try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }
-
     // --- Shared account storage helpers ---
     _getAccountStorage(username) {
         if (!username) return [];
@@ -742,7 +699,6 @@ export class Town extends Phaser.Scene {
         } catch (e) { /* ignore */ }
         return [];
     }
-
     _setAccountStorage(username, storageArr) {
         if (!username) return;
         try {
@@ -752,7 +708,6 @@ export class Town extends Phaser.Scene {
             localStorage.setItem(key, JSON.stringify(userObj));
         } catch (e) { console.warn('Could not set account storage', e); }
     }
-
     // --- Storage chest modal ---
     _openStorageModal() {
         if (this._storageModal) return;
@@ -771,19 +726,16 @@ export class Town extends Phaser.Scene {
         modal.style.borderRadius = '12px';
         modal.style.color = '#fff';
         modal.style.minWidth = '420px';
-
         modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Account Storage</strong><button id='storage-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' style='max-height:260px;overflow:auto;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;'></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' style='max-height:260px;overflow:auto;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;'></div></div></div>`;
         document.body.appendChild(modal);
         this._storageModal = modal;
         document.getElementById('storage-close').onclick = () => this._closeStorageModal();
         this._refreshStorageModal();
     }
-
     _closeStorageModal() {
         if (this._storageModal && this._storageModal.parentNode) this._storageModal.parentNode.removeChild(this._storageModal);
         this._storageModal = null;
     }
-
     _refreshStorageModal() {
         if (!this._storageModal) return;
         const invContainer = this._storageModal.querySelector('#storage-inv');
@@ -823,7 +775,6 @@ export class Town extends Phaser.Scene {
             boxContainer.appendChild(el);
         }
     }
-
     _depositToStorage(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
         this.char.inventory = this.char.inventory || [];
@@ -856,7 +807,6 @@ export class Town extends Phaser.Scene {
         if (this._storageModal) this._refreshStorageModal();
         if (this._inventoryModal) this._refreshInventoryModal();
     }
-
     _withdrawFromStorage(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
@@ -881,7 +831,6 @@ export class Town extends Phaser.Scene {
         if (this._storageModal) this._refreshStorageModal();
         if (this._inventoryModal) this._refreshInventoryModal();
     }
-
     // --- Fog helpers ---
     _createFog() {
         this.fogCanvas = document.createElement('canvas');
@@ -903,7 +852,6 @@ export class Town extends Phaser.Scene {
         }
         this._startFog();
     }
-
     _startFog() {
         const that = this;
         function loop() {
@@ -924,7 +872,6 @@ export class Town extends Phaser.Scene {
         }
         this._fogRaf = requestAnimationFrame(loop);
     }
-
     _stopFog() {
         if (this._fogRaf) {
             cancelAnimationFrame(this._fogRaf);
@@ -936,23 +883,19 @@ export class Town extends Phaser.Scene {
             this.fogCtx = null;
         }
     }
-
     // --- HUD helpers ---
     _createHUD() {
         if (window && window.__hud_shared && window.__hud_shared.createHUD) return window.__hud_shared.createHUD(this);
     }
-
     _destroyHUD() {
         if (window && window.__hud_shared && window.__hud_shared.destroyHUD) return window.__hud_shared.destroyHUD(this);
     }
-
     _updateHUD() {
         if (window && window.__hud_shared && window.__hud_shared.updateHUD) return window.__hud_shared.updateHUD(this);
         // fallback: recreate if update not available
         try { return this._destroyHUD(); } catch(e) {}
         try { return this._createHUD(); } catch(e) {}
     }
-
     // Persist mining skill to localStorage (finds char by name)
     _persistMiningForActiveChar(username) {
         if (!username || !this.char) return;
@@ -982,7 +925,6 @@ export class Town extends Phaser.Scene {
             console.warn('Could not persist mining skill', e);
         }
     }
-
     _stopFog() {
         if (this._fogRaf) cancelAnimationFrame(this._fogRaf);
         this._fogRaf = null;
@@ -990,7 +932,6 @@ export class Town extends Phaser.Scene {
         this.fogCanvas = null;
         this.fogCtx = null;
     }
-
     update() {
         if (!this.player || !this.keys) return;
         const speed = 180;
@@ -1004,11 +945,9 @@ export class Town extends Phaser.Scene {
             this.player.setVelocityX(0);
             this.player.anims.play('turn');
         }
-
         if (this.keys.up.isDown && this.player.body.blocked.down) {
             this.player.setVelocityY(-380);
         }
-
         // Portal interaction: proximity + E to enter
         if (this.portal) {
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.portal.x, this.portal.y);
@@ -1041,13 +980,12 @@ export class Town extends Phaser.Scene {
                             localStorage.setItem(key, JSON.stringify(userObj));
                         }
                     } catch (e) { console.warn('Could not persist lastLocation', e); }
-                    this.scene.start('Cave', { character: this.char, username: username });
+                    this.scene.start('Cave', { character: this.char, username: username, spawnX: this.scale.width - 140, spawnY: cavePortalY });
                 }
             } else {
                 this.portalPrompt.setVisible(false);
             }
         }
-
         if (this.fieldPortal) {
             const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.fieldPortal.x, this.fieldPortal.y);
             if (fdist <= 56) {
@@ -1078,13 +1016,12 @@ export class Town extends Phaser.Scene {
                             localStorage.setItem(key, JSON.stringify(userObj));
                         }
                     } catch (e) { console.warn('Could not persist lastLocation (inner field)', e); }
-                    this.scene.start('InnerField', { character: this.char, username: username });
+                    this.scene.start('InnerField', { character: this.char, username: username, spawnX: Math.max(80, this.scale.width * 0.12), spawnY: fieldPortalY });
                 }
             } else {
                 this.fieldPortalPrompt.setVisible(false);
             }
         }
-
         // Furnace interaction: proximity + E to open smelting UI
         if (this.furnace) {
             const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.furnace.x, this.furnace.y);
@@ -1099,7 +1036,6 @@ export class Town extends Phaser.Scene {
                 if (this._furnaceModal) this._closeFurnaceModal();
             }
         }
-
         // Workbench interaction: proximity + E to open crafting UI
         if (this.workbench) {
             const wdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.workbench.x, this.workbench.y);
@@ -1113,7 +1049,6 @@ export class Town extends Phaser.Scene {
                 if (this._workbenchModal) this._closeWorkbenchModal();
             }
         }
-
         // Storage chest interaction
         if (this.storageChest) {
             const sdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.storageChest.x, this.storageChest.y);
@@ -1127,7 +1062,6 @@ export class Town extends Phaser.Scene {
                 if (this._storageModal) this._closeStorageModal();
             }
         }
-
         // Inventory toggle (I)
         if (Phaser.Input.Keyboard.JustDown(this.keys.inventory)) {
             if (window && window.__shared_ui) {
@@ -1151,7 +1085,6 @@ export class Town extends Phaser.Scene {
             }
         }
     }
-
     // Equipment modal UI
     _openEquipmentModal() {
         if (this._equipmentModal) return;
@@ -1175,12 +1108,10 @@ export class Town extends Phaser.Scene {
         document.getElementById('equip-close').onclick = () => this._closeEquipmentModal();
         this._refreshEquipmentModal();
     }
-
     _closeEquipmentModal() {
         if (this._equipmentModal && this._equipmentModal.parentNode) this._equipmentModal.parentNode.removeChild(this._equipmentModal);
         this._equipmentModal = null;
     }
-
     _refreshEquipmentModal() {
         if (!this._equipmentModal) return;
         const container = this._equipmentModal.querySelector('#equip-list');
