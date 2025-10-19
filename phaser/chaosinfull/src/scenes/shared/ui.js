@@ -212,26 +212,27 @@ export function equipItemFromInventory(scene, itemId) {
     scene.char.equipment[slot] = { id: itemId, name: def.name || itemId };
     applyEquipmentBonuses(scene, scene.char.equipment[slot]);
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
-    scene._destroyHUD && scene._destroyHUD(); scene._createHUD && scene._createHUD();
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
 export function unequipItem(scene, slot) {
-    if (!scene.char.equipment) return; const eq = scene.char.equipment[slot]; if (!eq) return; removeEquipmentBonuses(scene, eq); scene.char.inventory = scene.char.inventory || []; scene.char.inventory.push({ id: eq.id, name: eq.name, qty:1 }); scene.char.equipment[slot] = null; const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username); scene._destroyHUD && scene._destroyHUD(); scene._createHUD && scene._createHUD();
+    if (!scene.char.equipment) return; const eq = scene.char.equipment[slot]; if (!eq) return; removeEquipmentBonuses(scene, eq); scene.char.inventory = scene.char.inventory || []; scene.char.inventory.push({ id: eq.id, name: eq.name, qty:1 }); scene.char.equipment[slot] = null; const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
 export function applyEquipmentBonuses(scene, eq) {
     if (!eq || !eq.id) return; const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {}; const def = defs[eq.id]; if (!def) return; if (!scene.char._equipBonuses) scene.char._equipBonuses = { str:0,int:0,agi:0,luk:0,defense:0 }; if (def.statBonus) { for (const k of Object.keys(def.statBonus)) scene.char._equipBonuses[k] = (scene.char._equipBonuses[k]||0) + def.statBonus[k]; } if (def.defense) scene.char._equipBonuses.defense = (scene.char._equipBonuses.defense||0) + def.defense;
     // refresh stats modal and HUD if open
-    try { if (scene._destroyHUD) scene._destroyHUD(); } catch(e) {}
-    try { if (scene._createHUD) scene._createHUD(); } catch(e) {}
+        // refresh stats modal and HUD if open (prefer in-place update)
+        try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
     try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch(e) {}
 }
 
 export function removeEquipmentBonuses(scene, eq) {
     if (!eq || !eq.id) return; const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {}; const def = defs[eq.id]; if (!def) return; if (!scene.char._equipBonuses) scene.char._equipBonuses = { str:0,int:0,agi:0,luk:0,defense:0 }; if (def.statBonus) { for (const k of Object.keys(def.statBonus)) scene.char._equipBonuses[k] = (scene.char._equipBonuses[k]||0) - def.statBonus[k]; } if (def.defense) scene.char._equipBonuses.defense = (scene.char._equipBonuses.defense||0) - def.defense;
     // refresh stats modal and HUD if open
-    try { if (scene._destroyHUD) scene._destroyHUD(); } catch(e) {}
-    try { if (scene._createHUD) scene._createHUD(); } catch(e) {}
+        // refresh stats modal and HUD if open (prefer in-place update)
+        try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
     try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch(e) {}
 }
 

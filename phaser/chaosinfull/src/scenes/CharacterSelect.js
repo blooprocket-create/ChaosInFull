@@ -492,17 +492,44 @@ export class CharacterSelect extends Phaser.Scene {
                 if (characters[idx]) {
                     // Show expanded character info and play button
                     const char = characters[idx];
-                    // Calculate base stats (example values)
-                    const baseStats = {
-                        maxhp: 100 + ((char.level || 1) * 10) + (((char.stats && char.stats.str) || 0) * 10),
-                        maxmana: 50 + ((char.level || 1) * 5) + (((char.stats && char.stats.int) || 0) * 10),
-                        attackspeed: 1.0 + (((char.stats && char.stats.agi) || 0) * 0.02),
-                        def: 5 + ((char.level || 1)) + (((char.stats && char.stats.luk) || 0) * 2),
-                        str: (char.stats && char.stats.str) || 0,
-                        agi: (char.stats && char.stats.agi) || 0,
-                        int: (char.stats && char.stats.int) || 0,
-                        luk: (char.stats && char.stats.luk) || 0
-                    };
+                    // Compute effective stats/vitals (include equipment, class/race bonuses).
+                    // Deep-clone the character so we don't accidentally mutate the stored object when reconciling equipment.
+                    let baseStats;
+                    try {
+                        const displayChar = JSON.parse(JSON.stringify(char || {}));
+                        displayChar.stats = displayChar.stats || { str: 0, int: 0, agi: 0, luk: 0 };
+                        displayChar.equipment = displayChar.equipment || {};
+                        // Some shared helpers expect an object like { char: ... }
+                        if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) {
+                            try { window.__shared_ui.reconcileEquipmentBonuses({ char: displayChar }); } catch (e) { /* continue to effective calc */ }
+                        }
+                        const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats)
+                            ? window.__shared_ui.stats.effectiveStats(displayChar)
+                            : displayChar.stats;
+
+                        baseStats = {
+                            maxhp: (eff && eff.maxhp) || (100 + ((displayChar.level || 1) * 10) + (((eff && eff.str) || 0) * 10)),
+                            maxmana: (eff && eff.maxmana) || (50 + ((displayChar.level || 1) * 5) + (((eff && eff.int) || 0) * 10)),
+                            attackspeed: (eff && eff.attackspeed) || (1.0 + (((eff && eff.agi) || 0) * 0.02)),
+                            def: (eff && eff.def) || (5 + ((displayChar.level || 1)) + (((eff && eff.luk) || 0) * 2)),
+                            str: (eff && eff.str) || 0,
+                            agi: (eff && eff.agi) || 0,
+                            int: (eff && eff.int) || 0,
+                            luk: (eff && eff.luk) || 0
+                        };
+                    } catch (err) {
+                        // Fallback to original base stat calculation if anything goes wrong
+                        baseStats = {
+                            maxhp: 100 + ((char.level || 1) * 10) + (((char.stats && char.stats.str) || 0) * 10),
+                            maxmana: 50 + ((char.level || 1) * 5) + (((char.stats && char.stats.int) || 0) * 10),
+                            attackspeed: 1.0 + (((char.stats && char.stats.agi) || 0) * 0.02),
+                            def: 5 + ((char.level || 1)) + (((char.stats && char.stats.luk) || 0) * 2),
+                            str: (char.stats && char.stats.str) || 0,
+                            agi: (char.stats && char.stats.agi) || 0,
+                            int: (char.stats && char.stats.int) || 0,
+                            luk: (char.stats && char.stats.luk) || 0
+                        };
+                    }
                     // Show lastLocation info if present
                     const last = (char && char.lastLocation) ? char.lastLocation : null;
                     const lastStr = last && last.scene ? `${last.scene} (${Math.round(last.x||0)}, ${Math.round(last.y||0)})` : 'None';

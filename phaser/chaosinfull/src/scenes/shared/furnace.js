@@ -77,8 +77,7 @@ export function openFurnaceModal(scene) {
     };
 
     refreshFurnaceModal(scene);
-    scene._destroyHUD && scene._destroyHUD();
-    scene._createHUD && scene._createHUD();
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
 export function closeFurnaceModal(scene) {
@@ -86,8 +85,7 @@ export function closeFurnaceModal(scene) {
     if (scene._furnaceModal && scene._furnaceModal.parentNode) scene._furnaceModal.parentNode.removeChild(scene._furnaceModal);
     scene._furnaceModal = null;
     if (scene._furnaceIndicator && !scene.smeltingActive) scene._furnaceIndicator.setVisible(false);
-    scene._destroyHUD && scene._destroyHUD();
-    scene._createHUD && scene._createHUD();
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
 export function refreshFurnaceModal(scene) {
@@ -149,8 +147,7 @@ export function startContinuousSmelting(scene, recipeId) {
     scene._smeltingEvent = scene.time.addEvent({ delay: scene.smeltingInterval, callback: attemptSmelt, callbackScope: scene, args: [recipeId], loop: true });
     scene._showToast('Started smelting ' + (recipe.name || recipeId));
     if (scene._furnaceIndicator) scene._furnaceIndicator.setVisible(true);
-    scene._destroyHUD && scene._destroyHUD();
-    scene._createHUD && scene._createHUD();
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
     refreshFurnaceModal(scene);
 }
 
@@ -162,8 +159,7 @@ export function stopContinuousSmelting(scene) {
     scene._smeltType = null;
     if (scene._furnaceIndicator) scene._furnaceIndicator.setVisible(false);
     refreshFurnaceModal(scene);
-    scene._destroyHUD && scene._destroyHUD();
-    scene._createHUD && scene._createHUD();
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
 export function attemptSmelt(recipeId) {

@@ -565,6 +565,9 @@ export class Login extends Phaser.Scene {
                 const userObj = JSON.parse(userData);
                 if (userObj.password === password) {
                     errorDiv.textContent = '';
+                    // mark as logged in
+                    userObj.loggedIn = true;
+                    localStorage.setItem('cif_user_' + username, JSON.stringify(userObj));
                     this.scene.start('CharacterSelect');
                     container.remove();
                 } else {
@@ -586,8 +589,9 @@ export class Login extends Phaser.Scene {
                 errorDiv.textContent = 'User already exists.';
                 return;
             }
-            // Save user to localStorage
-            localStorage.setItem('cif_user_' + username, JSON.stringify({ username, password }));
+            // Save user to localStorage and mark logged in
+            const newUser = { username, password, loggedIn: true, characters: [] };
+            localStorage.setItem('cif_user_' + username, JSON.stringify(newUser));
             errorDiv.textContent = '';
             this.scene.start('CharacterSelect');
             container.remove();

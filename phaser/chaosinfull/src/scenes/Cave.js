@@ -40,8 +40,8 @@ export class Cave extends Phaser.Scene {
     if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
     if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
 
-    // Input: WASD + E + I (inventory) + U (equipment) + X (stats)
-    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I, equip: Phaser.Input.Keyboard.KeyCodes.U, stats: Phaser.Input.Keyboard.KeyCodes.X });
+    // Input: WASD + E + I (inventory) + U (equipment) + X (stats) - centralized
+    if (window && window.__shared_keys && window.__shared_keys.attachCommonKeys) this.keys = window.__shared_keys.attachCommonKeys(this);
 
     // Character data from scene settings
     this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
@@ -135,6 +135,8 @@ export class Cave extends Phaser.Scene {
     _createHUD() { if (window && window.__hud_shared && window.__hud_shared.createHUD) return window.__hud_shared.createHUD(this); }
 
     _destroyHUD() { if (window && window.__hud_shared && window.__hud_shared.destroyHUD) return window.__hud_shared.destroyHUD(this); }
+
+    _updateHUD() { if (window && window.__hud_shared && window.__hud_shared.updateHUD) return window.__hud_shared.updateHUD(this); try { this._destroyHUD(); this._createHUD(); } catch(e) {} }
 
     // --- Mining node creation ---
     // create a mining node of a given type ('tin' or 'copper')
@@ -290,7 +292,7 @@ export class Cave extends Phaser.Scene {
 
         this._refreshCaveFurnaceModal();
         // HUD switch to smithing
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _closeCaveFurnaceModal() {
@@ -298,7 +300,7 @@ export class Cave extends Phaser.Scene {
         this._furnaceModal = null;
         // Only hide the indicator if smelting is not active; keep it visible during background smelting
         if (this._furnaceIndicator && !this.smeltingActive) this._furnaceIndicator.setVisible(false);
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _refreshCaveFurnaceModal() {
@@ -358,12 +360,14 @@ export class Cave extends Phaser.Scene {
 
         this.smeltingActive = true;
         this._smeltType = type;
+    // set activity flag so HUD shows smithing
+    try { if (this.char) this.char.activity = 'smithing'; } catch(e) {}
         // schedule-first: wait interval, then call _attemptSmelt
         this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: this._attemptSmelt, callbackScope: this, args: [type], loop: true });
         this._showToast('Started smelting ' + (recipe.name || type));
         if (this._furnaceIndicator) this._furnaceIndicator.setVisible(true);
         // show smithing HUD and refresh modal
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
         this._refreshCaveFurnaceModal();
     }
 
@@ -374,8 +378,9 @@ export class Cave extends Phaser.Scene {
         this._showToast('Smelting stopped');
         this._smeltType = null;
         if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+        try { if (this.char) this.char.activity = null; } catch(e) {}
         this._refreshCaveFurnaceModal();
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _attemptSmelt(recipeId) {
@@ -390,7 +395,10 @@ export class Cave extends Phaser.Scene {
         for (const req of (recipe.requires || [])) {
             const have = (find(req.id) && find(req.id).qty) || 0;
             if (have < (req.qty || 1)) {
+                // out of materials: stop smelting, clear activity and refresh HUD
                 this._stopContinuousSmelting();
+                try { if (this.char) this.char.activity = null; } catch(e) {}
+                try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
                 this._showToast('Out of materials for ' + (recipe.name || recipeId));
                 return;
             }
@@ -651,18 +659,21 @@ export class Cave extends Phaser.Scene {
         this._persistCharacter(username);
 
         // update HUD (simple re-render of HUD element)
-        this._destroyHUD();
-        this._createHUD();
+        try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     // Start continuous mining: attempt immediately and then repeatedly until stopped
     _startContinuousMining() {
         if (this.miningActive) return;
         this.miningActive = true;
+        // mark activity as mining so HUD shows mining progress
+        try { if (this.char) this.char.activity = 'mining'; } catch(e) {}
         // schedule-first: wait miningInterval before first attempt
         this._miningEvent = this.time.addEvent({ delay: this.miningInterval, callback: this._attemptMine, callbackScope: this, loop: true });
         // show mining indicator
         this._showMiningIndicator();
+        // refresh HUD immediately so the mining bar appears
+        try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _stopContinuousMining() {
@@ -672,5 +683,8 @@ export class Cave extends Phaser.Scene {
             this._miningEvent = null;
         }
         this._hideMiningIndicator();
+        try { if (this.char) this.char.activity = null; } catch(e) {}
+        // refresh HUD so it reverts to class exp bar
+        try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 }

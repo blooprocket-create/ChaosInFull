@@ -2,12 +2,25 @@
 export function effectiveStats(char) {
     const base = Object.assign({}, (char.stats || { str:0, int:0, agi:0, luk:0 }));
     const equip = char._equipBonuses || { str:0, int:0, agi:0, luk:0, defense:0 };
+    const str = (base.str||0) + (equip.str||0);
+    const int = (base.int||0) + (equip.int||0);
+    const agi = (base.agi||0) + (equip.agi||0);
+    const luk = (base.luk||0) + (equip.luk||0);
+    const defense = (char.defenseBonus||0) + (equip.defense||0);
+    // Derived vitals (centralized formulas):
+    // maxhp = 100 + level*10 + STR*10
+    // maxmana = 50 + level*5 + INT*10
+    // attackSpeed = base speed modified by AGI (higher agi -> faster attacks). We invert to a ms-per-attack metric lower is faster.
+    const level = (char.level || 1);
+    const maxhp = Math.max(1, Math.floor((char.maxhp || (100 + level * 10 + (str * 10)))));
+    const maxmana = Math.max(0, Math.floor((char.maxmana || (50 + level * 5 + (int * 10)))));
+    // baseline ms/attack = 1000, agi reduces it by up to 40% at 100 AGI. Formula: ms = 1000 * (1 - clamp(agi / 250, 0, 0.4))
+    const agiFactor = Math.max(0, Math.min(0.4, (agi / 250)));
+    const attackSpeedMs = Math.max(120, Math.floor(1000 * (1 - agiFactor)));
     return {
-        str: (base.str||0) + (equip.str||0),
-        int: (base.int||0) + (equip.int||0),
-        agi: (base.agi||0) + (equip.agi||0),
-        luk: (base.luk||0) + (equip.luk||0),
-        defense: (char.defenseBonus||0) + (equip.defense||0)
+        str, int, agi, luk, defense,
+        // canonical derived vitals
+        maxhp, maxmana, attackSpeedMs
     };
 }
 
@@ -60,9 +73,8 @@ export function checkClassLevelUps(scene) {
     }
     if (leveled) {
         // when leveled, persist and refresh HUD + stats modal
-        try { if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null); } catch(e) { /* ignore */ }
-        try { if (scene._destroyHUD) scene._destroyHUD(); } catch(e) {}
-        try { if (scene._createHUD) scene._createHUD(); } catch(e) {}
+    try { if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null); } catch(e) { /* ignore */ }
+    try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
         try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch(e) { /* ignore */ }
     }
     return leveled;

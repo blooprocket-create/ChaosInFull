@@ -43,8 +43,8 @@ export class Town extends Phaser.Scene {
     if (!this.anims.exists('turn')) this.anims.create({ key: 'turn', frames: [{ key: 'dude', frame: 4 }], frameRate: 20 });
     if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
 
-        // Input (WASD + E + I inventory + U equipment + X stats)
-    this.keys = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, left: Phaser.Input.Keyboard.KeyCodes.A, down: Phaser.Input.Keyboard.KeyCodes.S, right: Phaser.Input.Keyboard.KeyCodes.D, interact: Phaser.Input.Keyboard.KeyCodes.E, inventory: Phaser.Input.Keyboard.KeyCodes.I, equip: Phaser.Input.Keyboard.KeyCodes.U, stats: Phaser.Input.Keyboard.KeyCodes.X });
+        // Input (WASD + E + I + U + X) - centralized
+    if (window && window.__shared_keys && window.__shared_keys.attachCommonKeys) this.keys = window.__shared_keys.attachCommonKeys(this);
 
         // Character data
         const char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
@@ -56,16 +56,6 @@ export class Town extends Phaser.Scene {
         // Reconcile equipment bonuses using shared helper (centralized)
         try {
             if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses(this);
-            // If char.stats appears to include equipment bonuses historically stored, subtract equip bonuses once
-            if (this.char.stats) {
-                const sb = this.char._equipBonuses || { str:0,int:0,agi:0,luk:0 };
-                let subtract = false;
-                for (const k of ['str','int','agi','luk']) if ((sb[k] || 0) !== 0 && (this.char.stats[k] || 0) >= (sb[k] || 0)) subtract = true;
-                if (subtract) {
-                    for (const k of ['str','int','agi','luk']) { this.char.stats[k] = (this.char.stats[k] || 0) - (sb[k] || 0); }
-                    this.char.defenseBonus = (this.char.defenseBonus || 0) - ((this.char._equipBonuses && this.char._equipBonuses.defense) || 0);
-                }
-            }
         } catch (e) { /* ignore */ }
 
         // If the character was just created with startingEquipment, add those items to inventory once
@@ -109,7 +99,7 @@ export class Town extends Phaser.Scene {
                         try { if (window && window.__shared_ui && window.__shared_ui.applyEquipmentBonuses) window.__shared_ui.applyEquipmentBonuses(this, this.char.equipment.weapon); } catch (e) { /* ignore */ }
                         this._persistCharacter(username);
                         // refresh HUD to reflect new vitals
-                        this._destroyHUD(); this._createHUD();
+                        try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
                     }
                 } catch (e) { /* ignore auto-equip errors */ }
             }
@@ -256,14 +246,14 @@ export class Town extends Phaser.Scene {
         closeBtn.onclick = () => this._closeWorkbenchModal();
 
         this._refreshWorkbenchModal();
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _closeWorkbenchModal() {
         if (this._workbenchModal && this._workbenchModal.parentNode) this._workbenchModal.parentNode.removeChild(this._workbenchModal);
         this._workbenchModal = null;
         // HUD revert
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _refreshWorkbenchModal() {
@@ -319,6 +309,8 @@ export class Town extends Phaser.Scene {
 
         this.craftingActive = true;
         this._craftType = recipeId;
+    // set activity for HUD to show smithing bar
+    try { if (this.char) this.char.activity = 'smithing'; } catch(e) {}
         // schedule first crafting after the interval (no immediate grant)
         this._craftingEvent = this.time.addEvent({ delay: this.craftingInterval, callback: this._attemptCraft, callbackScope: this, args: [recipeId], loop: true });
         this._showToast('Started crafting ' + (recipe.name || recipeId));
@@ -326,7 +318,7 @@ export class Town extends Phaser.Scene {
         if (this.workbench && this._workbenchIndicator) {
             this._workbenchIndicator.setVisible(true);
         }
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _stopContinuousCrafting() {
@@ -336,8 +328,10 @@ export class Town extends Phaser.Scene {
         this._showToast('Crafting stopped');
         this._craftType = null;
     if (this._workbenchIndicator) this._workbenchIndicator.setVisible(false);
+        try { if (this.char) this.char.activity = null; } catch(e) {}
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
         // avoid re-creating HUD in tight loops; recreate once on stop
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _attemptCraft(recipeId) {
@@ -543,7 +537,7 @@ export class Town extends Phaser.Scene {
         // initialize labels/state
         this._refreshFurnaceModal();
         // HUD should reflect smithing while furnace modal is open
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     _closeFurnaceModal() {
@@ -552,7 +546,7 @@ export class Town extends Phaser.Scene {
         // restore HUD display and hide furnace indicator
         // Keep the indicator visible if smelting is still active; only hide when smelting has stopped
         if (this._furnaceIndicator && !this.smeltingActive) this._furnaceIndicator.setVisible(false);
-        this._destroyHUD(); this._createHUD();
+        try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     // Start continuous smelting of a given recipe ('copper' or 'bronze')
@@ -571,11 +565,13 @@ export class Town extends Phaser.Scene {
 
         this.smeltingActive = true;
         this._smeltType = recipeId;
+    // mark activity as smithing so HUD shows smithing progress
+    try { if (this.char) this.char.activity = 'smithing'; } catch(e) {}
         // schedule-first: wait interval before first smelt
         this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: this._attemptSmelt, callbackScope: this, args: [recipeId], loop: true });
         this._showToast('Started smelting ' + (recipe.name || recipeId));
         if (this._furnaceIndicator) this._furnaceIndicator.setVisible(true);
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
         this._refreshFurnaceModal();
     }
 
@@ -586,9 +582,10 @@ export class Town extends Phaser.Scene {
         this._showToast('Smelting stopped');
         this._smeltType = null;
         if (this._furnaceIndicator) this._furnaceIndicator.setVisible(false);
+    try { if (this.char) this.char.activity = null; } catch(e) {}
         this._refreshFurnaceModal();
         // HUD revert
-        this._destroyHUD(); this._createHUD();
+    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
 
     // Attempt a single smelt of specified type. Shows toast for each produced bar and persists.
@@ -604,7 +601,10 @@ export class Town extends Phaser.Scene {
         for (const req of (recipe.requires || [])) {
             const have = (find(req.id) && find(req.id).qty) || 0;
             if (have < (req.qty || 1)) {
+                // out of materials: stop smelting, clear activity and refresh HUD
                 this._stopContinuousSmelting();
+                try { if (this.char) this.char.activity = null; } catch(e) {}
+                try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
                 this._showToast('Out of materials for ' + (recipe.name || recipeId));
                 return;
             }
@@ -936,6 +936,13 @@ export class Town extends Phaser.Scene {
 
     _destroyHUD() {
         if (window && window.__hud_shared && window.__hud_shared.destroyHUD) return window.__hud_shared.destroyHUD(this);
+    }
+
+    _updateHUD() {
+        if (window && window.__hud_shared && window.__hud_shared.updateHUD) return window.__hud_shared.updateHUD(this);
+        // fallback: recreate if update not available
+        try { return this._destroyHUD(); } catch(e) {}
+        try { return this._createHUD(); } catch(e) {}
     }
 
     // Persist mining skill to localStorage (finds char by name)
