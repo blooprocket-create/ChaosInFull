@@ -364,16 +364,21 @@ function findFirstSlotIndex(slots, itemId) {
 // Use an item from the scene's inventory by slot index. Supports heal/mana potions and bag_of_gold.
 function useItemFromSlot(scene, slotIndex) {
     try {
+        try { console.log && console.log('[useItemFromSlot] called', { slotIndex }); } catch(e) {}
         if (!scene || !scene.char) return false;
         scene.char.inventory = initSlots(scene.char.inventory || []);
         const slots = scene.char.inventory;
         if (slotIndex < 0 || slotIndex >= slots.length) return false;
         const s = slots[slotIndex]; if (!s || !s.id) return false;
+    try { console.log && console.log('[useItemFromSlot] slot item', { id: s.id, qty: s.qty }); } catch(e) {}
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
         const def = defs[s.id] || {};
         let acted = false;
+        let attempted = false; // whether we attempted to use the item (so clicks are considered handled even if no effect)
         // heal
         if (def.healAmount) {
+            try { console.log && console.log('[useItemFromSlot] healAmount detected', def.healAmount, 'usable?', def.usable); } catch(e) {}
+            attempted = true;
             if (!def.usable) { if (scene._showToast) scene._showToast('Cannot use that item'); }
             else {
                 // compute effective maxhp
@@ -391,6 +396,8 @@ function useItemFromSlot(scene, slotIndex) {
         }
         // mana
         if (def.manaAmount) {
+            try { console.log && console.log('[useItemFromSlot] manaAmount detected', def.manaAmount, 'usable?', def.usable); } catch(e) {}
+            attempted = true;
             if (!def.usable) { if (scene._showToast) scene._showToast('Cannot use that item'); }
             else {
                 let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
@@ -407,6 +414,7 @@ function useItemFromSlot(scene, slotIndex) {
         }
         // bag of gold or items that convert to gold via value
         if ((s.id === 'bag_of_gold' || (def && def.value && def.convertToGold)) && def.usable) {
+            try { console.log && console.log('[useItemFromSlot] bag_of_gold or convertToGold used'); } catch(e) {}
             const goldGain = Number(def.value || 0);
             scene.char.gold = (typeof scene.char.gold === 'number') ? scene.char.gold + goldGain : goldGain;
             acted = true;
@@ -414,6 +422,8 @@ function useItemFromSlot(scene, slotIndex) {
         }
         // teleport scroll: move player to Town scene (persist first)
         if (s.id === 'teleport_scroll' && def.usable) {
+            try { console.log && console.log('[useItemFromSlot] teleport_scroll used'); } catch(e) {}
+            attempted = true;
             acted = true;
             if (scene._showToast) scene._showToast(`${def.name || s.id} used`);
             try {
@@ -425,8 +435,10 @@ function useItemFromSlot(scene, slotIndex) {
         }
         // buff items: apply temporary stat bonuses (def.buff expected: { statBonus: {...}, defense: n, duration: ms })
         if (def && def.usable && def.buff && (def.buff.statBonus || def.buff.defense || def.buff.duration)) {
+            try { console.log && console.log('[useItemFromSlot] buff item used', def.buff); } catch(e) {}
             const duration = Number(def.buff.duration || 30000);
             const buffId = (s.id || 'buff') + '_' + Date.now() + '_' + Math.floor(Math.random()*9999);
+            attempted = true;
             const buffObj = { id: buffId, source: s.id, statBonus: def.buff.statBonus || {}, defense: def.buff.defense || 0, expiresAt: Date.now() + duration };
             if (!scene.char._buffs) scene.char._buffs = [];
             scene.char._buffs.push(buffObj);
@@ -463,6 +475,10 @@ function useItemFromSlot(scene, slotIndex) {
             try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch(e) {}
             return true;
         }
+        // If we attempted to use the item (it was usable) but it had no actionable effect
+        // (for example HP was already full), treat the click as handled so the
+        // inventory double-click does not fall back to equipping the item.
+        if (attempted) return true;
     } catch (e) { console.warn('useItemFromSlot error', e); }
     return false;
 }
@@ -531,11 +547,10 @@ export function refreshInventoryModal(scene) {
                 try { console.debug && console.debug('[inventory][delegated] clicked slot', { slotIndex: idx, item: (target && target.dataset && target.dataset.slotIndex) }); } catch(e) {}
                 if (!isNaN(idx)) {
                     try {
-                        if (window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
-                            const ok = window.__shared_ui.useItemFromSlot(scene, idx);
-                            try { console.debug && console.debug('[inventory][delegated] useItemFromSlot returned', ok); } catch(e) {}
-                            if (ok) return;
-                        }
+                        // Do not call useItemFromSlot on single clicks — that prevents
+                        // double-click (ondblclick) from being the reliable trigger for use/equip.
+                        // Instead, focus the slot so keyboard Enter/Space can still trigger use.
+                        if (slotEl && typeof slotEl.focus === 'function') slotEl.focus();
                     } catch (e) { try { console.warn && console.warn('[inventory][delegated] handler error', e); } catch(_) {} }
                 }
             };
@@ -561,7 +576,9 @@ export function refreshInventoryModal(scene) {
     // render each slot
     for (let i = 0; i < inv.length; i++) {
         const s = inv[i];
-        const slotEl = document.createElement('div'); slotEl.className = 'slot'; slotEl.dataset.slotIndex = i;
+    const slotEl = document.createElement('div'); slotEl.className = 'slot'; slotEl.dataset.slotIndex = i;
+    // ensure the slot is positioned and sits above potential overlays so clicks/dblclicks reach it
+    try { slotEl.style.position = slotEl.style.position || 'relative'; slotEl.style.zIndex = '20'; slotEl.style.userSelect = 'none'; } catch (e) {}
         if (s) {
             const def = defs && defs[s.id];
             const icon = def && def.weapon ? '⚔️' : (def && def.armor ? '🛡️' : '📦');
@@ -586,9 +603,11 @@ export function refreshInventoryModal(scene) {
             slotEl.ondblclick = () => {
                 try {
                     const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
+                    try { console.log && console.log('[slot dblclick] idx', idx, 'itemId', (def && def.id) || (s && s.id)); } catch(e) {}
                     // If item is usable, attempt to use it first
                     if (def && def.usable && !isNaN(idx) && window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
                         const used = window.__shared_ui.useItemFromSlot(scene, idx);
+                        try { console.log && console.log('[slot dblclick] useItemFromSlot returned', used); } catch(e) {}
                         if (used) {
                             // refresh UI after use
                             try { refreshInventoryModal(scene); } catch(e) {}
@@ -620,6 +639,32 @@ export function refreshInventoryModal(scene) {
                         }
                     }
                 });
+            } catch (e) {}
+            // Add a small 'Use' button for usable items (clicking stops propagation so it doesn't trigger dblclick)
+            try {
+                if (def && def.usable) {
+                    const useBtn = document.createElement('button');
+                    useBtn.className = 'use-btn';
+                    useBtn.textContent = 'Use';
+                    useBtn.style.cssText = 'position:absolute;left:6px;bottom:6px;background:#2b6be6;color:#fff;border:none;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px;z-index:50;pointer-events:auto;';
+                    useBtn.onclick = (ev) => {
+                        ev.stopPropagation();
+                        try {
+                            const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
+                            if (isNaN(idx)) return;
+                            console.log && console.log('[use-btn] clicked slot', idx, 'item', s && s.id);
+                            // Call the local function directly (same as debug header) to avoid
+                            // relying on window.__shared_ui being present or stale.
+                            const ok = typeof useItemFromSlot === 'function' ? useItemFromSlot(scene, idx) : false;
+                            console.log && console.log('[use-btn] useItemFromSlot returned', ok);
+                            if (ok) {
+                                try { refreshInventoryModal(scene); } catch (e) {}
+                                try { refreshEquipmentModal(scene); } catch (e) {}
+                            }
+                        } catch (e) { console.warn && console.warn('[use-btn] error', e); }
+                    };
+                    slotEl.appendChild(useBtn);
+                }
             } catch (e) {}
         }
         grid.appendChild(slotEl);
