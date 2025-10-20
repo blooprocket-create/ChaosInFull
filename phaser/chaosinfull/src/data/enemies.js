@@ -50,6 +50,72 @@ export const ENEMY_DEFS = {
             { itemId: 'slime_crown_shard', minQty: 1, maxQty: 1, baseChance: 0.025, luckBonus: 0.001 },
             { itemId: 'strange_slime_egg', minQty: 1, maxQty: 1, baseChance: 0.005, luckBonus: 0.0002 }
         ]
+    },
+    goblin_common: {
+        id: 'goblin_common',
+        name: 'Goblin',
+        tier: 'common',
+        level: 3,
+        maxhp: 60,
+        moveSpeed: 90,
+        attackRange: 40,
+        attackCooldown: 1300,
+        damage: [4, 8],
+        exp: 25,
+        drops: [
+            { itemId: 'copper_ore', minQty: 1, maxQty: 3, baseChance: 0.85, luckBonus: 0.001 },
+            { itemId: 'copper_sword', minQty: 1, maxQty: 1, baseChance: 0.01, luckBonus: 0.0004 }
+        ]
+    },
+    goblin_epic: {
+        id: 'goblin_epic',
+        name: 'Goblin Warrior',
+        tier: 'epic',
+        level: 7,
+        maxhp: 150,
+        moveSpeed: 100,
+        attackRange: 48,
+        attackCooldown: 1100,
+        damage: [8, 14],
+        exp: 75,
+        drops: [
+            { itemId: 'bronze_ore', minQty: 1, maxQty: 4, baseChance: 0.9, luckBonus: 0.0015 },
+            { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0006 },
+            { itemId: 'copper_armor', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0006 }
+        ]
+    },
+    goblin_boss: {
+        id: 'goblin_boss',
+        name: 'Goblin Chieftain',
+        tier: 'boss',
+        level: 12,
+        maxhp: 400,
+        moveSpeed: 80,
+        attackRange: 56,
+        attackCooldown: 800,
+        damage: [15, 25],
+        exp: 300,
+        drops: [
+            { itemId: 'bronze_ore', minQty: 2, maxQty: 6, baseChance: 1.0, luckBonus: 0.002 },
+            { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0012 },
+            { itemId: 'bag_of_gold', minQty: 1, maxQty: 1, baseChance: 0.3, luckBonus: 0.005 }
+        ]
+    },
+    goblin_girl: {
+        id: 'goblin_girl',
+        name: 'Goblinette',
+        tier: 'rare',
+        level: 4,
+        maxhp: 70,
+        moveSpeed: 95,
+        attackRange: 42,
+        attackCooldown: 1250,
+        damage: [5, 9],
+        exp: 30,
+        drops: [
+            { itemId: 'copper_ore', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 },
+            { itemId: 'copper_dagger', minQty: 1, maxQty: 1, baseChance: 0.015, luckBonus: 0.0005 }
+        ]
     }
 };
 
