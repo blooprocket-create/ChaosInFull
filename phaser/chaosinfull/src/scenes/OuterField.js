@@ -162,6 +162,28 @@ export class OuterField extends Phaser.Scene {
             this.goblinPortal = toGoblin.display;
             this.goblinPortalPrompt = null;
         }
+
+        // portal on the highest platform (platformHeights[2]) -> GraveForest
+        try {
+            const highestPlatformY = this.scale.height - 280; // topmost platform
+            const highestX = this.scale.width / 2;
+            const portalHelper2 = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            // Place the portal slightly above the platform (raise ~16px) so it doesn't look embedded
+            const portalY = highestPlatformY - 44; // previously -28, move up by ~16
+            // When entering GraveForest from OuterField, spawn in GraveForest near its portal (right side). When returning, GraveForest will spawn back to this highest platform center.
+            const graveSpawnInForestX = this.scale.width - 80; // GraveForest portal X (right side)
+            const graveSpawnInForestY = this.scale.height - 90; // GraveForest portal Y (platformY - 60)
+            const toGraveTop = portalHelper2.createPortal(this, highestX, portalY, { depth: 1.5, targetScene: 'GraveForest', spawnX: graveSpawnInForestX, spawnY: graveSpawnInForestY, promptLabel: 'Grave Forest' });
+            this.gravePortalTop = toGraveTop.display;
+        } catch (e) {
+            // fallback visual if helper fails
+            const highestPlatformY = this.scale.height - 280;
+            const highestX = this.scale.width / 2;
+            this.gravePortalTop = this.add.circle(highestX, highestPlatformY - 44, 28, 0x224422, 0.95).setDepth(1.5);
+            this.tweens.add({ targets: this.gravePortalTop, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
+            // no further helper attach; keep fallback visual only
+        }
+        
     }
 
     // Portal behavior handled by shared portal helper via targetScene/onEnter options

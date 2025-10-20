@@ -23,13 +23,71 @@ function getFurnaceRecipes() {
 function getState(scene) {
     if (!scene.__furnaceState) {
         scene.__furnaceState = {
+            selectedCategory: null,
             selectedRecipe: null,
             count: 1,
             countManual: false,
-            continuous: false
+            continuous: false,
+            hasFocusedRecipe: false
         };
     }
     return scene.__furnaceState;
+}
+
+function getFurnaceRecipeDefs() {
+    if (typeof window !== 'undefined' && window.RECIPE_DEFS) return window.RECIPE_DEFS;
+    return RECIPE_DEFS || {};
+}
+
+function normalizeCategory(value) {
+    if (!value || typeof value !== 'string') return 'misc';
+    const trimmed = value.trim().toLowerCase();
+    return trimmed || 'misc';
+}
+
+function toTitleCase(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+}
+
+function formatCategoryLabel(normalized, raw) {
+    if (raw && typeof raw === 'string' && raw.trim().length) {
+        return toTitleCase(raw.trim());
+    }
+    switch (normalized) {
+        case 'ore': return 'Ores';
+        case 'bar': return 'Bars';
+        case 'misc':
+        default:
+            return 'Misc';
+    }
+}
+
+function buildCategoryData(recipes) {
+    const map = new Map();
+    for (const key of Object.keys(recipes || {})) {
+        const recipe = recipes[key];
+        if (!recipe || recipe.tool !== 'furnace') continue;
+        const normalized = normalizeCategory(recipe.category);
+        if (!map.has(normalized)) {
+            map.set(normalized, { label: formatCategoryLabel(normalized, recipe.category), count: 0 });
+        }
+        map.get(normalized).count += 1;
+    }
+    const ordered = Array.from(map.keys()).sort((a,b) => map.get(a).label.localeCompare(map.get(b).label));
+    const labels = {};
+    map.forEach((v,k) => labels[k] = v.label);
+    return { ordered, labels };
+}
+
+function findCategoryForRecipe(recipeId) {
+    const defs = getFurnaceRecipeDefs();
+    for (const k of Object.keys(defs || {})) {
+        const r = defs[k];
+        if (!r) continue;
+        const id = r.id || k;
+        if (id === recipeId) return normalizeCategory(r.category);
+    }
+    return null;
 }
 
 function getSmeltingDelay(scene) {
@@ -113,6 +171,7 @@ function renderRecipes(scene) {
     const recipes = getFurnaceRecipes();
     listEl.innerHTML = '';
 
+    // If categories are available, render as recipe buttons in this column (middle column)
     if (!recipes.length) {
         const empty = document.createElement('div');
         empty.className = 'furnace-empty';
@@ -122,21 +181,90 @@ function renderRecipes(scene) {
         return;
     }
 
-    recipes.forEach((recipe) => {
+    // Determine category filter
+    const defs = getFurnaceRecipeDefs();
+    const cat = state.selectedCategory || null;
+    const keys = Object.keys(defs).filter(k => defs[k] && defs[k].tool === 'furnace' && (!cat || normalizeCategory(defs[k].category) === cat));
+    keys.sort((a,b) => (defs[a].name || a).localeCompare(defs[b].name || b));
+
+    if (!keys.length) {
+        const empty = document.createElement('div');
+        empty.className = 'furnace-empty';
+        empty.textContent = 'No recipes in this category yet.';
+        listEl.appendChild(empty);
+        renderDetails(scene);
+        return;
+    }
+
+    if (!state.selectedRecipe) {
+        state.selectedRecipe = defs[keys[0]]?.id || keys[0];
+    }
+
+    keys.forEach(key => {
+        const recipe = defs[key];
+        if (!recipe) return;
+        const recipeId = recipe.id || key;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'wb-cat-btn';
-        if (recipe.id === state.selectedRecipe) btn.classList.add('is-active');
-        const label = recipe.name || recipe.id;
-        btn.innerHTML = `<div class='wb-cat-label'>${label}</div><div class='wb-cat-sub'>Lv ${recipe.reqLevel || 1}</div>`;
+        btn.className = 'wb-recipe-btn';
+        btn.dataset.recipe = recipeId;
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'wb-recipe-name';
+        nameEl.textContent = recipe.name || recipeId;
+        btn.appendChild(nameEl);
+
+        const meta = document.createElement('div');
+        meta.className = 'wb-recipe-meta';
+        const lvlSpan = document.createElement('span'); lvlSpan.textContent = `Lv ${recipe.reqLevel || 1}`; meta.appendChild(lvlSpan);
+        const parts = (recipe.requires || []).map(req => { const label = (ITEM_DEFS[req.id] && ITEM_DEFS[req.id].name) || req.id; return req.qty && req.qty > 1 ? `${label} x${req.qty}` : label; });
+        if (parts.length) { const mats = document.createElement('span'); mats.textContent = parts.join(' | '); meta.appendChild(mats); }
+        btn.appendChild(meta);
+
+        if (state.selectedRecipe === recipeId) btn.classList.add('is-active');
+
         btn.addEventListener('click', () => {
             const active = scene._furnaceActive;
-            if (active && active.recipeId !== recipe.id) cancelSmelting(scene, true);
-            state.selectedRecipe = recipe.id;
+            if (active && active.recipeId !== recipeId) cancelSmelting(scene, true);
+            // ensure category highlight updates when a recipe is clicked
+            try {
+                let cat = null;
+                try { cat = normalizeCategory(recipe.category); } catch (e) {}
+                if (!cat) cat = findCategoryForRecipe(recipeId);
+                if (cat) state.selectedCategory = cat;
+            } catch (e) {}
+            state.selectedRecipe = recipeId;
             state.countManual = false;
             renderFurnace(scene);
+            // also re-render categories to update the active class
+            try { renderCategories(scene); } catch (e) {}
         });
+
         listEl.appendChild(btn);
+    });
+}
+
+function renderCategories(scene) {
+    if (!scene._furnaceModal) return;
+    const catsEl = scene._furnaceModal.querySelector('#furnace-cats');
+    if (!catsEl) return;
+    const state = getState(scene);
+    const recipes = getFurnaceRecipeDefs();
+    const { ordered, labels } = buildCategoryData(recipes);
+    state.categoryLabels = labels;
+    catsEl.innerHTML = '';
+    if (!ordered.length) {
+        const empty = document.createElement('div'); empty.className = 'workbench-alert'; empty.textContent = 'No furnace recipes unlocked yet.'; catsEl.appendChild(empty); state.selectedCategory = null; return;
+    }
+    if (!state.selectedCategory || !labels[state.selectedCategory]) state.selectedCategory = ordered[0];
+    ordered.forEach(category => {
+        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'wb-cat-btn'; if (category === state.selectedCategory) btn.classList.add('is-active'); btn.textContent = labels[category] || toTitleCase(category);
+        btn.addEventListener('click', () => {
+            const activeCat = (scene._furnaceActive && scene._furnaceActive.recipeId) ? normalizeCategory(getRecipeById(scene._furnaceActive.recipeId)?.category) : null;
+            if (activeCat && activeCat !== category) { cancelSmelting(scene, true); }
+            state.selectedCategory = category; state.selectedRecipe = null; state.countManual = false; updateMessage(scene, ''); renderFurnace(scene);
+        });
+        catsEl.appendChild(btn);
     });
 }
 
@@ -160,136 +288,112 @@ function renderDetails(scene) {
     const details = scene._furnaceModal.querySelector(`#${DETAILS_ID}`);
     if (!details) return;
     details.innerHTML = '';
-
     const state = ensureFurnaceState(scene);
     const recipe = getRecipeById(state.selectedRecipe);
     if (!recipe) {
-        const empty = document.createElement('div');
-        empty.className = 'furnace-empty';
-        empty.textContent = 'Select a recipe to begin smelting.';
-        details.appendChild(empty);
+        const placeholder = document.createElement('div');
+        placeholder.className = 'workbench-alert';
+        placeholder.textContent = 'Select a recipe to see its requirements.';
+        details.appendChild(placeholder);
         return;
     }
 
-    const header = document.createElement('div');
-    header.className = 'furnace-details-head';
-    header.innerHTML = `
-        <div class='furnace-title'>${recipe.name || recipe.id}</div>
-        <div class='furnace-sub'>Requires Smithing Lv ${recipe.reqLevel || 1} • +${recipe.smithingXp || 0} XP</div>
-    `;
+    const items = ITEM_DEFS || {};
+    const craftable = getCraftableCount(scene, recipe);
+    let count = Math.max(1, state.count || 1);
+    if (!state.countManual) {
+        if (craftable > 0) count = Math.min(count, craftable);
+        state.count = count;
+    } else {
+        state.count = count;
+    }
+
+    const validation = (function() {
+        const res = { levelOk: true, missing: [] };
+        const lvlOk = !(scene.char && scene.char.smithing && (scene.char.smithing.level || 1) < (recipe.reqLevel || 1));
+        res.levelOk = lvlOk;
+        if (!lvlOk) return res;
+        for (const req of (recipe.requires || [])) {
+            const need = Math.max(1, req.qty || 1) * count;
+            const have = getAvailableQty(scene, req.id);
+            if (have < need) res.missing.push({ id: req.id, need, have });
+        }
+        return res;
+    })();
+
+    const active = scene._furnaceActive && !scene._furnaceActive.continuous ? scene._furnaceActive : null;
+    const isSmeltingThis = !!(scene._furnaceActive && scene._furnaceActive.recipeId === recipe.id);
+
+    const header = document.createElement('div'); header.className = 'workbench-recipe-header';
+    header.innerHTML = `<div class='workbench-recipe-title'>${recipe.name || recipe.id}</div>`;
+    const sub = document.createElement('div'); sub.className = 'workbench-recipe-sub'; sub.innerHTML = `Smithing Lv ${recipe.reqLevel || 1} • ${recipe.smithingXp || 0} xp per craft • Max craftable: ${craftable}`;
+    header.appendChild(sub);
     details.appendChild(header);
 
-    const reqList = document.createElement('div');
-    reqList.className = 'furnace-req-list';
-    (recipe.requires || []).forEach(req => reqList.appendChild(buildRequirementRow(scene, req)));
+    const reqHeading = document.createElement('div'); reqHeading.className = 'workbench-section-heading'; reqHeading.textContent = 'Materials'; details.appendChild(reqHeading);
+    const reqList = document.createElement('div'); reqList.className = 'workbench-reqs';
+    for (const req of (recipe.requires || [])) {
+        const per = Math.max(1, req.qty || 1);
+        const need = per * count;
+        const have = getAvailableQty(scene, req.id);
+        const def = items[req.id] || {};
+        const name = def.name || req.id;
+        const row = document.createElement('div'); row.className = 'wb-req';
+        row.classList.add(have >= need ? 'is-ready' : 'is-missing');
+        row.innerHTML = `<div class='wb-req-name'>${name}</div><div class='wb-req-counts'><span class='wb-req-reserved'>Need ${need}</span><span class='wb-req-have'>Have ${have}</span></div>`;
+        reqList.appendChild(row);
+    }
     details.appendChild(reqList);
 
-    const controls = document.createElement('div');
-    controls.className = 'furnace-count-controls';
+    if (!validation.levelOk) {
+        const alert = document.createElement('div'); alert.className = 'workbench-alert'; alert.textContent = `Requires Smithing level ${recipe.reqLevel || 1}.`; details.appendChild(alert);
+    } else if (validation.missing.length) {
+        const alert = document.createElement('div'); alert.className = 'workbench-alert';
+        const parts = validation.missing.map(entry => { const d = items[entry.id]; const label = (d && d.name) || entry.id; return `${label} (${entry.have}/${entry.need})`; });
+        alert.textContent = `Missing materials: ${parts.join(', ')}`;
+        details.appendChild(alert);
+    } else if (isSmeltingThis) {
+        const ready = document.createElement('div'); ready.className = 'workbench-ready'; ready.textContent = `Smelting in progress (${scene._furnaceActive.produced || 0}/${scene._furnaceActive.total || 0})...`; details.appendChild(ready);
+    } else {
+        const ready = document.createElement('div'); ready.className = 'workbench-ready'; ready.textContent = `All materials ready for ${count} craft${count > 1 ? 's' : ''}.`; details.appendChild(ready);
+    }
 
-    const minus = document.createElement('button');
-    minus.type = 'button';
-    minus.className = 'btn btn-secondary';
-    minus.textContent = '−';
-    minus.addEventListener('click', () => {
-        const current = state.count || 1;
-        clampCount(scene, recipe, current - 1);
-        state.countManual = true;
-        renderFurnace(scene);
-    });
+    const progress = document.createElement('div'); progress.id = PROGRESS_ID; progress.className = 'workbench-progress'; details.appendChild(progress);
 
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '1';
-    input.className = 'furnace-count-input';
-    input.value = state.count || 1;
-    input.addEventListener('change', (ev) => {
-        const value = Number(ev.target.value);
-        if (Number.isFinite(value)) {
-            clampCount(scene, recipe, value);
-            state.countManual = true;
-            renderFurnace(scene);
-        }
-    });
-
-    const plus = document.createElement('button');
-    plus.type = 'button';
-    plus.className = 'btn btn-secondary';
-    plus.textContent = '+';
-    plus.addEventListener('click', () => {
-        const current = state.count || 1;
-        clampCount(scene, recipe, current + 1);
-        state.countManual = true;
-        renderFurnace(scene);
-    });
-
-    const maxBtn = document.createElement('button');
-    maxBtn.type = 'button';
-    maxBtn.className = 'btn btn-secondary';
-    maxBtn.textContent = 'Max';
+    const actions = document.createElement('div'); actions.className = 'workbench-actions';
+    const left = document.createElement('div'); left.className = 'workbench-actions-left';
+    const maxBtn = document.createElement('button'); maxBtn.type = 'button'; maxBtn.className = 'btn btn-secondary'; maxBtn.textContent = 'Max'; maxBtn.disabled = isSmeltingThis || craftable <= 0;
     maxBtn.addEventListener('click', () => {
         const max = getCraftableCount(scene, recipe);
-        clampCount(scene, recipe, max > 0 ? max : 1);
-        state.countManual = true;
-        renderFurnace(scene);
+        if (max <= 0) { updateMessage(scene, 'No materials available to craft this.', 'warn'); return; }
+        state.countManual = true; state.count = Math.max(1, max); updateMessage(scene, `Set count to maximum craftable (${max}).`, 'success'); renderFurnace(scene);
     });
+    left.appendChild(maxBtn);
+    actions.appendChild(left);
 
-    controls.appendChild(minus);
-    controls.appendChild(input);
-    controls.appendChild(plus);
-    controls.appendChild(maxBtn);
-    details.appendChild(controls);
-
-    const continuousRow = document.createElement('label');
-    continuousRow.className = 'furnace-toggle';
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.checked = !!state.continuous;
-    chk.addEventListener('change', (ev) => {
-        state.continuous = !!ev.target.checked;
-        renderFurnace(scene);
+    const right = document.createElement('div'); right.className = 'workbench-actions-right';
+    const countLabel = document.createElement('label'); countLabel.textContent = 'Count'; right.appendChild(countLabel);
+    const countInput = document.createElement('input'); countInput.type = 'number'; countInput.min = '1'; countInput.value = state.count || 1; countInput.className = 'input-small'; countInput.disabled = isSmeltingThis;
+    countInput.addEventListener('input', () => {
+        const val = Math.max(1, parseInt(countInput.value, 10) || 1);
+        countInput.value = val; state.count = val; state.countManual = true; renderFurnace(scene);
     });
-    continuousRow.appendChild(chk);
-    continuousRow.appendChild(document.createTextNode(' Smelt continuously until materials run out'));
-    details.appendChild(continuousRow);
+    right.appendChild(countInput);
 
-    if (state.continuous) controls.classList.add('is-disabled');
-    else controls.classList.remove('is-disabled');
-    input.disabled = state.continuous;
-    minus.disabled = state.continuous;
-    plus.disabled = state.continuous;
-    maxBtn.disabled = state.continuous;
+    const startBtn = document.createElement('button'); startBtn.type = 'button'; startBtn.className = 'btn btn-primary'; startBtn.textContent = isSmeltingThis ? 'Smelting...' : `Smelt ${state.count || 1}`;
+    const readyToSmelt = validation.levelOk && validation.missing.length === 0 && !isSmeltingThis;
+    startBtn.disabled = !readyToSmelt;
+    startBtn.addEventListener('click', () => { if (startBtn.disabled) return; // if continuous mode enabled, startSmelting handles it
+        begin: startSmelting(scene);
+    });
+    right.appendChild(startBtn);
 
-    const actions = document.createElement('div');
-    actions.className = 'furnace-actions';
-    const startBtn = document.createElement('button');
-    const active = scene._furnaceActive;
-    const maxCraftable = getCraftableCount(scene, recipe);
-    const playerLevel = (scene.char && scene.char.smithing && scene.char.smithing.level) || 1;
+    const cancelBtn = document.createElement('button'); cancelBtn.type = 'button'; cancelBtn.className = 'btn btn-ghost'; cancelBtn.textContent = 'Cancel'; cancelBtn.disabled = !isSmeltingThis; cancelBtn.addEventListener('click', () => cancelSmelting(scene));
+    right.appendChild(cancelBtn);
 
-    if (active && active.recipeId === recipe.id) {
-        startBtn.type = 'button';
-        startBtn.className = 'btn btn-warn';
-        startBtn.textContent = 'Stop Smelting';
-        startBtn.addEventListener('click', () => cancelSmelting(scene));
-    } else {
-        startBtn.type = 'button';
-        startBtn.className = 'btn btn-primary';
-        const count = state.continuous ? '∞' : (state.count || 1);
-        startBtn.textContent = state.continuous
-            ? `Begin Smelting ${recipe.name}`
-            : `Smelt ${count}× ${recipe.name}`;
-        const disabled = playerLevel < (recipe.reqLevel || 1) || maxCraftable <= 0 || (active && active.recipeId !== recipe.id);
-        startBtn.disabled = !!disabled;
-        startBtn.addEventListener('click', () => startSmelting(scene));
-    }
-    actions.appendChild(startBtn);
+    actions.appendChild(right);
     details.appendChild(actions);
 
-    const progress = document.createElement('div');
-    progress.id = PROGRESS_ID;
-    progress.className = 'furnace-progress';
-    details.appendChild(progress);
     updateProgress(scene);
 }
 
@@ -404,6 +508,21 @@ function smeltOnce(scene, recipe) {
         smithing.expToLevel = Math.floor(smithing.expToLevel * 1.25);
         scene._showToast && scene._showToast(`Smithing level up! L${smithing.level}`, 1800);
     }
+
+    // Award cooking XP for food recipes
+    try {
+        if (recipe.cookingXp) {
+            const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
+            cooking.exp = (cooking.exp || 0) + (recipe.cookingXp || 0);
+            while (cooking.exp >= cooking.expToLevel) {
+                cooking.exp -= cooking.expToLevel;
+                cooking.level = (cooking.level || 1) + 1;
+                cooking.expToLevel = Math.floor(cooking.expToLevel * 1.25);
+                scene._showToast && scene._showToast(`Cooking level up! L${cooking.level}`, 1800);
+            }
+            try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
+        }
+    } catch (e) {}
 
     try {
         const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
@@ -592,14 +711,19 @@ export function openFurnace(scene) {
     modal.appendChild(desc);
 
     const body = document.createElement('div');
-    body.className = 'modal-body furnace-body';
+    // Use workbench-like three-column layout: categories | recipes | details
+    body.className = 'modal-body workbench-body furnace-body';
+    const catsCol = document.createElement('nav');
+    catsCol.id = 'furnace-cats';
+    catsCol.className = 'modal-column workbench-categories';
     const recipesCol = document.createElement('section');
     recipesCol.id = RECIPES_LIST_ID;
-    recipesCol.className = 'modal-column furnace-recipes';
-    body.appendChild(recipesCol);
+    recipesCol.className = 'modal-column workbench-recipes furnace-recipes';
     const detailsCol = document.createElement('section');
     detailsCol.id = DETAILS_ID;
-    detailsCol.className = 'modal-column furnace-details';
+    detailsCol.className = 'modal-column workbench-details furnace-details';
+    body.appendChild(catsCol);
+    body.appendChild(recipesCol);
     body.appendChild(detailsCol);
     modal.appendChild(body);
 
@@ -615,12 +739,19 @@ export function openFurnace(scene) {
     scene._furnaceModal = modal;
     scene._furnaceMessageEl = message;
 
+    // initialize category selection
+    const state = getState(scene);
+    const defs = getFurnaceRecipeDefs();
+    const { ordered } = buildCategoryData(defs);
+    state.selectedCategory = state.selectedCategory || (ordered[0] || null);
+
     scene._furnaceEscHandler = (ev) => {
         if (ev.key === 'Escape') closeFurnace(scene);
     };
     window.addEventListener('keydown', scene._furnaceEscHandler);
 
     renderFurnace(scene);
+    renderCategories(scene);
 }
 
 export function closeFurnace(scene) {

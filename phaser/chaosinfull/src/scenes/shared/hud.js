@@ -114,6 +114,7 @@ export function updateHUD(scene) {
     const expToLevel = char.expToLevel || 100;
     const mining = char.mining || { level: 1, exp: 0, expToLevel: 100 };
     const smithing = char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+    const woodcutting = char.woodcutting || { level: 1, exp: 0, expToLevel: 100 };
     const activity = (char && char.activity) ? char.activity : null;
 
     const idBase = (scene && scene.scene && scene.scene.key) ? scene.scene.key.toLowerCase() : 'scene';
@@ -151,9 +152,9 @@ export function updateHUD(scene) {
     if (hpText) hpText.textContent = `${hp}/${maxhp}`;
     if (manaBar) manaBar.style.width = maxmana > 0 ? (Math.max(0, Math.min(100, (mana / maxmana) * 100)) + '%') : '0%';
     if (manaText) manaText.textContent = `${mana}/${maxmana}`;
-    const xpPct = (activity === 'mining') ? Math.max(0, Math.min(100, (mining.exp / mining.expToLevel) * 100)) : (activity === 'smithing') ? Math.max(0, Math.min(100, (smithing.exp / smithing.expToLevel) * 100)) : Math.max(0, Math.min(100, (exp / expToLevel) * 100));
+    const xpPct = (activity === 'mining') ? Math.max(0, Math.min(100, (mining.exp / mining.expToLevel) * 100)) : (activity === 'smithing') ? Math.max(0, Math.min(100, (smithing.exp / smithing.expToLevel) * 100)) : (activity === 'woodcutting') ? Math.max(0, Math.min(100, (woodcutting.exp / woodcutting.expToLevel) * 100)) : Math.max(0, Math.min(100, (exp / expToLevel) * 100));
     if (xpBar) xpBar.style.width = xpPct + '%';
-    if (xpText) xpText.textContent = (activity === 'mining') ? (mining.exp + '/' + mining.expToLevel + ' (Mining L' + mining.level + ')') : (activity === 'smithing') ? (smithing.exp + '/' + smithing.expToLevel + ' (Smithing L' + smithing.level + ')') : (exp + '/' + expToLevel);
+    if (xpText) xpText.textContent = (activity === 'mining') ? (mining.exp + '/' + mining.expToLevel + ' (Mining L' + mining.level + ')') : (activity === 'smithing') ? (smithing.exp + '/' + smithing.expToLevel + ' (Smithing L' + smithing.level + ')') : (activity === 'woodcutting') ? (woodcutting.exp + '/' + woodcutting.expToLevel + ' (Woodcutting L' + woodcutting.level + ')') : (exp + '/' + expToLevel);
 }
 
 export function destroyHUD(scene) {

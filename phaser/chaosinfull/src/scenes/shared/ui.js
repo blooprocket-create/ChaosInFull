@@ -770,6 +770,8 @@ export function openStatsModal(scene) {
     if (!char.stats) char.stats = { str:0,int:0,agi:0,luk:0 };
     if (!char.mining) char.mining = { level:1, exp:0, expToLevel:100 };
     if (!char.smithing) char.smithing = { level:1, exp:0, expToLevel:100 };
+    if (!char.woodcutting) char.woodcutting = { level:1, exp:0, expToLevel:100 };
+    if (!char.cooking) char.cooking = { level:1, exp:0, expToLevel:100 };
     if (scene._statsModal) return;
     const modal = document.createElement('div');
     modal.id = 'stats-modal';
@@ -795,6 +797,9 @@ export function refreshStatsModal(scene) {
     const skills = scene._statsModal.querySelector('#skills-list');
     container.innerHTML = ''; skills.innerHTML = '';
     const char = scene.char || {};
+    try { console.debug && console.debug('[refreshStatsModal] char.woodcutting =', char.woodcutting); } catch(e) {}
+    // Defensive init: ensure woodcutting exists so UI can always render it
+    if (!char.woodcutting) char.woodcutting = { level:1, exp:0, expToLevel:100 };
     const eff = effectiveStats(char);
     container.innerHTML += makeStatPill('STR', eff.str);
     container.innerHTML += makeStatPill('INT', eff.int);
@@ -803,8 +808,20 @@ export function refreshStatsModal(scene) {
     container.innerHTML += makeStatPill('DEF', eff.defense);
     const mining = char.mining || { level:1, exp:0, expToLevel:100 };
     const smithing = char.smithing || { level:1, exp:0, expToLevel:100 };
-    skills.innerHTML += `<div style='font-size:0.95em;color:#ddd;'>${formatSkillLine('Mining', mining)}</div>`;
-    skills.innerHTML += `<div style='font-size:0.95em;color:#ddd;'>${formatSkillLine('Smithing', smithing)}</div>`;
+    const woodcutting = char.woodcutting || { level:1, exp:0, expToLevel:100 };
+    const cooking = char.cooking || { level:1, exp:0, expToLevel:100 };
+    // Ensure all core skills are shown. Keep Woodcutting last for visibility.
+    try {
+        // highlight core gathering/crafting skills so they're visually obvious
+        const highlightStyle = 'font-size:0.99em;color:#ffd27a;background:rgba(255,210,122,0.03);padding:6px;border-radius:8px;';
+    skills.innerHTML += `<div style='${highlightStyle}'>${formatSkillLine('Mining', mining)}</div>`;
+    skills.innerHTML += `<div style='${highlightStyle}'>${formatSkillLine('Smithing', smithing)}</div>`;
+    skills.innerHTML += `<div style='${highlightStyle}'>${formatSkillLine('Cooking', cooking)}</div>`;
+    skills.innerHTML += `<div id='skill-woodcutting' style='${highlightStyle}'>${formatSkillLine('Woodcutting', woodcutting)}</div>`;
+    } catch (e) {
+        // fallback: if DOM insertion fails, append a simple text node
+        try { if (skills) skills.appendChild(document.createTextNode('Mining: L' + (mining.level||1) + '\nSmithing: L' + (smithing.level||1) + '\nWoodcutting: L' + (woodcutting.level||1))); } catch (err) {}
+    }
 }
 
 // Equip/unequip helpers used internally by shared UI

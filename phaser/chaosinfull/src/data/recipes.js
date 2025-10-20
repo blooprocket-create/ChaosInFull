@@ -25,7 +25,8 @@ export const RECIPE_DEFS = {
         category: 'food',
         requires: [ { id: 'rat_meat', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 5
+        smithingXp: 5,
+        cookingXp: 8
     },
     'cooked_minnow': {
         id: 'cooked_minnow',
@@ -34,7 +35,8 @@ export const RECIPE_DEFS = {
         category: 'food',
         requires: [ { id: 'minnow', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 5
+        smithingXp: 5,
+        cookingXp: 8
     },
     'cooked_salmon': {
         id: 'cooked_salmon',
@@ -42,8 +44,9 @@ export const RECIPE_DEFS = {
         tool: 'furnace',
         category: 'food',
         requires: [ { id: 'salmon', qty: 1 } ],
-        reqLevel: 1,
-        smithingXp: 5
+        reqLevel: 5,
+        smithingXp: 5,
+        cookingXp: 40
     },
     // workbench recipes (craft weapons)
     'copper_dagger': {
