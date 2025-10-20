@@ -865,7 +865,15 @@ export class Town extends Phaser.Scene {
         this.fogCanvas.style.pointerEvents = 'none';
         this.fogCanvas.style.zIndex = '99'; // below HUD (100)
         document.body.appendChild(this.fogCanvas);
-        this.fogCtx = this.fogCanvas.getContext('2d');
+        // When the page frequently reads canvas pixels, browsers recommend using
+        // willReadFrequently:true for better performance. Use it when supported.
+        try {
+            this.fogCtx = this.fogCanvas.getContext('2d', { willReadFrequently: true });
+            if (!this.fogCtx) this.fogCtx = this.fogCanvas.getContext('2d');
+        } catch (e) {
+            // some environments (older browsers) may throw for the options param
+            this.fogCtx = this.fogCanvas.getContext('2d');
+        }
         this.fogParticles = [];
         for (let i = 0; i < 120; i++) {
             this.fogParticles.push({ x: Math.random() * this.fogCanvas.width, y: Math.random() * this.fogCanvas.height, r: 30 + Math.random() * 80, vx: 0.08 + Math.random() * 0.2, vy: -0.02 + Math.random() * 0.06, alpha: 0.06 + Math.random() * 0.12 });
@@ -919,16 +927,16 @@ export class Town extends Phaser.Scene {
 
     _tickSafeZoneRegen() {
         if (!this.char) return;
-        const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : { str: 0 };
+        const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : null;
         const strength = (effStats && effStats.str) || 0;
         const level = this.char.level || 1;
-        const estimatedMax = 100 + level * 10 + ((strength || 0) * 10);
-        const maxhp = Math.max(this.char.maxhp || estimatedMax, 1);
-        this.char.maxhp = maxhp;
-        const currentHp = Math.max(0, this.char.hp != null ? this.char.hp : maxhp);
-        if (currentHp >= maxhp) return;
+        // compute authoritative maxhp and ensure char reflects it
+        const computedMax = (effStats && typeof effStats.maxhp === 'number') ? effStats.maxhp : Math.max(1, 100 + level * 10 + ((strength || 0) * 10));
+        this.char.maxhp = computedMax;
+    const currentHp = Math.max(0, this.char.hp != null ? this.char.hp : computedMax);
+    if (currentHp >= computedMax) return;
         const amount = Math.max(1, Math.floor(strength / 2) + 2);
-        this.char.hp = Math.min(maxhp, currentHp + amount);
+    this.char.hp = Math.min(computedMax, currentHp + amount);
         this._updateHUD();
     }
 

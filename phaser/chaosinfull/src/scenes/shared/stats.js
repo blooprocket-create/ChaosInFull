@@ -12,8 +12,12 @@ export function effectiveStats(char) {
     // maxmana = 50 + level*5 + INT*10
     // attackSpeed = base speed modified by AGI (higher agi -> faster attacks). We invert to a ms-per-attack metric lower is faster.
     const level = (char.level || 1);
-    const maxhp = Math.max(1, Math.floor((char.maxhp || (100 + level * 10 + (str * 10)))));
-    const maxmana = Math.max(0, Math.floor((char.maxmana || (50 + level * 5 + (int * 10)))));
+    // Always compute vitals from canonical formula using level + effective stats.
+    // Do NOT prefer stored char.maxhp/char.maxmana here because those may be stale.
+    const computedMaxHp = Math.max(1, Math.floor((100 + level * 10 + (str * 10))));
+    const computedMaxMana = Math.max(0, Math.floor((50 + level * 5 + (int * 10))));
+    const maxhp = computedMaxHp;
+    const maxmana = computedMaxMana;
     // baseline ms/attack = 1000, agi reduces it by up to 40% at 100 AGI. Formula: ms = 1000 * (1 - clamp(agi / 250, 0, 0.4))
     const agiFactor = Math.max(0, Math.min(0.4, (agi / 250)));
     const attackSpeedMs = Math.max(120, Math.floor(1000 * (1 - agiFactor)));
@@ -76,6 +80,22 @@ export function checkClassLevelUps(scene) {
     try { if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null); } catch(e) { /* ignore */ }
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
         try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch(e) { /* ignore */ }
+    }
+
+    // If we leveled, recompute and assign vitals so stored character reflects new maxima.
+    // This ensures HUD and other scenes read the updated values.
+    if (leveled && scene && scene.char) {
+        try {
+            const effAfter = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats)
+                ? window.__shared_ui.stats.effectiveStats(scene.char)
+                : { maxhp: (100 + (scene.char.level || 1) * 10 + (((scene.char.stats && scene.char.stats.str) || 0) * 10)), maxmana: (50 + (scene.char.level || 1) * 5 + (((scene.char.stats && scene.char.stats.int) || 0) * 10)) };
+            // overwrite stored maxima to the authoritative computed values
+            scene.char.maxhp = (effAfter && typeof effAfter.maxhp === 'number') ? effAfter.maxhp : scene.char.maxhp;
+            scene.char.maxmana = (effAfter && typeof effAfter.maxmana === 'number') ? effAfter.maxmana : scene.char.maxmana;
+            // clamp current hp/mana to new maxima
+            if (typeof scene.char.hp !== 'number' || scene.char.hp > scene.char.maxhp) scene.char.hp = scene.char.maxhp;
+            if (typeof scene.char.mana !== 'number' || scene.char.mana > scene.char.maxmana) scene.char.mana = scene.char.maxmana;
+        } catch (e) { /* ignore */ }
     }
     return leveled;
 }

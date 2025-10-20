@@ -101,10 +101,12 @@ export function updateHUD(scene) {
     if (!scene || !scene.hud) return;
     const hud = scene.hud;
     const char = scene.char || {};
+    // compute effective stats (derived from level + base stats + equip bonuses)
     let eff = { str:0,int:0,agi:0,luk:0,defense:0, maxhp:0, maxmana:0, attackSpeedMs:1000 };
     try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(char); } catch(e) {}
     const level = char.level || 1;
-    const maxhp = (typeof char.maxhp === 'number' && char.maxhp > 0) ? char.maxhp : (eff.maxhp || 0);
+    // prefer authoritative computed effective maxhp so the HUD reflects stat changes (STR/level/equipment)
+    const maxhp = (eff && typeof eff.maxhp === 'number' && eff.maxhp > 0) ? eff.maxhp : ((typeof char.maxhp === 'number' && char.maxhp > 0) ? char.maxhp : 0);
     const hp = (typeof char.hp === 'number') ? char.hp : maxhp;
     const maxmana = (typeof char.maxmana === 'number' && char.maxmana > 0) ? char.maxmana : (eff.maxmana || 0);
     const mana = (typeof char.mana === 'number') ? char.mana : maxmana;
@@ -125,7 +127,25 @@ export function updateHUD(scene) {
     const xpBar = document.getElementById(`${hudId}-xp-bar`);
     const xpText = document.getElementById(`${hudId}-xp-text`);
 
-    if (nameEl) nameEl.textContent = `${char.name || 'Character'} `;
+    // Update name without removing the nested level element. The name span contains a child span for level
+    if (nameEl) {
+        try {
+            // if a dedicated level element exists, keep it and only update the leading text node
+            const lvl = document.getElementById(`${hudId}-level`);
+            if (lvl && nameEl.firstChild && nameEl.firstChild.nodeType === Node.TEXT_NODE) {
+                nameEl.firstChild.nodeValue = `${char.name || 'Character'} `;
+            } else if (lvl) {
+                // insert a text node before the level span
+                nameEl.insertBefore(document.createTextNode(`${char.name || 'Character'} `), lvl);
+            } else {
+                // fallback: no nested level span present, set full text
+                nameEl.textContent = `${char.name || 'Character'} `;
+            }
+        } catch (e) {
+            // DOM manipulation could fail in some environments; fall back
+            nameEl.textContent = `${char.name || 'Character'} `;
+        }
+    }
     if (levelEl) levelEl.textContent = `- Lv ${level}`;
     if (hpBar) hpBar.style.width = maxhp > 0 ? (Math.max(0, Math.min(100, (hp / maxhp) * 100)) + '%') : '0%';
     if (hpText) hpText.textContent = `${hp}/${maxhp}`;

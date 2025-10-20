@@ -332,8 +332,9 @@ export class InnerField extends Phaser.Scene {
         const stats = (window && window.__shared_ui && window.__shared_ui.stats) ? window.__shared_ui.stats.effectiveStats(this.char) : null;
         const eff = stats || { str:0,int:0,agi:0,luk:0,defense:0 };
         const level = this.char.level || 1;
-        this.char.maxhp = this.char.maxhp || (100 + level * 10 + ((eff.str || 0) * 10));
-        this.char.maxmana = this.char.maxmana || (50 + level * 5 + ((eff.int || 0) * 10));
+        // Always assign computed maxima so stored character stays in sync with stats/equipment/level
+        this.char.maxhp = (eff && typeof eff.maxhp === 'number') ? eff.maxhp : Math.max(1, Math.floor(100 + level * 10 + ((eff.str || 0) * 10)));
+        this.char.maxmana = (eff && typeof eff.maxmana === 'number') ? eff.maxmana : Math.max(0, Math.floor(50 + level * 5 + ((eff.int || 0) * 10)));
         if (!this.char.expToLevel) this.char.expToLevel = 100;
     }
 

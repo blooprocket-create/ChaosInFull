@@ -63,6 +63,25 @@
     </head>
     <body>
         <div id="game-container"></div>
+        <!-- Dev-only: prevent external telemetry from firing while running on localhost -->
+        <script>
+            try {
+                const host = (typeof location !== 'undefined' && location.hostname) ? location.hostname : '';
+                if (host === 'localhost' || host === '127.0.0.1') {
+                    // stub PostHog global
+                    window.posthog = window.posthog || {};
+                    window.posthog.init = window.posthog.init || function(){};
+                    window.posthog.capture = window.posthog.capture || function(){};
+                    window.posthog.identify = window.posthog.identify || function(){};
+                    window.posthog.people = window.posthog.people || { set: function(){}, identify: function(){}};
+                    // stub rrweb / recorder APIs if present
+                    window.rrweb = window.rrweb || {};
+                    window.rrweb.record = window.rrweb.record || function() { return function(){}; };
+                    window.__rrweb = window.__rrweb || {};
+                    window.__rrweb.record = window.__rrweb.record || function() { return function(){}; };
+                }
+            } catch (e) { /* silent dev stub failure */ }
+        </script>
         <script src="./phaser.js"></script>
         <script type="module" src="./src/main.js"></script>
     </body>
