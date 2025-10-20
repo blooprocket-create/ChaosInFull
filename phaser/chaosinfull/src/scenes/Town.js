@@ -169,7 +169,15 @@ export class Town extends Phaser.Scene {
     const furnaceY = platformY - 70;
     // animation only needs to be registered once; choose end frame dynamically based on loaded texture
         // create furnace sprite via shared helper
-        try { if (window && window.__furnace_shared && window.__furnace_shared.createFurnace) { window.__furnace_shared.createFurnace(this, furnaceX, furnaceY); } else { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); this._setFurnaceFlame(false); } } catch (e) { try { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); this._setFurnaceFlame(false); } catch(_) {} }
+        try {
+            if (window && window.__furnace_shared && window.__furnace_shared.createFurnace) {
+                window.__furnace_shared.createFurnace(this, furnaceX, furnaceY);
+            } else {
+                this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5);
+            }
+        } catch (e) {
+            try { this.furnace = this.add.sprite(furnaceX, furnaceY, 'furnace', 0).setOrigin(0.5).setDepth(1.5); } catch (_) {}
+        }
     this.furnacePrompt = this.add.text(furnaceX, furnaceY - 60, '[E] Use Furnace', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
     this.furnacePrompt.setVisible(false);
     // furnace animation will indicate active state (no separate emoji indicator)
@@ -188,9 +196,7 @@ export class Town extends Phaser.Scene {
     this.storageChestPrompt.setVisible(false);
     // smithing skill on character
     if (!this.char.smithing) this.char.smithing = { level: 1, exp: 0, expToLevel: 100 };
-    // smelting state (works similar to mining timing)
-    this.smeltingActive = false;
-    this._smeltingEvent = null;
+    // furnace smelting cadence (shared helper reads this delay)
     this.smeltingInterval = 2800; // ms per bar (matches mining)
     // crafting (workbench) state - supports continuous crafting like furnace
     this.craftingActive = false;
@@ -212,7 +218,7 @@ export class Town extends Phaser.Scene {
             // cleanup furnace modal and toasts
             this._closeFurnaceModal();
             // ensure furnace animation stopped
-            try { this._setFurnaceFlame(false); } catch(e) {}
+            try { if (window && window.__furnace_shared && window.__furnace_shared.setFurnaceFlame) window.__furnace_shared.setFurnaceFlame(this, false); } catch(e) {}
             this._closeWorkbenchModal();
             this._closeInventoryModal();
             this._clearToasts();
@@ -420,289 +426,24 @@ export class Town extends Phaser.Scene {
         if (this._toastContainer && this._toastContainer.parentNode) this._toastContainer.parentNode.removeChild(this._toastContainer);
         this._toastContainer = null;
     }
-    // --- Furnace modal UI ---
+    // Furnace UI handled by shared helper
     _openFurnaceModal() {
-        if (this._furnaceModal) return;
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const inv = this.char.inventory || [];
-        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-        const copperOreQty = findQty('copper_ore');
-        const tinOreQty = findQty('tin_ore');
-        const modal = document.createElement('div');
-        modal.id = 'furnace-modal';
-        modal.style.position = 'fixed';
-        modal.style.left = '50%';
-        modal.style.top = '50%';
-        modal.style.transform = 'translate(-50%,-50%)';
-        modal.style.zIndex = '220';
-        modal.style.background = 'linear-gradient(135deg,#2a223a 0%, #1a1026 100%)';
-        modal.style.padding = '18px';
-        modal.style.borderRadius = '12px';
-        modal.style.color = '#eee';
-        modal.style.fontFamily = 'UnifrakturCook, cursive';
-        modal.style.minWidth = '300px';
-        modal.innerHTML = `
-            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>
-                <strong>Furnace</strong>
-                <button id='furnace-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button>
-            </div>
-            <div style='margin-bottom:8px;'>Smelt ores into bars here. Open your Inventory (I) to view quantities.</div>
-            <div style='display:flex;flex-direction:column;gap:8px;'>
-                <button id='smelt-copper' style='padding:8px;background:#6b4f3a;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Smelt Copper Bar (2x Copper Ore)</button>
-                <button id='smelt-bronze' style='padding:8px;background:#7a5f3a;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Smelt Bronze (1x Copper Ore + 1x Tin Ore)</button>
-            </div>
-            <div id='furnace-msg' style='color:#ffcc99;margin-top:8px;min-height:18px;'></div>
-        `;
-        document.body.appendChild(modal);
-        this._furnaceModal = modal;
-        const close = document.getElementById('furnace-close');
-        if (close) close.onclick = () => this._closeFurnaceModal();
-        const updateDisplay = () => {
-            const inv = this.char.inventory || [];
-            const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-            const copperOreQty = findQty('copper_ore');
-            const tinOreQty = findQty('tin_ore');
-            const elC = document.getElementById('furnace-copper-qty'); if (elC) elC.textContent = copperOreQty;
-            const elT = document.getElementById('furnace-tin-qty'); if (elT) elT.textContent = tinOreQty;
-        };
-        // recipe toggle buttons (start/stop). only one recipe can run at a time
-        const btnCopper = document.getElementById('smelt-copper');
-        const btnBronze = document.getElementById('smelt-bronze');
-        const updateDisplayLocal = updateDisplay; // alias to call inside handlers
-        if (btnCopper) btnCopper.onclick = () => {
-            const recipeId = 'copper_bar';
-            if (this.smeltingActive) {
-                if (this._smeltType === recipeId) this._stopContinuousSmelting();
-                else this._showToast('Already smelting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._smeltType] ? (window.RECIPE_DEFS[this._smeltType].name || this._smeltType) : this._smeltType));
-            } else {
-                // only start if requirements met
-                const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
-                const recipe = recipes[recipeId];
-                const inv = this.char.inventory || [];
-                const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-                let ok = true;
-                for (const req of (recipe.requires || [])) { if (findQty(req.id) < (req.qty || 1)) { ok = false; break; } }
-                const lvlOk = !(this.char.smithing && (this.char.smithing.level || 1) < (recipe.reqLevel || 1));
-                if (!ok || !lvlOk) { this._showToast('Missing materials or smithing level too low'); }
-                else this._startContinuousSmelting(recipeId);
+        try {
+            if (window && window.__furnace_shared && window.__furnace_shared.openFurnace) {
+                window.__furnace_shared.openFurnace(this);
             }
-            updateDisplayLocal();
-        };
-        if (btnBronze) btnBronze.onclick = () => {
-            const recipeId = 'bronze_bar';
-            if (this.smeltingActive) {
-                if (this._smeltType === recipeId) this._stopContinuousSmelting();
-                else this._showToast('Already smelting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._smeltType] ? (window.RECIPE_DEFS[this._smeltType].name || this._smeltType) : this._smeltType));
-            } else {
-                const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
-                const recipe = recipes[recipeId];
-                const inv = this.char.inventory || [];
-                const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-                let ok = true;
-                for (const req of (recipe.requires || [])) { if (findQty(req.id) < (req.qty || 1)) { ok = false; break; } }
-                const lvlOk = !(this.char.smithing && (this.char.smithing.level || 1) < (recipe.reqLevel || 1));
-                if (!ok || !lvlOk) { this._showToast('Missing materials or smithing level too low'); }
-                else this._startContinuousSmelting(recipeId);
-            }
-            updateDisplayLocal();
-        };
-        // initialize labels/state
-        this._refreshFurnaceModal();
-        // HUD should reflect smithing while furnace modal is open
-    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
+        } catch (e) { /* ignore furnace modal errors */ }
     }
     _closeFurnaceModal() {
-        if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
-        this._furnaceModal = null;
-    try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
-    // restore HUD display and ensure furnace animation is stopped if not smelting
-    try { if (!this.smeltingActive && this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
-        try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
+        try {
+            if (window && window.__furnace_shared && window.__furnace_shared.closeFurnace) {
+                window.__furnace_shared.closeFurnace(this);
+            }
+            if (window && window.__furnace_shared && window.__furnace_shared.cancelSmelting) {
+                window.__furnace_shared.cancelSmelting(this, true);
+            }
+        } catch (e) { /* ignore furnace modal errors */ }
     }
-    // Start continuous smelting of a given recipe ('copper' or 'bronze')
-    _startContinuousSmelting(recipeId) {
-        if (this.smeltingActive) return;
-        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
-        const recipe = recipes[recipeId];
-        if (!recipe) { this._showToast('Unknown recipe'); return; }
-        if (this.char.smithing && (this.char.smithing.level || 1) < (recipe.reqLevel || 1)) { this._showToast('Smithing level too low'); return; }
-        // quick check for materials
-        const inv = this.char.inventory || [];
-        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-        let ok = true;
-        for (const req of (recipe.requires || [])) { if (findQty(req.id) < (req.qty || 1)) { ok = false; break; } }
-        if (!ok) { this._showToast('Missing materials'); return; }
-        this.smeltingActive = true;
-        this._smeltType = recipeId;
-    // start furnace flame animation
-    try { this._setFurnaceFlame(true); } catch (e) {}
-    // mark activity as smithing so HUD shows smithing progress
-    try { if (this.char) this.char.activity = 'smithing'; } catch(e) {}
-        // schedule-first: wait interval before first smelt
-        this._smeltingEvent = this.time.addEvent({ delay: this.smeltingInterval, callback: this._attemptSmelt, callbackScope: this, args: [recipeId], loop: true });
-        this._showToast('Started smelting ' + (recipe.name || recipeId));
-    try { if (this._setFurnaceFlame) this._setFurnaceFlame(true); } catch(e) {}
-    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
-        this._refreshFurnaceModal();
-    }
-    _stopContinuousSmelting() {
-        if (!this.smeltingActive) return;
-        this.smeltingActive = false;
-        if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
-        this._showToast('Smelting stopped');
-        this._smeltType = null;
-    // stop furnace flame animation
-    try { this._setFurnaceFlame(false); } catch (e) {}
-    try { if (this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
-    try { if (this.char) this.char.activity = null; } catch(e) {}
-        this._refreshFurnaceModal();
-        // HUD revert
-    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
-    }
-
-    _setFurnaceFlame(active) {
-        if (!this.furnace) return;
-        if (active) {
-            if (!this.anims.exists('furnace_burn')) {
-                console.warn('furnace_burn animation not found for furnace');
-            }
-            try {
-                this.furnace.play('furnace_burn', true);
-            } catch (e) {
-                console.warn('Could not play furnace animation', e);
-            }
-        } else {
-            if (this.furnace.anims) this.furnace.anims.stop();
-            if (this.furnace.setFrame) this.furnace.setFrame(0);
-        }
-    }
-    // Attempt a single smelt of specified type. Shows toast for each produced bar and persists.
-    _attemptSmelt(recipeId) {
-        const inv = this.char.inventory = this.char.inventory || [];
-        const find = (id) => {
-            if (window && window.__shared_ui && window.__shared_ui.initSlots) {
-                const slots = window.__shared_ui.initSlots(this.char.inventory || []);
-                return slots.find(x => x && x.id === id);
-            }
-            return inv.find(x => x && x.id === id);
-        };
-        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
-        const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const recipe = recipes[recipeId];
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        if (!recipe) { this._stopContinuousSmelting(); this._showToast('Unknown recipe'); return; }
-        // check requirements
-        for (const req of (recipe.requires || [])) {
-            const have = (find(req.id) && find(req.id).qty) || 0;
-            if (have < (req.qty || 1)) {
-                // out of materials: stop smelting, clear activity and refresh HUD
-                this._stopContinuousSmelting();
-                try { if (this.char) this.char.activity = null; } catch(e) {}
-                try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
-                this._showToast('Out of materials for ' + (recipe.name || recipeId));
-                return;
-            }
-        }
-        // consume materials
-        // consume materials (slot-aware when possible)
-        for (const req of (recipe.requires || [])) {
-            const qtyNeeded = (req.qty || 1);
-            if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
-                const ok = window.__shared_ui.removeItemFromInventory(this, req.id, qtyNeeded);
-                if (!ok) {
-                    this._stopContinuousSmelting && this._stopContinuousSmelting();
-                    this._showToast('Out of materials for ' + (recipe.name || recipeId));
-                    return;
-                }
-            } else {
-                const it = find(req.id);
-                if (it) {
-                    it.qty -= qtyNeeded;
-                    if (it.qty <= 0) inv.splice(inv.indexOf(it), 1);
-                }
-            }
-        }
-        // give product
-        const prodId = recipe.id || recipeId;
-        const prodDef = items && items[prodId];
-        // give product (slot-aware)
-        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
-            const added = window.__shared_ui.addItemToInventory(this, prodId, 1);
-            if (!added) this._showToast('Not enough inventory space');
-        } else {
-            if (prodDef && prodDef.stackable) {
-                let ex = find(prodId);
-                if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
-            } else {
-                inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
-            }
-        }
-        const newQty = (find(prodId) && find(prodId).qty) || 1;
-        this._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);
-        // award smithing XP
-        this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-        this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
-        // check smithing level up
-        if (this.char.smithing) {
-            while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
-                this.char.smithing.exp -= this.char.smithing.expToLevel;
-                this.char.smithing.level = (this.char.smithing.level || 1) + 1;
-                this.char.smithing.expToLevel = Math.floor(this.char.smithing.expToLevel * 1.25);
-                this._showToast('Smithing level up! L' + this.char.smithing.level, 1800);
-                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
-            }
-        }
-        // persist and refresh modal/inventory only; avoid re-creating HUD each tick
-        this._persistCharacter(username);
-        this._refreshFurnaceModal();
-        if (this._inventoryModal) this._refreshInventoryModal();
-    }
-    _refreshFurnaceModal() {
-        if (!this._furnaceModal) return;
-        const inv = this.char.inventory || [];
-        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-        const copperOreQty = findQty('copper_ore');
-        const tinOreQty = findQty('tin_ore');
-        const elC = document.getElementById('furnace-copper-qty'); if (elC) elC.textContent = copperOreQty;
-        const elT = document.getElementById('furnace-tin-qty'); if (elT) elT.textContent = tinOreQty;
-        const btnCopper = document.getElementById('smelt-copper');
-        const btnBronze = document.getElementById('smelt-bronze');
-        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
-        const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const copperRecipe = recipes['copper_bar'];
-        const bronzeRecipe = recipes['bronze_bar'];
-        const buildLabel = (r) => {
-            if (!r) return '';
-            try {
-                return 'Smelt ' + (r.name || r.id) + ' (' + (r.requires || []).map(req => ((items[req.id] && items[req.id].name) || req.id) + (req.qty && req.qty > 1 ? ' x' + req.qty : '')).join(' + ') + ')';
-            } catch (e) { return 'Smelt ' + (r.name || r.id); }
-        };
-        if (btnCopper) {
-            if (this.smeltingActive && this._smeltType === 'copper_bar') { btnCopper.textContent = 'Stop Smelting ' + (copperRecipe && copperRecipe.name ? copperRecipe.name : 'Copper'); btnCopper.style.background = '#aa4422'; }
-            else { btnCopper.textContent = buildLabel(copperRecipe) || 'Smelt Copper Bar'; btnCopper.style.background = '#6b4f3a'; }
-            // disable if other recipe is active
-            // disable if other recipe is active or missing materials/level
-            const inv = this.char.inventory || [];
-            const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-            let okCopper = true;
-            for (const req of (copperRecipe.requires || [])) { if (findQty(req.id) < (req.qty || 1)) { okCopper = false; break; } }
-            const lvlOkCopper = !(this.char.smithing && (this.char.smithing.level || 1) < (copperRecipe.reqLevel || 1));
-            btnCopper.disabled = (this.smeltingActive && this._smeltType !== 'copper_bar') || !okCopper || !lvlOkCopper;
-            btnCopper.style.opacity = btnCopper.disabled ? '0.6' : '1';
-        }
-        if (btnBronze) {
-            if (this.smeltingActive && this._smeltType === 'bronze_bar') { btnBronze.textContent = 'Stop Smelting ' + (bronzeRecipe && bronzeRecipe.name ? bronzeRecipe.name : 'Bronze'); btnBronze.style.background = '#aa4422'; }
-            else { btnBronze.textContent = buildLabel(bronzeRecipe) || 'Smelt Bronze'; btnBronze.style.background = '#7a5f3a'; }
-            const inv2 = this.char.inventory || [];
-            const findQty2 = (id) => { const it = inv2.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-            let okBronze = true;
-            for (const req of (bronzeRecipe.requires || [])) { if (findQty2(req.id) < (req.qty || 1)) { okBronze = false; break; } }
-            const lvlOkBronze = !(this.char.smithing && (this.char.smithing.level || 1) < (bronzeRecipe.reqLevel || 1));
-            btnBronze.disabled = (this.smeltingActive && this._smeltType !== 'bronze_bar') || !okBronze || !lvlOkBronze;
-            btnBronze.style.opacity = btnBronze.disabled ? '0.6' : '1';
-        }
-    }
-    // Persist character (inventory/mining/etc) by id or fallback to name
     _persistCharacter(username) {
         if (!username || !this.char) return;
         try {
@@ -1123,5 +864,6 @@ export class Town extends Phaser.Scene {
         }
     }
 }
+
 
 
