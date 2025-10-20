@@ -1,10 +1,11 @@
-import { checkClassLevelUps } from './shared/stats.js';
+import { applyCombatMixin, initAutoCombat } from './shared/combat.js';
 
 export class OuterField extends Phaser.Scene {
     constructor() { super('OuterField'); }
 
     preload() {
-        this.load.image('field_bg', 'assets/field_bg.png');
+        // reuse town background art until dedicated outer field art is available
+        this.load.image('field_bg', 'assets/town_bg.png');
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
         this.load.spritesheet('portal', 'assets/Dimensional_Portal.png', { frameWidth: 32, frameHeight: 32 });
     }
@@ -51,7 +52,12 @@ export class OuterField extends Phaser.Scene {
         this.attackRange = 68;
         this.nextAttackTime = 0;
 
+        initAutoCombat(this, { position: { x: 16, y: 16 } });
+
         this._createHUD();
+        this._createPlayerHealthBar();
+        this.damageLayer = this.add.layer();
+        this.damageLayer.setDepth(6);
 
         // enemies: rats on outer field
         this.enemies = this.physics.add.group();
@@ -88,9 +94,33 @@ export class OuterField extends Phaser.Scene {
         }
         if (this.keys.up && this.keys.up.isDown && this.player.body.blocked.down) this.player.setVelocityY(-420);
 
+        if (this.autoToggleKey && Phaser.Input.Keyboard.JustDown(this.autoToggleKey)) this._toggleAutoAttack();
+
         if (Phaser.Input.Keyboard.JustDown(this.attackKey)) this._tryAttack();
 
+        if (this.keys.inventory && Phaser.Input.Keyboard.JustDown(this.keys.inventory)) {
+            if (window && window.__shared_ui) {
+                if (this._inventoryModal) window.__shared_ui.closeInventoryModal(this);
+                else window.__shared_ui.openInventoryModal(this);
+            }
+        }
+
+        if (this.keys.equip && Phaser.Input.Keyboard.JustDown(this.keys.equip)) {
+            if (window && window.__shared_ui) {
+                if (this._equipmentModal) window.__shared_ui.closeEquipmentModal(this);
+                else window.__shared_ui.openEquipmentModal(this);
+            }
+        }
+
+        if (this.keys.stats && Phaser.Input.Keyboard.JustDown(this.keys.stats)) {
+            if (window && window.__shared_ui) {
+                if (this._statsModal) window.__shared_ui.closeStatsModal(this);
+                else window.__shared_ui.openStatsModal(this);
+            }
+        }
+
         this._updateEnemiesAI();
+        this._processAutoCombat();
         this._updatePlayerHealthBar();
     }
 
@@ -179,40 +209,25 @@ export class OuterField extends Phaser.Scene {
         });
     }
 
-    _tryAttack(silentMiss = false, preferredTarget = null) {
-        if (this.time.now < this.nextAttackTime) return;
-        this.nextAttackTime = this.time.now + this.attackCooldown;
-        const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : { str: 0 };
-        const strength = (effStats && effStats.str) || 0;
-        const baseDamage = Phaser.Math.Between(6, 10) + strength * 2;
-        let hitSomething = false;
-        const targets = preferredTarget ? [preferredTarget] : this.enemies.getChildren();
-        targets.forEach((enemy) => {
-            if (!enemy || !enemy.getData('alive')) return;
-            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
-            if (dist <= this.attackRange) {
-                hitSomething = true;
-                const hp = enemy.getData('hp') - baseDamage;
-                enemy.setData('hp', hp);
-                this._showDamageNumber(enemy.x, enemy.y - 42, `-${baseDamage}`, '#ffee66');
-                this._updateEnemyHealthBar(enemy);
-                if (hp <= 0) this._handleEnemyDeath(enemy);
-            }
-        });
-        if (!hitSomething && !silentMiss) this._showToast('Your attack hits nothing...', 900);
+    _createPlayerHealthBar() {
+        const width = 70;
+        const height = 8;
+        this.playerHpBarBg = this.add.rectangle(0, 0, width, height, 0x000000, 0.55).setDepth(4);
+        this.playerHpBar = this.add.rectangle(0, 0, width, height, 0xff4444).setDepth(4);
+        this.playerHpBar.fullWidth = width;
+        this.playerHpBarBg.setOrigin(0.5);
+        this.playerHpBar.setOrigin(0.5);
+        this._updatePlayerHealthBar();
     }
 
-    _handleEnemyDeath(enemy) {
-        const def = this.enemyDefs[enemy.getData('defId')];
-        enemy.setData('alive', false);
-        this._detachEnemyBars(enemy);
-        enemy.disableBody(true, true);
-        const spawn = enemy.getData('spawn'); if (spawn) spawn.active = null;
-        this._rollDrops(def);
-        this._gainExperience(def.exp || 0);
-        this._updateHUD();
-        this._persistCharacter(this.username);
-        this.time.addEvent({ delay: (spawn && spawn.respawn) || 5000, callback: () => { if (!spawn) return; if (!spawn.active) this._spawnEnemy(spawn); } });
+    _updatePlayerHealthBar() {
+        if (!this.playerHpBar || !this.player) return;
+        const ratio = Math.max(0, Math.min(1, (this.char.hp || 0) / (this.char.maxhp || 1)));
+        const barWidth = this.playerHpBar.fullWidth || 70;
+        this.playerHpBar.displayWidth = barWidth * ratio;
+        const barY = this.player.y - 60;
+        this.playerHpBarBg.setPosition(this.player.x, barY);
+        this.playerHpBar.setPosition(this.player.x, barY);
     }
 
     _onPlayerDown() {
@@ -235,14 +250,23 @@ export class OuterField extends Phaser.Scene {
     _destroyHUD() { if (window && window.__hud_shared && window.__hud_shared.destroyHUD) window.__hud_shared.destroyHUD(this); }
     _showToast(t, timeout = 1400) { if (window && window.__shared_ui && window.__shared_ui.showToast) return window.__shared_ui.showToast(this, t, timeout); /* fallback */ if (!this._toastContainer) { this._toastContainer = document.createElement('div'); this._toastContainer.style.position = 'fixed'; this._toastContainer.style.bottom = '14px'; this._toastContainer.style.left = '50%'; this._toastContainer.style.transform = 'translateX(-50%)'; this._toastContainer.style.zIndex = '210'; this._toastContainer.style.pointerEvents = 'none'; document.body.appendChild(this._toastContainer); } const el = document.createElement('div'); el.textContent = t; el.style.background = 'rgba(10,10,12,0.85)'; el.style.color = '#fff'; el.style.padding = '8px 12px'; el.style.marginTop = '6px'; el.style.borderRadius = '8px'; el.style.fontFamily = 'UnifrakturCook, cursive'; el.style.opacity = '0'; el.style.transition = 'opacity 180ms ease, transform 220ms ease'; el.style.transform = 'translateY(6px)'; this._toastContainer.appendChild(el); requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }); setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(6px)'; setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220); }, timeout); }
 
-    _showDamageNumber(x,y,text,color='#fff'){ if (!this.damageLayer) this.damageLayer = this.add.layer(); const label = this.add.text(x,y,text,{ fontSize:'18px', color, fontFamily:'UnifrakturCook, cursive'}).setOrigin(0.5).setDepth(6); this.damageLayer.add(label); this.tweens.add({ targets: label, y: y-30, alpha: 0, duration: 600, ease: 'Cubic.easeOut', onComplete:()=>label.destroy() }); }
+    _showDamageNumber(x,y,text,color='#fff'){ if (!this.damageLayer) { this.damageLayer = this.add.layer(); this.damageLayer.setDepth(6); } const label = this.add.text(x,y,text,{ fontSize:'18px', color, fontFamily:'UnifrakturCook, cursive'}).setOrigin(0.5).setDepth(6); this.damageLayer.add(label); this.tweens.add({ targets: label, y: y-30, alpha: 0, duration: 600, ease: 'Cubic.easeOut', onComplete:()=>label.destroy() }); }
 
     _attachEnemyBars(enemy){ const width=50,height=6; enemy.healthBarBg = this.add.rectangle(enemy.x, enemy.y - 50, width, height, 0x000000, 0.55).setDepth(3); enemy.healthBar = this.add.rectangle(enemy.x, enemy.y - 50, width, height, 0xff5555).setDepth(3); enemy.healthBar.fullWidth = width; enemy.healthBarBg.setOrigin(0.5); enemy.healthBar.setOrigin(0.5); this._updateEnemyHealthBar(enemy); this._updateEnemyBarPosition(enemy); }
     _updateEnemyHealthBar(enemy){ if (!enemy.healthBar) return; const hp = Math.max(0, enemy.getData('hp')); const maxhp = Math.max(1, enemy.getData('maxhp')); const ratio = Math.max(0, Math.min(1, hp/maxhp)); enemy.healthBar.displayWidth = (enemy.healthBar.fullWidth || 50) * ratio; }
     _updateEnemyBarPosition(enemy){ if (!enemy.healthBarBg) return; const y = enemy.y - 50; enemy.healthBarBg.setPosition(enemy.x,y); if (enemy.healthBar) enemy.healthBar.setPosition(enemy.x,y); }
     _detachEnemyBars(enemy){ if (enemy.healthBar) enemy.healthBar.destroy(); if (enemy.healthBarBg) enemy.healthBarBg.destroy(); enemy.healthBar = null; enemy.healthBarBg = null; }
 
-    shutdown(){ this._persistCharacter(this.username); this._destroyHUD(); if (this.damageLayer) { this.damageLayer.destroy(); this.damageLayer = null; } }
+    shutdown(){
+        this._persistCharacter(this.username);
+        this._destroyHUD();
+        if (this.autoIndicator) { this.autoIndicator.destroy(); this.autoIndicator = null; }
+        if (this.playerHpBar) { this.playerHpBar.destroy(); this.playerHpBar = null; }
+        if (this.playerHpBarBg) { this.playerHpBarBg.destroy(); this.playerHpBarBg = null; }
+        if (this.damageLayer) { this.damageLayer.destroy(); this.damageLayer = null; }
+    }
 }
+
+applyCombatMixin(OuterField.prototype);
 
 export default OuterField;

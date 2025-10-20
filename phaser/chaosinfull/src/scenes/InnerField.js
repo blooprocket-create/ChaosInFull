@@ -1,4 +1,4 @@
-import { checkClassLevelUps } from './shared/stats.js';
+import { applyCombatMixin, initAutoCombat } from './shared/combat.js';
 
 export class InnerField extends Phaser.Scene {
     constructor() {
@@ -52,9 +52,7 @@ export class InnerField extends Phaser.Scene {
         this.attackCooldown = 520;
         this.attackRange = 68;
         this.nextAttackTime = 0;
-        this.autoAttack = false;
-        this.autoToggleKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
-        this.autoIndicator = this.add.text(16, 16, 'Auto: OFF (R)', { fontSize: '16px', color: '#ffd27a', fontFamily: 'UnifrakturCook, cursive' }).setDepth(5).setScrollFactor(0);
+        initAutoCombat(this, { position: { x: 16, y: 16 } });
         this.damageLayer = this.add.layer();
         this.damageLayer.setDepth(6);
 
@@ -96,7 +94,7 @@ export class InnerField extends Phaser.Scene {
             this.player.setVelocityY(-400);
         }
 
-        if (Phaser.Input.Keyboard.JustDown(this.autoToggleKey)) {
+        if (this.autoToggleKey && Phaser.Input.Keyboard.JustDown(this.autoToggleKey)) {
             this._toggleAutoAttack();
         }
 
@@ -126,10 +124,7 @@ export class InnerField extends Phaser.Scene {
         }
 
         this._updateEnemiesAI();
-        if (this.autoAttack && this.time.now >= this.nextAttackTime) {
-            const target = this._getEnemyInRange(this.attackRange);
-            if (target) this._tryAttack(true, target);
-        }
+        this._processAutoCombat();
         this._updatePlayerHealthBar();
     }
 
@@ -181,128 +176,6 @@ export class InnerField extends Phaser.Scene {
         });
     }
 
-    _tryAttack(silentMiss = false, preferredTarget = null) {
-        if (this.time.now < this.nextAttackTime) return;
-        this.nextAttackTime = this.time.now + this.attackCooldown;
-        const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : { str: 0 };
-        const strength = (effStats && effStats.str) || 0;
-        const baseDamage = Phaser.Math.Between(6, 10) + strength * 2;
-        let hitSomething = false;
-        const targets = preferredTarget ? [preferredTarget] : this.enemies.getChildren();
-        targets.forEach((enemy) => {
-            if (!enemy || !enemy.getData('alive')) return;
-            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
-            if (dist <= this.attackRange) {
-                hitSomething = true;
-                const hp = enemy.getData('hp') - baseDamage;
-                enemy.setData('hp', hp);
-                this._showDamageNumber(enemy.x, enemy.y - 42, `-${baseDamage}`, '#ffee66');
-                this._updateEnemyHealthBar(enemy);
-                if (hp <= 0) {
-                    this._handleEnemyDeath(enemy);
-                }
-            }
-        });
-        if (!hitSomething && !silentMiss) {
-            this._showToast('Your attack hits nothing...', 900);
-        }
-    }
-
-    _handleEnemyDeath(enemy) {
-        const def = this.enemyDefs[enemy.getData('defId')];
-        enemy.setData('alive', false);
-        this._detachEnemyBars(enemy);
-        enemy.disableBody(true, true);
-        const spawn = enemy.getData('spawn');
-        if (spawn) spawn.active = null;
-        this._rollDrops(def);
-        this._gainExperience(def.exp || 0);
-        this._updateHUD();
-        this._persistCharacter(this.username);
-        this.time.addEvent({
-            delay: (spawn && spawn.respawn) || 5000,
-            callback: () => {
-                if (!spawn) return;
-                if (!spawn.active) this._spawnEnemy(spawn);
-            }
-        });
-    }
-
-    _rollDrops(def) {
-        if (!def) return;
-        const luk = ((this.char && this.char.stats && this.char.stats.luk) || 0) + (this.char._equipBonuses && this.char._equipBonuses.luk || 0);
-        const dropsAwarded = [];
-        // handle item drops if present
-        if (def.drops && Array.isArray(def.drops)) {
-            def.drops.forEach(drop => {
-                const baseChance = drop.baseChance || 0;
-                const bonus = (drop.luckBonus || 0) * luk;
-                const chance = Math.min(0.99, baseChance + bonus);
-                if (Math.random() <= chance) {
-                    const qty = Phaser.Math.Between(drop.minQty || 1, drop.maxQty || 1);
-                    this._addItemToInventory(drop.itemId, qty);
-                    dropsAwarded.push({ itemId: drop.itemId, qty });
-                }
-            });
-        }
-        // handle numeric gold drop if defined on enemy def
-        let goldAwarded = 0;
-        if (def.gold && typeof def.gold === 'object') {
-            const baseChance = def.gold.chance || 0;
-            const bonus = (def.gold.luckBonus || 0) * luk;
-            const chance = Math.min(0.99, baseChance + bonus);
-            if (Math.random() <= chance) {
-                const min = Math.max(0, Math.floor(def.gold.min || 0));
-                const max = Math.max(min, Math.floor(def.gold.max || min));
-                goldAwarded = Phaser.Math.Between(min, max);
-                // ensure player object has a gold field
-                try { this.char.gold = (this.char.gold || 0) + goldAwarded; } catch (e) { /* ignore */ }
-            }
-        }
-
-        // display consolidated results to player (single toast)
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        if (dropsAwarded.length || goldAwarded) {
-            const parts = [];
-            dropsAwarded.forEach(drop => {
-                const name = (defs && defs[drop.itemId] && defs[drop.itemId].name) || drop.itemId;
-                parts.push(`${drop.qty}x ${name}`);
-            });
-            if (goldAwarded) parts.push(`Gold +${goldAwarded}`);
-            const msg = 'Loot: ' + parts.join(', ');
-            this._showToast(msg, 2000);
-        } else {
-            this._showToast('No loot this time...', 1000);
-        }
-    }
-
-    _addItemToInventory(itemId, qty) {
-        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const def = defs[itemId];
-        // prefer shared UI slot helpers when available
-        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
-            const added = window.__shared_ui.addItemToInventory(this, itemId, qty || 1);
-            if (!added) this._showToast && this._showToast('Inventory full');
-        } else {
-            const inv = this.char.inventory = this.char.inventory || [];
-            if (def && def.stackable) {
-                let entry = inv.find(x => x && x.id === itemId);
-                if (entry) entry.qty = (entry.qty || 0) + qty;
-                else inv.push({ id: itemId, name: (def && def.name) || itemId, qty });
-            } else {
-                for (let i = 0; i < qty; i++) inv.push({ id: itemId, name: (def && def.name) || itemId, qty: 1 });
-            }
-        }
-        if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal && this._inventoryModal) window.__shared_ui.refreshInventoryModal(this);
-    }
-
-    _gainExperience(amount) {
-        if (!amount) return;
-        this.char.exp = (this.char.exp || 0) + amount;
-        const leveled = checkClassLevelUps(this);
-        if (leveled) this._showToast('Level up!', 1800);
-    }
-
     _onPlayerDown() {
         this._showToast('You are overwhelmed! Returning to the entrance...', 2000);
         this.player.disableBody(true, true);
@@ -318,13 +191,15 @@ export class InnerField extends Phaser.Scene {
 
     _createPortals(groundY) {
         const portalX = this.scale.width * 0.1;
+        const townSpawnX = this.scale.width - 220;
+        const townSpawnY = this.scale.height - 90;
         try {
             const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5, targetScene: 'Town', spawnX: 120, spawnY: this.scale.height - 100, promptLabel: 'Return to Town' });
+            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5, targetScene: 'Town', spawnX: townSpawnX, spawnY: townSpawnY, promptLabel: 'Return to Town' });
             this.returnPortal = pobj.display;
         } catch (e) {
             const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5, targetScene: 'Town', spawnX: 120, spawnY: this.scale.height - 100, promptLabel: 'Return to Town' });
+            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5, targetScene: 'Town', spawnX: townSpawnX, spawnY: townSpawnY, promptLabel: 'Return to Town' });
             this.returnPortal = pobj.display;
         }
 
@@ -460,20 +335,6 @@ export class InnerField extends Phaser.Scene {
         spawn.active = enemy;
     }
 
-    _toggleAutoAttack() {
-        this.autoAttack = !this.autoAttack;
-        const stateText = this.autoAttack ? 'Auto: ON (R)' : 'Auto: OFF (R)';
-        if (this.autoIndicator) {
-            this.autoIndicator.setText(stateText);
-            this.autoIndicator.setColor(this.autoAttack ? '#66ff88' : '#ffd27a');
-        }
-        this._showToast(this.autoAttack ? 'Auto combat enabled' : 'Auto combat disabled', 1000);
-    }
-
-    _getEnemyInRange(range) {
-        return this.enemies.getChildren().find(enemy => enemy && enemy.getData('alive') && Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y) <= range);
-    }
-
     _createPlayerHealthBar() {
         const width = 70;
         const height = 8;
@@ -541,5 +402,7 @@ export class InnerField extends Phaser.Scene {
         });
     }
 }
+
+applyCombatMixin(InnerField.prototype);
 
 export default InnerField;

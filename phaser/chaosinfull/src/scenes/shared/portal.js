@@ -26,6 +26,10 @@ export function createPortal(scene, x, y, opts = {}) {
     const animKey = opts.key || 'portal_anim';
     let usedFallback = false;
     let portal = null;
+    const sceneEvents = (typeof Phaser !== 'undefined' && Phaser.Scenes && Phaser.Scenes.Events) ? Phaser.Scenes.Events : null;
+    const updateEvent = (sceneEvents && sceneEvents.UPDATE) || 'update';
+    const shutdownEvent = (sceneEvents && sceneEvents.SHUTDOWN) || 'shutdown';
+    const destroyEvent = (sceneEvents && sceneEvents.DESTROY) || 'destroy';
     try {
         ensurePortalAnim(scene, opts);
         portal = scene.add.sprite(x, y, 'portal', 0).setDepth(depth);
@@ -129,13 +133,33 @@ export function createPortal(scene, x, y, opts = {}) {
         };
 
         // attach handler to scene update
-        try { scene.events.on('update', updateHandler); } catch (e) {}
+        try {
+            if (scene && scene.events && scene.events.on) {
+                scene.events.on(updateEvent, updateHandler);
+                try { scene.events.once(shutdownEvent, destroy); } catch (e) {}
+                try { scene.events.once(destroyEvent, destroy); } catch (e) {}
+            }
+            const sysEvents = (scene && scene.sys && scene.sys.events && scene.sys.events !== scene.events) ? scene.sys.events : null;
+            if (sysEvents && sysEvents.on) {
+                sysEvents.on(updateEvent, updateHandler);
+                try { sysEvents.once(shutdownEvent, destroy); } catch (e) {}
+                try { sysEvents.once(destroyEvent, destroy); } catch (e) {}
+            }
+        } catch (e) {}
     }
 
     function destroy() {
         try { if (prompt && prompt.destroy) prompt.destroy(); } catch (e) {}
         try { if (portal && portal.destroy) portal.destroy(); } catch (e) {}
-        try { if (updateHandler && scene && scene.events) scene.events.off('update', updateHandler); } catch (e) {}
+        try {
+            if (updateHandler && scene && scene.events && scene.events.off) {
+                scene.events.off(updateEvent, updateHandler);
+            }
+            const sysEvents = (scene && scene.sys && scene.sys.events && scene.sys.events !== scene.events) ? scene.sys.events : null;
+            if (updateHandler && sysEvents && sysEvents.off) {
+                sysEvents.off(updateEvent, updateHandler);
+            }
+        } catch (e) {}
     }
 
     // expose small API: sprite (or circle), upgrade attempt, destroy
@@ -147,3 +171,11 @@ export function createPortal(scene, x, y, opts = {}) {
 }
 
 export default { ensurePortalAnim, createPortal };
+
+try {
+    if (typeof window !== 'undefined') {
+        if (!window.__portal_shared) {
+            window.__portal_shared = { ensurePortalAnim, createPortal };
+        }
+    }
+} catch (e) { /* ignore global expose errors */ }
