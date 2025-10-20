@@ -208,6 +208,7 @@ try {
         window.__shared_ui.getQtyInSlots = getQtyInSlots;
         window.__shared_ui.addItemToSlots = addItemToSlots;
         window.__shared_ui.removeItemFromSlots = removeItemFromSlots;
+    window.__shared_ui.useItemFromSlot = useItemFromSlot;
         // inventory convenience helpers
         window.__shared_ui.addItemToInventory = addItemToInventory;
         window.__shared_ui.removeItemFromInventory = removeItemFromInventory;
@@ -301,6 +302,58 @@ function findFirstSlotIndex(slots, itemId) {
     for (let i = 0; i < slots.length; i++) if (slots[i] && slots[i].id === itemId) return i; return -1;
 }
 
+// Use an item from the scene's inventory by slot index. Supports heal/mana potions and bag_of_gold.
+function useItemFromSlot(scene, slotIndex) {
+    try {
+        if (!scene || !scene.char) return false;
+        scene.char.inventory = initSlots(scene.char.inventory || []);
+        const slots = scene.char.inventory;
+        if (slotIndex < 0 || slotIndex >= slots.length) return false;
+        const s = slots[slotIndex]; if (!s || !s.id) return false;
+        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        const def = defs[s.id] || {};
+        let acted = false;
+        // heal
+        if (def.healAmount) {
+            // compute effective maxhp
+            let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
+            const maxhp = (eff && typeof eff.maxhp === 'number') ? eff.maxhp : ((typeof scene.char.maxhp === 'number' && scene.char.maxhp > 0) ? scene.char.maxhp : Math.max(1, 100 + (scene.char.level || 1) * 10));
+            scene.char.hp = Math.min(maxhp, (typeof scene.char.hp === 'number' ? scene.char.hp : maxhp) + Number(def.healAmount || 0));
+            acted = true;
+            if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.healAmount} HP)`);
+        }
+        // mana
+        if (def.manaAmount) {
+            let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
+            const maxmana = (eff && typeof eff.maxmana === 'number') ? eff.maxmana : ((typeof scene.char.maxmana === 'number' && scene.char.maxmana > 0) ? scene.char.maxmana : Math.max(0, Math.floor(50 + (scene.char.level || 1) * 5 + (((scene.char.stats && scene.char.stats.int) || 0) * 10))));
+            scene.char.mana = Math.min(maxmana, (typeof scene.char.mana === 'number' ? scene.char.mana : maxmana) + Number(def.manaAmount || 0));
+            acted = true;
+            if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.manaAmount} Mana)`);
+        }
+        // bag of gold or items that convert to gold via value
+        if (s.id === 'bag_of_gold' || (def && def.value && def.convertToGold)) {
+            const goldGain = Number(def.value || 0);
+            scene.char.gold = (typeof scene.char.gold === 'number') ? scene.char.gold + goldGain : goldGain;
+            acted = true;
+            if (scene._showToast) scene._showToast(`Gained ${goldGain} gold`);
+        }
+        // If we applied an effect, consume one and refresh UI/HUD and persist
+        if (acted) {
+            // remove one from slot array
+            removeItemFromSlots(scene.char.inventory, s.id, 1);
+            // persist if available
+            try { const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username); } catch (e) {}
+            // refresh inventory modal and HUD if present
+            try { if (scene._refreshInventoryModal) scene._refreshInventoryModal(); } catch(e) {}
+            try { if (scene._updateHUD) scene._updateHUD(); else if (scene._createHUD) scene._createHUD(); } catch(e) {}
+            // hide tooltip (avoid stale tooltip when slot removed)
+            try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch(e) {}
+            return true;
+        }
+    } catch (e) { console.warn('useItemFromSlot error', e); }
+    return false;
+}
+
 // export low-level helpers for legacy scenes that reference them
 export { initSlots, addItemToSlots, removeItemFromSlots, getQtyInSlots };
 
@@ -378,6 +431,16 @@ export function refreshInventoryModal(scene) {
                 if (defs && def && (def.weapon || def.armor)) { equipItemFromInventory(scene, s.id); refreshInventoryModal(scene); refreshEquipmentModal(scene); }
             };
             // single-click: keep existing behavior for inventory modal (no deposit here)
+            // single-click: attempt to use consumable items (potions, bags of gold)
+            slotEl.addEventListener('click', (ev) => {
+                try {
+                    // call shared helper to attempt use
+                    if (window && window.__shared_ui && window.__shared_ui.useItemFromSlot) {
+                        const ok = window.__shared_ui.useItemFromSlot(scene, i);
+                        if (ok) return; // used
+                    }
+                } catch (e) { /* ignore */ }
+            });
         }
         grid.appendChild(slotEl);
     }
