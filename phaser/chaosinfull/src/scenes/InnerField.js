@@ -8,6 +8,7 @@ export class InnerField extends Phaser.Scene {
     preload() {
         this.load.image('inner_bg', 'assets/town_bg.png');
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('portal', 'assets/Dimensional_Portal.png', { frameWidth: 32, frameHeight: 32 });
     }
 
     create() {
@@ -70,7 +71,7 @@ export class InnerField extends Phaser.Scene {
             enemy.setVelocityX(enemy.x < player.x ? -60 : 60);
         });
 
-        this._createPortals(platformY - 70);
+    this._createPortals(platformY - 60);
         this._updateHUD();
 
         this.events.once('shutdown', () => this.shutdown());
@@ -284,10 +285,20 @@ export class InnerField extends Phaser.Scene {
 
     _createPortals(groundY) {
         const portalX = this.scale.width * 0.1;
-        this.returnPortal = this.add.circle(portalX, groundY, 26, 0x4b7bd6, 0.85).setDepth(1.5);
-        this.tweens.add({ targets: this.returnPortal, scale: { from: 1, to: 1.1 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-        this.returnPrompt = this.add.text(portalX, groundY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.returnPrompt.setVisible(false);
+        try {
+            const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5 });
+            this.returnPortal = pobj.display;
+            this.returnPrompt = this.add.text(portalX, groundY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.returnPrompt.setVisible(false);
+            // if we fell back to circle, attempt a short upgrade
+            try { this.time.delayedCall(180, () => { if (pobj && pobj.tryUpgrade) pobj.tryUpgrade(); }); } catch (e) {}
+        } catch (e) {
+            this.returnPortal = this.add.circle(portalX, groundY, 26, 0x4b7bd6, 0.85).setDepth(1.5);
+            this.tweens.add({ targets: this.returnPortal, scale: { from: 1, to: 1.1 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+            this.returnPrompt = this.add.text(portalX, groundY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.returnPrompt.setVisible(false);
+        }
     }
 
     _recalculateVitals() {

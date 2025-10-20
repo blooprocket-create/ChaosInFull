@@ -4,6 +4,7 @@ export class Town extends Phaser.Scene {
     preload() {
         this.load.image('town_bg', 'assets/town_bg.png');
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('portal', 'assets/Dimensional_Portal.png', { frameWidth: 32, frameHeight: 32 });
         this.load.spritesheet('furnace', 'assets/furnace.png', { frameWidth: 64, frameHeight: 96 });
     }
     create() {
@@ -99,23 +100,46 @@ export class Town extends Phaser.Scene {
         } catch (e) { /* ignore starting equipment apply errors */ }
         // HUD
         this._createHUD();
-    // Portal on left
-    const cavePortalX = 80;
-    const cavePortalY = platformY - 70;
-    this.portal = this.add.circle(cavePortalX, cavePortalY, 28, 0x6644aa, 0.9).setDepth(1.5);
+    // Portal on left -> Cave (use shared helper)
+    try {
+        const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+        const cavePortalX = 80;
+        const cavePortalY = platformY - 60; // slightly lowered to sit on platform
+        const caveObj = portalHelper.createPortal(this, cavePortalX, cavePortalY, { depth: 1.5 });
+        this.portal = caveObj.display;
+        this.portalPrompt = this.add.text(cavePortalX, cavePortalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        this.portalPrompt.setVisible(false);
+        this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
+        // attempt upgrade later if fallback was used (safe no-op if already sprite)
+        try { this.time.delayedCall(220, () => { if (caveObj && caveObj.tryUpgrade) caveObj.tryUpgrade(); }); } catch (e) {}
+    } catch (e) {
+        // fallback: circle
+        const cavePortalX = 80;
+        const cavePortalY = platformY - 60;
+        this.portal = this.add.circle(cavePortalX, cavePortalY, 28, 0x6644aa, 0.9).setDepth(1.5);
         this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
         this.portalPrompt = this.add.text(cavePortalX, cavePortalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.portalPrompt.setVisible(false);
         this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
-        this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
+    }
     // Portal to Inner Field near the forge
     const fieldPortalX = this.scale.width - 220;
-    const fieldPortalY = platformY - 70;
-    this.fieldPortal = this.add.circle(fieldPortalX, fieldPortalY, 26, 0x44aa88, 0.9).setDepth(1.5);
+    const fieldPortalY = platformY - 60; // lowered to sit on platform
+    try {
+        const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+        const fieldObj = portalHelper.createPortal(this, fieldPortalX, fieldPortalY, { depth: 1.5 });
+        this.fieldPortal = fieldObj.display;
+        this.fieldPortalPrompt = this.add.text(fieldPortalX, fieldPortalY - 60, '[E] Inner Field', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        this.fieldPortalPrompt.setVisible(false);
+        this.fieldPortalPos = { x: fieldPortalX, y: fieldPortalY };
+        try { this.time.delayedCall(220, () => { if (fieldObj && fieldObj.tryUpgrade) fieldObj.tryUpgrade(); }); } catch (e) {}
+    } catch (e) {
+        this.fieldPortal = this.add.circle(fieldPortalX, fieldPortalY, 26, 0x44aa88, 0.9).setDepth(1.5);
         this.tweens.add({ targets: this.fieldPortal, scale: { from: 1, to: 1.1 }, yoyo: true, repeat: -1, duration: 1000, ease: 'Sine.easeInOut' });
         this.fieldPortalPrompt = this.add.text(fieldPortalX, fieldPortalY - 60, '[E] Inner Field', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.fieldPortalPrompt.setVisible(false);
         this.fieldPortalPos = { x: fieldPortalX, y: fieldPortalY };
+    }
     // Furnace on right side (combine ores into bars)
     const furnaceX = this.scale.width - 120;
     const furnaceY = platformY - 70;

@@ -6,6 +6,9 @@ export class Cave extends Phaser.Scene {
 
     preload() {
         this.load.image('cave_bg', 'assets/cave_bg.png');
+        this.load.image('tin', 'assets/tin.png');
+        this.load.image('copper', 'assets/copper.png');
+        this.load.spritesheet('portal', 'assets/Dimensional_Portal.png', { frameWidth: 32, frameHeight: 32 });
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
         this.load.spritesheet('furnace', 'assets/furnace.png', { frameWidth: 64, frameHeight: 96 });
     }
@@ -53,15 +56,26 @@ export class Cave extends Phaser.Scene {
 
         // HUD (same condensed HUD as Town, without mining bar)
     if (window && window.__hud_shared && window.__hud_shared.createHUD) window.__hud_shared.createHUD(this); else this._createHUD();
+    // atmospheric overlays (fog, embers, shadow, vignette, fireflies)
+    try { if (window && window.__overlays_shared && window.__overlays_shared.createAtmosphericOverlays) { this._overlays = window.__overlays_shared.createAtmosphericOverlays(this, { idPrefix: 'cave', zIndexBase: 120, layers: ['fireflies'] }); } } catch (e) { this._overlays = null; }
     this._startSafeZoneRegen();
 
-    // Right-side portal to return to Town; requires proximity + E
+        // Right-side portal to return to Town; requires proximity + E
         const portalX = this.scale.width - 80;
-        const portalY = platformY - 70;
-        this.portal = this.add.circle(portalX, portalY, 28, 0x2266aa, 0.9).setDepth(1.5);
-        this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
-        this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.portalPrompt.setVisible(false);
+        const portalY = platformY - 60; // lowered to sit properly on platform
+        try {
+            const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            const pobj = portalHelper.createPortal(this, portalX, portalY, { depth: 1.5 });
+            this.portal = pobj.display;
+            this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.portalPrompt.setVisible(false);
+            try { this.time.delayedCall(220, () => { if (pobj && pobj.tryUpgrade) pobj.tryUpgrade(); }); } catch (e) {}
+        } catch (e) {
+            this.portal = this.add.circle(portalX, portalY, 28, 0x2266aa, 0.9).setDepth(1.5);
+            this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
+            this.portalPrompt = this.add.text(portalX, portalY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.portalPrompt.setVisible(false);
+        }
 
     // Furnace in cave (convenience) - moved to left side to avoid overlapping copper node
     const furnaceX = 120;
@@ -94,38 +108,7 @@ export class Cave extends Phaser.Scene {
         // Toast container
         this._toastContainer = null;
 
-        // Debug button to quickly toggle furnace animation (only in dev/test)
-        try {
-            const btn = document.createElement('button');
-            btn.id = 'debug-furnace-toggle';
-            btn.textContent = 'Toggle Furnace Anim';
-            btn.style.position = 'fixed';
-            btn.style.right = '14px';
-            btn.style.top = '14px';
-            btn.style.zIndex = '999';
-            btn.style.padding = '8px 10px';
-            btn.style.background = '#222';
-            btn.style.color = '#fff';
-            btn.style.border = '1px solid #444';
-            btn.style.borderRadius = '6px';
-            btn.style.cursor = 'pointer';
-            btn.onclick = () => {
-                try {
-                    const scene = this;
-                    // toggle based on smeltingActive or current sprite anim state
-                    const playing = (scene.furnace && scene.furnace.anims && scene.furnace.anims.isPlaying) || false;
-                    if (playing) {
-                        try { if (window && window.__furnace_shared && window.__furnace_shared.setFurnaceFlame) window.__furnace_shared.setFurnaceFlame(scene, false); else if (scene._setFurnaceFlame) scene._setFurnaceFlame(false); } catch(e) {}
-                        console.log('Debug: stopped furnace animation');
-                    } else {
-                        try { if (window && window.__furnace_shared && window.__furnace_shared.setFurnaceFlame) window.__furnace_shared.setFurnaceFlame(scene, true); else if (scene._setFurnaceFlame) scene._setFurnaceFlame(true); } catch(e) {}
-                        console.log('Debug: started furnace animation');
-                    }
-                } catch (e) { console.log('Debug toggle error', e); }
-            };
-            document.body.appendChild(btn);
-            this._debugFurnaceBtn = btn;
-        } catch (e) {}
+
 
         // cleanup on shutdown
         this.events.once('shutdown', () => {
@@ -140,13 +123,14 @@ export class Cave extends Phaser.Scene {
             // cleanup furnace modal if present
             if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
             this._furnaceModal = null;
+            // destroy atmospheric overlays if created
+            try { if (this._overlays && this._overlays.destroy) this._overlays.destroy(); } catch(e) {}
+            this._overlays = null;
             // ensure furnace animation stopped
             try { this._setFurnaceFlame(false); } catch(e) {}
             // stop any smelting events
             if (this._smeltingEvent) { this._smeltingEvent.remove(false); this._smeltingEvent = null; }
             this._closeInventoryModal();
-            // remove debug button if present
-            try { if (this._debugFurnaceBtn && this._debugFurnaceBtn.parentNode) this._debugFurnaceBtn.parentNode.removeChild(this._debugFurnaceBtn); this._debugFurnaceBtn = null; } catch(e) {}
         });
     }
 
@@ -221,7 +205,33 @@ export class Cave extends Phaser.Scene {
         node.item = cfg.item;
         node.color = cfg.color;
         node.label = cfg.label;
-        node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
+        if (type === 'tin' && this.textures.exists && this.textures.exists('tin')) {
+            // use tin sprite if available and align its bottom to the platform top
+            try {
+                node.sprite = this.add.sprite(x, y, 'tin').setOrigin(0.5).setDepth(1.2);
+                try {
+                    const hh = node.sprite.displayHeight || (node.sprite.frame && node.sprite.frame.realHeight) || 32;
+                    // original circle used center y such that center+radius = platformTop
+                    // adjust sprite center so bottom aligns to platformTop: newY = y + (radius - hh/2)
+                    node.sprite.y = y + (node.r - (hh / 2));
+                } catch (e) { /* ignore positioning errors */ }
+            } catch (e) {
+                node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
+            }
+        } else if (type === 'copper' && this.textures.exists && this.textures.exists('copper')) {
+            // use copper sprite if available and align its bottom to the platform top
+            try {
+                node.sprite = this.add.sprite(x, y, 'copper').setOrigin(0.5).setDepth(1.2);
+                try {
+                    const hh = node.sprite.displayHeight || (node.sprite.frame && node.sprite.frame.realHeight) || 32;
+                    node.sprite.y = y + (node.r - (hh / 2));
+                } catch (e) { /* ignore positioning errors */ }
+            } catch (e) {
+                node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
+            }
+        } else {
+            node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
+        }
         node.prompt = this.add.text(x, y - 60, `[E] Mine ${node.label}`, { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         node.prompt.setVisible(false);
         this.miningNodes.push(node);
