@@ -1,6 +1,5 @@
 import { Login } from './scenes/Login.js';
 import { CharacterSelect } from './scenes/CharacterSelect.js';
-import { Game } from './scenes/Game.js';
 import { Start } from './scenes/Start.js';
 import { Town } from './scenes/Town.js';
 import { Cave } from './scenes/Cave.js';
@@ -10,10 +9,14 @@ import { RECIPE_DEFS } from './data/recipes.js';
 import { RACE_DEFS } from './data/races.js';
 import { CLASS_DEFS } from './data/classes.js';
 import { ENEMY_DEFS } from './data/enemies.js';
+import { Boot } from './scenes/Boot.js';
 import * as SharedUI from './scenes/shared/ui.js';
 import * as furnaceShared from './scenes/shared/furnace.js';
 import * as hudShared from './scenes/shared/hud.js';
 import * as keysShared from './scenes/shared/keys.js';
+import * as overlaysShared from './scenes/shared/overlays.js';
+import * as portalShared from './scenes/shared/portal.js';
+import * as workbenchShared from './scenes/shared/workbench.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -32,9 +35,9 @@ const config = {
         }
     },
     scene: [
+        Boot,
         Login,
         CharacterSelect,
-        Game,
         Start,
         Town,
         Cave,
@@ -56,6 +59,9 @@ if (typeof window !== 'undefined') window.__shared_ui = SharedUI;
 if (typeof window !== 'undefined') window.__furnace_shared = furnaceShared;
 if (typeof window !== 'undefined') window.__hud_shared = hudShared;
 if (typeof window !== 'undefined') window.__shared_keys = keysShared;
+if (typeof window !== 'undefined') window.__overlays_shared = overlaysShared;
+if (typeof window !== 'undefined') window.__portal_shared = portalShared;
+if (typeof window !== 'undefined') window.__workbench_shared = workbenchShared;
 
 new Phaser.Game(config);
             
