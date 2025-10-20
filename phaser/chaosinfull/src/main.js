@@ -17,6 +17,7 @@ import * as hudShared from './scenes/shared/hud.js';
 import * as keysShared from './scenes/shared/keys.js';
 import * as overlaysShared from './scenes/shared/overlays.js';
 import * as portalShared from './scenes/shared/portal.js';
+import * as workbenchShared from './scenes/shared/workbench.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -62,6 +63,7 @@ if (typeof window !== 'undefined') window.__hud_shared = hudShared;
 if (typeof window !== 'undefined') window.__shared_keys = keysShared;
 if (typeof window !== 'undefined') window.__overlays_shared = overlaysShared;
 if (typeof window !== 'undefined') window.__portal_shared = portalShared;
+if (typeof window !== 'undefined') window.__workbench_shared = workbenchShared;
 
 new Phaser.Game(config);
             
