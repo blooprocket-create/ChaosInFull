@@ -150,7 +150,7 @@ export const ENEMY_DEFS = {
         damage: [2, 4],
         exp: 10,
         drops: [
-            { itemId: 'rat_tail', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 }
+            { itemId: 'rat_tail', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 },
             { itemId: 'rat_meat', minQty: 1, maxQty: 1, baseChance: 0.5, luckBonus: 0.0005 }
         ]
         ,
@@ -169,7 +169,7 @@ export const ENEMY_DEFS = {
         exp: 15,
         drops: [
             { itemId: 'rat_tail', minQty: 1, maxQty: 3, baseChance: 0.95, luckBonus: 0.0012 },
-            { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0005 }
+            { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0005 },
             { itemId: 'rat_meat', minQty: 1, maxQty: 1, baseChance: 0.4, luckBonus: 0.0004 }
         ]
         ,
