@@ -478,7 +478,7 @@ export class CharacterSelect extends Phaser.Scene {
                                 let tempChar = { stats: { str:0,int:0,agi:0,luk:0 }, equipment: {}, class: 'beginner' };
                                 try { const defs2 = (window && window.RACE_DEFS) ? window.RACE_DEFS : {}; if (defs2 && defs2[selRace] && defs2[selRace].base) tempChar.stats = Object.assign({}, defs2[selRace].base); } catch(e) {}
                                 // treat selected weapon as equipped if chosen
-                                if (selWeapon) tempChar.equipment = { weapon: { id: selWeapon, name: (window && window.ITEM_DEFS && window.ITEM_DEFS[selWeapon] && window.ITEM_DEFS[selWeapon].name) || selWeapon } };
+                                if (selWeapon) tempChar.equipment = { weapon: { id: selWeapon, name: (window && window.ITEM_DEFS && window.ITEM_DEFS[selWeapon] && window.ITEM_DEFS[selWeapon].name) || selWeapon }, fishing: null };
                                 try {
                                     if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses({ char: tempChar });
                                     const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(tempChar) : tempChar.stats;

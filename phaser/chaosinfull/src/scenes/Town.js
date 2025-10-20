@@ -48,7 +48,7 @@ export class Town extends Phaser.Scene {
         if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
     if (!char.inventory) char.inventory = [];
     // equipment slots
-    if (!char.equipment) char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null };
+    if (!char.equipment) char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null, fishing: null };
         this.char = char;
         // Reconcile equipment bonuses using shared helper (centralized)
         try {
@@ -85,7 +85,7 @@ export class Town extends Phaser.Scene {
                                   (defs && defs['starter_staff'] && inv.find(x => x && x.id === 'starter_staff') ? 'starter_staff' :
                                   (defs && defs['starter_dagger'] && inv.find(x => x && x.id === 'starter_dagger') ? 'starter_dagger' :
                                   (defs && defs['starter_dice'] && inv.find(x => x && x.id === 'starter_dice') ? 'starter_dice' : null)));
-                    if (starter && !this.char.equipment) this.char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null };
+                    if (starter && !this.char.equipment) this.char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null, fishing: null };
                         if (starter && !this.char.equipment.weapon) {
                         // remove one from inventory (unique starter) using slot helper if present
                         try {

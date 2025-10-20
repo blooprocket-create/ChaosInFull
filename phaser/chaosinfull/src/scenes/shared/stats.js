@@ -40,10 +40,41 @@ export function effectiveStats(char) {
     // baseline ms/attack = 1000, agi reduces it by up to 40% at 100 AGI. Formula: ms = 1000 * (1 - clamp(agi / 250, 0, 0.4))
     const agiFactor = Math.max(0, Math.min(0.4, (effAgi / 250)));
     const attackSpeedMs = Math.max(120, Math.floor(1000 * (1 - agiFactor)));
+    // Fishing: derive a basic fishing skill and fishingSpeedMs from effective LUK and any equipped fishing tool bonuses.
+    // Base fishing skill scales with LUK: each point of LUK gives 0.2 fishing skill by default (this is a lightweight scaling).
+
+    const baseFishingFromLuk = effLuk * 0.2; // e.g. 5 LUK -> 1 fishing skill
+    // Check equipment fishing bonuses if available on the character object (reconciled into _equipBonuses or via item defs)
+    let equipFishingSkillBonus = 0;
+    let equipFishingSpeedReductionMs = 0;
+    try {
+        // If the character has an equipped fishing tool with id, look up its definition for fishingBonus
+        if (char && char.equipment && char.equipment.fishing && char.equipment.fishing.id) {
+            const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+            const fdef = defs[char.equipment.fishing.id];
+            if (fdef && fdef.fishingBonus) {
+                equipFishingSkillBonus += (fdef.fishingBonus.skill || 0);
+                equipFishingSpeedReductionMs += (fdef.fishingBonus.speedReductionMs || 0);
+            }
+        }
+        // Also allow generic equip bonuses to include fishing skill under _equipBonuses.fishing if present
+        if (char && char._equipBonuses && typeof char._equipBonuses.fishing === 'number') {
+            equipFishingSkillBonus += char._equipBonuses.fishing;
+        }
+    } catch (e) { /* ignore */ }
+
+    const fishingSkill = Math.max(0, Math.floor(baseFishingFromLuk + equipFishingSkillBonus));
+    // Base fishing speed (ms) baseline 3000ms per attempt; LUK reduces time: each LUK reduces 5ms up to a cap (50% reduction)
+    const baseFishingMs = 3000;
+    const lukFishingReduction = Math.floor(Math.min(0.5 * baseFishingMs, effLuk * 5)); // each LUK reduces 5ms, cap at 50% of base
+    let fishingSpeedMs = Math.max(500, baseFishingMs - lukFishingReduction - equipFishingSpeedReductionMs);
+
     return {
         str: effStr, int: effInt, agi: effAgi, luk: effLuk, defense,
         // canonical derived vitals
-        maxhp, maxmana, attackSpeedMs
+        maxhp, maxmana, attackSpeedMs,
+        // fishing derived stats
+        fishingSkill, fishingSpeedMs
     };
 }
 

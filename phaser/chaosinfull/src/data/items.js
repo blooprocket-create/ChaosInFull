@@ -57,6 +57,10 @@ export const ITEM_DEFS = {
     'manster_energy': { id: 'manster_energy', name: 'MANster Energy Drink', rarity: 'common', stackable: true, maxStack: 50, value: 7, usable: true, description: 'A can of energy drink that claims to unleash your inner beast. May cause sudden bursts of strength and uncontrollable howling.', buff: { statBonus: { str: 6 }, duration: 45000 } },
     'cellulix': { id: 'cellulix', name: 'Cellulix Energy Drink', rarity: 'common', stackable: true, maxStack: 50, value: 7, usable: true, description: 'A can of energy drink that advertises enhanced mental clarity and focus. Side effects may include overthinking and existential dread.', buff: { statBonus: { int: 6 }, duration: 45000 } },
     'lucky_clover': { id: 'lucky_clover', name: 'Lucky Clover Energy Drink', rarity: 'common', stackable: true, maxStack: 50, value: 6, usable: true, description: 'A can of energy drink that promises to enhance your luck and fortune. Side effects may include sudden bursts of confidence and an uncanny ability to find four-leaf clovers.', buff: { statBonus: { luk: 6 }, duration: 45000 } },
+
+    // Fishing tools
+    'basic_rod': { id: 'basic_rod', name: 'Basic Fishing Rod', rarity: 'common', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 20, description: 'A simple rod for catching small fish. Improves your basic fishing skill slightly.', statBonus: { luk: 1 }, fishingBonus: { skill: 1, speedReductionMs: 50 } },
+    'good_rod': { id: 'good_rod', name: 'Good Fishing Rod', rarity: 'uncommon', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 120, description: 'A well-made rod that makes fishing easier and quicker.', statBonus: { luk: 2 }, fishingBonus: { skill: 3, speedReductionMs: 150 } },
     
     // Quest items
     'strange_slime_egg': { id: 'strange_slime_egg', name: 'Strange Slime Egg', rarity: 'epic', stackable: false, maxStack: 1, value: 800, description: 'An egg pulsating with mysterious energy. It\'s warm to the touch and occasionally jiggles on its own. What could be inside?' },
@@ -65,13 +69,40 @@ export const ITEM_DEFS = {
     'teleport_scroll': { id: 'teleport_scroll', name: 'Teleportation Scroll', rarity: 'rare', stackable: true, maxStack: 10, value: 120, usable: true, description: 'A magical scroll that allows instant travel to a known location. Perfect for avoiding awkward social situations or dangerous monsters.' },
     'bag_of_gold': { id: 'bag_of_gold', name: 'Bag of Gold', rarity: 'common', stackable: true, maxStack: 50, value: 100, usable: true, description: 'A hefty bag filled with gleaming gold coins. Heavy enough to make you feel wealthy, but light enough to carry without a mule.' },
 
-    // Cooking Items
+    // Fish and Cooking Items
     'rat_meat': { id: 'rat_meat', name: 'Rat Meat', rarity: 'common', stackable: true, maxStack: 50, value: 5, description: 'Freshly obtained rat meat. Needs to be cooked before consumption to avoid unpleasant side effects.' },
     'cooked_rat_meat': { id: 'cooked_rat_meat', name: 'Cooked Rat Meat', rarity: 'common', stackable: true, maxStack: 50, value: 15, healAmount: 25, usable: true, description: 'Tender rat meat cooked to perfection. Restores a small amount of health when eaten.' },
     'minnow': { id: 'minnow', name: 'Minnow', rarity: 'common', stackable: true, maxStack: 50, value: 4, description: 'A small, slippery minnow. Needs to be cooked before consumption to avoid unpleasant side effects.' },
     'cooked_minnow': { id: 'cooked_minnow', name: 'Cooked Minnow', rarity: 'common', stackable: true, maxStack: 50, value: 12, healAmount: 20, usable: true, description: 'A perfectly cooked minnow. Restores a small amount of health when eaten.' },
     'salmon': { id: 'salmon', name: 'Salmon', rarity: 'uncommon', stackable: true, maxStack: 50, value: 10, description: 'A fresh salmon fillet. Needs to be cooked before consumption to avoid unpleasant side effects.' },
     'cooked_salmon': { id: 'cooked_salmon', name: 'Cooked Salmon', rarity: 'uncommon', stackable: true, maxStack: 50, value: 30, healAmount: 50, usable: true, description: 'A deliciously cooked salmon fillet. Restores a moderate amount of health when eaten.' },
+    'shrimp': { id: 'shrimp', name: 'Shrimp', rarity: 'common', stackable: true, maxStack: 50, value: 6, description: 'A fresh shrimp. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_shrimp': { id: 'cooked_shrimp', name: 'Cooked Shrimp', rarity: 'common', stackable: true, maxStack: 50, value: 18, healAmount: 30, usable: true, description: 'A succulent cooked shrimp. Restores a small amount of health when eaten.' },
+    'tuna': { id: 'tuna', name: 'Tuna', rarity: 'uncommon', stackable: true, maxStack: 50, value: 12, description: 'A fresh tuna steak. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_tuna': { id: 'cooked_tuna', name: 'Cooked Tuna', rarity: 'uncommon', stackable: true, maxStack: 50, value: 36, healAmount: 60, usable: true, description: 'A perfectly cooked tuna steak. Restores a moderate amount of health when eaten.' },
+    'bass': { id: 'bass', name: 'Bass', rarity: 'uncommon', stackable: true, maxStack: 50, value: 14, description: 'A fresh bass fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_bass': { id: 'cooked_bass', name: 'Cooked Bass', rarity: 'uncommon', stackable: true, maxStack: 50, value: 42, healAmount: 70, usable: true, description: 'A deliciously cooked bass fish. Restores a moderate amount of health when eaten.' },
+    'catfish': { id: 'catfish', name: 'Catfish', rarity: 'rare', stackable: true, maxStack: 50, value: 20, description: 'A fresh catfish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_catfish': { id: 'cooked_catfish', name: 'Cooked Catfish', rarity: 'rare', stackable: true, maxStack: 50, value: 60, healAmount: 90, usable: true, description: 'A perfectly cooked catfish. Restores a large amount of health when eaten.' },
+    'lobster': { id: 'lobster', name: 'Lobster', rarity: 'rare', stackable: true, maxStack: 50, value: 25, description: 'A fresh lobster. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_lobster': { id: 'cooked_lobster', name: 'Cooked Lobster', rarity: 'rare', stackable: true, maxStack: 50, value: 75, healAmount: 100, usable: true, description: 'A succulent cooked lobster. Restores a large amount of health when eaten.' },
+    'crab': { id: 'crab', name: 'Crab', rarity: 'rare', stackable: true, maxStack: 50, value: 22, description: 'A fresh crab. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_crab': { id: 'cooked_crab', name: 'Cooked Crab', rarity: 'rare', stackable: true, maxStack: 50, value: 66, healAmount: 95, usable: true, description: 'A deliciously cooked crab. Restores a large amount of health when eaten.' },
+    'sardine': { id: 'sardine', name: 'Sardine', rarity: 'common', stackable: true, maxStack: 50, value: 5, description: 'A small sardine fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_sardine': { id: 'cooked_sardine', name: 'Cooked Sardine', rarity: 'common', stackable: true, maxStack: 50, value: 15, healAmount: 25, usable: true, description: 'A perfectly cooked sardine. Restores a small amount of health when eaten.' },
+    'herring': { id: 'herring', name: 'Herring', rarity: 'common', stackable: true, maxStack: 50, value: 6, description: 'A fresh herring fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_herring': { id: 'cooked_herring', name: 'Cooked Herring', rarity: 'common', stackable: true, maxStack: 50, value: 18, healAmount: 30, usable: true, description: 'A deliciously cooked herring. Restores a small amount of health when eaten.' },
+    'mackerel': { id: 'mackerel', name: 'Mackerel', rarity: 'common', stackable: true, maxStack: 50, value: 7, description: 'A fresh mackerel fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_mackerel': { id: 'cooked_mackerel', name: 'Cooked Mackerel', rarity: 'common', stackable: true, maxStack: 50, value: 21, healAmount: 35, usable: true, description: 'A perfectly cooked mackerel. Restores a small amount of health when eaten.' },
+    'anchovy': { id: 'anchovy', name: 'Anchovy', rarity: 'common', stackable: true, maxStack: 50, value: 4, description: 'A tiny anchovy fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_anchovy': { id: 'cooked_anchovy', name: 'Cooked Anchovy', rarity: 'common', stackable: true, maxStack: 50, value: 12, healAmount: 20, usable: true, description: 'A deliciously cooked anchovy. Restores a small amount of health when eaten.' },
+    'seaweed': { id: 'seaweed', name: 'Seaweed', rarity: 'common', stackable: true, maxStack: 100, value: 3, description: 'Fresh seaweed harvested from the ocean. Can be eaten raw or used in cooking.' },
+    'dried_seaweed': { id: 'dried_seaweed', name: 'Dried Seaweed', rarity: 'common', stackable: true, maxStack: 100, value: 9, healAmount: 15, usable: true, description: 'Seaweed that has been dried for preservation. Restores a small amount of health when eaten.' },
+    'kelp_salad': { id: 'kelp_salad', name: 'Kelp Salad', rarity: 'uncommon', stackable: true, maxStack: 50, value: 20, healAmount: 40, usable: true, description: 'A fresh salad made from kelp and other sea vegetables. Restores a moderate amount of health when eaten.' },
+
+    // Fishing bait
+    'worm_bait': { id: 'worm_bait', name: 'Worm Bait', rarity: 'common', stackable: true, maxStack: 100, value: 25, description: 'A wriggling worm, perfect for attracting fish. Increases your chances of catching fish when used.' },
+    'insect_bait': { id: 'insect_bait', name: 'Insect Bait', rarity: 'uncommon', stackable: true, maxStack: 100, value: 75, description: 'A crunchy insect, ideal for luring in larger fish. Significantly boosts your fishing success rate.' },
 };
 
 if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;

@@ -33,6 +33,9 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
     #shared-item-tooltip { position:fixed; pointer-events:none; z-index:9999; min-width:160px; max-width:320px; padding:10px 12px; border-radius:10px; color:#fff; opacity:0; transform:translateY(6px) scale(0.98); transition:opacity 180ms ease, transform 220ms cubic-bezier(.2,.9,.3,1); backdrop-filter: blur(6px) saturate(120%); -webkit-backdrop-filter: blur(6px) saturate(120%); box-shadow: 0 10px 30px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.06);
     }
     #shared-item-tooltip.show { opacity:1; transform:translateY(0) scale(1); }
+    /* Skill tooltip (small, transient) */
+    #shared-skill-tooltip { position:fixed; pointer-events:none; z-index:10000; min-width:120px; max-width:260px; padding:8px 10px; border-radius:8px; color:#fff; opacity:0; transform:translateY(6px) scale(0.98); transition:opacity 140ms ease, transform 160ms cubic-bezier(.2,.9,.3,1); background: rgba(18,18,20,0.96); border:1px solid rgba(255,255,255,0.04); font-size:13px; }
+    #shared-skill-tooltip.show { opacity:1; transform:translateY(0) scale(1); }
     #shared-item-tooltip .tt-title { font-weight:800; font-size:14px; margin-bottom:6px; /* etched effect */ color: rgba(255,255,255,0.92); text-shadow: 0 -1px 0 rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.03); }
     #shared-item-tooltip .tt-desc { font-size:12px; color: rgba(240,240,240,0.9); margin-bottom:6px; font-family: 'Segoe UI', Roboto, 'Comic Sans MS', cursive; }
     #shared-item-tooltip .tt-value { font-size:12px; color: #ffd27a; margin-bottom:6px; font-family: 'Segoe UI', Roboto, 'Comic Sans MS', cursive; }
@@ -128,7 +131,7 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
     /* Equipment grid - centered, requested layout */
     .equip-grid { display:flex; justify-content:center; align-items:center; padding:8px 0; }
     /* 3x4 layout; empty spaces allowed; ordered per request */
-    .equip-slots { display:grid; grid-template-columns: repeat(3, 96px); grid-template-rows: repeat(4, 96px); gap:12px; grid-template-areas: "ring1 head ring2" "amulet armor weapon" ". legs ." ". boots ."; justify-content:center; }
+    .equip-slots { display:grid; grid-template-columns: repeat(3, 96px); grid-template-rows: repeat(4, 96px); gap:12px; grid-template-areas: "ring1 head ring2" "amulet armor weapon" "fishing legs ." ". boots ."; justify-content:center; }
     .equip-slot { width:96px; height:96px; border-radius:12px; background:rgba(255,255,255,0.02); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; cursor:pointer; position:relative; border:1px solid rgba(255,255,255,0.04); }
     .equip-slot.empty { opacity:0.55; }
     .equip-slot .slot-name { font-size:12px; color:#ddd; text-align:center; max-width:86px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -155,9 +158,116 @@ function ensureTooltip() {
     return t;
 }
 
+function ensureSkillTooltip() {
+    if (typeof document === 'undefined') return null;
+    let t = document.getElementById('shared-skill-tooltip');
+    if (t) return t;
+    t = document.createElement('div'); t.id = 'shared-skill-tooltip';
+        t.innerHTML = `<div id='skill-title' style='font-weight:800;margin-bottom:6px;'></div><div id='skill-body' style='font-size:13px; line-height: 1.3;'></div>`;
+    document.body.appendChild(t);
+    return t;
+}
+
+function msToEta(ms) {
+    if (!ms || isNaN(ms)) return 'N/A';
+    if (ms < 1000) return `${ms} ms`;
+    const s = Math.round(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m}m ${rem}s`;
+}
+
+function estimateSuccessChance(level = 1, toolSkillBonus = 0, difficulty = 12) {
+    // Simple, conservative formula:
+    // base = level / (level + difficulty)
+    // toolSkillBonus is additive skill points (not percent)
+    const effective = Math.max(0, level + (toolSkillBonus || 0));
+    const base = effective > 0 ? (effective / (effective + difficulty)) : 0.05;
+    return Math.round(Math.max(1, Math.min(99, base * 100)));
+}
+
+function showSkillTooltip(scene, skillName, lines, anchorEl) {
+    const t = ensureSkillTooltip(); if (!t) return;
+    const title = t.querySelector('#skill-title'); const body = t.querySelector('#skill-body');
+    if (title) title.textContent = skillName;
+
+    // Normalize skill key (map display label to character property)
+    const labelToKey = { 'Mining': 'mining', 'Smithing': 'smithing', 'Cooking': 'cooking', 'Woodcutting': 'woodcutting', 'Fishing': 'fishing' };
+    const key = labelToKey[skillName] || (skillName && skillName.toLowerCase && skillName.toLowerCase());
+    const char = (scene && scene.char) ? scene.char : {};
+    const skillObj = (key && char[key]) ? char[key] : (char[key] = { level: 1, exp: 0, expToLevel: 100 });
+
+    // Gather basic numbers
+    const level = (skillObj && typeof skillObj.level === 'number') ? skillObj.level : 1;
+    const exp = (skillObj && typeof skillObj.exp === 'number') ? skillObj.exp : 0;
+    const next = (skillObj && (skillObj.expToLevel || skillObj.next || skillObj.expToNext)) || null;
+
+    // Determine ms per attempt for this skill
+    const eff = effectiveStats(char);
+    const miningMs = (typeof scene.miningInterval === 'number') ? scene.miningInterval : 2800;
+    const smithingMs = (typeof scene.smeltingInterval === 'number') ? scene.smeltingInterval : 2800;
+    const cookingMs = (typeof scene.craftingInterval === 'number') ? scene.craftingInterval : 2800;
+    const woodcuttingMs = 3000;
+    const fishingMs = (eff && typeof eff.fishingSpeedMs === 'number') ? eff.fishingSpeedMs : 3000;
+    const speedMap = { mining: miningMs, smithing: smithingMs, cooking: cookingMs, woodcutting: woodcuttingMs, fishing: fishingMs };
+    const speedMs = speedMap[key] || 3000;
+
+    // Tool/equipment bonuses
+    let toolSkillBonus = 0;
+    if (key === 'fishing' && char.equipment && char.equipment.fishing) {
+        const iid = char.equipment.fishing.id;
+        const idef = (window && window.ITEM_DEFS) ? window.ITEM_DEFS[iid] : null;
+        if (idef && idef.fishingBonus) toolSkillBonus += (idef.fishingBonus.skill || 0);
+    }
+
+    // Build tooltip lines
+    const out = [];
+    if (Array.isArray(lines)) for (const l of lines) out.push(l);
+    out.push(`Level: ${level}`);
+    if (next) out.push(`Exp: ${exp} / ${next}`);
+    if (next) {
+        const need = Math.max(0, next - exp);
+        // Assumptions for ETA: assume ~5 exp per success (conservative). This is an estimate.
+        const expPerSuccess = 5;
+        const successPct = (key === 'fishing') ? estimateSuccessChance(level + toolSkillBonus, toolSkillBonus, 12) : estimateSuccessChance(level, 0, 12);
+        const successFrac = Math.max(0.01, successPct / 100);
+        const expPerAttempt = expPerSuccess * successFrac;
+        const attemptsNeeded = expPerAttempt > 0 ? Math.ceil(need / expPerAttempt) : Infinity;
+        const totalMs = attemptsNeeded * speedMs;
+        out.push(`ETA to next: ${next ? msToEta(totalMs) : 'N/A'}`);
+        out.push(`Attempts ≈ ${isFinite(attemptsNeeded) ? attemptsNeeded : '∞'} (avg)`);
+    }
+    out.push(`Speed: ${speedMs} ms (${msToEta(speedMs)})`);
+    // Success chance / modifiers for gathering skills (not relevant for pure craft skills)
+    if (key === 'fishing') {
+        const chance = estimateSuccessChance(level + toolSkillBonus, toolSkillBonus, 12);
+        out.push(`Estimated success: ${chance}%`);
+        if (toolSkillBonus) out.push(`Tool bonus: +${toolSkillBonus} skill`);
+    }
+
+    if (body) body.innerHTML = out.map(l => `<div>${l}</div>`).join('');
+
+    // position near anchor with adjustments
+    let x = 24, y = 24;
+    if (anchorEl && anchorEl.getBoundingClientRect) {
+        const r = anchorEl.getBoundingClientRect();
+        x = Math.max(8, r.right + 10);
+        y = Math.max(8, r.top);
+        if (y + t.offsetHeight > window.innerHeight - 12) y = window.innerHeight - t.offsetHeight - 12;
+        // if tooltip would overflow right edge, move it left of anchor
+        if (x + t.offsetWidth > window.innerWidth - 12) x = Math.max(8, r.left - t.offsetWidth - 10);
+    }
+    t.style.left = x + 'px'; t.style.top = Math.max(8, y) + 'px';
+    requestAnimationFrame(() => t.classList.add('show'));
+}
+
+function hideSkillTooltip() { const t = document.getElementById('shared-skill-tooltip'); if (!t) return; t.classList.remove('show'); }
+
 function buildStatLines(def) {
     const lines = [];
-    if (!def) return lines;
+        if (!def) return lines;
+        if (!def) return lines;
     if (def.statBonus) {
         for (const k of Object.keys(def.statBonus)) lines.push(`+${def.statBonus[k]} ${k.toUpperCase()}`);
     }
@@ -179,7 +289,8 @@ export function showItemTooltip(scene, itemOrId, anchorEl) {
     if (typeof document === 'undefined') return;
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
     let def = null; let name = ''; let desc = '';
-    if (!itemOrId) return;
+        if (!itemOrId) return;
+        if (!itemOrId) return;
     if (typeof itemOrId === 'string') { def = defs[itemOrId] || null; name = (def && def.name) || itemOrId; }
     else if (itemOrId && itemOrId.id) { def = defs[itemOrId.id] || null; name = itemOrId.name || (def && def.name) || itemOrId.id; }
     else { def = defs[itemOrId] || null; name = (def && def.name) || itemOrId; }
@@ -675,7 +786,7 @@ export function refreshInventoryModal(scene) {
 export function openEquipmentModal(scene) {
     if (!scene) return;
     const char = scene.char = scene.char || {};
-    if (!char.equipment) char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null };
+    if (!char.equipment) char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null, fishing:null };
     if (scene._equipmentModal) return;
     const modal = document.createElement('div');
     modal.id = 'equipment-modal';
@@ -708,18 +819,18 @@ export function refreshEquipmentModal(scene) {
     if (!scene || !scene._equipmentModal) return;
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
     const equip = scene.char.equipment || {};
-    const slotOrder = ['weapon','head','armor','legs','boots','ring1','ring2','amulet'];
+    const slotOrder = ['weapon','head','armor','amulet','fishing','legs','boots','ring1','ring2'];
     const slotsContainer = scene._equipmentModal.querySelector('#equip-slots');
     if (!slotsContainer) return;
     slotsContainer.innerHTML = '';
     // layout mapping to place slots in visually meaningful positions
-    const slotDisplayNames = { weapon: 'Weapon', head: 'Head', armor: 'Body', legs: 'Legs', boots: 'Boots', ring1: 'Ring', ring2: 'Ring', amulet: 'Amulet' };
+    const slotDisplayNames = { weapon: 'Weapon', head: 'Head', armor: 'Body', amulet: 'Amulet', fishing: 'Fishing Rod', legs: 'Legs', boots: 'Boots', ring1: 'Ring', ring2: 'Ring' };
     for (const s of slotOrder) {
         const eq = equip[s];
         const slotEl = document.createElement('div'); slotEl.className = 'equip-slot';
         if (!eq) slotEl.classList.add('empty');
     // assign grid area so slots follow requested layout
-    const areaMap = { head: 'head', weapon: 'weapon', amulet: 'amulet', armor: 'armor', ring1: 'ring1', ring2: 'ring2', legs: 'legs', boots: 'boots' };
+    const areaMap = { head: 'head', weapon: 'weapon', amulet: 'amulet', armor: 'armor', fishing: 'fishing', ring1: 'ring1', ring2: 'ring2', legs: 'legs', boots: 'boots' };
         const area = areaMap[s] || null;
         if (area) slotEl.style.gridArea = area;
         const iconSpan = document.createElement('div'); iconSpan.className = 'slot-icon';
@@ -806,6 +917,7 @@ export function refreshStatsModal(scene) {
     container.innerHTML += makeStatPill('AGI', eff.agi);
     container.innerHTML += makeStatPill('LUK', eff.luk);
     container.innerHTML += makeStatPill('DEF', eff.defense);
+    // (Fishing moved to skill group tooltip; do not show as stat pills here)
     const mining = char.mining || { level:1, exp:0, expToLevel:100 };
     const smithing = char.smithing || { level:1, exp:0, expToLevel:100 };
     const woodcutting = char.woodcutting || { level:1, exp:0, expToLevel:100 };
@@ -813,11 +925,28 @@ export function refreshStatsModal(scene) {
     // Ensure all core skills are shown. Keep Woodcutting last for visibility.
     try {
         // highlight core gathering/crafting skills so they're visually obvious
-        const highlightStyle = 'font-size:0.99em;color:#ffd27a;background:rgba(255,210,122,0.03);padding:6px;border-radius:8px;';
-    skills.innerHTML += `<div style='${highlightStyle}'>${formatSkillLine('Mining', mining)}</div>`;
-    skills.innerHTML += `<div style='${highlightStyle}'>${formatSkillLine('Smithing', smithing)}</div>`;
-    skills.innerHTML += `<div style='${highlightStyle}'>${formatSkillLine('Cooking', cooking)}</div>`;
-    skills.innerHTML += `<div id='skill-woodcutting' style='${highlightStyle}'>${formatSkillLine('Woodcutting', woodcutting)}</div>`;
+        const highlightStyle = 'font-size:0.99em;color:#ffd27a;background:rgba(255,210,122,0.03);padding:6px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;';
+        // derive skill speeds (defaults where not explicit)
+        const miningMs = (typeof scene.miningInterval === 'number') ? scene.miningInterval : 2800;
+        const smithingMs = (typeof scene.smeltingInterval === 'number') ? scene.smeltingInterval : 2800;
+        const cookingMs = (typeof scene.craftingInterval === 'number') ? scene.craftingInterval : 2800;
+        const woodcuttingMs = 3000;
+        const fishingMs = (eff && typeof eff.fishingSpeedMs === 'number') ? eff.fishingSpeedMs : 3000;
+
+        function makeSkillRow(label, skObj, ms) {
+            const div = document.createElement('div'); div.style.cssText = highlightStyle; div.className = 'skill-row';
+            div.innerHTML = `<div style='font-weight:700'>${label}</div><div style='opacity:0.9'>L${(skObj.level||1)}</div>`;
+            // hover to show ms tooltip
+            div.addEventListener('mouseenter', (ev) => { try { showSkillTooltip(scene, label, [`Speed: ${ms} ms`], div); } catch (e) {} });
+            div.addEventListener('mouseleave', () => { try { hideSkillTooltip(); } catch (e) {} });
+            return div;
+        }
++
+        skills.appendChild(makeSkillRow('Mining', mining, miningMs));
+        skills.appendChild(makeSkillRow('Smithing', smithing, smithingMs));
+        skills.appendChild(makeSkillRow('Cooking', cooking, cookingMs));
+        skills.appendChild(makeSkillRow('Woodcutting', woodcutting, woodcuttingMs));
+        skills.appendChild(makeSkillRow('Fishing', char.fishing || { level:1 }, fishingMs));
     } catch (e) {
         // fallback: if DOM insertion fails, append a simple text node
         try { if (skills) skills.appendChild(document.createTextNode('Mining: L' + (mining.level||1) + '\nSmithing: L' + (smithing.level||1) + '\nWoodcutting: L' + (woodcutting.level||1))); } catch (err) {}

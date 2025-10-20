@@ -18,7 +18,7 @@ export class InnerField extends Phaser.Scene {
         const dataChar = sceneData.character || {};
         this.char = dataChar || {};
         if (!this.char.inventory) this.char.inventory = [];
-        if (!this.char.equipment) this.char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null };
+    if (!this.char.equipment) this.char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null, fishing:null };
         if (!this.char.stats) this.char.stats = this.char.stats || { str:0,int:0,agi:0,luk:0 };
         if (!this.char.mining) this.char.mining = { level: 1, exp: 0, expToLevel: 100 };
         if (!this.char.smithing) this.char.smithing = { level: 1, exp: 0, expToLevel: 100 };
