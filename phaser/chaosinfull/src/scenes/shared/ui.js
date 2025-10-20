@@ -493,12 +493,32 @@ export function equipItemFromInventory(scene, itemId) {
     if (!scene || !scene.char) return;
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
     const def = defs[itemId]; if (!def) { scene._showToast && scene._showToast('Unknown item'); return; }
-    let slot = null; if (def.weapon) slot = 'weapon'; else if (def.armor) slot = 'armor'; else { scene._showToast && scene._showToast('Cannot equip this item'); return; }
+    // Determine equipment slot. Prefer explicit `def.slot` when provided.
+    let slot = null;
+    if (def.slot) {
+        slot = def.slot;
+    } else if (def.weapon) {
+        slot = 'weapon';
+    } else if (def.armor) {
+        // try to guess the correct armor sub-slot by id/name keywords
+        const id = (def.id || '').toLowerCase();
+        const name = (def.name || '').toLowerCase();
+        if (id.includes('helmet') || name.includes('helmet') || id.includes('head')) slot = 'head';
+        else if (id.includes('legs') || name.includes('leggings') || id.includes('leggings') || id.includes('leg')) slot = 'legs';
+        else if (id.includes('boot') || name.includes('boots')) slot = 'boots';
+        else if (id.includes('ring') || name.includes('ring')) slot = 'ring1';
+        else if (id.includes('amulet') || name.includes('amulet')) slot = 'amulet';
+        else slot = 'armor';
+    } else { scene._showToast && scene._showToast('Cannot equip this item'); return; }
     // ensure slot array and remove one item
     scene.char.inventory = initSlots(scene.char.inventory);
     const removed = removeItemFromSlots(scene.char.inventory, itemId, 1);
     if (!removed) { scene._showToast && scene._showToast('Item not in inventory'); return; }
     if (!scene.char.equipment) scene.char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null };
+    // handle ring auto-slotting: if item slot is 'ring', prefer ring1 then ring2
+    if (slot === 'ring') {
+        if (!scene.char.equipment.ring1) slot = 'ring1'; else if (!scene.char.equipment.ring2) slot = 'ring2'; else slot = 'ring1';
+    }
     const prev = scene.char.equipment[slot]; if (prev) { addItemToSlots(scene.char.inventory, prev.id, 1); removeEquipmentBonuses(scene, prev); }
     scene.char.equipment[slot] = { id: itemId, name: def.name || itemId };
     applyEquipmentBonuses(scene, scene.char.equipment[slot]);
