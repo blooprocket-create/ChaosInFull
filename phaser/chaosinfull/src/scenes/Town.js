@@ -85,9 +85,15 @@ export class Town extends Phaser.Scene {
                                   (defs && defs['starter_dice'] && inv.find(x => x && x.id === 'starter_dice') ? 'starter_dice' : null)));
                     if (starter && !this.char.equipment) this.char.equipment = { head: null, armor: null, legs: null, boots: null, ring1: null, ring2: null, amulet: null, weapon: null };
                         if (starter && !this.char.equipment.weapon) {
-                        // remove one from inventory (unique starter so just remove the entry)
-                        const idx = inv.findIndex(x => x && x.id === starter);
-                        if (idx !== -1) inv.splice(idx, 1);
+                        // remove one from inventory (unique starter) using slot helper if present
+                        try {
+                            if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
+                                window.__shared_ui.removeItemFromInventory(this, starter, 1);
+                            } else {
+                                const idx = inv.findIndex(x => x && x.id === starter);
+                                if (idx !== -1) inv.splice(idx, 1);
+                            }
+                        } catch (e) { const idx = inv.findIndex(x => x && x.id === starter); if (idx !== -1) inv.splice(idx,1); }
                         this.char.equipment.weapon = { id: starter, name: (defs && defs[starter] && defs[starter].name) || starter };
                         // apply equipment bonuses so stats reflect equipped starter immediately
                         try { if (window && window.__shared_ui && window.__shared_ui.applyEquipmentBonuses) window.__shared_ui.applyEquipmentBonuses(this, this.char.equipment.weapon); } catch (e) { /* ignore */ }
@@ -354,7 +360,13 @@ export class Town extends Phaser.Scene {
         if (this.char.smithing && (this.char.smithing.level || 1) < (recipe.reqLevel || 1)) { this._showToast('Smithing level too low'); return; }
         // check requirements
         const inv = this.char.inventory = this.char.inventory || [];
-        const find = (id) => inv.find(x => x && x.id === id);
+        const find = (id) => {
+            if (window && window.__shared_ui && window.__shared_ui.initSlots) {
+                const slots = window.__shared_ui.initSlots(this.char.inventory || []);
+                return slots.find(x => x && x.id === id);
+            }
+            return inv.find(x => x && x.id === id);
+        };
         for (const req of (recipe.requires || [])) {
             const have = (find(req.id) && find(req.id).qty) || 0;
             if (have < (req.qty || 1)) {
@@ -372,22 +384,50 @@ export class Town extends Phaser.Scene {
             }
         }
         // consume materials
+        // consume materials (use slot helpers where available)
         for (const req of (recipe.requires || [])) {
-            const it = find(req.id);
-            if (it) {
-                it.qty -= (req.qty || 1);
-                if (it.qty <= 0) inv.splice(inv.indexOf(it), 1);
+            const qtyNeeded = (req.qty || 1);
+            if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
+                const ok = window.__shared_ui.removeItemFromInventory(this, req.id, qtyNeeded);
+                if (!ok) {
+                    if (this.craftingActive && this._craftType === recipeId) {
+                        this._stopContinuousCrafting();
+                        const el = (this._workbenchModal && this._workbenchModal.querySelector) ? this._workbenchModal.querySelector('#workbench-msg') : null;
+                        if (el) el.textContent = 'Out of materials; crafting stopped.';
+                        return;
+                    }
+                    this._showToast('Missing materials');
+                    return;
+                }
+            } else {
+                const it = find(req.id);
+                if (it) {
+                    it.qty -= qtyNeeded;
+                    if (it.qty <= 0) {
+                        // if slot helpers exist, remove by id to ensure consistent slot array compaction
+                        if (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) {
+                            window.__shared_ui.removeItemFromSlots(inv, req.id, 0); // remove all of this id
+                        } else {
+                            inv.splice(inv.indexOf(it), 1);
+                        }
+                    }
+                }
             }
         }
         // give crafted item (non-stackable weapon, push as separate entry)
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
         const def = defs && defs[recipeId];
-        if (def && def.stackable) {
-            let ex = find(recipeId);
-            if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: recipeId, name: def.name || recipe.name, qty: 1 });
+        // give crafted item (slot-aware if helpers exist)
+        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+            const added = window.__shared_ui.addItemToInventory(this, recipeId, 1);
+            if (!added) this._showToast('Not enough inventory space');
         } else {
-            // unique weapon: push new entry
-            inv.push({ id: recipeId, name: (def && def.name) || recipe.name, qty: 1 });
+            if (def && def.stackable) {
+                let ex = find(recipeId);
+                if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: recipeId, name: def.name || recipe.name, qty: 1 });
+            } else {
+                inv.push({ id: recipeId, name: (def && def.name) || recipe.name, qty: 1 });
+            }
         }
         // smithing xp
     this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
@@ -608,7 +648,13 @@ export class Town extends Phaser.Scene {
     // Attempt a single smelt of specified type. Shows toast for each produced bar and persists.
     _attemptSmelt(recipeId) {
         const inv = this.char.inventory = this.char.inventory || [];
-        const find = (id) => inv.find(x => x && x.id === id);
+        const find = (id) => {
+            if (window && window.__shared_ui && window.__shared_ui.initSlots) {
+                const slots = window.__shared_ui.initSlots(this.char.inventory || []);
+                return slots.find(x => x && x.id === id);
+            }
+            return inv.find(x => x && x.id === id);
+        };
         const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
         const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
         const recipe = recipes[recipeId];
@@ -627,21 +673,38 @@ export class Town extends Phaser.Scene {
             }
         }
         // consume materials
+        // consume materials (slot-aware when possible)
         for (const req of (recipe.requires || [])) {
-            const it = find(req.id);
-            if (it) {
-                it.qty -= (req.qty || 1);
-                if (it.qty <= 0) inv.splice(inv.indexOf(it), 1);
+            const qtyNeeded = (req.qty || 1);
+            if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
+                const ok = window.__shared_ui.removeItemFromInventory(this, req.id, qtyNeeded);
+                if (!ok) {
+                    this._stopContinuousSmelting && this._stopContinuousSmelting();
+                    this._showToast('Out of materials for ' + (recipe.name || recipeId));
+                    return;
+                }
+            } else {
+                const it = find(req.id);
+                if (it) {
+                    it.qty -= qtyNeeded;
+                    if (it.qty <= 0) inv.splice(inv.indexOf(it), 1);
+                }
             }
         }
         // give product
         const prodId = recipe.id || recipeId;
         const prodDef = items && items[prodId];
-        if (prodDef && prodDef.stackable) {
-            let ex = find(prodId);
-            if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
+        // give product (slot-aware)
+        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+            const added = window.__shared_ui.addItemToInventory(this, prodId, 1);
+            if (!added) this._showToast('Not enough inventory space');
         } else {
-            inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
+            if (prodDef && prodDef.stackable) {
+                let ex = find(prodId);
+                if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
+            } else {
+                inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
+            }
         }
         const newQty = (find(prodId) && find(prodId).qty) || 1;
         this._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);
@@ -746,14 +809,15 @@ export class Town extends Phaser.Scene {
             const userObj = JSON.parse(localStorage.getItem(key));
             if (userObj && userObj.storage) return userObj.storage;
         } catch (e) { /* ignore */ }
-        return [];
+        // default: return empty slot array
+        return Array.from({length:50}).map(_=>null);
     }
     _setAccountStorage(username, storageArr) {
         if (!username) return;
         try {
             const key = 'cif_user_' + username;
             const userObj = JSON.parse(localStorage.getItem(key)) || { characters: [] };
-            userObj.storage = storageArr || [];
+            userObj.storage = storageArr || Array.from({length:50}).map(_=>null);
             localStorage.setItem(key, JSON.stringify(userObj));
         } catch (e) { console.warn('Could not set account storage', e); }
     }
@@ -762,7 +826,7 @@ export class Town extends Phaser.Scene {
         if (this._storageModal) return;
         const inv = this.char.inventory || [];
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const storage = this._getAccountStorage(username) || [];
+        const storage = this._getAccountStorage(username) || Array.from({length:50}).map(_=>null);
         const modal = document.createElement('div');
         modal.id = 'storage-modal';
         modal.style.position = 'fixed';
@@ -775,7 +839,7 @@ export class Town extends Phaser.Scene {
         modal.style.borderRadius = '12px';
         modal.style.color = '#fff';
         modal.style.minWidth = '420px';
-        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Account Storage</strong><button id='storage-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' style='max-height:260px;overflow:auto;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;'></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' style='max-height:260px;overflow:auto;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;'></div></div></div>`;
+        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Account Storage</strong><button id='storage-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' class='grid-scroll'><div id='storage-inv-grid' class='slot-grid'></div></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' class='grid-scroll'><div id='storage-box-grid' class='slot-grid'></div></div></div></div>`;
         document.body.appendChild(modal);
         this._storageModal = modal;
         document.getElementById('storage-close').onclick = () => this._closeStorageModal();
@@ -787,69 +851,70 @@ export class Town extends Phaser.Scene {
     }
     _refreshStorageModal() {
         if (!this._storageModal) return;
-        const invContainer = this._storageModal.querySelector('#storage-inv');
-        const boxContainer = this._storageModal.querySelector('#storage-box');
-        invContainer.innerHTML = '';
-        boxContainer.innerHTML = '';
-        const inv = this.char.inventory || [];
+        const invGrid = this._storageModal.querySelector('#storage-inv-grid');
+        const boxGrid = this._storageModal.querySelector('#storage-box-grid');
+        invGrid.innerHTML = '';
+        boxGrid.innerHTML = '';
+    const invSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const storage = this._getAccountStorage(username) || [];
+    const storageSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this._getAccountStorage(username) || []) : Array.from({length:50}).map(_=>null);
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        // Inventory entries with Deposit buttons
-        for (const it of inv) {
-            if (!it) continue;
-            const def = defs && defs[it.id];
-            const name = it.name || (def && def.name) || it.id;
-            const qty = it.qty || 1;
-            const el = document.createElement('div'); el.style.display = 'flex'; el.style.justifyContent = 'space-between'; el.style.alignItems = 'center'; el.style.padding = '6px'; el.style.marginBottom = '6px'; el.style.background = 'rgba(255,255,255,0.02)'; el.style.borderRadius = '8px';
-            const left = document.createElement('div'); left.innerHTML = `<strong>${name}</strong><div style='font-size:0.85em;color:#ccc;'>${def && def.stackable ? 'Stackable' : 'Unique'}</div>`;
-            const right = document.createElement('div'); right.style.display = 'flex'; right.style.alignItems = 'center'; right.innerHTML = `<div style='margin-right:8px'>${qty}</div>`;
-            const btn = document.createElement('button'); btn.textContent = 'Deposit'; btn.style.padding = '6px 8px'; btn.style.border = 'none'; btn.style.borderRadius = '6px'; btn.style.cursor = 'pointer'; btn.onclick = () => { this._depositToStorage(it.id, 1); };
-            right.appendChild(btn);
-            el.appendChild(left); el.appendChild(right);
-            invContainer.appendChild(el);
+        // render inventory slots — slots are clickable to Deposit
+        for (let i = 0; i < invSlots.length; i++) {
+            const s = invSlots[i];
+            const el = document.createElement('div'); el.className = 'slot';
+            if (s) {
+                const def = defs && defs[s.id]; const icon = def && def.weapon ? '⚔️' : (def && def.armor ? '🛡️' : '📦');
+                // include icon and a small label for the item name; label uses pointer-events:none so clicks hit the slot
+                el.innerHTML = `<div title='${s.name || (def && def.name) || s.id}'>${icon}</div>`;
+                if (s.qty && s.qty > 1) { const q = document.createElement('div'); q.className='qty'; q.textContent = s.qty; el.appendChild(q); }
+                const label = document.createElement('div'); label.className = 'slot-label'; label.style.cssText = 'font-size:10px;position:absolute;left:6px;bottom:4px;color:#ddd;pointer-events:none;text-shadow:0 1px 0 rgba(0,0,0,0.6);';
+                label.textContent = (def && def.name) || s.name || s.id;
+                el.appendChild(label);
+                el.style.cursor = 'pointer';
+                // click the slot to deposit one
+                try { el.addEventListener('click', () => { try { this._depositToStorage(s.id, 1); } catch (e) {} }); } catch (e) {}
+                // show item tooltip on hover
+                try {
+                    el.addEventListener('mouseenter', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(this, s, el); } catch (e) {} });
+                    el.addEventListener('mouseleave', () => { try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {} });
+                } catch (e) { /* ignore DOM attach errors */ }
+            }
+            invGrid.appendChild(el);
         }
-        // Storage entries with Withdraw buttons
-        for (const it of storage) {
-            if (!it) continue;
-            const def = defs && defs[it.id];
-            const name = it.name || (def && def.name) || it.id;
-            const qty = it.qty || 1;
-            const el = document.createElement('div'); el.style.display = 'flex'; el.style.justifyContent = 'space-between'; el.style.alignItems = 'center'; el.style.padding = '6px'; el.style.marginBottom = '6px'; el.style.background = 'rgba(255,255,255,0.02)'; el.style.borderRadius = '8px';
-            const left = document.createElement('div'); left.innerHTML = `<strong>${name}</strong><div style='font-size:0.85em;color:#ccc;'>${def && def.stackable ? 'Stackable' : 'Unique'}</div>`;
-            const right = document.createElement('div'); right.style.display = 'flex'; right.style.alignItems = 'center'; right.innerHTML = `<div style='margin-right:8px'>${qty}</div>`;
-            const btn = document.createElement('button'); btn.textContent = 'Withdraw'; btn.style.padding = '6px 8px'; btn.style.border = 'none'; btn.style.borderRadius = '6px'; btn.style.cursor = 'pointer'; btn.onclick = () => { this._withdrawFromStorage(it.id, 1); };
-            right.appendChild(btn);
-            el.appendChild(left); el.appendChild(right);
-            boxContainer.appendChild(el);
+        // render storage slots — slots are clickable to Withdraw
+        for (let i = 0; i < storageSlots.length; i++) {
+            const s = storageSlots[i];
+            const el = document.createElement('div'); el.className = 'slot';
+            if (s) {
+                const def = defs && defs[s.id]; const icon = def && def.weapon ? '⚔️' : (def && def.armor ? '🛡️' : '📦');
+                el.innerHTML = `<div title='${s.name || (def && def.name) || s.id}'>${icon}</div>`;
+                if (s.qty && s.qty > 1) { const q = document.createElement('div'); q.className='qty'; q.textContent = s.qty; el.appendChild(q); }
+                const label = document.createElement('div'); label.className = 'slot-label'; label.style.cssText = 'font-size:10px;position:absolute;left:6px;bottom:4px;color:#ddd;pointer-events:none;text-shadow:0 1px 0 rgba(0,0,0,0.6);';
+                label.textContent = (def && def.name) || s.name || s.id;
+                el.appendChild(label);
+                el.style.cursor = 'pointer';
+                // click the slot to withdraw one
+                try { el.addEventListener('click', () => { try { this._withdrawFromStorage(s.id, 1); } catch (e) {} }); } catch (e) {}
+                // show item tooltip on hover
+                try {
+                    el.addEventListener('mouseenter', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(this, s, el); } catch (e) {} });
+                    el.addEventListener('mouseleave', () => { try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {} });
+                } catch (e) { /* ignore DOM attach errors */ }
+            }
+            boxGrid.appendChild(el);
         }
     }
     _depositToStorage(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
-        this.char.inventory = this.char.inventory || [];
-        const inv = this.char.inventory;
-        const idx = inv.findIndex(x => x && x.id === itemId);
-        if (idx === -1) { this._showToast('Item not found'); return; }
-        const it = inv[idx];
-        // remove from inventory
-        if (it.qty && it.qty > qty) {
-            it.qty -= qty;
-        } else {
-            inv.splice(idx, 1);
-        }
-        // add to account storage
+        // remove from inventory slots and add to storage slots
+    this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
+    const removed = (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) ? window.__shared_ui.removeItemFromSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){const s=slots[i]; if(!s) continue; if(s.id!==id) continue; if(s.qty&&s.qty>q){s.qty-=q; q=0; break;} q-=(s.qty||1); slots[i]=null;} return q<=0;})(this.char.inventory,itemId,qty);
+        if (!removed) { this._showToast('Item not found'); return; }
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const storage = this._getAccountStorage(username) || [];
-        const itemDef = (window && window.ITEM_DEFS && window.ITEM_DEFS[itemId]) || null;
-        if (itemDef && itemDef.stackable) {
-            let found = storage.find(x => x && x.id === itemId);
-            if (found) found.qty = (found.qty || 0) + qty; else storage.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: qty });
-        } else {
-            // Unstackable/unique items should be stored as separate entries to preserve uniqueness.
-            for (let i = 0; i < qty; i++) {
-                storage.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 });
-            }
-        }
+    const storage = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this._getAccountStorage(username) || []) : Array.from({length:50}).map(_=>null);
+    const added = (window && window.__shared_ui && window.__shared_ui.addItemToSlots) ? window.__shared_ui.addItemToSlots(storage, itemId, qty) : (function(slots,id,q){ while(q>0){ let placed=false; for(const s of slots){ if(s && s.id===id){ const can= (999999)-(s.qty||0); const take=Math.min(can,q); if(take>0){ s.qty=(s.qty||0)+take; q-=take; placed=true; if(q<=0) return true; } } } for(let i=0;i<slots.length&&q>0;i++){ if(!slots[i]){ const put=q; slots[i]={id:id,name:id,qty:put}; q-=put; placed=true; } } if(!placed) break; } return q<=0; })(storage,itemId,qty);
+        if (!added) { this._showToast('Not enough storage space'); return; }
         this._setAccountStorage(username, storage);
         this._persistCharacter(username);
         this._showToast('Deposited ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
@@ -859,22 +924,14 @@ export class Town extends Phaser.Scene {
     _withdrawFromStorage(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const storage = this._getAccountStorage(username) || [];
-        const idx = storage.findIndex(x => x && x.id === itemId);
-        if (idx === -1) { this._showToast('Item not in storage'); return; }
-        const it = storage[idx];
-        if ((it.qty || 0) < qty) { this._showToast('Not enough in storage'); return; }
-        if (it.qty > qty) it.qty -= qty; else storage.splice(idx, 1);
+    const storage = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this._getAccountStorage(username) || []) : Array.from({length:50}).map(_=>null);
+    const removed = (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) ? window.__shared_ui.removeItemFromSlots(storage, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){ const s=slots[i]; if(!s) continue; if(s.id!==id) continue; if(s.qty&&s.qty>q){ s.qty-=q; q=0; break;} q-=(s.qty||1); slots[i]=null;} return q<=0;})(storage,itemId,qty);
+        if (!removed) { this._showToast('Not enough in storage'); return; }
         this._setAccountStorage(username, storage);
-        // add to this.char.inventory
-        this.char.inventory = this.char.inventory || [];
-        const inv = this.char.inventory;
-        const found = inv.find(x => x && x.id === itemId);
-        if (found && (window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].stackable)) {
-            found.qty = (found.qty || 0) + qty;
-        } else {
-            inv.push({ id: itemId, name: (window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId, qty: qty });
-        }
+        // add to inventory
+    this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
+    const added = (window && window.__shared_ui && window.__shared_ui.addItemToSlots) ? window.__shared_ui.addItemToSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){ if(!slots[i]){ slots[i]={id:id,name:id,qty:1}; q--; } } return q<=0; })(this.char.inventory,itemId,qty);
+        if (!added) { this._showToast('Not enough inventory space'); return; }
         this._persistCharacter(username);
         this._showToast('Withdrew ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
         if (this._storageModal) this._refreshStorageModal();

@@ -59,7 +59,13 @@ export function openFurnaceModal(scene) {
     // reuse implementation previously duplicated in scenes but operate on passed-in scene
     if (scene._furnaceModal) return;
     const inv = scene.char.inventory || [];
-    const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
+    const findQty = (id) => {
+        if (window && window.__shared_ui && window.__shared_ui.initSlots) {
+            const slots = window.__shared_ui.initSlots(scene.char.inventory || []);
+            let n = 0; for (const s of slots) if (s && s.id === id) n += (s.qty || 1); return n;
+        }
+        const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0;
+    };
     const modal = document.createElement('div');
     modal.id = (scene.scene && scene.scene.key === 'Cave') ? 'cave-furnace-modal' : 'furnace-modal';
     modal.style.position = 'fixed';
@@ -234,16 +240,36 @@ export function attemptSmelt(recipeId) {
         if (have < (req.qty || 1)) { stopContinuousSmelting(scene); scene._showToast('Out of materials for ' + (recipe.name || recipeId)); return; }
     }
     for (const req of (recipe.requires || [])) {
-        const it = find(req.id);
-        if (it) { it.qty -= (req.qty || 1); if (it.qty <= 0) inv.splice(inv.indexOf(it), 1); }
+        const qtyNeeded = (req.qty || 1);
+        if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
+            const ok = window.__shared_ui.removeItemFromInventory(scene, req.id, qtyNeeded);
+            if (!ok) { stopContinuousSmelting(scene); scene._showToast('Out of materials for ' + (recipe.name || recipeId)); return; }
+        } else {
+            const it = find(req.id);
+            if (it) {
+                it.qty -= qtyNeeded;
+                if (it.qty <= 0) {
+                    if (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) {
+                        window.__shared_ui.removeItemFromSlots(inv, req.id, 0);
+                    } else {
+                        inv.splice(inv.indexOf(it), 1);
+                    }
+                }
+            }
+        }
     }
     const prodId = recipe.id || recipeId;
     const prodDef = items && items[prodId];
-    if (prodDef && prodDef.stackable) {
-        let ex = find(prodId);
-        if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
+    if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+        const added = window.__shared_ui.addItemToInventory(scene, prodId, 1);
+        if (!added) scene._showToast('Not enough inventory space');
     } else {
-        inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
+        if (prodDef && prodDef.stackable) {
+            let ex = find(prodId);
+            if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
+        } else {
+            inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
+        }
     }
     const newQty = (find(prodId) && find(prodId).qty) || 1;
     scene._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);

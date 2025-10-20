@@ -484,24 +484,41 @@ export class Cave extends Phaser.Scene {
                 return;
             }
         }
-        // consume materials
+        // consume materials (slot-aware when possible)
         for (const req of (recipe.requires || [])) {
-            const it = find(req.id);
-            if (it) {
-                it.qty -= (req.qty || 1);
-                if (it.qty <= 0) inv.splice(inv.indexOf(it), 1);
+            const qtyNeeded = (req.qty || 1);
+            if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
+                const ok = window.__shared_ui.removeItemFromInventory(this, req.id, qtyNeeded);
+                if (!ok) { this._stopContinuousSmelting(); this._showToast('Out of materials for ' + (recipe.name || recipeId)); return; }
+            } else {
+                const it = find(req.id);
+                if (it) {
+                    it.qty -= qtyNeeded;
+                    if (it.qty <= 0) {
+                        if (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) {
+                            window.__shared_ui.removeItemFromSlots(inv, req.id, 0);
+                        } else {
+                            inv.splice(inv.indexOf(it), 1);
+                        }
+                    }
+                }
             }
         }
         // give product
         const prodId = recipe.id || recipeId;
         const prodDef = items && items[prodId];
-        if (prodDef && prodDef.stackable) {
-            let ex = find(prodId);
-            if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
-        } else {
-            inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
-        }
-        const newQty = (find(prodId) && find(prodId).qty) || 1;
+            if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+                const added = window.__shared_ui.addItemToInventory(this, prodId, 1);
+                if (!added) this._showToast('Not enough inventory space');
+            } else {
+                if (prodDef && prodDef.stackable) {
+                    let ex = find(prodId);
+                    if (ex) ex.qty = (ex.qty || 0) + 1; else inv.push({ id: prodId, name: prodDef.name || recipe.name, qty: 1 });
+                } else {
+                    inv.push({ id: prodId, name: (prodDef && prodDef.name) || recipe.name, qty: 1 });
+                }
+            }
+            const newQty = (find(prodId) && find(prodId).qty) || 1;
         this._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);
     // award smithing XP
     this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
@@ -695,39 +712,67 @@ export class Cave extends Phaser.Scene {
     // lower bound only; allow chance to exceed 1.0 so multiplier can grow with level/str
     chance = Math.max(0.05, chance);
         const gotOre = Math.random() < chance;
-        if (gotOre) {
-            // multiplier based on efficiency relative to node.baseChance
-            const base = node.baseChance || 0.35;
-            const multiplier = Math.max(1, Math.floor(chance / base));
-            // award node-specific item (stack qty) and report per-swing gain
-            this.char.inventory = this.char.inventory || [];
-            let found = null;
-            for (let it of this.char.inventory) { if (it && it.id === node.item.id) { found = it; break; } }
-            let prevQty = 0;
-            let newQty = 0;
-            if (found) {
-                prevQty = found.qty || 0;
-                newQty = prevQty + multiplier;
-                found.qty = newQty;
-            } else {
-                this.char.inventory.push({ id: node.item.id, name: node.item.name, qty: multiplier });
-                found = this.char.inventory[this.char.inventory.length - 1];
-                prevQty = 0;
-                newQty = multiplier;
-            }
-            const delta = newQty - prevQty;
-            // grant mining XP scaled by multiplier (keep per-ore XP reasonable)
-            mining.exp = (mining.exp || 0) + (15 * multiplier);
-            // refresh stats modal if open (mining XP affects skills display)
-            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
-            // show toast with per-swing amount and item name
-            this._showToast(`You mined ${delta}x ${node.item.name}! (+${15 * multiplier} mining XP)`);
-            // visual effect scaled by multiplier
-            this._playMiningSwingEffect(node, true);
-            if (multiplier > 1 && node.sprite) {
-                // extra pulse to emphasize multi-ore
-                this.tweens.add({ targets: node.sprite, scale: { from: 1.12, to: 1.25 }, yoyo: true, duration: 220, ease: 'Sine.easeOut' });
-            }
+            if (gotOre) {
+                // multiplier based on efficiency relative to node.baseChance
+                const base = node.baseChance || 0.35;
+                const multiplier = Math.max(1, Math.floor(chance / base));
+                // compute delta defensively so any errors in shared helpers don't throw
+                let delta = 0;
+                try {
+                    if (window && window.__shared_ui && typeof window.__shared_ui.addItemToInventory === 'function') {
+                        // try to read previous qty (best-effort)
+                        let prev = 0;
+                        try {
+                            if (typeof window.__shared_ui.initSlots === 'function' && typeof window.__shared_ui.getQtyInSlots === 'function') {
+                                prev = window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), node.item.id) || 0;
+                            }
+                        } catch (e) { prev = 0; }
+                        // try to add via shared helper
+                        let added = false;
+                        try { added = !!window.__shared_ui.addItemToInventory(this, node.item.id, multiplier); } catch (e) { added = false; }
+                        // try to read new qty (best-effort)
+                        let newQty = prev + (added ? multiplier : 0);
+                        try {
+                            if (typeof window.__shared_ui.initSlots === 'function' && typeof window.__shared_ui.getQtyInSlots === 'function') {
+                                newQty = window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), node.item.id);
+                            }
+                        } catch (e) { /* ignore */ }
+                        delta = Math.max(0, (newQty || 0) - (prev || 0));
+                    } else {
+                        // simple fallback inventory manipulation
+                        this.char.inventory = this.char.inventory || [];
+                        let found = null;
+                        for (let it of this.char.inventory) { if (it && it.id === node.item.id) { found = it; break; } }
+                        let prevQty = 0;
+                        let newQty = 0;
+                        if (found) {
+                            prevQty = found.qty || 0;
+                            newQty = prevQty + multiplier;
+                            found.qty = newQty;
+                        } else {
+                            this.char.inventory.push({ id: node.item.id, name: node.item.name, qty: multiplier });
+                            prevQty = 0;
+                            newQty = multiplier;
+                        }
+                        delta = Math.max(0, newQty - prevQty);
+                    }
+                } catch (e) {
+                    console.warn('Error while adding mined item, falling back:', e);
+                    // ensure we still award something sensible
+                    delta = multiplier;
+                }
+                // grant mining XP scaled by multiplier (keep per-ore XP reasonable)
+                mining.exp = (mining.exp || 0) + (15 * multiplier);
+                // refresh stats modal if open (mining XP affects skills display)
+                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
+                // show toast with per-swing amount and item name
+                this._showToast(`You mined ${delta}x ${node.item.name}! (+${15 * multiplier} mining XP)`);
+                // visual effect scaled by multiplier
+                this._playMiningSwingEffect(node, true);
+                if (multiplier > 1 && node.sprite) {
+                    // extra pulse to emphasize multi-ore
+                    this.tweens.add({ targets: node.sprite, scale: { from: 1.12, to: 1.25 }, yoyo: true, duration: 220, ease: 'Sine.easeOut' });
+                }
         } else {
             mining.exp = (mining.exp || 0) + 5;
             this._showToast('You swing and find nothing. (+5 mining XP)');

@@ -1,4 +1,8 @@
 export const ITEM_DEFS = {
+    //Admin items
+    'admin_godmode': { id: 'admin_godmode', name: 'God Mode Toggle', rarity: 'legendary', stackable: false, maxStack: 1, description: 'An omnipotent artifact that grants the wielder invincibility and the ability to ignore game rules. Use with caution, as it may lead to existential boredom.' },
+    'admin_weapon': { id: 'admin_weapon', name: 'Admin Weapon', rarity: 'legendary', stackable: false, maxStack: 1, weapon: true, damage: [100,200], statBonus: { str: 100, int: 100, agi: 100, luk: 100, defense: 100 }, description: 'A weapon of unparalleled power, capable of obliterating any foe with a single strike. Wielded only by those who command the very fabric of the game world.' },
+    // Crafting materials and equipment
     'copper_ore': { id: 'copper_ore', name: 'Copper Ore', rarity: 'common', stackable: true, maxStack: 9999, description: 'Dull rocks with delusions of metal grandeur. Smelts into something that vaguely resembles a tool.' },
     'tin_ore': { id: 'tin_ore', name: 'Tin Ore', rarity: 'common', stackable: true, maxStack: 9999, description: 'A soft, panicked metal that melted before it could make better life choices.' },
     'copper_bar': { id: 'copper_bar', name: 'Copper Bar', rarity: 'common', stackable: true, maxStack: 9999, description: 'Forged from ore and broken promises. Good for crafting and dulling your enemies\' expectations.' },
@@ -16,4 +20,11 @@ export const ITEM_DEFS = {
     'slime_core': { id: 'slime_core', name: 'Glowing Slime Core', rarity: 'rare', stackable: true, maxStack: 99, description: 'A pulsing core that hums with condensed mana. Slightly warm, like a tiny sun of poor decisions.' },
     'slime_crown_shard': { id: 'slime_crown_shard', name: 'Royal Slime Crown Shard', rarity: 'epic', stackable: false, maxStack: 1, description: 'A fragment of a monarch slime crown. It radiates confidence and the faint whiff of tyranny.', statBonus: { luk: 2 } },
     'slime_whip': { id: 'slime_whip', name: 'Gel Lash', rarity: 'rare', stackable: false, maxStack: 1, weapon: true, damage: [3,6], statBonus: { agi: 2, luk: 1 }, description: 'A whip that slaps enemies and occasionally apologizes in gooey tones.' },
+    // Health and mana items
+    'minor_health_potion': { id: 'minor_health_potion', name: 'Minor Health Potion', rarity: 'common', stackable: true, maxStack: 99, healAmount: 20, description: 'A small vial of red liquid that tastes like cherry-flavored hope. Restores a modest amount of health.' },
+    'major_health_potion': { id: 'major_health_potion', name: 'Major Health Potion', rarity: 'uncommon', stackable: true, maxStack: 99, healAmount: 75, description: 'A large bottle of crimson concoction that smells like victory. Heals a significant portion of health.' },
+    'minor_mana_potion': { id: 'minor_mana_potion', name: 'Minor Mana Potion', rarity: 'common', stackable: true, maxStack: 99, manaAmount: 15, description: 'A small vial of blue liquid that tastes like blueberry dreams. Restores a modest amount of mana.' },
+    'major_mana_potion': { id: 'major_mana_potion', name: 'Major Mana Potion', rarity: 'uncommon', stackable: true, maxStack: 99, manaAmount: 60, description: 'A large bottle of azure elixir that smells like arcane triumph. Replenishes a significant portion of mana.' },
+    // Quest items
+    'strange_slime_egg': { id: 'strange_slime_egg', name: 'Strange Slime Egg', rarity: 'epic', stackable: false, maxStack: 1, description: 'An egg pulsating with mysterious energy. It\'s warm to the touch and occasionally jiggles on its own. What could be inside?' },
 };

@@ -104,6 +104,27 @@ export class InnerField extends Phaser.Scene {
             this._tryAttack();
         }
 
+        // Inventory toggle (I)
+        if (Phaser.Input.Keyboard.JustDown(this.keys.inventory)) {
+            if (window && window.__shared_ui) {
+                if (this._inventoryModal) window.__shared_ui.closeInventoryModal(this); else window.__shared_ui.openInventoryModal(this);
+            } else {
+                if (this._inventoryModal) { /* no local fallback modal implemented */ } else { /* no-op */ }
+            }
+        }
+        // Equipment toggle (U)
+        if (Phaser.Input.Keyboard.JustDown(this.keys.equip)) {
+            if (window && window.__shared_ui) {
+                if (this._equipmentModal) window.__shared_ui.closeEquipmentModal(this); else window.__shared_ui.openEquipmentModal(this);
+            }
+        }
+        // Stats toggle (X)
+        if (this.keys.stats && Phaser.Input.Keyboard.JustDown(this.keys.stats)) {
+            if (window && window.__shared_ui) {
+                if (this._statsModal) window.__shared_ui.closeStatsModal(this); else window.__shared_ui.openStatsModal(this);
+            }
+        }
+
         this._updateEnemiesAI();
         if (this.autoAttack && this.time.now >= this.nextAttackTime) {
             const target = this._getEnemyInRange(this.attackRange);
@@ -236,14 +257,20 @@ export class InnerField extends Phaser.Scene {
 
     _addItemToInventory(itemId, qty) {
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        const inv = this.char.inventory = this.char.inventory || [];
         const def = defs[itemId];
-        if (def && def.stackable) {
-            let entry = inv.find(x => x && x.id === itemId);
-            if (entry) entry.qty = (entry.qty || 0) + qty;
-            else inv.push({ id: itemId, name: (def && def.name) || itemId, qty });
+        // prefer shared UI slot helpers when available
+        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+            const added = window.__shared_ui.addItemToInventory(this, itemId, qty || 1);
+            if (!added) this._showToast && this._showToast('Inventory full');
         } else {
-            for (let i = 0; i < qty; i++) inv.push({ id: itemId, name: (def && def.name) || itemId, qty: 1 });
+            const inv = this.char.inventory = this.char.inventory || [];
+            if (def && def.stackable) {
+                let entry = inv.find(x => x && x.id === itemId);
+                if (entry) entry.qty = (entry.qty || 0) + qty;
+                else inv.push({ id: itemId, name: (def && def.name) || itemId, qty });
+            } else {
+                for (let i = 0; i < qty; i++) inv.push({ id: itemId, name: (def && def.name) || itemId, qty: 1 });
+            }
         }
         if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal && this._inventoryModal) window.__shared_ui.refreshInventoryModal(this);
     }
