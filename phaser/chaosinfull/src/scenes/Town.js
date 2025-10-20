@@ -498,6 +498,7 @@ export class Town extends Phaser.Scene {
     _closeFurnaceModal() {
         if (this._furnaceModal && this._furnaceModal.parentNode) this._furnaceModal.parentNode.removeChild(this._furnaceModal);
         this._furnaceModal = null;
+    try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
     // restore HUD display and ensure furnace animation is stopped if not smelting
     try { if (!this.smeltingActive && this._setFurnaceFlame) this._setFurnaceFlame(false); } catch(e) {}
         try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
@@ -762,6 +763,7 @@ export class Town extends Phaser.Scene {
     _closeStorageModal() {
         if (this._storageModal && this._storageModal.parentNode) this._storageModal.parentNode.removeChild(this._storageModal);
         this._storageModal = null;
+    try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
     }
     _refreshStorageModal() {
         if (!this._storageModal) return;

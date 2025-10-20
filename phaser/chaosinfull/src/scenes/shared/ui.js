@@ -35,6 +35,7 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
     #shared-item-tooltip.show { opacity:1; transform:translateY(0) scale(1); }
     #shared-item-tooltip .tt-title { font-weight:800; font-size:14px; margin-bottom:6px; /* etched effect */ color: rgba(255,255,255,0.92); text-shadow: 0 -1px 0 rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.03); }
     #shared-item-tooltip .tt-desc { font-size:12px; color: rgba(240,240,240,0.9); margin-bottom:6px; font-family: 'Segoe UI', Roboto, 'Comic Sans MS', cursive; }
+    #shared-item-tooltip .tt-value { font-size:12px; color: #ffd27a; margin-bottom:6px; font-family: 'Segoe UI', Roboto, 'Comic Sans MS', cursive; }
     #shared-item-tooltip .tt-stats { font-size:12px; color: #ffd27a; font-family: 'Segoe UI', Roboto, 'Comic Sans MS', cursive; display:flex; flex-direction:column; gap:4px; }
     #shared-item-tooltip.tt-rare { border-color: rgba(100,170,255,0.18); background: linear-gradient(180deg, rgba(100,170,255,0.06), rgba(255,255,255,0.02)); }
     #shared-item-tooltip.tt-epic { border-color: rgba(200,100,255,0.2); background: linear-gradient(180deg, rgba(200,100,255,0.06), rgba(255,255,255,0.02)); }
@@ -134,7 +135,7 @@ function ensureTooltip() {
     let t = document.getElementById('shared-item-tooltip');
     if (t) return t;
     t = document.createElement('div'); t.id = 'shared-item-tooltip';
-    t.innerHTML = `<div class='tt-title'></div><div class='tt-desc'></div><div class='tt-stats'></div>`;
+    t.innerHTML = `<div class='tt-title'></div><div class='tt-desc'></div><div class='tt-value' style='display:none'></div><div class='tt-stats'></div>`;
     document.body.appendChild(t);
     return t;
 }
@@ -160,13 +161,33 @@ export function showItemTooltip(scene, itemOrId, anchorEl) {
     else { def = defs[itemOrId] || null; name = (def && def.name) || itemOrId; }
     desc = (def && def.desc) || (def && def.description) || '';
     const t = ensureTooltip(); if (!t) return;
-    // set rarity class
+    // set rarity class and tag title color
     const rarity = (def && def.rarity) || 'common'; t.className = '';
     t.classList.add(`tt-${rarity}`);
+    try {
+        const titleColor = RARITY_TITLE_COLORS[rarity] || RARITY_TITLE_COLORS.common;
+        const titleEl = t.querySelector('.tt-title');
+        if (titleEl) titleEl.style.color = titleColor;
+        // slightly strengthen border tint for visible contrast
+        if (rarity && rarity !== 'common') t.style.borderColor = (RARITY_COLORS[rarity] || RARITY_COLORS.common);
+        else t.style.borderColor = 'rgba(255,255,255,0.06)';
+    } catch (e) {}
     // fill content
-    const titleEl = t.querySelector('.tt-title'); const descEl = t.querySelector('.tt-desc'); const statsEl = t.querySelector('.tt-stats');
+    const titleEl = t.querySelector('.tt-title'); const descEl = t.querySelector('.tt-desc'); const valueEl = t.querySelector('.tt-value'); const statsEl = t.querySelector('.tt-stats');
     if (titleEl) titleEl.textContent = name;
     if (descEl) descEl.textContent = desc || '';
+    // value display (optional)
+    try {
+        if (valueEl) {
+            if (def && typeof def.value !== 'undefined' && def.value !== null) {
+                valueEl.style.display = 'block';
+                valueEl.textContent = '\uD83D\uDCB0 Value: ' + (def.value || 0);
+            } else {
+                valueEl.style.display = 'none';
+                valueEl.textContent = '';
+            }
+        }
+    } catch (e) {}
     // hint for usable items
     if (def && def.usable) {
         if (descEl) descEl.textContent = (descEl.textContent ? descEl.textContent + ' ' : '') + '(Click to use)';
@@ -237,9 +258,19 @@ const SLOT_COUNT = 50;
 // Rarity -> color map (used for scrollbar tint on hover)
 const RARITY_COLORS = {
     common: 'rgba(255,255,255,0.12)',
+    uncommon: 'rgba(100,255,100,0.9)',
     rare: 'rgba(100,170,255,0.9)',
     epic: 'rgba(200,100,255,0.95)',
     legendary: 'rgba(255,200,80,0.95)'
+};
+
+// Title color mapping for rarities (used to tint the item name for better contrast)
+const RARITY_TITLE_COLORS = {
+    common: '#ffffff',
+    uncommon: '#8ef58a',
+    rare: '#66baff',
+    epic: '#d08cff',
+    legendary: '#ffd27a'
 };
 
 function initSlots(arr) {
@@ -411,6 +442,7 @@ export function closeInventoryModal(scene) {
     if (!scene) return;
     if (scene._inventoryModal && scene._inventoryModal.parentNode) scene._inventoryModal.parentNode.removeChild(scene._inventoryModal);
     scene._inventoryModal = null;
+    try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
 }
 
 export function refreshInventoryModal(scene) {
@@ -424,10 +456,16 @@ export function refreshInventoryModal(scene) {
     try {
         if (grid && !grid._invHandlerAttached) {
             const delegatedClick = (ev) => {
+                // Normalize event target to an Element and find the nearest .slot.
                 let target = ev.target;
-                if (target && target.closest) target = target.closest('.slot');
-                if (!target) return;
-                const idx = Number(target.dataset && target.dataset.slotIndex);
+                // If the initial target is not an Element (e.g. a Text node), walk up to a parent element.
+                if (target && target.nodeType !== 1) target = target.parentElement;
+                // If still not an Element, abort.
+                if (!target || typeof target.closest !== 'function') return;
+                // Find the slot element (may be the target itself or an ancestor)
+                const slotEl = target.closest('.slot');
+                if (!slotEl) return;
+                const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
                 try { console.debug && console.debug('[inventory][delegated] clicked slot', { slotIndex: idx, item: (target && target.dataset && target.dataset.slotIndex) }); } catch(e) {}
                 if (!isNaN(idx)) {
                     try {
@@ -537,6 +575,7 @@ export function closeEquipmentModal(scene) {
     if (!scene) return;
     if (scene._equipmentModal && scene._equipmentModal.parentNode) scene._equipmentModal.parentNode.removeChild(scene._equipmentModal);
     scene._equipmentModal = null;
+    try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
 }
 
 export function refreshEquipmentModal(scene) {
@@ -597,6 +636,7 @@ export function closeStatsModal(scene) {
     if (!scene) return;
     if (scene._statsModal && scene._statsModal.parentNode) scene._statsModal.parentNode.removeChild(scene._statsModal);
     scene._statsModal = null;
+    try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
 }
 
 export function refreshStatsModal(scene) {
