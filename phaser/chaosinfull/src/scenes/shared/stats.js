@@ -2,11 +2,30 @@
 export function effectiveStats(char) {
     const base = Object.assign({}, (char.stats || { str:0, int:0, agi:0, luk:0 }));
     const equip = char._equipBonuses || { str:0, int:0, agi:0, luk:0, defense:0 };
+    // Temporary buffs (from consumables) may add stat bonuses or defense
+    const buffs = Array.isArray(char._buffs) ? char._buffs : (Array.isArray(char.buffs) ? char.buffs : []);
+    const buffTotals = { str:0, int:0, agi:0, luk:0, defense:0 };
+    try {
+        for (const b of buffs) {
+            if (!b) continue;
+            if (b.statBonus) {
+                for (const k of Object.keys(b.statBonus || {})) {
+                    buffTotals[k] = (buffTotals[k] || 0) + (b.statBonus[k] || 0);
+                }
+            }
+            if (typeof b.defense === 'number') buffTotals.defense = (buffTotals.defense || 0) + b.defense;
+        }
+    } catch (e) {}
     const str = (base.str||0) + (equip.str||0);
     const int = (base.int||0) + (equip.int||0);
     const agi = (base.agi||0) + (equip.agi||0);
     const luk = (base.luk||0) + (equip.luk||0);
-    const defense = (char.defenseBonus||0) + (equip.defense||0);
+    const defense = (char.defenseBonus||0) + (equip.defense||0) + (buffTotals.defense || 0);
+    // include buff stat totals into effective stats
+    const effStr = str + (buffTotals.str || 0);
+    const effInt = int + (buffTotals.int || 0);
+    const effAgi = agi + (buffTotals.agi || 0);
+    const effLuk = luk + (buffTotals.luk || 0);
     // Derived vitals (centralized formulas):
     // maxhp = 100 + level*10 + STR*10
     // maxmana = 50 + level*5 + INT*10
@@ -14,15 +33,15 @@ export function effectiveStats(char) {
     const level = (char.level || 1);
     // Always compute vitals from canonical formula using level + effective stats.
     // Do NOT prefer stored char.maxhp/char.maxmana here because those may be stale.
-    const computedMaxHp = Math.max(1, Math.floor((100 + level * 10 + (str * 10))));
-    const computedMaxMana = Math.max(0, Math.floor((50 + level * 5 + (int * 10))));
+    const computedMaxHp = Math.max(1, Math.floor((100 + level * 10 + (effStr * 10))));
+    const computedMaxMana = Math.max(0, Math.floor((50 + level * 5 + (effInt * 10))));
     const maxhp = computedMaxHp;
     const maxmana = computedMaxMana;
     // baseline ms/attack = 1000, agi reduces it by up to 40% at 100 AGI. Formula: ms = 1000 * (1 - clamp(agi / 250, 0, 0.4))
-    const agiFactor = Math.max(0, Math.min(0.4, (agi / 250)));
+    const agiFactor = Math.max(0, Math.min(0.4, (effAgi / 250)));
     const attackSpeedMs = Math.max(120, Math.floor(1000 * (1 - agiFactor)));
     return {
-        str, int, agi, luk, defense,
+        str: effStr, int: effInt, agi: effAgi, luk: effLuk, defense,
         // canonical derived vitals
         maxhp, maxmana, attackSpeedMs
     };

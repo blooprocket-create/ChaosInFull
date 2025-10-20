@@ -212,9 +212,9 @@ export function showItemTooltip(scene, itemOrId, anchorEl) {
             }
         }
     } catch (e) {}
-    // hint for usable items
+    // hint for usable items (double-click to use in the inventory)
     if (def && def.usable) {
-        if (descEl) descEl.textContent = (descEl.textContent ? descEl.textContent + ' ' : '') + '(Click to use)';
+        if (descEl) descEl.textContent = (descEl.textContent ? descEl.textContent + ' ' : '') + '(Double-click to use)';
     }
     // stats
     statsEl.innerHTML = '';
@@ -412,6 +412,44 @@ function useItemFromSlot(scene, slotIndex) {
             acted = true;
             if (scene._showToast) scene._showToast(`Gained ${goldGain} gold`);
         }
+        // teleport scroll: move player to Town scene (persist first)
+        if (s.id === 'teleport_scroll' && def.usable) {
+            acted = true;
+            if (scene._showToast) scene._showToast(`${def.name || s.id} used`);
+            try {
+                const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
+                if (scene._persistCharacter) scene._persistCharacter(username);
+            } catch (e) {}
+            // schedule the scene transition after this function returns so inventory removal and persistence happen first
+            try { setTimeout(() => { try { if (scene && scene.scene && typeof scene.scene.start === 'function') scene.scene.start('Town', { character: scene.char, username: (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null }); } catch(e) {} }, 80); } catch (e) {}
+        }
+        // buff items: apply temporary stat bonuses (def.buff expected: { statBonus: {...}, defense: n, duration: ms })
+        if (def && def.usable && def.buff && (def.buff.statBonus || def.buff.defense || def.buff.duration)) {
+            const duration = Number(def.buff.duration || 30000);
+            const buffId = (s.id || 'buff') + '_' + Date.now() + '_' + Math.floor(Math.random()*9999);
+            const buffObj = { id: buffId, source: s.id, statBonus: def.buff.statBonus || {}, defense: def.buff.defense || 0, expiresAt: Date.now() + duration };
+            if (!scene.char._buffs) scene.char._buffs = [];
+            scene.char._buffs.push(buffObj);
+            acted = true;
+            if (scene._showToast) scene._showToast(`${def.name || s.id} used (buff applied)`);
+            // schedule buff removal using scene timer when possible
+            try {
+                if (scene.time && typeof scene.time.addEvent === 'function') {
+                    scene.time.addEvent({ delay: duration, callback: () => {
+                        try {
+                            if (scene && scene.char && scene.char._buffs) {
+                                scene.char._buffs = scene.char._buffs.filter(b => b && b.id !== buffId);
+                            }
+                        } catch (e) {}
+                        try { if (scene._updateHUD) scene._updateHUD(); } catch(e) {}
+                        try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch(e) {}
+                    } });
+                } else {
+                    // fallback: remove after timeout
+                    setTimeout(() => { try { if (scene && scene.char && scene.char._buffs) scene.char._buffs = scene.char._buffs.filter(b => b && b.id !== buffId); } catch(e) {} try { if (scene._updateHUD) scene._updateHUD(); } catch(e) {} try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch(e) {} }, duration + 50);
+                }
+            } catch (e) {}
+        }
         // If we applied an effect, consume one and refresh UI/HUD and persist
         if (acted) {
             // remove one from slot array
@@ -544,9 +582,27 @@ export function refreshInventoryModal(scene) {
                 const scroll = scene._inventoryModal.querySelector('.grid-scroll'); if (scroll) { scroll.style.setProperty('--scroll-thumb-color', RARITY_COLORS.common); }
                 try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch (e) {}
             });
-            // double-click to equip if equippable
+            // double-click: use consumable items or equip weapons/armor
             slotEl.ondblclick = () => {
-                if (defs && def && (def.weapon || def.armor)) { equipItemFromInventory(scene, s.id); refreshInventoryModal(scene); refreshEquipmentModal(scene); }
+                try {
+                    const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
+                    // If item is usable, attempt to use it first
+                    if (def && def.usable && !isNaN(idx) && window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
+                        const used = window.__shared_ui.useItemFromSlot(scene, idx);
+                        if (used) {
+                            // refresh UI after use
+                            try { refreshInventoryModal(scene); } catch(e) {}
+                            try { refreshEquipmentModal(scene); } catch(e) {}
+                            return;
+                        }
+                    }
+                    // otherwise, if equippable, equip on double-click (legacy behavior)
+                    if (defs && def && (def.weapon || def.armor)) {
+                        equipItemFromInventory(scene, s.id);
+                        try { refreshInventoryModal(scene); } catch(e) {}
+                        try { refreshEquipmentModal(scene); } catch(e) {}
+                    }
+                } catch (e) { console.warn && console.warn('[inventory] dblclick handler error', e); }
             };
             // single-click: keep existing behavior for inventory modal (no deposit here)
             // single-click: attempt to use consumable items (potions, bags of gold)
