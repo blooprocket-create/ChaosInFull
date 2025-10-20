@@ -121,7 +121,11 @@ function getAvailableQty(scene, itemId) {
 
 function getCraftableCount(scene, recipe) {
     if (!scene || !recipe) return 0;
-    const playerLevel = (scene.char && scene.char.smithing && scene.char.smithing.level) || 1;
+    // Use cooking level for food/fish/meat recipes, smithing level for others
+    const isCookable = recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat');
+    const playerLevel = isCookable
+        ? ((scene.char && scene.char.cooking && scene.char.cooking.level) || 1)
+        : ((scene.char && scene.char.smithing && scene.char.smithing.level) || 1);
     if ((recipe.reqLevel || 1) > playerLevel) return 0;
     let max = Infinity;
     for (const req of (recipe.requires || [])) {
@@ -185,7 +189,13 @@ function renderRecipes(scene) {
     const defs = getFurnaceRecipeDefs();
     const cat = state.selectedCategory || null;
     const keys = Object.keys(defs).filter(k => defs[k] && defs[k].tool === 'furnace' && (!cat || normalizeCategory(defs[k].category) === cat));
-    keys.sort((a,b) => (defs[a].name || a).localeCompare(defs[b].name || b));
+    keys.sort((a,b) => {
+        const ra = defs[a] || {};
+        const rb = defs[b] || {};
+        const levelDiff = (ra.reqLevel || 0) - (rb.reqLevel || 0);
+        if (levelDiff !== 0) return levelDiff;
+        return (ra.name || a).localeCompare(rb.name || b);
+    });
 
     if (!keys.length) {
         const empty = document.createElement('div');
@@ -310,7 +320,12 @@ function renderDetails(scene) {
 
     const validation = (function() {
         const res = { levelOk: true, missing: [] };
-        const lvlOk = !(scene.char && scene.char.smithing && (scene.char.smithing.level || 1) < (recipe.reqLevel || 1));
+        // determine which skill's level to check (cooking for food recipes)
+        const reqLevel = recipe.reqLevel || 1;
+        const playerLevel = (recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat'))
+            ? ((scene.char && scene.char.cooking && scene.char.cooking.level) || 1)
+            : ((scene.char && scene.char.smithing && scene.char.smithing.level) || 1);
+        const lvlOk = playerLevel >= reqLevel;
         res.levelOk = lvlOk;
         if (!lvlOk) return res;
         for (const req of (recipe.requires || [])) {
@@ -326,8 +341,27 @@ function renderDetails(scene) {
 
     const header = document.createElement('div'); header.className = 'workbench-recipe-header';
     header.innerHTML = `<div class='workbench-recipe-title'>${recipe.name || recipe.id}</div>`;
-    const sub = document.createElement('div'); sub.className = 'workbench-recipe-sub'; sub.innerHTML = `Smithing Lv ${recipe.reqLevel || 1} • ${recipe.smithingXp || 0} xp per craft • Max craftable: ${craftable}`;
+    const sub = document.createElement('div'); sub.className = 'workbench-recipe-sub';
+    if (recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat')) {
+        sub.innerHTML = `Cooking Lv ${recipe.reqLevel || 1} • ${recipe.cookingXp || 0} xp per cook • Max craftable: ${craftable}`;
+    } else {
+        sub.innerHTML = `Smithing Lv ${recipe.reqLevel || 1} • ${recipe.smithingXp || 0} xp per craft • Max craftable: ${craftable}`;
+    }
     header.appendChild(sub);
+    // If this recipe is cookable (food/fish/meat) show estimated success chance based on cooking level and INT
+    try {
+        const cookable = recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat');
+        if (cookable) {
+            const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
+            const cookLevel = cooking.level || 1;
+            const intStat = (scene.char && scene.char.stats && scene.char.stats.int) || 0;
+            const baseChance = 0.45 + Math.min(0.4, (cookLevel - 1) * 0.02) + Math.min(0.14, intStat * 0.01);
+            const successChance = Math.max(0.3, Math.min(0.99, baseChance));
+            const chanceEl = document.createElement('div'); chanceEl.className = 'workbench-recipe-chance'; chanceEl.style.marginTop = '6px'; chanceEl.style.fontSize = '13px'; chanceEl.style.opacity = '0.95';
+            chanceEl.textContent = `Success chance: ${Math.round(successChance * 100)}% (Cooking L${cookLevel} • INT ${intStat})`;
+            header.appendChild(chanceEl);
+        }
+    } catch (e) { /* ignore UI chance calc errors */ }
     details.appendChild(header);
 
     const reqHeading = document.createElement('div'); reqHeading.className = 'workbench-section-heading'; reqHeading.textContent = 'Materials'; details.appendChild(reqHeading);
@@ -346,7 +380,10 @@ function renderDetails(scene) {
     details.appendChild(reqList);
 
     if (!validation.levelOk) {
-        const alert = document.createElement('div'); alert.className = 'workbench-alert'; alert.textContent = `Requires Smithing level ${recipe.reqLevel || 1}.`; details.appendChild(alert);
+        const alert = document.createElement('div'); alert.className = 'workbench-alert';
+    if (recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat')) alert.textContent = `Requires Cooking level ${recipe.reqLevel || 1}.`;
+    else alert.textContent = `Requires Smithing level ${recipe.reqLevel || 1}.`;
+        details.appendChild(alert);
     } else if (validation.missing.length) {
         const alert = document.createElement('div'); alert.className = 'workbench-alert';
         const parts = validation.missing.map(entry => { const d = items[entry.id]; const label = (d && d.name) || entry.id; return `${label} (${entry.have}/${entry.need})`; });
@@ -486,27 +523,90 @@ function smeltOnce(scene, recipe) {
 
     const prodId = recipe.id || recipe.recipeId;
     const prodDef = ITEM_DEFS[prodId];
-    if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
-        const added = window.__shared_ui.addItemToInventory(scene, prodId, 1);
-        if (!added) return false;
-    } else {
-        const inv = scene.char.inventory = scene.char.inventory || [];
-        if (prodDef && prodDef.stackable) {
-            let slot = inv.find(x => x && x.id === prodId);
-            if (slot) slot.qty = (slot.qty || 0) + 1;
-            else inv.push({ id: prodId, name: (prodDef && prodDef.name) || prodId, qty: 1 });
-        } else {
-            inv.push({ id: prodId, name: (prodDef && prodDef.name) || prodId, qty: 1 });
-        }
+
+    // If this is a food/fish/meat recipe, apply chance-based cooking using cooking level and INT
+    let cookedSuccessfully = true;
+    const isCookableCategory = recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat');
+    let lastComputedSuccessChance = null;
+    if (isCookableCategory) {
+        try {
+            const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
+            const cookLevel = cooking.level || 1;
+            const intStat = (scene.char && scene.char.stats && scene.char.stats.int) || 0;
+            // base success chance increases with level and INT; clamp between 30% and 99%
+            const baseChance = 0.45 + Math.min(0.4, (cookLevel - 1) * 0.02) + Math.min(0.14, intStat * 0.01);
+            const successChance = Math.max(0.3, Math.min(0.99, baseChance));
+            lastComputedSuccessChance = successChance;
+            const roll = Math.random();
+            cookedSuccessfully = roll <= successChance;
+            if (!cookedSuccessfully) {
+                // failure: show toast and give partial XP
+                scene._showToast && scene._showToast('Cooking failed — it got burnt.', 1400);
+            }
+        } catch (e) { cookedSuccessfully = true; }
     }
 
-    const smithing = scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-    smithing.exp = (smithing.exp || 0) + (recipe.smithingXp || 0);
-    while (smithing.exp >= smithing.expToLevel) {
-        smithing.exp -= smithing.expToLevel;
-        smithing.level = (smithing.level || 1) + 1;
-        smithing.expToLevel = Math.floor(smithing.expToLevel * 1.25);
-        scene._showToast && scene._showToast(`Smithing level up! L${smithing.level}`, 1800);
+    if (cookedSuccessfully) {
+        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+            const added = window.__shared_ui.addItemToInventory(scene, prodId, 1);
+            if (!added) return false;
+        } else {
+            const inv = scene.char.inventory = scene.char.inventory || [];
+            if (prodDef && prodDef.stackable) {
+                let slot = inv.find(x => x && x.id === prodId);
+                if (slot) slot.qty = (slot.qty || 0) + 1;
+                else inv.push({ id: prodId, name: (prodDef && prodDef.name) || prodId, qty: 1 });
+            } else {
+                inv.push({ id: prodId, name: (prodDef && prodDef.name) || prodId, qty: 1 });
+            }
+        }
+    } else {
+        // Failed: don't add the product. Grant a fraction of cooking XP (if defined)
+        try {
+            if (recipe.cookingXp) {
+                const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
+                const partial = Math.max(1, Math.floor((recipe.cookingXp || 0) * 0.25));
+                cooking.exp = (cooking.exp || 0) + partial;
+                while (cooking.exp >= cooking.expToLevel) {
+                    cooking.exp -= cooking.expToLevel;
+                    cooking.level = (cooking.level || 1) + 1;
+                    cooking.expToLevel = Math.floor(cooking.expToLevel * 1.25);
+                    scene._showToast && scene._showToast(`Cooking level up! L${cooking.level}`, 1800);
+                }
+                try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
+            }
+        } catch (e) {}
+        // On failure, if a burnt item exists (burnt_fish or burnt_meat), give it to player
+        try {
+            const burntId = (recipe.category === 'fish') ? 'burnt_fish' : (recipe.category === 'meat') ? 'burnt_meat' : 'burnt_food';
+            const burntDef = ITEM_DEFS[burntId];
+            if (burntDef) {
+                if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) window.__shared_ui.addItemToInventory(scene, burntId, 1);
+                else {
+                    const inv = scene.char.inventory = scene.char.inventory || [];
+                    if (burntDef && burntDef.stackable) {
+                        let slot = inv.find(x => x && x.id === burntId);
+                        if (slot) slot.qty = (slot.qty || 0) + 1; else inv.push({ id: burntId, name: (burntDef && burntDef.name) || burntId, qty: 1 });
+                    } else {
+                        inv.push({ id: burntId, name: (burntDef && burntDef.name) || burntId, qty: 1 });
+                    }
+                }
+            }
+        } catch (e) { /* ignore burnt item grant errors */ }
+        scene._showToast && scene._showToast(`Failed to cook ${recipe.name || prodId}.`, 1400);
+        return true; // treat as consumed materials but no product (burnt item may have been given)
+    }
+
+    // Award smithing XP if this is not a food recipe
+    if (recipe.category !== 'food') {
+        const smithing = scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+        smithing.exp = (smithing.exp || 0) + (recipe.smithingXp || 0);
+        while (smithing.exp >= smithing.expToLevel) {
+            smithing.exp -= smithing.expToLevel;
+            smithing.level = (smithing.level || 1) + 1;
+            smithing.expToLevel = Math.floor(smithing.expToLevel * 1.25);
+            scene._showToast && scene._showToast(`Smithing level up! L${smithing.level}`, 1800);
+        }
     }
 
     // Award cooking XP for food recipes
@@ -557,9 +657,11 @@ function startSmelting(scene) {
     const state = ensureFurnaceState(scene);
     const recipe = getRecipeById(state.selectedRecipe);
     if (!recipe) return;
-    const playerLevel = (scene.char && scene.char.smithing && scene.char.smithing.level) || 1;
+    const playerLevel = (recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat'))
+        ? ((scene.char && scene.char.cooking && scene.char.cooking.level) || 1)
+        : ((scene.char && scene.char.smithing && scene.char.smithing.level) || 1);
     if ((recipe.reqLevel || 1) > playerLevel) {
-        updateMessage(scene, 'Smithing level too low for this recipe.', 'warn');
+        updateMessage(scene, (recipe && (recipe.category === 'food' || recipe.category === 'fish' || recipe.category === 'meat')) ? 'Cooking level too low for this recipe.' : 'Smithing level too low for this recipe.', 'warn');
         return;
     }
     const available = getCraftableCount(scene, recipe);

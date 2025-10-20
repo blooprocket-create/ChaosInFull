@@ -727,11 +727,27 @@ export function refreshInventoryModal(scene) {
                         }
                     }
                     // otherwise, if equippable, equip on double-click (legacy behavior)
-                    if (defs && def && (def.weapon || def.armor)) {
-                        equipItemFromInventory(scene, s.id);
-                        try { refreshInventoryModal(scene); } catch(e) {}
-                        try { refreshEquipmentModal(scene); } catch(e) {}
-                    }
+                    // Treat items with explicit `slot`, `tool`, or classic `weapon`/`armor` as equippable
+                    try {
+                        const isEquippable = !!(def && (def.slot || def.tool || def.weapon || def.armor));
+                        if (isEquippable) {
+                            try {
+                                equipItemFromInventory(scene, s.id);
+                                try { refreshInventoryModal(scene); } catch(e) {}
+                                try { refreshEquipmentModal(scene); } catch(e) {}
+                                // verify equip succeeded: scan equipment for this id
+                                const eq = scene.char && scene.char.equipment ? scene.char.equipment : {};
+                                let found = false;
+                                try { for (const k of Object.keys(eq||{})) { const v = eq[k]; if (v && v.id === s.id) { found = true; break; } } } catch(e) {}
+                                if (found) {
+                                    try { if (scene._showToast) scene._showToast(`Equipped ${def && def.name ? def.name : s.id}`); } catch(e) {}
+                                } else {
+                                    try { if (scene._showToast) scene._showToast(`Could not equip ${def && def.name ? def.name : s.id}`); } catch(e) {}
+                                    try { console.warn && console.warn('[inventory] equip failed for', s.id, 'scene.char.equipment=', scene.char && scene.char.equipment); } catch(e) {}
+                                }
+                            } catch (e) { console.warn && console.warn('[inventory] equip-on-dblclick error', e); }
+                        }
+                    } catch (e) { console.warn && console.warn('[inventory] equip-on-dblclick error', e); }
                 } catch (e) { console.warn && console.warn('[inventory] dblclick handler error', e); }
             };
             // single-click: keep existing behavior for inventory modal (no deposit here)
