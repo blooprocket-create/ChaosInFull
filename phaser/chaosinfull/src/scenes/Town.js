@@ -211,106 +211,650 @@ export class Town extends Phaser.Scene {
     }
     _openWorkbenchModal() {
         if (this._workbenchModal) return;
-        const inv = this.char.inventory || [];
-        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
-        const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        const overlay = document.createElement('div');
+        overlay.id = 'workbench-overlay';
+        overlay.className = 'modal-overlay';
+        overlay.addEventListener('click', (ev) => {
+            if (ev.target === overlay) this._closeWorkbenchModal();
+        });
+
         const modal = document.createElement('div');
         modal.id = 'workbench-modal';
-        modal.style.position = 'fixed';
-        modal.style.left = '50%';
-        modal.style.top = '50%';
-        modal.style.transform = 'translate(-50%,-50%)';
-        modal.style.zIndex = '220';
-        modal.style.background = 'linear-gradient(135deg,#2b2f1f, #0f120a)';
-        modal.style.padding = '18px';
-        modal.style.borderRadius = '12px';
-        modal.style.color = '#eee';
-        modal.style.fontFamily = 'UnifrakturCook, cursive';
-        modal.style.minWidth = '360px';
+        modal.className = 'modal-card';
+        overlay.appendChild(modal);
+
         const head = document.createElement('div');
-        head.style.display = 'flex'; head.style.justifyContent = 'space-between'; head.style.alignItems = 'center'; head.style.marginBottom = '8px';
-        head.innerHTML = `<strong>Workbench</strong>`;
+        head.className = 'modal-head';
+        const title = document.createElement('div');
+        title.className = 'modal-title';
+        title.textContent = 'Workbench';
+        head.appendChild(title);
+
         const closeBtn = document.createElement('button');
-        closeBtn.id = 'workbench-close'; closeBtn.textContent = 'Close';
-        closeBtn.style.background = '#222'; closeBtn.style.color = '#fff'; closeBtn.style.border = 'none'; closeBtn.style.padding = '6px 10px'; closeBtn.style.borderRadius = '6px'; closeBtn.style.cursor = 'pointer';
+        closeBtn.id = 'workbench-close';
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn btn-secondary modal-close';
+        closeBtn.textContent = 'Close';
+        closeBtn.addEventListener('click', () => this._closeWorkbenchModal());
         head.appendChild(closeBtn);
         modal.appendChild(head);
-        const desc = document.createElement('div'); desc.style.marginBottom = '8px'; desc.textContent = 'Craft items at the workbench. Requires bars produced from the furnace.'; modal.appendChild(desc);
-        const list = document.createElement('div'); list.style.display = 'flex'; list.style.flexDirection = 'column'; list.style.gap = '8px';
-        // generate buttons for recipes that use the workbench
-        for (const k of Object.keys(recipes || {})) {
-            const r = recipes[k];
-            if (!r || r.tool !== 'workbench') continue;
-            const btn = document.createElement('button');
-            btn.dataset.recipe = r.id || k;
-            btn.style.padding = '8px'; btn.style.border = 'none'; btn.style.borderRadius = '8px'; btn.style.cursor = 'pointer'; btn.style.color = '#fff';
-            // color choice per recipe id (simple hash)
-            btn.style.background = '#445533';
-            // build human label from recipe requires
-            const labelParts = (r.requires || []).map(req => {
-                const name = (items[req.id] && items[req.id].name) || req.id;
-                return (req.qty && req.qty > 1) ? (req.qty + 'x ' + name) : ('1x ' + name);
-            });
-            btn.textContent = `${r.name || r.id} (${labelParts.join(' + ')})`;
-            btn.onclick = () => {
-                const recipeId = btn.dataset.recipe;
-                if (this.craftingActive) {
-                    if (this._craftType === recipeId) this._stopContinuousCrafting();
-                    else this._showToast('Already crafting ' + (window && window.RECIPE_DEFS && window.RECIPE_DEFS[this._craftType] ? (window.RECIPE_DEFS[this._craftType].name || this._craftType) : this._craftType));
-                } else {
-                    this._startContinuousCrafting(recipeId);
-                }
-                this._refreshWorkbenchModal();
-            };
-            list.appendChild(btn);
-        }
-        modal.appendChild(list);
-        const msg = document.createElement('div'); msg.id = 'workbench-msg'; msg.style.color = '#ffcc99'; msg.style.marginTop = '8px'; msg.style.minHeight = '18px'; modal.appendChild(msg);
-        document.body.appendChild(modal);
+
+        const desc = document.createElement('p');
+        desc.className = 'modal-subtitle';
+        desc.textContent = 'Craft gear with bars from the furnace.';
+        modal.appendChild(desc);
+
+        const body = document.createElement('div');
+        body.className = 'modal-body workbench-body';
+
+        const cats = document.createElement('nav');
+        cats.id = 'wb-cats';
+        cats.className = 'modal-column workbench-categories';
+
+        const recipesCol = document.createElement('section');
+        recipesCol.id = 'wb-recipes';
+        recipesCol.className = 'modal-column workbench-recipes';
+
+        const details = document.createElement('section');
+        details.id = 'wb-details';
+        details.className = 'modal-column workbench-details';
+
+        body.appendChild(cats);
+        body.appendChild(recipesCol);
+        body.appendChild(details);
+        modal.appendChild(body);
+
+        const msg = document.createElement('div');
+        msg.id = 'workbench-msg';
+        msg.className = 'workbench-message';
+        modal.appendChild(msg);
+
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('show'));
+
+        this._workbenchOverlay = overlay;
         this._workbenchModal = modal;
-        closeBtn.onclick = () => this._closeWorkbenchModal();
+        this._workbenchMessageEl = msg;
+        this._workbenchSelectedCategory = this._workbenchSelectedCategory || 'weapon';
+        this._workbenchSelectedRecipe = this._workbenchSelectedRecipe || null;
+        this._workbenchSlots = this._workbenchSlots || {};
+        this._workbenchCraftCount = this._workbenchCraftCount || 1;
+        this._workbenchHasFocusedRecipe = false;
+
+        this._workbenchEscHandler = (ev) => {
+            if (ev.key === 'Escape') this._closeWorkbenchModal();
+        };
+        window.addEventListener('keydown', this._workbenchEscHandler);
+
+        this._renderWorkbenchCategories();
         this._refreshWorkbenchModal();
-    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
     _closeWorkbenchModal() {
-        if (this._workbenchModal && this._workbenchModal.parentNode) this._workbenchModal.parentNode.removeChild(this._workbenchModal);
+        if (this._workbenchActiveCraft) {
+            this._workbenchActiveCraft.silent = true;
+            this._cancelWorkbenchCraft(true);
+        }
+        if (this._workbenchEscHandler) {
+            window.removeEventListener('keydown', this._workbenchEscHandler);
+            this._workbenchEscHandler = null;
+        }
+        if (this._workbenchOverlay && this._workbenchOverlay.parentNode) {
+            this._workbenchOverlay.parentNode.removeChild(this._workbenchOverlay);
+        } else if (this._workbenchModal && this._workbenchModal.parentNode) {
+            this._workbenchModal.parentNode.removeChild(this._workbenchModal);
+        }
+        this._workbenchOverlay = null;
         this._workbenchModal = null;
-        // HUD revert
-    try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
+        this._workbenchMessageEl = null;
+        this._workbenchHasFocusedRecipe = false;
+        try { this._updateHUD(); } catch (e) {
+            try { this._destroyHUD(); this._createHUD(); } catch (_) {}
+        }
+    }
+    _renderWorkbenchCategories() {
+        if (!this._workbenchModal) return;
+        const catsEl = this._workbenchModal.querySelector('#wb-cats');
+        if (!catsEl) return;
+        const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
+        const catSet = new Set();
+        for (const key of Object.keys(recipes || {})) {
+            const r = recipes[key];
+            if (!r || r.tool !== 'workbench') continue;
+            catSet.add(r.category || 'misc');
+        }
+        const categories = Array.from(catSet);
+        const preferred = ['weapon', 'armor', 'helm', 'boots', 'legs', 'rings', 'amulets', 'misc'];
+        categories.sort((a, b) => {
+            const ai = preferred.indexOf(a);
+            const bi = preferred.indexOf(b);
+            if (ai === -1 && bi === -1) return a.localeCompare(b);
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+        });
+        catsEl.innerHTML = '';
+        if (!categories.length) {
+            const empty = document.createElement('div');
+            empty.className = 'workbench-alert';
+            empty.textContent = 'No workbench recipes unlocked yet.';
+            catsEl.appendChild(empty);
+            this._workbenchSelectedCategory = null;
+            return;
+        }
+        if (!this._workbenchSelectedCategory || !categories.includes(this._workbenchSelectedCategory)) {
+            this._workbenchSelectedCategory = categories[0];
+        }
+        for (const c of categories) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'wb-cat-btn';
+            if (c === this._workbenchSelectedCategory) btn.classList.add('is-active');
+            const label = c.charAt(0).toUpperCase() + c.slice(1);
+            btn.textContent = label;
+            btn.addEventListener('click', () => {
+                const activeCat = (this._workbenchActiveCraft && this._workbenchActiveCraft.recipe) ? (this._workbenchActiveCraft.recipe.category || 'misc') : null;
+                if (activeCat && activeCat !== c) {
+                    this._workbenchActiveCraft.silent = true;
+                    this._cancelWorkbenchCraft(true);
+                }
+                this._workbenchSelectedCategory = c;
+                this._workbenchSelectedRecipe = null;
+                this._updateWorkbenchMessage('');
+                this._renderWorkbenchCategories();
+                this._refreshWorkbenchModal();
+            });
+            catsEl.appendChild(btn);
+        }
     }
     _refreshWorkbenchModal() {
         if (!this._workbenchModal) return;
-        const inv = this.char.inventory || [];
-        const findQty = (id) => { const it = inv.find(x => x && x.id === id); return it ? (it.qty || 0) : 0; };
-        const el = this._workbenchModal.querySelector('#workbench-msg');
-        if (el) el.textContent = '';
+        this._renderWorkbenchCategories();
+        const recipesCol = this._workbenchModal.querySelector('#wb-recipes');
+        if (!recipesCol) return;
         const recipes = (window && window.RECIPE_DEFS) ? window.RECIPE_DEFS : {};
         const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        // update each button generated in the modal
-        const buttons = this._workbenchModal.querySelectorAll('button[data-recipe]');
-        buttons.forEach(btn => {
-            const rid = btn.dataset.recipe;
-            const r = recipes[rid];
-            if (!r) return;
-            // check reqs
-            let ok = true;
-            for (const req of (r.requires || [])) {
-                if (findQty(req.id) < (req.qty || 1)) { ok = false; break; }
-            }
-            const lvlOk = !(this.char.smithing && (this.char.smithing.level || 1) < (r.reqLevel || 1));
-            btn.disabled = !ok || !lvlOk;
-            btn.style.opacity = btn.disabled ? '0.6' : '1';
-            // label
-            if (this.craftingActive && this._craftType === rid) {
-                btn.textContent = 'Stop Crafting ' + (r.name || rid);
-                btn.style.background = '#aa4422';
-            } else {
-                const parts = (r.requires || []).map(req => ((items[req.id] && items[req.id].name) || req.id) + (req.qty && req.qty > 1 ? ' x' + req.qty : ''));
-                btn.textContent = (r.name || rid) + ' (' + parts.join(' + ') + ')';
-                // simple color mapping
-                btn.style.background = '#444033';
-            }
+        const inv = this.char.inventory || [];
+        const findQty = (id) => {
+            const it = inv.find(x => x && x.id === id);
+            return it ? (it.qty || 0) : 0;
+        };
+
+        recipesCol.innerHTML = '';
+        const cat = this._workbenchSelectedCategory || 'weapon';
+        const recKeys = Object.keys(recipes || {}).filter(key => {
+            const r = recipes[key];
+            return r && r.tool === 'workbench' && ((r.category || 'misc') === cat);
+        }).sort((a, b) => {
+            const ra = recipes[a];
+            const rb = recipes[b];
+            return (ra && (ra.name || ra.id || a)).localeCompare(rb && (rb.name || rb.id || b));
         });
+
+        if (!recKeys.length) {
+            const empty = document.createElement('div');
+            empty.className = 'workbench-alert';
+            empty.textContent = 'No recipes in this category yet.';
+            recipesCol.appendChild(empty);
+            this._renderWorkbenchDetails(null);
+            return;
+        }
+
+        if (!this._workbenchSelectedRecipe) {
+            const firstKey = recKeys[0];
+            const def = recipes[firstKey];
+            this._workbenchSelectedRecipe = (def && def.id) ? def.id : firstKey;
+        }
+
+        const activeCraft = (this._workbenchActiveCraft && !this._workbenchActiveCraft.cancelled) ? this._workbenchActiveCraft : null;
+        const recipeMap = {};
+        let firstFocusable = null;
+
+        for (const key of recKeys) {
+            const r = recipes[key];
+            if (!r) continue;
+            const recipeId = r.id || key;
+            recipeMap[recipeId] = r;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'wb-recipe-btn';
+            btn.dataset.recipe = recipeId;
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'wb-recipe-name';
+            nameEl.textContent = r.name || recipeId;
+            btn.appendChild(nameEl);
+
+            const meta = document.createElement('div');
+            meta.className = 'wb-recipe-meta';
+            const levelSpan = document.createElement('span');
+            levelSpan.textContent = `Lv ${r.reqLevel || 1}`;
+            meta.appendChild(levelSpan);
+            const xpSpan = document.createElement('span');
+            xpSpan.textContent = `${r.smithingXp || 0} xp`;
+            meta.appendChild(xpSpan);
+            const parts = (r.requires || []).map(req => {
+                const label = (items[req.id] && items[req.id].name) || req.id;
+                return req.qty && req.qty > 1 ? `${label} x${req.qty}` : label;
+            });
+            if (parts.length) {
+                const mats = document.createElement('span');
+                mats.textContent = parts.join(' | ');
+                meta.appendChild(mats);
+            }
+            const ownEnough = (r.requires || []).every(req => findQty(req.id) >= (req.qty || 1));
+            const lvlOk = !(this.char.smithing && (this.char.smithing.level || 1) < (r.reqLevel || 1));
+            const status = document.createElement('span');
+            status.className = 'wb-recipe-status';
+            if (!lvlOk) {
+                status.classList.add('locked');
+                status.textContent = 'Locked';
+            } else if (ownEnough) {
+                status.classList.add('ready');
+                status.textContent = 'Ready';
+            } else {
+                status.classList.add('missing');
+                status.textContent = 'Missing';
+            }
+            meta.appendChild(status);
+            btn.appendChild(meta);
+
+            if (this._workbenchSelectedRecipe === recipeId) btn.classList.add('is-active');
+            if (activeCraft && activeCraft.recipe && activeCraft.recipe.id === recipeId) btn.classList.add('is-crafting');
+
+            if (activeCraft && activeCraft.recipe && activeCraft.recipe.id !== recipeId) {
+                btn.disabled = true;
+            } else if (!lvlOk) {
+                btn.disabled = true;
+            }
+
+            btn.addEventListener('click', () => {
+                if (this._workbenchActiveCraft && this._workbenchActiveCraft.recipe && this._workbenchActiveCraft.recipe.id !== recipeId) {
+                    this._workbenchActiveCraft.silent = true;
+                    this._cancelWorkbenchCraft(true);
+                }
+                this._workbenchSelectedRecipe = recipeId;
+                this._updateWorkbenchMessage('');
+                this._refreshWorkbenchModal();
+            });
+
+            recipesCol.appendChild(btn);
+            if (!firstFocusable && !btn.disabled) firstFocusable = btn;
+        }
+
+        if (!recipeMap[this._workbenchSelectedRecipe]) {
+            const firstKey = recKeys[0];
+            const def = recipes[firstKey];
+            this._workbenchSelectedRecipe = (def && def.id) ? def.id : firstKey;
+        }
+
+        if (!this._workbenchHasFocusedRecipe && firstFocusable) {
+            firstFocusable.focus();
+            this._workbenchHasFocusedRecipe = true;
+        }
+
+        const selectedRecipe = recipeMap[this._workbenchSelectedRecipe];
+        this._renderWorkbenchDetails(selectedRecipe || null);
+    }
+
+    _renderWorkbenchDetails(recipe) {
+        if (!this._workbenchModal) return;
+        const details = this._workbenchModal.querySelector('#wb-details');
+        if (!details) return;
+        details.innerHTML = '';
+        if (!recipe) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'workbench-alert';
+            placeholder.textContent = 'Select a recipe to see its requirements.';
+            details.appendChild(placeholder);
+            return;
+        }
+        const items = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        const inv = this.char.inventory || [];
+        this.char.inventory = inv;
+        const findQty = (id) => {
+            const it = inv.find(x => x && x.id === id);
+            return it ? (it.qty || 0) : 0;
+        };
+
+        this._workbenchSlots = this._workbenchSlots || {};
+        this._workbenchSlots[recipe.id] = this._workbenchSlots[recipe.id] || {};
+
+        const header = document.createElement('div');
+        header.className = 'workbench-recipe-header';
+        const title = document.createElement('div');
+        title.className = 'workbench-recipe-title';
+        title.textContent = recipe.name || recipe.id;
+        header.appendChild(title);
+        const sub = document.createElement('div');
+        sub.className = 'workbench-recipe-sub';
+        const lvlSpan = document.createElement('span');
+        lvlSpan.textContent = `Smithing Lv ${recipe.reqLevel || 1}`;
+        sub.appendChild(lvlSpan);
+        const xpSpan = document.createElement('span');
+        xpSpan.textContent = `${recipe.smithingXp || 0} xp per craft`;
+        sub.appendChild(xpSpan);
+        header.appendChild(sub);
+        details.appendChild(header);
+
+        const reqHeading = document.createElement('div');
+        reqHeading.className = 'workbench-section-heading';
+        reqHeading.textContent = 'Materials';
+        details.appendChild(reqHeading);
+
+        const reqList = document.createElement('div');
+        reqList.className = 'workbench-reqs';
+        const active = (this._workbenchActiveCraft && !this._workbenchActiveCraft.cancelled) ? this._workbenchActiveCraft : null;
+        const isCraftingThis = !!(active && active.recipe && active.recipe.id === recipe.id);
+        const missingItems = [];
+        for (const req of (recipe.requires || [])) {
+            const need = req.qty || 1;
+            const reserved = this._workbenchSlots[recipe.id][req.id] || 0;
+            const have = findQty(req.id);
+            if (reserved < need) missingItems.push({ req, reserved, have });
+            const totalAvailable = reserved + have;
+
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'wb-req';
+            if (reserved >= need) row.classList.add('is-ready');
+            else if (totalAvailable < need) row.classList.add('is-missing');
+            row.disabled = isCraftingThis;
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'wb-req-name';
+            nameEl.textContent = (items[req.id] && items[req.id].name) || req.id;
+            row.appendChild(nameEl);
+            const counts = document.createElement('div');
+            counts.className = 'wb-req-counts';
+            const haveEl = document.createElement('span');
+            haveEl.className = 'wb-req-have';
+            haveEl.textContent = `${have} owned`;
+            counts.appendChild(haveEl);
+            const reservedEl = document.createElement('span');
+            reservedEl.className = 'wb-req-reserved';
+            reservedEl.textContent = `${reserved}/${need} reserved`;
+            counts.appendChild(reservedEl);
+            row.appendChild(counts);
+
+            if (!isCraftingThis) {
+                row.title = 'Click to reserve from inventory or return reserved items';
+                row.addEventListener('click', () => {
+                    const shared = (window && window.__shared_ui) || null;
+                    let handled = false;
+                    if (shared && shared.removeItemFromInventory) {
+                        const ok = shared.removeItemFromInventory(this, req.id, 1, true);
+                        if (ok) {
+                            this._workbenchSlots[recipe.id][req.id] = (this._workbenchSlots[recipe.id][req.id] || 0) + 1;
+                            handled = true;
+                        }
+                    }
+                    if (!handled) {
+                        const invSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : this.char.inventory;
+                        const slotItem = invSlots.find(s => s && s.id === req.id && (s.qty || 1) > 0);
+                        if (slotItem) {
+                            slotItem.qty = (slotItem.qty || 1) - 1;
+                            if (slotItem.qty <= 0) {
+                                const idx = (this.char.inventory || []).findIndex(x => x && x.id === req.id);
+                                if (idx !== -1) this.char.inventory.splice(idx, 1);
+                            }
+                            this._workbenchSlots[recipe.id][req.id] = (this._workbenchSlots[recipe.id][req.id] || 0) + 1;
+                            handled = true;
+                        }
+                    }
+                    if (!handled && reserved > 0) {
+                        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+                            window.__shared_ui.addItemToInventory(this, req.id, 1, true);
+                        } else {
+                            this.char.inventory.push({ id: req.id, name: (items[req.id] && items[req.id].name) || req.id, qty: 1 });
+                        }
+                        this._workbenchSlots[recipe.id][req.id] = Math.max(0, this._workbenchSlots[recipe.id][req.id] - 1);
+                    }
+                    this._refreshWorkbenchModal();
+                });
+            }
+            reqList.appendChild(row);
+        }
+        details.appendChild(reqList);
+
+        const lvlOk = !(this.char.smithing && (this.char.smithing.level || 1) < (recipe.reqLevel || 1));
+        const needsReserve = missingItems.length > 0;
+        if (!lvlOk) {
+            const alert = document.createElement('div');
+            alert.className = 'workbench-alert';
+            alert.textContent = `Requires Smithing level ${recipe.reqLevel || 1}.`;
+            details.appendChild(alert);
+        } else if (needsReserve) {
+            const missingNames = missingItems.map(entry => {
+                const label = (items[entry.req.id] && items[entry.req.id].name) || entry.req.id;
+                const need = entry.req.qty || 1;
+                return `${label} (${entry.reserved}/${need})`;
+            });
+            const alert = document.createElement('div');
+            alert.className = 'workbench-alert';
+            alert.textContent = `Reserve more materials: ${missingNames.join(', ')}`;
+            details.appendChild(alert);
+        } else {
+            const ready = document.createElement('div');
+            ready.className = 'workbench-ready';
+            ready.textContent = 'All materials reserved. Ready to craft!';
+            details.appendChild(ready);
+        }
+
+        const progress = document.createElement('div');
+        progress.id = 'workbench-progress';
+        progress.className = 'workbench-progress';
+        details.appendChild(progress);
+        if (active && active.recipe && active.recipe.id === recipe.id) active.progressContainer = progress;
+
+        const actions = document.createElement('div');
+        actions.className = 'workbench-actions';
+
+        const left = document.createElement('div');
+        left.className = 'workbench-actions-left';
+        const quickBtn = document.createElement('button');
+        quickBtn.type = 'button';
+        quickBtn.className = 'btn btn-secondary';
+        quickBtn.textContent = 'Quick Add';
+        quickBtn.disabled = isCraftingThis || !needsReserve;
+        quickBtn.addEventListener('click', () => {
+            for (const req of recipe.requires || []) {
+                const need = (req.qty || 1) - (this._workbenchSlots[recipe.id][req.id] || 0);
+                if (need <= 0) continue;
+                if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) {
+                    const okAll = window.__shared_ui.removeItemFromInventory(this, req.id, need, true);
+                    if (okAll) {
+                        this._workbenchSlots[recipe.id][req.id] = (this._workbenchSlots[recipe.id][req.id] || 0) + need;
+                        continue;
+                    }
+                }
+                for (let i = 0; i < need; i++) {
+                    const idx = this.char.inventory.findIndex(x => x && x.id === req.id);
+                    if (idx === -1) break;
+                    const it = this.char.inventory[idx];
+                    it.qty = (it.qty || 1) - 1;
+                    if (it.qty <= 0) this.char.inventory.splice(idx, 1);
+                    this._workbenchSlots[recipe.id][req.id] = (this._workbenchSlots[recipe.id][req.id] || 0) + 1;
+                }
+            }
+            this._refreshWorkbenchModal();
+        });
+        left.appendChild(quickBtn);
+        actions.appendChild(left);
+
+        const right = document.createElement('div');
+        right.className = 'workbench-actions-right';
+        const countLabel = document.createElement('label');
+        countLabel.textContent = 'Count';
+        right.appendChild(countLabel);
+        const countInput = document.createElement('input');
+        countInput.type = 'number';
+        countInput.min = '1';
+        countInput.value = this._workbenchCraftCount || 1;
+        countInput.className = 'input-small';
+        countInput.addEventListener('input', () => {
+            const val = Math.max(1, parseInt(countInput.value, 10) || 1);
+            countInput.value = val;
+            this._workbenchCraftCount = val;
+        });
+        right.appendChild(countInput);
+
+        const startBtn = document.createElement('button');
+        startBtn.type = 'button';
+        startBtn.className = 'btn btn-primary';
+        startBtn.textContent = isCraftingThis ? 'Crafting...' : `Craft ${this._workbenchCraftCount || 1}`;
+        const readyToCraft = lvlOk && !needsReserve;
+        startBtn.disabled = isCraftingThis || !readyToCraft;
+        startBtn.addEventListener('click', () => {
+            if (startBtn.disabled) return;
+            this._updateWorkbenchMessage(`Crafting ${this._workbenchCraftCount || 1}x ${recipe.name || recipe.id}...`, 'warn');
+            this._beginWorkbenchCraft(recipe);
+        });
+        right.appendChild(startBtn);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn btn-ghost';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.disabled = !isCraftingThis;
+        cancelBtn.addEventListener('click', () => this._cancelWorkbenchCraft());
+        right.appendChild(cancelBtn);
+
+        actions.appendChild(right);
+        details.appendChild(actions);
+    }
+    _updateWorkbenchMessage(text = '', tone) {
+        if (!this._workbenchModal) return;
+        if (!this._workbenchMessageEl) {
+            this._workbenchMessageEl = this._workbenchModal.querySelector('#workbench-msg');
+        }
+        const el = this._workbenchMessageEl;
+        if (!el) return;
+        el.textContent = text || '';
+        el.classList.remove('success', 'warn', 'error');
+        if (tone) el.classList.add(tone);
+    }
+    _beginWorkbenchCraft(recipe) {
+        if (!recipe || !this._workbenchModal) return;
+        const count = this._workbenchCraftCount || 1;
+        const duration = this.craftingInterval || 2800;
+        const active = { recipe, cancelled: false, silent: false, cancel: null, frameId: null, progressContainer: null };
+        this._workbenchActiveCraft = active;
+        const run = async () => {
+            let crafted = 0;
+            while (crafted < count && !active.cancelled) {
+                if (!this._workbenchModal || !document.body.contains(this._workbenchModal)) {
+                    active.cancelled = true;
+                    break;
+                }
+                const progressEl = this._workbenchModal.querySelector('#workbench-progress');
+                if (!progressEl) break;
+                progressEl.innerHTML = '';
+                const canvas = document.createElement('canvas');
+                canvas.width = 72;
+                canvas.height = 72;
+                progressEl.appendChild(canvas);
+                const ctx = canvas.getContext('2d');
+                const finished = await this._workbenchProgressTick(ctx, duration, active);
+                if (!finished) break;
+                for (const req of recipe.requires || []) {
+                    this._workbenchSlots[recipe.id][req.id] = Math.max(0, (this._workbenchSlots[recipe.id][req.id] || 0) - (req.qty || 1));
+                }
+                if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+                    window.__shared_ui.addItemToInventory(this, recipe.id, 1);
+                } else {
+                    const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+                    const def = defs && defs[recipe.id];
+                    const target = this.char.inventory || [];
+                    if (def && def.stackable) {
+                        const existing = target.find(x => x && x.id === recipe.id);
+                        if (existing) existing.qty = (existing.qty || 0) + 1;
+                        else target.push({ id: recipe.id, name: (def && def.name) || recipe.name, qty: 1 });
+                    } else {
+                        target.push({ id: recipe.id, name: (recipe && recipe.name) || recipe.id, qty: 1 });
+                    }
+                }
+                this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+                this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
+                while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
+                    this.char.smithing.exp -= this.char.smithing.expToLevel;
+                    this.char.smithing.level = (this.char.smithing.level || 1) + 1;
+                    this.char.smithing.expToLevel = Math.floor(this.char.smithing.expToLevel * 1.25);
+                    this._showToast('Smithing level up! L' + this.char.smithing.level, 1800);
+                }
+                try {
+                    if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) {
+                        window.__shared_ui.refreshStatsModal(this);
+                    }
+                } catch (_) {}
+                const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+                if (this._persistCharacter) this._persistCharacter(username);
+                if (this._inventoryModal) this._refreshInventoryModal();
+                crafted++;
+                this._refreshWorkbenchModal();
+            }
+            if (active.cancelled) {
+                if (!active.silent) this._updateWorkbenchMessage('Crafting cancelled.', 'warn');
+            } else if (crafted > 0) {
+                this._updateWorkbenchMessage(`Crafted ${crafted}x ${recipe.name || recipe.id}`, 'success');
+            }
+            this._workbenchActiveCraft = null;
+            this._refreshWorkbenchModal();
+        };
+        run();
+    }
+    _workbenchProgressTick(ctx, duration, active) {
+        return new Promise((resolve) => {
+            if (!ctx) {
+                resolve(false);
+                return;
+            }
+            let finished = false;
+            const center = ctx.canvas.width / 2;
+            const radius = (Math.min(ctx.canvas.width, ctx.canvas.height) / 2) - 6;
+            ctx.lineCap = 'round';
+            const finish = (value) => {
+                if (finished) return;
+                finished = true;
+                if (active) active.frameId = null;
+                resolve(value);
+            };
+            const start = performance.now();
+            const step = (now) => {
+                if (active && active.cancelled) {
+                    finish(false);
+                    return;
+                }
+                const t = Math.min(1, (now - start) / duration);
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                ctx.beginPath();
+                ctx.arc(center, center, radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(center, center, radius, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * t));
+                ctx.strokeStyle = '#ffd27a';
+                ctx.lineWidth = 6;
+                ctx.stroke();
+                if (t >= 1) {
+                    finish(true);
+                    return;
+                }
+                active.frameId = requestAnimationFrame(step);
+            };
+            active.cancel = () => {
+                if (active.frameId) cancelAnimationFrame(active.frameId);
+                finish(false);
+            };
+            active.frameId = requestAnimationFrame(step);
+        });
+    }
+    _cancelWorkbenchCraft(silent = false) {
+        const active = this._workbenchActiveCraft;
+        if (!active || active.cancelled) return;
+        active.silent = silent;
+        active.cancelled = true;
+        if (typeof active.cancel === 'function') active.cancel();
     }
     _startContinuousCrafting(recipeId) {
         if (this.craftingActive) return;
