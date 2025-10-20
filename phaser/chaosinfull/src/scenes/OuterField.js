@@ -129,11 +129,23 @@ export class OuterField extends Phaser.Scene {
         const groundY = this.scale.height - 30;
         try {
             const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-            const toInner = portalHelper.createPortal(this, leftX, groundY - 60, { depth: 1.5, targetScene: 'InnerField', spawnX: Math.max(80, this.scale.width * 0.12), spawnY: groundY - 70, promptLabel: 'Return to Inner Field' });
+            const toInner = portalHelper.createPortal(this, leftX, groundY - 60, {
+                depth: 1.5,
+                targetScene: 'InnerField',
+                spawnX: this.scale.width - 220,
+                spawnY: this.scale.height - 120,
+                promptLabel: 'Return to Inner Field'
+            });
             this.innerPortal = toInner.display;
         } catch (e) {
             const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-            const toInner = portalHelper.createPortal(this, leftX, groundY - 60, { depth: 1.5, targetScene: 'InnerField', spawnX: Math.max(80, this.scale.width * 0.12), spawnY: groundY - 70, promptLabel: 'Return to Inner Field' });
+            const toInner = portalHelper.createPortal(this, leftX, groundY - 60, {
+                depth: 1.5,
+                targetScene: 'InnerField',
+                spawnX: this.scale.width - 220,
+                spawnY: this.scale.height - 120,
+                promptLabel: 'Return to Inner Field'
+            });
             this.innerPortal = toInner.display;
         }
 

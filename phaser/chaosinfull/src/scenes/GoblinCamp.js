@@ -4,7 +4,8 @@ export class GoblinCamp extends Phaser.Scene {
     constructor() { super('GoblinCamp'); }
 
     preload() {
-        this.load.image('goblin_bg', 'assets/goblin_bg.png');
+        // reuse town background art until dedicated goblin camp art is available
+        this.load.image('goblin_bg', 'assets/town_bg.png');
         this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
         this.load.spritesheet('portal', 'assets/Dimensional_Portal.png', { frameWidth: 32, frameHeight: 32 });
     }
