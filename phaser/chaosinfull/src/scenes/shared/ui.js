@@ -167,6 +167,10 @@ export function showItemTooltip(scene, itemOrId, anchorEl) {
     const titleEl = t.querySelector('.tt-title'); const descEl = t.querySelector('.tt-desc'); const statsEl = t.querySelector('.tt-stats');
     if (titleEl) titleEl.textContent = name;
     if (descEl) descEl.textContent = desc || '';
+    // hint for usable items
+    if (def && def.usable) {
+        if (descEl) descEl.textContent = (descEl.textContent ? descEl.textContent + ' ' : '') + '(Click to use)';
+    }
     // stats
     statsEl.innerHTML = '';
     const statLines = buildStatLines(def);
@@ -315,23 +319,39 @@ function useItemFromSlot(scene, slotIndex) {
         let acted = false;
         // heal
         if (def.healAmount) {
-            // compute effective maxhp
-            let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
-            const maxhp = (eff && typeof eff.maxhp === 'number') ? eff.maxhp : ((typeof scene.char.maxhp === 'number' && scene.char.maxhp > 0) ? scene.char.maxhp : Math.max(1, 100 + (scene.char.level || 1) * 10));
-            scene.char.hp = Math.min(maxhp, (typeof scene.char.hp === 'number' ? scene.char.hp : maxhp) + Number(def.healAmount || 0));
-            acted = true;
-            if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.healAmount} HP)`);
+            if (!def.usable) { if (scene._showToast) scene._showToast('Cannot use that item'); }
+            else {
+                // compute effective maxhp
+                let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
+                const maxhp = (eff && typeof eff.maxhp === 'number') ? eff.maxhp : ((typeof scene.char.maxhp === 'number' && scene.char.maxhp > 0) ? scene.char.maxhp : Math.max(1, 100 + (scene.char.level || 1) * 10));
+                const currentHp = (typeof scene.char.hp === 'number') ? scene.char.hp : maxhp;
+                if (currentHp >= maxhp) {
+                    if (scene._showToast) scene._showToast('Already at full health');
+                } else {
+                    scene.char.hp = Math.min(maxhp, currentHp + Number(def.healAmount || 0));
+                    acted = true;
+                    if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.healAmount} HP)`);
+                }
+            }
         }
         // mana
         if (def.manaAmount) {
-            let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
-            const maxmana = (eff && typeof eff.maxmana === 'number') ? eff.maxmana : ((typeof scene.char.maxmana === 'number' && scene.char.maxmana > 0) ? scene.char.maxmana : Math.max(0, Math.floor(50 + (scene.char.level || 1) * 5 + (((scene.char.stats && scene.char.stats.int) || 0) * 10))));
-            scene.char.mana = Math.min(maxmana, (typeof scene.char.mana === 'number' ? scene.char.mana : maxmana) + Number(def.manaAmount || 0));
-            acted = true;
-            if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.manaAmount} Mana)`);
+            if (!def.usable) { if (scene._showToast) scene._showToast('Cannot use that item'); }
+            else {
+                let eff = null; try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
+                const maxmana = (eff && typeof eff.maxmana === 'number') ? eff.maxmana : ((typeof scene.char.maxmana === 'number' && scene.char.maxmana > 0) ? scene.char.maxmana : Math.max(0, Math.floor(50 + (scene.char.level || 1) * 5 + (((scene.char.stats && scene.char.stats.int) || 0) * 10))));
+                const currentMana = (typeof scene.char.mana === 'number') ? scene.char.mana : maxmana;
+                if (currentMana >= maxmana) {
+                    if (scene._showToast) scene._showToast('Already at full mana');
+                } else {
+                    scene.char.mana = Math.min(maxmana, currentMana + Number(def.manaAmount || 0));
+                    acted = true;
+                    if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.manaAmount} Mana)`);
+                }
+            }
         }
         // bag of gold or items that convert to gold via value
-        if (s.id === 'bag_of_gold' || (def && def.value && def.convertToGold)) {
+        if ((s.id === 'bag_of_gold' || (def && def.value && def.convertToGold)) && def.usable) {
             const goldGain = Number(def.value || 0);
             scene.char.gold = (typeof scene.char.gold === 'number') ? scene.char.gold + goldGain : goldGain;
             acted = true;
@@ -400,6 +420,42 @@ export function refreshInventoryModal(scene) {
     grid.innerHTML = '';
     const inv = scene.char.inventory = initSlots(scene.char.inventory);
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+    // Attach a delegated click handler once per modal grid so clicks work reliably
+    try {
+        if (grid && !grid._invHandlerAttached) {
+            const delegatedClick = (ev) => {
+                let target = ev.target;
+                if (target && target.closest) target = target.closest('.slot');
+                if (!target) return;
+                const idx = Number(target.dataset && target.dataset.slotIndex);
+                try { console.debug && console.debug('[inventory][delegated] clicked slot', { slotIndex: idx, item: (target && target.dataset && target.dataset.slotIndex) }); } catch(e) {}
+                if (!isNaN(idx)) {
+                    try {
+                        if (window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
+                            const ok = window.__shared_ui.useItemFromSlot(scene, idx);
+                            try { console.debug && console.debug('[inventory][delegated] useItemFromSlot returned', ok); } catch(e) {}
+                            if (ok) return;
+                        }
+                    } catch (e) { try { console.warn && console.warn('[inventory][delegated] handler error', e); } catch(_) {} }
+                }
+            };
+            grid.addEventListener('click', delegatedClick);
+            // keyboard support for focused slot elements
+            grid.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    const active = document.activeElement;
+                    if (active && active.classList && active.classList.contains('slot')) {
+                        ev.preventDefault();
+                        const idx = Number(active.dataset && active.dataset.slotIndex);
+                        if (!isNaN(idx) && window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
+                            try { const ok = window.__shared_ui.useItemFromSlot(scene, idx); try { console.debug && console.debug('[inventory][delegated] key use returned', ok); } catch(e) {} } catch(e) {}
+                        }
+                    }
+                }
+            });
+            grid._invHandlerAttached = true;
+        }
+    } catch (e) { /* ignore delegation attach errors */ }
     // update gold display if present
     try { const goldEl = scene._inventoryModal.querySelector('#inv-gold'); if (goldEl) goldEl.textContent = '' + ((scene.char && scene.char.gold) ? scene.char.gold : 0); } catch (e) {}
     // render each slot
@@ -432,15 +488,21 @@ export function refreshInventoryModal(scene) {
             };
             // single-click: keep existing behavior for inventory modal (no deposit here)
             // single-click: attempt to use consumable items (potions, bags of gold)
-            slotEl.addEventListener('click', (ev) => {
-                try {
-                    // call shared helper to attempt use
-                    if (window && window.__shared_ui && window.__shared_ui.useItemFromSlot) {
-                        const ok = window.__shared_ui.useItemFromSlot(scene, i);
-                        if (ok) return; // used
+            // ensure slot is focusable and keyboard accessible; delegated grid handler will handle clicks
+            try { slotEl.style.pointerEvents = 'auto'; } catch (e) {}
+            try { slotEl.setAttribute('role', 'button'); slotEl.setAttribute('tabindex', '0'); } catch (e) {}
+            // small per-slot key handler for accessibility (Enter/Space)
+            try {
+                slotEl.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault();
+                        const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
+                        if (!isNaN(idx) && window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
+                            try { const ok = window.__shared_ui.useItemFromSlot(scene, idx); try { console.debug && console.debug('[inventory] slot key use returned', ok); } catch(e) {} } catch(e) {}
+                        }
                     }
-                } catch (e) { /* ignore */ }
-            });
+                });
+            } catch (e) {}
         }
         grid.appendChild(slotEl);
     }
