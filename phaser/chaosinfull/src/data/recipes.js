@@ -161,6 +161,9 @@ export const RECIPE_DEFS = {
     'cooked_glowshrimp': { id: 'cooked_glowshrimp', name: 'Cooked Glow Shrimp', tool: 'furnace', category: 'fish', requires: [ { id: 'glowshrimp', qty: 1 } ], reqLevel: 3, cookingXp: 20 },
     'cooked_tinny_nautilus': { id: 'cooked_tinny_nautilus', name: 'Cooked Tinny Nautilus', tool: 'furnace', category: 'fish', requires: [ { id: 'tinny_nautilus', qty: 1 } ], reqLevel: 4, cookingXp: 60 },
     'cooked_nightling': { id: 'cooked_nightling', name: 'Cooked Nightling', tool: 'furnace', category: 'fish', requires: [ { id: 'nightling', qty: 1 } ], reqLevel: 4, cookingXp: 65 },
+    // sea-vegetable salads
+    'dried_seaweed': { id: 'dried_seaweed', name: 'Dried Seaweed', tool: 'furnace', category: 'salad', requires: [ { id: 'seaweed', qty: 1 } ], reqLevel: 1, cookingXp: 6 },
+    'kelp_salad': { id: 'kelp_salad', name: 'Kelp Salad', tool: 'furnace', category: 'salad', requires: [ { id: 'seaweed', qty: 2 }, { id: 'dried_seaweed', qty: 1 } ], reqLevel: 2, cookingXp: 22 },
     'cooked_abyssal_grouper': { id: 'cooked_abyssal_grouper', name: 'Cooked Abyssal Grouper', tool: 'furnace', category: 'fish', requires: [ { id: 'abyssal_grouper', qty: 1 } ], reqLevel: 8, cookingXp: 220 },
     'cooked_moon_shrike': { id: 'cooked_moon_shrike', name: 'Cooked Moon Shrike', tool: 'furnace', category: 'fish', requires: [ { id: 'moon_shrike', qty: 1 } ], reqLevel: 8, cookingXp: 240 },
     'cooked_deep_sabre': { id: 'cooked_deep_sabre', name: 'Cooked Deep Sabrefish', tool: 'furnace', category: 'fish', requires: [ { id: 'deep_sabre', qty: 1 } ], reqLevel: 9, cookingXp: 300 },
