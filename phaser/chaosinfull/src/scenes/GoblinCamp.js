@@ -58,8 +58,10 @@ export class GoblinCamp extends Phaser.Scene {
 
         this.enemies = this.physics.add.group();
         this.spawnPoints = [
-            { x: this.scale.width * 0.32, y: platformY - 70, type: 'goblin_common', respawn: 4500, active: null },
-            { x: this.scale.width * 0.62, y: platformY - 70, type: 'goblin_girl', respawn: 5200, active: null }
+            { x: this.scale.width * 0.28, y: platformY - 70, type: 'goblin_common', respawn: 4200, active: null },
+            { x: this.scale.width * 0.46, y: platformY - 70, type: 'goblin_girl', respawn: 5200, active: null },
+            { x: this.scale.width * 0.64, y: platformY - 70, type: 'goblin_epic', respawn: 6200, active: null },
+            { x: this.scale.width * 0.80, y: platformY - 70, type: 'goblin_boss', respawn: 14000, active: null }
         ];
         this.spawnPoints.forEach(sp => this._spawnEnemy(sp));
         this.physics.add.collider(this.enemies, platform);

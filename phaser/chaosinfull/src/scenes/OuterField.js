@@ -62,9 +62,10 @@ export class OuterField extends Phaser.Scene {
         // enemies: rats on outer field
         this.enemies = this.physics.add.group();
         this.spawnPoints = [
-            { x: this.scale.width * 0.25, y: groundY - 70, type: 'rat', respawn: 4000, active: null },
-            { x: this.scale.width * 0.45, y: this.scale.height - 160 - 70, type: 'zombie_rat', respawn: 5000, active: null },
-            { x: this.scale.width * 0.68, y: groundY - 70, type: 'rat', respawn: 4200, active: null }
+            { x: this.scale.width * 0.22, y: groundY - 70, type: 'rat', respawn: 4000, active: null },
+            { x: this.scale.width * 0.40, y: this.scale.height - 160 - 70, type: 'zombie_rat', respawn: 5200, active: null },
+            { x: this.scale.width * 0.58, y: groundY - 70, type: 'rat', respawn: 4300, active: null },
+            { x: this.scale.width * 0.78, y: groundY - 70, type: 'ghost_rat', respawn: 6400, active: null }
         ];
         this.spawnPoints.forEach(sp => this._spawnEnemy(sp));
         this.platforms.getChildren().forEach(p => this.physics.add.collider(this.enemies, p));

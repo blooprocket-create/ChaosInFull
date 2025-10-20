@@ -805,7 +805,14 @@ export class Town extends Phaser.Scene {
                 el.appendChild(label);
                 el.style.cursor = 'pointer';
                 // click the slot to deposit one
-                try { el.addEventListener('click', () => { try { this._depositToStorage(s.id, 1); } catch (e) {} }); } catch (e) {}
+                try {
+                    el.addEventListener('click', (ev) => {
+                        try {
+                            const amount = (ev && ev.shiftKey) ? (s.qty || 1) : 1;
+                            this._depositToStorage(s.id, amount);
+                        } catch (err) { /* ignore deposit errors */ }
+                    });
+                } catch (e) {}
                 // show item tooltip on hover
                 try {
                     el.addEventListener('mouseenter', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(this, s, el); } catch (e) {} });
@@ -827,7 +834,14 @@ export class Town extends Phaser.Scene {
                 el.appendChild(label);
                 el.style.cursor = 'pointer';
                 // click the slot to withdraw one
-                try { el.addEventListener('click', () => { try { this._withdrawFromStorage(s.id, 1); } catch (e) {} }); } catch (e) {}
+                try {
+                    el.addEventListener('click', (ev) => {
+                        try {
+                            const amount = (ev && ev.shiftKey) ? (s.qty || 1) : 1;
+                            this._withdrawFromStorage(s.id, amount);
+                        } catch (err) { /* ignore withdraw errors */ }
+                    });
+                } catch (e) {}
                 // show item tooltip on hover
                 try {
                     el.addEventListener('mouseenter', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(this, s, el); } catch (e) {} });
