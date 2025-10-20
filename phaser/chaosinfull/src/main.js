@@ -7,6 +7,7 @@ import { InnerField } from './scenes/InnerField.js';
 import { OuterField } from './scenes/OuterField.js';
 import { GoblinCamp } from './scenes/GoblinCamp.js';
 import { GraveForest } from './scenes/GraveForest.js';
+import { BrokenDock } from './scenes/BrokenDock.js';
 import { ITEM_DEFS } from './data/items.js';
 import { RECIPE_DEFS } from './data/recipes.js';
 import { RACE_DEFS } from './data/races.js';
@@ -47,7 +48,8 @@ const config = {
         InnerField,
         OuterField,
         GoblinCamp,
-        GraveForest
+        GraveForest,
+        BrokenDock
     ],
     scale: {
         mode: Phaser.Scale.FIT,

@@ -82,6 +82,22 @@ export class GraveForest extends Phaser.Scene {
         this._createTreeNode(460, platformTop - 28, 'normal');
         this._createTreeNode(580, platformTop - 28, 'oak');
 
+        // Portal to BrokenDock (left-side near entrance)
+        try {
+            const dockPortalX = 140;
+            const dockPortalY = platformY - 60;
+            const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            const pob = portalHelper.createPortal(this, dockPortalX, dockPortalY, { depth: 1.5, targetScene: 'BrokenDock', spawnX: 120, spawnY: platformY - 70, promptLabel: 'Enter Broken Dock' });
+            this.brokenDockPortal = pob.display;
+            this.brokenDockPrompt = this.add.text(dockPortalX, dockPortalY - 60, '[E] Enter Broken Dock', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.brokenDockPrompt.setVisible(false);
+        } catch (e) {
+            const dockPortalX = 140; const dockPortalY = platformY - 60;
+            this.brokenDockPortal = this.add.circle(dockPortalX, dockPortalY, 28, 0x2266aa, 0.9).setDepth(1.5);
+            this.brokenDockPrompt = this.add.text(dockPortalX, dockPortalY - 60, '[E] Enter Broken Dock', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.brokenDockPrompt.setVisible(false);
+        }
+
         // continuous woodcutting state
         this.woodcuttingActive = false;
         this._woodcuttingEvent = null;

@@ -25,7 +25,6 @@ export const RECIPE_DEFS = {
         category: 'food',
         requires: [ { id: 'rat_meat', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 5,
         cookingXp: 8
     },
     'cooked_minnow': {
@@ -35,7 +34,6 @@ export const RECIPE_DEFS = {
         category: 'food',
         requires: [ { id: 'minnow', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 5,
         cookingXp: 8
     },
     'cooked_salmon': {
@@ -45,9 +43,108 @@ export const RECIPE_DEFS = {
         category: 'food',
         requires: [ { id: 'salmon', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 5,
         cookingXp: 40
     },
+    'cooked_tuna': {
+        id: 'cooked_tuna',
+        name: 'Cooked Tuna',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'tuna', qty: 1 } ],
+        reqLevel: 5,
+        cookingXp: 42
+    },
+    'cooked_bass': {
+        id: 'cooked_bass',
+        name: 'Cooked Bass',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'bass', qty: 1 } ],
+        reqLevel: 3,
+        cookingXp: 18
+    },
+    'cooked_mackerel': {
+        id: 'cooked_mackerel',
+        name: 'Cooked Mackerel',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'mackerel', qty: 1 } ],
+        reqLevel: 2,
+        cookingXp: 12
+    },
+    'cooked_sardine': {
+        id: 'cooked_sardine',
+        name: 'Cooked Sardine',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'sardine', qty: 1 } ],
+        reqLevel: 1,
+        cookingXp: 8
+    },
+    'cooked_anchovy': {
+        id: 'cooked_anchovy',
+        name: 'Cooked Anchovy',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'anchovy', qty: 1 } ],
+        reqLevel: 1,
+        cookingXp: 8
+    },
+    'cooked_herring': {
+        id: 'cooked_herring',
+        name: 'Cooked Herring',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'herring', qty: 1 } ],
+        reqLevel: 1,
+        cookingXp: 10
+    },
+    'cooked_catfish': {
+        id: 'cooked_catfish',
+        name: 'Cooked Catfish',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'catfish', qty: 1 } ],
+        reqLevel: 4,
+        cookingXp: 30
+    },
+    'cooked_crab': {
+        id: 'cooked_crab',
+        name: 'Cooked Crab',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'crab', qty: 1 } ],
+        reqLevel: 4,
+        cookingXp: 32
+    },
+    'cooked_lobster': {
+        id: 'cooked_lobster',
+        name: 'Cooked Lobster',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'lobster', qty: 1 } ],
+        reqLevel: 6,
+        cookingXp: 45
+    },
+    'cooked_marlin': {
+        id: 'cooked_marlin',
+        name: 'Cooked Marlin',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'marlin', qty: 1 } ],
+        reqLevel: 10,
+        cookingXp: 120
+    },
+    'cooked_giant_turtle': {
+        id: 'cooked_giant_turtle',
+        name: 'Cooked Giant Turtle',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'giant_turtle', qty: 1 } ],
+        reqLevel: 12,
+        cookingXp: 160
+    },
+
     // workbench recipes (craft weapons)
     'copper_dagger': {
         id: 'copper_dagger',

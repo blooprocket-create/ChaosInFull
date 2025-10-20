@@ -88,6 +88,10 @@ export const ITEM_DEFS = {
     'cooked_lobster': { id: 'cooked_lobster', name: 'Cooked Lobster', rarity: 'rare', stackable: true, maxStack: 50, value: 75, healAmount: 100, usable: true, description: 'A succulent cooked lobster. Restores a large amount of health when eaten.' },
     'crab': { id: 'crab', name: 'Crab', rarity: 'rare', stackable: true, maxStack: 50, value: 22, description: 'A fresh crab. Needs to be cooked before consumption to avoid unpleasant side effects.' },
     'cooked_crab': { id: 'cooked_crab', name: 'Cooked Crab', rarity: 'rare', stackable: true, maxStack: 50, value: 66, healAmount: 95, usable: true, description: 'A deliciously cooked crab. Restores a large amount of health when eaten.' },
+    'marlin': { id: 'marlin', name: 'Marlin', rarity: 'epic', stackable: true, maxStack: 20, value: 420, description: 'A massive marlin with a shiny bill. Needs to be cooked before consumption.' },
+    'cooked_marlin': { id: 'cooked_marlin', name: 'Cooked Marlin', rarity: 'epic', stackable: true, maxStack: 20, value: 1260, healAmount: 260, usable: true, description: 'A perfectly grilled marlin steak. Restores a very large amount of health when eaten.' },
+    'giant_turtle': { id: 'giant_turtle', name: 'Giant Turtle (Raw)', rarity: 'epic', stackable: true, maxStack: 10, value: 560, description: 'A rare and enormous sea turtle. Needs careful cooking before consumption.' },
+    'cooked_giant_turtle': { id: 'cooked_giant_turtle', name: 'Cooked Giant Turtle', rarity: 'epic', stackable: true, maxStack: 10, value: 1680, healAmount: 360, usable: true, description: 'A hearty serving from a giant turtle. Restores a huge amount of health when eaten.' },
     'sardine': { id: 'sardine', name: 'Sardine', rarity: 'common', stackable: true, maxStack: 50, value: 5, description: 'A small sardine fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
     'cooked_sardine': { id: 'cooked_sardine', name: 'Cooked Sardine', rarity: 'common', stackable: true, maxStack: 50, value: 15, healAmount: 25, usable: true, description: 'A perfectly cooked sardine. Restores a small amount of health when eaten.' },
     'herring': { id: 'herring', name: 'Herring', rarity: 'common', stackable: true, maxStack: 50, value: 6, description: 'A fresh herring fish. Needs to be cooked before consumption to avoid unpleasant side effects.' },
@@ -101,8 +105,25 @@ export const ITEM_DEFS = {
     'kelp_salad': { id: 'kelp_salad', name: 'Kelp Salad', rarity: 'uncommon', stackable: true, maxStack: 50, value: 20, healAmount: 40, usable: true, description: 'A fresh salad made from kelp and other sea vegetables. Restores a moderate amount of health when eaten.' },
 
     // Fishing bait
-    'worm_bait': { id: 'worm_bait', name: 'Worm Bait', rarity: 'common', stackable: true, maxStack: 100, value: 25, description: 'A wriggling worm, perfect for attracting fish. Increases your chances of catching fish when used.' },
-    'insect_bait': { id: 'insect_bait', name: 'Insect Bait', rarity: 'uncommon', stackable: true, maxStack: 100, value: 75, description: 'A crunchy insect, ideal for luring in larger fish. Significantly boosts your fishing success rate.' },
+    'worm_bait': { id: 'worm_bait', name: 'Worm Bait', rarity: 'common', stackable: true, maxStack: 200, value: 25, description: 'A wriggling worm, perfect for attracting common fish.' },
+    'insect_bait': { id: 'insect_bait', name: 'Insect Bait', rarity: 'uncommon', stackable: true, maxStack: 150, value: 75, description: 'A crunchy insect, ideal for luring in larger predatory fish.' },
+    'shrimp_bait': { id: 'shrimp_bait', name: 'Shrimp Bait', rarity: 'common', stackable: true, maxStack: 120, value: 40, description: 'Small shrimp pieces that attract bottom-feeders like catfish and crab.' },
+    'foil_bait': { id: 'foil_bait', name: 'Shiny Foil Bait', rarity: 'uncommon', stackable: true, maxStack: 100, value: 95, description: 'Reflective foil that imitates small baitfish. Good for predatory species.' },
+    'night_bait': { id: 'night_bait', name: 'Night Worm', rarity: 'rare', stackable: true, maxStack: 80, value: 160, description: 'A nocturnal bait that works better at night. Slight boost to rare catches.' },
+    'squid_bait': { id: 'squid_bait', name: 'Squid Bait', rarity: 'rare', stackable: true, maxStack: 60, value: 180, description: 'A potent bait favored by large sea creatures like tuna and lobster.' },
+    'crab_bait': { id: 'crab_bait', name: 'Crustacean Bait', rarity: 'rare', stackable: true, maxStack: 60, value: 140, description: 'Chunky bait made from shells and meat. Effective for crustaceans and big catfish.' },
+    'mystery_bait': { id: 'mystery_bait', name: 'Mystery Jar', rarity: 'epic', stackable: true, maxStack: 20, value: 520, description: 'A jar of odd-smelling bait. Very rare fish may be attracted to it.' },
+
+    // Fishing tools (rods)
+    'basic_rod': { id: 'basic_rod', name: 'Basic Fishing Rod', rarity: 'common', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 20, description: 'A simple rod for catching small fish. Slightly improves fishing skill.', statBonus: { luk: 1 }, fishingBonus: { skill: 1, speedReductionMs: 50 } },
+    'rusty_rod': { id: 'rusty_rod', name: 'Rusty Rod', rarity: 'common', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 40, description: 'A salvaged rod from old docks. A usable starter rod.', statBonus: { luk: 1 }, fishingBonus: { skill: 2, speedReductionMs: 40 } },
+    'good_rod': { id: 'good_rod', name: 'Good Fishing Rod', rarity: 'uncommon', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 120, description: 'A well-made rod that makes fishing easier and quicker.', statBonus: { luk: 2 }, fishingBonus: { skill: 4, speedReductionMs: 150 } },
+    'iron_rod': { id: 'iron_rod', name: 'Iron Rod', rarity: 'uncommon', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 240, description: 'A sturdy iron rod that helps reel in bigger fish.', statBonus: { luk: 2 }, fishingBonus: { skill: 6, speedReductionMs: 210 } },
+    'sea_rod': { id: 'sea_rod', name: 'Sea Rod', rarity: 'rare', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 520, description: 'A rod built for saltwater and large catches. Increases catch variety.', statBonus: { luk: 3 }, fishingBonus: { skill: 10, speedReductionMs: 340 } },
+    'trawler_rod': { id: 'trawler_rod', name: 'Trawler Rod', rarity: 'epic', stackable: false, maxStack: 1, tool: true, slot: 'fishing', value: 1400, description: 'Professional-grade rod used by serious fishers. Greatly improves rare catch odds.', statBonus: { luk: 6 }, fishingBonus: { skill: 18, speedReductionMs: 520 } },
+
+    // A simple bucket item (cosmetic/logic placeholder)
+    'bait_bucket': { id: 'bait_bucket', name: 'Fishing Bucket', rarity: 'common', stackable: false, maxStack: 1, usable: false, value: 0, description: 'A bucket used to deposit bait at fishing spots.' },
 };
 
 if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;
