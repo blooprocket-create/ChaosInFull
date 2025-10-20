@@ -133,7 +133,24 @@ export function cancelWorkbench(scene, silent = false) {
     if (!active || active.cancelled) return;
     active.silent = silent;
     active.cancelled = true;
-    if (typeof active.cancel === 'function') active.cancel();
+    if (active.timeoutId) {
+        clearTimeout(active.timeoutId);
+        active.timeoutId = null;
+    }
+    if (active.remaining > 0) {
+        for (const req of (active.requirements || [])) {
+            const refund = Math.max(0, req.per || 0) * active.remaining;
+            if (refund > 0) returnInventoryItems(scene, req.id, refund);
+        }
+        if (scene._inventoryModal) scene._refreshInventoryModal();
+    }
+    if (!silent) updateMessage(scene, 'Crafting cancelled.', 'warn');
+    scene._workbenchActiveCraft = null;
+    const state = getWorkbenchState(scene);
+    state.countManual = false;
+    const newMax = getCraftableCount(scene, active.recipe);
+    state.count = Math.max(1, Math.min(state.count || 1, newMax || 1));
+    refreshWorkbench(scene);
 }
 
 function renderCategories(scene) {
@@ -554,139 +571,86 @@ function beginCraft(scene, recipe) {
     }
     if (scene._inventoryModal) scene._refreshInventoryModal();
 
+    const requirements = (recipe.requires || []).map(req => ({ id: req.id, per: Math.max(1, req.qty || 1) }));
     const duration = scene.craftingInterval || 2800;
     const active = {
         recipe,
         cancelled: false,
         silent: false,
-        cancel: null,
-        frameId: null,
-        progressContainer: null,
+        timeoutId: null,
         remaining: count,
         total: count,
-        consumed
+        consumed,
+        requirements
     };
     scene._workbenchActiveCraft = active;
     updateMessage(scene, `Crafting ${count}x ${recipe.name || recipe.id}...`, 'warn');
     refreshWorkbench(scene);
 
-    const run = async () => {
-        while (active.remaining > 0 && !active.cancelled) {
-            if (!scene._workbenchModal || !document.body.contains(scene._workbenchModal)) {
-                active.cancelled = true;
-                break;
-            }
-            const progressEl = scene._workbenchModal.querySelector('#workbench-progress');
-            if (!progressEl) break;
-            progressEl.innerHTML = '';
-            const canvas = document.createElement('canvas');
-            canvas.width = 72;
-            canvas.height = 72;
-            progressEl.appendChild(canvas);
-            const ctx = canvas.getContext('2d');
-            const finished = await workbenchProgressTick(ctx, duration, active);
-            if (!finished) break;
-
-            if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
-                window.__shared_ui.addItemToInventory(scene, recipe.id, 1);
-            } else {
-                const defs = ITEM_DEFS || {};
-                const def = defs && defs[recipe.id];
-                const target = scene.char.inventory = scene.char.inventory || [];
-                if (def && def.stackable) {
-                    const existing = target.find(x => x && x.id === recipe.id);
-                    if (existing) existing.qty = (existing.qty || 0) + 1;
-                    else target.push({ id: recipe.id, name: (def && def.name) || recipe.name, qty: 1 });
-                } else {
-                    target.push({ id: recipe.id, name: (recipe && recipe.name) || recipe.id, qty: 1 });
-                }
-            }
-
-            scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-            scene.char.smithing.exp = (scene.char.smithing.exp || 0) + (recipe.smithingXp || 0);
-            while (scene.char.smithing.exp >= scene.char.smithing.expToLevel) {
-                scene.char.smithing.exp -= scene.char.smithing.expToLevel;
-                scene.char.smithing.level = (scene.char.smithing.level || 1) + 1;
-                scene.char.smithing.expToLevel = Math.floor(scene.char.smithing.expToLevel * 1.25);
-                scene._showToast?.('Smithing level up! L' + scene.char.smithing.level, 1800);
-            }
-            try {
-                if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) {
-                    window.__shared_ui.refreshStatsModal(scene);
-                }
-            } catch (_) {}
-            const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
-            if (scene._persistCharacter) scene._persistCharacter(username);
-            if (scene._inventoryModal) scene._refreshInventoryModal();
-            active.remaining -= 1;
-            refreshWorkbench(scene);
-        }
-        if (active.cancelled) {
-            if (active.remaining > 0) {
-                for (const entry of (recipe.requires || [])) {
-                    const per = Math.max(1, entry.qty || 1);
-                    const refund = per * active.remaining;
-                    if (refund > 0) returnInventoryItems(scene, entry.id, refund);
-                }
-                if (scene._inventoryModal) scene._refreshInventoryModal();
-            }
-            if (!active.silent) updateMessage(scene, 'Crafting cancelled.', 'warn');
-        } else {
-            updateMessage(scene, `Crafted ${active.total}x ${recipe.name || recipe.id}`, 'success');
-        }
+    const finishSuccess = () => {
         scene._workbenchActiveCraft = null;
-        state.countManual = false;
         const newMax = getCraftableCount(scene, recipe);
+        state.countManual = false;
         state.count = Math.max(1, Math.min(state.count || 1, newMax || 1));
+        updateMessage(scene, `Crafted ${active.total}x ${recipe.name || recipe.id}`, 'success');
         refreshWorkbench(scene);
     };
-    run();
-}
 
-function workbenchProgressTick(ctx, duration, active) {
-    return new Promise((resolve) => {
-        if (!ctx) { resolve(false); return; }
-        let finished = false;
-        const center = ctx.canvas.width / 2;
-        const radius = (Math.min(ctx.canvas.width, ctx.canvas.height) / 2) - 6;
-        ctx.lineCap = 'round';
-        const finish = (value) => {
-            if (finished) return;
-            finished = true;
-            if (active) active.frameId = null;
-            resolve(value);
-        };
-        const start = performance.now();
-        const step = (now) => {
-            if (active && active.cancelled) {
-                finish(false);
+    const craftOne = () => {
+        if (active.cancelled) return;
+        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+            window.__shared_ui.addItemToInventory(scene, recipe.id, 1);
+        } else {
+            const defs = ITEM_DEFS || {};
+            const def = defs && defs[recipe.id];
+            const target = scene.char.inventory = scene.char.inventory || [];
+            if (def && def.stackable) {
+                const existing = target.find(x => x && x.id === recipe.id);
+                if (existing) existing.qty = (existing.qty || 0) + 1;
+                else target.push({ id: recipe.id, name: (def && def.name) || recipe.name, qty: 1 });
+            } else {
+                target.push({ id: recipe.id, name: (recipe && recipe.name) || recipe.id, qty: 1 });
+            }
+        }
+        scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+        scene.char.smithing.exp = (scene.char.smithing.exp || 0) + (recipe.smithingXp || 0);
+        while (scene.char.smithing.exp >= scene.char.smithing.expToLevel) {
+            scene.char.smithing.exp -= scene.char.smithing.expToLevel;
+            scene.char.smithing.level = (scene.char.smithing.level || 1) + 1;
+            scene.char.smithing.expToLevel = Math.floor(scene.char.smithing.expToLevel * 1.25);
+            scene._showToast?.('Smithing level up! L' + scene.char.smithing.level, 1800);
+        }
+        try {
+            if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) {
+                window.__shared_ui.refreshStatsModal(scene);
+            }
+        } catch (_) {}
+        const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
+        if (scene._persistCharacter) scene._persistCharacter(username);
+        if (scene._inventoryModal) scene._refreshInventoryModal();
+    };
+
+    const scheduleNext = () => {
+        if (active.cancelled) return;
+        if (active.remaining <= 0) {
+            finishSuccess();
+            return;
+        }
+        active.timeoutId = window.setTimeout(() => {
+            if (active.cancelled) return;
+            craftOne();
+            active.remaining -= 1;
+            if (active.remaining <= 0) {
+                finishSuccess();
                 return;
             }
-            const t = Math.min(1, (now - start) / duration);
-            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.beginPath();
-            ctx.arc(center, center, radius, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.06)';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(center, center, radius, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * t));
-            ctx.strokeStyle = '#ffd27a';
-            ctx.lineWidth = 6;
-            ctx.stroke();
-            if (t >= 1) {
-                finish(true);
-                return;
-            }
-            active.frameId = requestAnimationFrame(step);
-        };
-        active.cancel = () => {
-            if (active.frameId) cancelAnimationFrame(active.frameId);
-            finish(false);
-        };
-        active.frameId = requestAnimationFrame(step);
-    });
-}
+            refreshWorkbench(scene);
+            scheduleNext();
+        }, duration);
+    };
 
+    scheduleNext();
+}
 function getRecipeDefs() {
     if (typeof window !== 'undefined' && window.RECIPE_DEFS) return window.RECIPE_DEFS;
     return RECIPE_DEFS || {};
@@ -814,3 +778,5 @@ export default {
     refreshWorkbench,
     cancelWorkbench
 };
+
+
