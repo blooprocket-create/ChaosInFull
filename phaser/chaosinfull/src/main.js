@@ -4,6 +4,8 @@ import { Start } from './scenes/Start.js';
 import { Town } from './scenes/Town.js';
 import { Cave } from './scenes/Cave.js';
 import { InnerField } from './scenes/InnerField.js';
+import { OuterField } from './scenes/OuterField.js';
+import { GoblinCamp } from './scenes/GoblinCamp.js';
 import { ITEM_DEFS } from './data/items.js';
 import { RECIPE_DEFS } from './data/recipes.js';
 import { RACE_DEFS } from './data/races.js';
@@ -41,7 +43,9 @@ const config = {
         Start,
         Town,
         Cave,
-        InnerField
+        InnerField,
+        OuterField,
+        GoblinCamp
     ],
     scale: {
         mode: Phaser.Scale.FIT,

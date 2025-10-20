@@ -131,8 +131,6 @@ export class InnerField extends Phaser.Scene {
             if (target) this._tryAttack(true, target);
         }
         this._updatePlayerHealthBar();
-
-        this._checkReturnPortal();
     }
 
     _buildSpawnPoints(groundY) {
@@ -318,36 +316,28 @@ export class InnerField extends Phaser.Scene {
         });
     }
 
-    _checkReturnPortal() {
-        if (!this.returnPortal || !this.player) return;
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.returnPortal.x, this.returnPortal.y);
-        if (dist <= 60) {
-            this.returnPrompt.setVisible(true);
-            if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                this.char.lastLocation = { scene: 'InnerField', x: this.player.x, y: this.player.y };
-                this._persistCharacter(this.username);
-                this.scene.start('Town', { character: this.char, username: this.username, spawnX: this.scale.width - 220, spawnY: this.scale.height - 100 });
-            }
-        } else {
-            this.returnPrompt.setVisible(false);
-        }
-    }
-
     _createPortals(groundY) {
         const portalX = this.scale.width * 0.1;
         try {
             const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5 });
+            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5, targetScene: 'Town', spawnX: 120, spawnY: this.scale.height - 100, promptLabel: 'Return to Town' });
             this.returnPortal = pobj.display;
-            this.returnPrompt = this.add.text(portalX, groundY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-            this.returnPrompt.setVisible(false);
-            // if we fell back to circle, attempt a short upgrade
-            try { this.time.delayedCall(180, () => { if (pobj && pobj.tryUpgrade) pobj.tryUpgrade(); }); } catch (e) {}
         } catch (e) {
-            this.returnPortal = this.add.circle(portalX, groundY, 26, 0x4b7bd6, 0.85).setDepth(1.5);
-            this.tweens.add({ targets: this.returnPortal, scale: { from: 1, to: 1.1 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-            this.returnPrompt = this.add.text(portalX, groundY - 60, '[E] Return to Town', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-            this.returnPrompt.setVisible(false);
+            const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            const pobj = portalHelper.createPortal(this, portalX, groundY, { depth: 1.5, targetScene: 'Town', spawnX: 120, spawnY: this.scale.height - 100, promptLabel: 'Return to Town' });
+            this.returnPortal = pobj.display;
+        }
+
+        // Create portal to OuterField on the right side of the scene
+        const fieldPortalX = this.scale.width - 220;
+        try {
+            const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            const fieldObj = portalHelper.createPortal(this, fieldPortalX, groundY, { depth: 1.5, targetScene: 'OuterField', spawnX: 120, spawnY: this.scale.height - 120, promptLabel: 'Outer Field' });
+            this.fieldPortal = fieldObj.display;
+        } catch (e) {
+            const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+            const fieldObj = portalHelper.createPortal(this, fieldPortalX, groundY, { depth: 1.5, targetScene: 'OuterField', spawnX: 120, spawnY: this.scale.height - 120, promptLabel: 'Outer Field' });
+            this.fieldPortal = fieldObj.display;
         }
     }
 

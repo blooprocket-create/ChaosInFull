@@ -113,21 +113,28 @@ export class Town extends Phaser.Scene {
         const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
         const cavePortalX = 80;
         const cavePortalY = platformY - 60; // slightly lowered to sit on platform
-        const caveObj = portalHelper.createPortal(this, cavePortalX, cavePortalY, { depth: 1.5 });
+        const caveObj = portalHelper.createPortal(this, cavePortalX, cavePortalY, {
+            depth: 1.5,
+            targetScene: 'Cave',
+            spawnX: this.scale.width - 140,
+            spawnY: cavePortalY,
+            promptLabel: 'Enter Cave'
+        });
         this.portal = caveObj.display;
-        this.portalPrompt = this.add.text(cavePortalX, cavePortalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.portalPrompt.setVisible(false);
         this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
-        // attempt upgrade later if fallback was used (safe no-op if already sprite)
         try { this.time.delayedCall(220, () => { if (caveObj && caveObj.tryUpgrade) caveObj.tryUpgrade(); }); } catch (e) {}
     } catch (e) {
-        // fallback: circle
         const cavePortalX = 80;
         const cavePortalY = platformY - 60;
-        this.portal = this.add.circle(cavePortalX, cavePortalY, 28, 0x6644aa, 0.9).setDepth(1.5);
-        this.tweens.add({ targets: this.portal, scale: { from: 1, to: 1.12 }, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.easeInOut' });
-        this.portalPrompt = this.add.text(cavePortalX, cavePortalY - 60, '[E] Enter Cave', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.portalPrompt.setVisible(false);
+        const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+        const caveObj = portalHelper.createPortal(this, cavePortalX, cavePortalY, {
+            depth: 1.5,
+            targetScene: 'Cave',
+            spawnX: this.scale.width - 140,
+            spawnY: cavePortalY,
+            promptLabel: 'Enter Cave'
+        });
+        this.portal = caveObj.display;
         this.cavePortalPos = { x: cavePortalX, y: cavePortalY };
     }
     // Portal to Inner Field near the forge
@@ -135,17 +142,26 @@ export class Town extends Phaser.Scene {
     const fieldPortalY = platformY - 60; // lowered to sit on platform
     try {
         const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-        const fieldObj = portalHelper.createPortal(this, fieldPortalX, fieldPortalY, { depth: 1.5 });
+        const fieldObj = portalHelper.createPortal(this, fieldPortalX, fieldPortalY, {
+            depth: 1.5,
+            targetScene: 'InnerField',
+            spawnX: Math.max(80, this.scale.width * 0.12),
+            spawnY: fieldPortalY,
+            promptLabel: 'Inner Field'
+        });
         this.fieldPortal = fieldObj.display;
-        this.fieldPortalPrompt = this.add.text(fieldPortalX, fieldPortalY - 60, '[E] Inner Field', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.fieldPortalPrompt.setVisible(false);
         this.fieldPortalPos = { x: fieldPortalX, y: fieldPortalY };
         try { this.time.delayedCall(220, () => { if (fieldObj && fieldObj.tryUpgrade) fieldObj.tryUpgrade(); }); } catch (e) {}
     } catch (e) {
-        this.fieldPortal = this.add.circle(fieldPortalX, fieldPortalY, 26, 0x44aa88, 0.9).setDepth(1.5);
-        this.tweens.add({ targets: this.fieldPortal, scale: { from: 1, to: 1.1 }, yoyo: true, repeat: -1, duration: 1000, ease: 'Sine.easeInOut' });
-        this.fieldPortalPrompt = this.add.text(fieldPortalX, fieldPortalY - 60, '[E] Inner Field', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-        this.fieldPortalPrompt.setVisible(false);
+        const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
+        const fieldObj = portalHelper.createPortal(this, fieldPortalX, fieldPortalY, {
+            depth: 1.5,
+            targetScene: 'InnerField',
+            spawnX: Math.max(80, this.scale.width * 0.12),
+            spawnY: fieldPortalY,
+            promptLabel: 'Inner Field'
+        });
+        this.fieldPortal = fieldObj.display;
         this.fieldPortalPos = { x: fieldPortalX, y: fieldPortalY };
     }
     // Furnace on right side (combine ores into bars)
@@ -973,81 +989,7 @@ export class Town extends Phaser.Scene {
         if (this.keys.up.isDown && this.player.body.blocked.down) {
             this.player.setVelocityY(-380);
         }
-        // Portal interaction: proximity + E to enter
-        if (this.portal) {
-            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.portal.x, this.portal.y);
-            if (dist <= 56) {
-                this.portalPrompt.setVisible(true);
-                if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                    const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                    // persist mining and mark lastLocation as Cave (store scene and optional position)
-                    try {
-                        const key = 'cif_user_' + username;
-                        const userObj = JSON.parse(localStorage.getItem(key));
-                        if (userObj && userObj.characters) {
-                            let found = false;
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                const uc = userObj.characters[i];
-                                if (!uc) continue;
-                                if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                                    userObj.characters[i].mining = this.char.mining;
-                                    userObj.characters[i].lastLocation = { scene: 'Cave', x: this.player.x, y: (this.portal ? this.portal.y : this.player.y) };
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                for (let i = 0; i < userObj.characters.length; i++) {
-                                    if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
-                                }
-                                if (!found) userObj.characters.push(this.char);
-                            }
-                            localStorage.setItem(key, JSON.stringify(userObj));
-                        }
-                    } catch (e) { console.warn('Could not persist lastLocation', e); }
-                    this.scene.start('Cave', { character: this.char, username: username, spawnX: this.scale.width - 140, spawnY: this.portal ? this.portal.y : (this.scale.height - 120) });
-                }
-            } else {
-                this.portalPrompt.setVisible(false);
-            }
-        }
-        if (this.fieldPortal) {
-            const portalY = (this.fieldPortal && this.fieldPortal.y) || (this.fieldPortalPos && this.fieldPortalPos.y) || (this.scale.height - 120);
-            const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.fieldPortal.x, this.fieldPortal.y);
-            if (fdist <= 56) {
-                this.fieldPortalPrompt.setVisible(true);
-                if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                    const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                    try {
-                        const key = 'cif_user_' + username;
-                        const userObj = JSON.parse(localStorage.getItem(key));
-                        if (userObj && userObj.characters) {
-                            let found = false;
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                const uc = userObj.characters[i];
-                                if (!uc) continue;
-                                if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                                    userObj.characters[i] = this.char;
-                                    userObj.characters[i].lastLocation = { scene: 'InnerField', x: this.player.x, y: portalY };
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                for (let i = 0; i < userObj.characters.length; i++) {
-                                    if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
-                                }
-                                if (!found) userObj.characters.push(this.char);
-                            }
-                            localStorage.setItem(key, JSON.stringify(userObj));
-                        }
-                    } catch (e) { console.warn('Could not persist lastLocation (inner field)', e); }
-                    this.scene.start('InnerField', { character: this.char, username: username, spawnX: Math.max(80, this.scale.width * 0.12), spawnY: portalY });
-                }
-            } else {
-                this.fieldPortalPrompt.setVisible(false);
-            }
-        }
+        // Portal interactions (cave, inner field) are handled by the shared portal helper
         // Furnace interaction: proximity + E to open smelting UI
         if (this.furnace) {
             const fdist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.furnace.x, this.furnace.y);
