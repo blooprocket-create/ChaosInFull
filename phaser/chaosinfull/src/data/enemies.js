@@ -16,6 +16,9 @@ export const ENEMY_DEFS = {
             { itemId: 'minor_health_potion', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.008 },
             { itemId: 'minor_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.008 }
         ]
+        ,
+        // numeric gold drop (min, max, chance, luckBonus)
+        gold: { min: 1, max: 3, chance: 0.8, luckBonus: 0.002 }
     },
     slime_epic: {
         id: 'slime_epic',
@@ -35,6 +38,8 @@ export const ENEMY_DEFS = {
             { itemId: 'minor_health_potion', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.008 },
             { itemId: 'minor_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.008 }
         ]
+        ,
+        gold: { min: 4, max: 9, chance: 0.9, luckBonus: 0.002 }
     },
     slime_boss: {
         id: 'slime_boss',
@@ -56,6 +61,8 @@ export const ENEMY_DEFS = {
             { itemId: 'major_health_potion', minQty: 1, maxQty: 1, baseChance: 0.08, luckBonus: 0.01 },
             { itemId: 'major_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.08, luckBonus: 0.01 }
         ]
+        ,
+        gold: { min: 40, max: 90, chance: 1.0, luckBonus: 0.003 }
     },
     goblin_common: {
         id: 'goblin_common',
@@ -72,6 +79,8 @@ export const ENEMY_DEFS = {
             { itemId: 'copper_ore', minQty: 1, maxQty: 3, baseChance: 0.85, luckBonus: 0.001 },
             { itemId: 'copper_sword', minQty: 1, maxQty: 1, baseChance: 0.01, luckBonus: 0.0004 }
         ]
+        ,
+        gold: { min: 2, max: 6, chance: 0.85, luckBonus: 0.001 }
     },
     goblin_epic: {
         id: 'goblin_epic',
@@ -89,6 +98,8 @@ export const ENEMY_DEFS = {
             { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0006 },
             { itemId: 'copper_armor', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0006 }
         ]
+        ,
+        gold: { min: 8, max: 18, chance: 0.9, luckBonus: 0.0018 }
     },
     goblin_boss: {
         id: 'goblin_boss',
@@ -103,9 +114,11 @@ export const ENEMY_DEFS = {
         exp: 300,
         drops: [
             { itemId: 'bronze_ore', minQty: 2, maxQty: 6, baseChance: 1.0, luckBonus: 0.002 },
-            { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0012 },
-            { itemId: 'bag_of_gold', minQty: 1, maxQty: 1, baseChance: 0.3, luckBonus: 0.005 }
+            { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0012 }
         ]
+        ,
+        // prefer direct numeric gold instead of bag_of_gold item
+        gold: { min: 60, max: 140, chance: 1.0, luckBonus: 0.004 }
     },
     goblin_girl: {
         id: 'goblin_girl',
@@ -122,6 +135,8 @@ export const ENEMY_DEFS = {
             { itemId: 'copper_ore', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 },
             { itemId: 'copper_dagger', minQty: 1, maxQty: 1, baseChance: 0.015, luckBonus: 0.0005 }
         ]
+        ,
+        gold: { min: 3, max: 8, chance: 0.9, luckBonus: 0.001 }
     },
     rat: {
         id: 'rat',
@@ -137,6 +152,8 @@ export const ENEMY_DEFS = {
         drops: [
             { itemId: 'rat_tail', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 }
         ]
+        ,
+        gold: { min: 1, max: 2, chance: 0.75, luckBonus: 0.0008 }
     },
     zombie_rat: {
         id: 'zombie_rat',
@@ -153,6 +170,8 @@ export const ENEMY_DEFS = {
             { itemId: 'rat_tail', minQty: 1, maxQty: 3, baseChance: 0.95, luckBonus: 0.0012 },
             { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0005 }
         ]
+        ,
+        gold: { min: 2, max: 4, chance: 0.8, luckBonus: 0.001 }
     },
     ghost_rat: {
         id: 'ghost_rat',
@@ -170,6 +189,8 @@ export const ENEMY_DEFS = {
             { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0008 },
             { itemId: 'spectral_essence', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0007 }
         ]
+        ,
+        gold: { min: 6, max: 15, chance: 0.9, luckBonus: 0.0016 }
     }
 };
 

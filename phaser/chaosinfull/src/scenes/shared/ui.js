@@ -324,7 +324,9 @@ export function openInventoryModal(scene) {
     modal.style.borderRadius = '12px';
     modal.style.color = '#fff';
     modal.style.minWidth = '420px';
-    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Inventory</strong><button id='inv-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='inv-items' class='grid-scroll'><div id='inv-grid' class='slot-grid'></div></div>`;
+    // include gold display in header so players can see current gold in inventory modal
+    const currentGold = (char && typeof char.gold === 'number') ? char.gold : 0;
+    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;'><div style='display:flex;align-items:center;gap:10px;'><strong>Inventory</strong><div style='display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);padding:6px 8px;border-radius:8px;font-weight:700;color:#ffd27a;'>💰<span id='inv-gold'>${currentGold}</span></div></div><button id='inv-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='inv-items' class='grid-scroll'><div id='inv-grid' class='slot-grid'></div></div>`;
     document.body.appendChild(modal);
     scene._inventoryModal = modal;
     const closeBtn = modal.querySelector('#inv-close');
@@ -345,6 +347,8 @@ export function refreshInventoryModal(scene) {
     grid.innerHTML = '';
     const inv = scene.char.inventory = initSlots(scene.char.inventory);
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+    // update gold display if present
+    try { const goldEl = scene._inventoryModal.querySelector('#inv-gold'); if (goldEl) goldEl.textContent = '' + ((scene.char && scene.char.gold) ? scene.char.gold : 0); } catch (e) {}
     // render each slot
     for (let i = 0; i < inv.length; i++) {
         const s = inv[i];

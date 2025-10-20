@@ -231,25 +231,48 @@ export class InnerField extends Phaser.Scene {
     }
 
     _rollDrops(def) {
-        if (!def || !def.drops) return;
+        if (!def) return;
         const luk = ((this.char && this.char.stats && this.char.stats.luk) || 0) + (this.char._equipBonuses && this.char._equipBonuses.luk || 0);
         const dropsAwarded = [];
-        def.drops.forEach(drop => {
-            const baseChance = drop.baseChance || 0;
-            const bonus = (drop.luckBonus || 0) * luk;
+        // handle item drops if present
+        if (def.drops && Array.isArray(def.drops)) {
+            def.drops.forEach(drop => {
+                const baseChance = drop.baseChance || 0;
+                const bonus = (drop.luckBonus || 0) * luk;
+                const chance = Math.min(0.99, baseChance + bonus);
+                if (Math.random() <= chance) {
+                    const qty = Phaser.Math.Between(drop.minQty || 1, drop.maxQty || 1);
+                    this._addItemToInventory(drop.itemId, qty);
+                    dropsAwarded.push({ itemId: drop.itemId, qty });
+                }
+            });
+        }
+        // handle numeric gold drop if defined on enemy def
+        let goldAwarded = 0;
+        if (def.gold && typeof def.gold === 'object') {
+            const baseChance = def.gold.chance || 0;
+            const bonus = (def.gold.luckBonus || 0) * luk;
             const chance = Math.min(0.99, baseChance + bonus);
             if (Math.random() <= chance) {
-                const qty = Phaser.Math.Between(drop.minQty || 1, drop.maxQty || 1);
-                this._addItemToInventory(drop.itemId, qty);
-                dropsAwarded.push({ itemId: drop.itemId, qty });
+                const min = Math.max(0, Math.floor(def.gold.min || 0));
+                const max = Math.max(min, Math.floor(def.gold.max || min));
+                goldAwarded = Phaser.Math.Between(min, max);
+                // ensure player object has a gold field
+                try { this.char.gold = (this.char.gold || 0) + goldAwarded; } catch (e) { /* ignore */ }
             }
-        });
-        if (dropsAwarded.length) {
-            const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        }
+
+        // display consolidated results to player (single toast)
+        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        if (dropsAwarded.length || goldAwarded) {
+            const parts = [];
             dropsAwarded.forEach(drop => {
                 const name = (defs && defs[drop.itemId] && defs[drop.itemId].name) || drop.itemId;
-                this._showToast(`Loot: ${drop.qty}x ${name}`, 1600);
+                parts.push(`${drop.qty}x ${name}`);
             });
+            if (goldAwarded) parts.push(`Gold +${goldAwarded}`);
+            const msg = 'Loot: ' + parts.join(', ');
+            this._showToast(msg, 2000);
         } else {
             this._showToast('No loot this time...', 1000);
         }
