@@ -1,5 +1,5 @@
 export const RECIPE_DEFS = {
-    // furnace recipes (already implemented in scene logic) kept for reference
+    // furnace recipes
     'copper_bar': {
         id: 'copper_bar',
         name: 'Copper Bar',
@@ -17,6 +17,33 @@ export const RECIPE_DEFS = {
         requires: [ { id: 'copper_ore', qty: 1 }, { id: 'tin_ore', qty: 1 } ],
         reqLevel: 1,
         smithingXp: 15
+    },
+    'cooked_rat_meat': {
+        id: 'cooked_rat_meat',
+        name: 'Cooked Rat Meat',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'rat_meat', qty: 1 } ],
+        reqLevel: 1,
+        smithingXp: 5
+    },
+    'cooked_minnow': {
+        id: 'cooked_minnow',
+        name: 'Cooked Minnow',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'minnow', qty: 1 } ],
+        reqLevel: 1,
+        smithingXp: 5
+    },
+    'cooked_salmon': {
+        id: 'cooked_salmon',
+        name: 'Cooked Salmon',
+        tool: 'furnace',
+        category: 'food',
+        requires: [ { id: 'salmon', qty: 1 } ],
+        reqLevel: 1,
+        smithingXp: 5
     },
     // workbench recipes (craft weapons)
     'copper_dagger': {

@@ -2,11 +2,13 @@ export const ITEM_DEFS = {
     //Admin items
     'admin_godmode': { id: 'admin_godmode', name: 'God Mode Toggle', rarity: 'legendary', stackable: false, maxStack: 1, value: 100000, description: 'An omnipotent artifact that grants the wielder invincibility and the ability to ignore game rules. Use with caution, as it may lead to existential boredom.' },
     'admin_weapon': { id: 'admin_weapon', name: 'Admin Weapon', rarity: 'legendary', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [100,200], statBonus: { str: 100, int: 100, agi: 100, luk: 100 }, defense: 100, value: 100000, description: 'A weapon of unparalleled power, capable of obliterating any foe with a single strike. Wielded only by those who command the very fabric of the game world.' },
+    
     // Crafting materials and equipment
     'copper_ore': { id: 'copper_ore', name: 'Copper Ore', rarity: 'common', stackable: true, maxStack: 9999, value: 1, description: 'Dull rocks with delusions of metal grandeur. Smelts into something that vaguely resembles a tool.' },
     'tin_ore': { id: 'tin_ore', name: 'Tin Ore', rarity: 'common', stackable: true, maxStack: 9999, value: 1, description: 'A soft, panicked metal that melted before it could make better life choices.' },
     'copper_bar': { id: 'copper_bar', name: 'Copper Bar', rarity: 'common', stackable: true, maxStack: 9999, value: 5, description: 'Forged from ore and broken promises. Good for crafting and dulling your enemies\' expectations.' },
     'bronze_bar': { id: 'bronze_bar', name: 'Bronze Bar', rarity: 'common', stackable: true, maxStack: 9999, value: 8, description: 'Alloyed from two metals and one existential crisis. Holds together until it doesn\'t.' },
+    
     // Weapons and armor
     'copper_dagger': { id: 'copper_dagger', name: 'Copper Dagger', rarity: 'common', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [1,3], statBonus: { agi: 1 }, value: 10, description: 'Sharp enough to ruin someone\'s day, but still mostly useful for opening suspiciously labeled crates.' },
     'bronze_dagger': { id: 'bronze_dagger', name: 'Bronze Dagger', rarity: 'common', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [2,4], statBonus: { agi: 2 }, value: 12, description: 'A stabby object with commitment issues — looks menacing until it meets armor.' },
@@ -23,24 +25,29 @@ export const ITEM_DEFS = {
     'copper_boots': { id: 'copper_boots', name: 'Copper Boots', rarity: 'common', stackable: false, maxStack: 1, armor: true, slot: 'boots', defense: 2, value: 15, description: 'Basic boots that offer minimal protection. Great for those who want to look the part without risking too much.' },
     'bronze_boots': { id: 'bronze_boots', name: 'Bronze Boots', rarity: 'uncommon', stackable: false, maxStack: 1, armor: true, slot: 'boots', defense: 6, value: 40, description: 'Sturdy boots that provide solid defense. Ideal for adventurers who take their footwear seriously.' },
     'sticky_dice': { id: 'sticky_dice', name: 'Sticky Dice', rarity: 'uncommon', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [2,5], statBonus: { luk: 3 }, value: 60, description: 'A pair of dice that seem to favor the user. Perfect for those who believe in luck and the occasional rigged game.' },
+    
     // Starter weapons (used as item defs for starting choices)
     'starter_sword': { id: 'starter_sword', name: 'Sword', rarity: 'common', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [1,1], statBonus: { str: 3 }, value: 5, description: 'Your first lesson in brutally honest conflict resolution. Also great for slicing cake.' },
     'starter_staff': { id: 'starter_staff', name: 'Staff', rarity: 'common', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [1,1], statBonus: { int: 3 }, value: 5, description: 'A stick with opinions. Channels magic and passive-aggressive commentary.' },
     'starter_dagger': { id: 'starter_dagger', name: 'Dagger', rarity: 'common', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [1,1], statBonus: { agi: 3 }, value: 5, description: 'Small, angular, and excellent at popping egos and balloons.' },
     'starter_dice': { id: 'starter_dice', name: 'Dice in a Bag', rarity: 'common', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [1,1], statBonus: { luk: 3 }, value: 5, description: 'Fate in soft, rattly form. Roll well and maybe the universe will owe you one.' },
+    
     // Slime drops and items
     'slime_gel': { id: 'slime_gel', name: 'Slime Gel', rarity: 'common', stackable: true, maxStack: 999, value: 2, description: 'Sticky residue left behind by common slimes. Smells faintly of regret and old socks.' },
     'slime_core': { id: 'slime_core', name: 'Glowing Slime Core', rarity: 'rare', stackable: true, maxStack: 99, value: 80, description: 'A pulsing core that hums with condensed mana. Slightly warm, like a tiny sun of poor decisions.' },
     'slime_crown_shard': { id: 'slime_crown_shard', name: 'Royal Slime Crown Shard', rarity: 'epic', stackable: false, maxStack: 1, value: 500, slot: 'head', description: 'A fragment of a monarch slime crown. It radiates confidence and the faint whiff of tyranny.', statBonus: { luk: 4 } },
     'slime_whip': { id: 'slime_whip', name: 'Gel Lash', rarity: 'rare', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [3,6], statBonus: { agi: 3, luk: 1 }, value: 220, description: 'A whip that slaps enemies and occasionally apologizes in gooey tones.' },
+    
     // Rat drops and items
     'rat_tail': { id: 'rat_tail', name: 'Rat Tail', rarity: 'common', stackable: true, maxStack: 99, value: 2, description: 'A scruffy tail from a common rat. Surprisingly flexible and mildly unsettling.' },
     'rotting_fang': { id: 'rotting_fang', name: 'Rotting Fang', rarity: 'uncommon', stackable: true, maxStack: 99, value: 12, description: 'A fang that has been left to rot. It\'s sharp and slightly toxic.' , statBonus: { str: 1 }, slot: 'weapon' },
     'spectral_essence': { id: 'spectral_essence', name: 'Spectral Essence', rarity: 'rare', stackable: true, maxStack: 99, value: 90, description: 'A ghostly essence that crackles with otherworldly energy. It\'s faintly cold and gives off an eerie glow.' },
+    
     // Wooden Items
     'normal_log': { id: 'normal_log', name: 'Normal Log', rarity: 'common', stackable: true, maxStack: 999, value: 1, description: 'A sturdy log, perfect for building fires or impromptu furniture.' },
     'oak_log': { id: 'oak_log', name: 'Oak Log', rarity: 'uncommon', stackable: true, maxStack: 999, value: 6, description: 'A strong oak log, ideal for crafting durable items and structures.' },
     'green_staff': { id: 'green_staff', name: 'Green Staff', rarity: 'uncommon', stackable: false, maxStack: 1, weapon: true, slot: 'weapon', damage: [2,4], statBonus: { int: 3 }, value: 90, description: 'A staff imbued with the essence of nature. It hums softly and feels alive to the touch.' },
+    
     // Health and mana items
     'minor_health_potion': { id: 'minor_health_potion', name: 'Minor Health Potion', rarity: 'common', stackable: true, maxStack: 99, healAmount: 20, value: 8, usable: true, description: 'A small vial of red liquid that tastes like cherry-flavored hope. Restores a modest amount of health.' },
     'major_health_potion': { id: 'major_health_potion', name: 'Major Health Potion', rarity: 'uncommon', stackable: true, maxStack: 99, healAmount: 75, value: 35, usable: true, description: 'A large bottle of crimson concoction that smells like victory. Heals a significant portion of health.' },
@@ -50,11 +57,21 @@ export const ITEM_DEFS = {
     'manster_energy': { id: 'manster_energy', name: 'MANster Energy Drink', rarity: 'common', stackable: true, maxStack: 50, value: 7, usable: true, description: 'A can of energy drink that claims to unleash your inner beast. May cause sudden bursts of strength and uncontrollable howling.', buff: { statBonus: { str: 6 }, duration: 45000 } },
     'cellulix': { id: 'cellulix', name: 'Cellulix Energy Drink', rarity: 'common', stackable: true, maxStack: 50, value: 7, usable: true, description: 'A can of energy drink that advertises enhanced mental clarity and focus. Side effects may include overthinking and existential dread.', buff: { statBonus: { int: 6 }, duration: 45000 } },
     'lucky_clover': { id: 'lucky_clover', name: 'Lucky Clover Energy Drink', rarity: 'common', stackable: true, maxStack: 50, value: 6, usable: true, description: 'A can of energy drink that promises to enhance your luck and fortune. Side effects may include sudden bursts of confidence and an uncanny ability to find four-leaf clovers.', buff: { statBonus: { luk: 6 }, duration: 45000 } },
+    
     // Quest items
     'strange_slime_egg': { id: 'strange_slime_egg', name: 'Strange Slime Egg', rarity: 'epic', stackable: false, maxStack: 1, value: 800, description: 'An egg pulsating with mysterious energy. It\'s warm to the touch and occasionally jiggles on its own. What could be inside?' },
+    
     // usage items
     'teleport_scroll': { id: 'teleport_scroll', name: 'Teleportation Scroll', rarity: 'rare', stackable: true, maxStack: 10, value: 120, usable: true, description: 'A magical scroll that allows instant travel to a known location. Perfect for avoiding awkward social situations or dangerous monsters.' },
-    'bag_of_gold': { id: 'bag_of_gold', name: 'Bag of Gold', rarity: 'common', stackable: true, maxStack: 50, value: 100, usable: true, description: 'A hefty bag filled with gleaming gold coins. Heavy enough to make you feel wealthy, but light enough to carry without a mule.' }
+    'bag_of_gold': { id: 'bag_of_gold', name: 'Bag of Gold', rarity: 'common', stackable: true, maxStack: 50, value: 100, usable: true, description: 'A hefty bag filled with gleaming gold coins. Heavy enough to make you feel wealthy, but light enough to carry without a mule.' },
+
+    // Cooking Items
+    'rat_meat': { id: 'rat_meat', name: 'Rat Meat', rarity: 'common', stackable: true, maxStack: 50, value: 5, description: 'Freshly obtained rat meat. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_rat_meat': { id: 'cooked_rat_meat', name: 'Cooked Rat Meat', rarity: 'common', stackable: true, maxStack: 50, value: 15, healAmount: 25, usable: true, description: 'Tender rat meat cooked to perfection. Restores a small amount of health when eaten.' },
+    'minnow': { id: 'minnow', name: 'Minnow', rarity: 'common', stackable: true, maxStack: 50, value: 4, description: 'A small, slippery minnow. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_minnow': { id: 'cooked_minnow', name: 'Cooked Minnow', rarity: 'common', stackable: true, maxStack: 50, value: 12, healAmount: 20, usable: true, description: 'A perfectly cooked minnow. Restores a small amount of health when eaten.' },
+    'salmon': { id: 'salmon', name: 'Salmon', rarity: 'uncommon', stackable: true, maxStack: 50, value: 10, description: 'A fresh salmon fillet. Needs to be cooked before consumption to avoid unpleasant side effects.' },
+    'cooked_salmon': { id: 'cooked_salmon', name: 'Cooked Salmon', rarity: 'uncommon', stackable: true, maxStack: 50, value: 30, healAmount: 50, usable: true, description: 'A deliciously cooked salmon fillet. Restores a moderate amount of health when eaten.' },
 };
 
 if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;
