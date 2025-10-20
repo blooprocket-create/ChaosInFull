@@ -125,6 +125,21 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
         .workbench-message.success { color:#b6f7b6; }
         .workbench-message.warn { color:#ffd27a; }
         .workbench-message.error { color:#ff9b9b; }
+    /* Equipment grid - centered, requested layout */
+    .equip-grid { display:flex; justify-content:center; align-items:center; padding:8px 0; }
+    /* 3x4 layout; empty spaces allowed; ordered per request */
+    .equip-slots { display:grid; grid-template-columns: repeat(3, 96px); grid-template-rows: repeat(4, 96px); gap:12px; grid-template-areas: "ring1 head ring2" "amulet armor weapon" ". legs ." ". boots ."; justify-content:center; }
+    .equip-slot { width:96px; height:96px; border-radius:12px; background:rgba(255,255,255,0.02); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; cursor:pointer; position:relative; border:1px solid rgba(255,255,255,0.04); }
+    .equip-slot.empty { opacity:0.55; }
+    .equip-slot .slot-name { font-size:12px; color:#ddd; text-align:center; max-width:86px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .equip-slot .slot-icon { font-size:20px; }
+    .equip-slot .unequip-btn { position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.35); color:#fff; border:none; padding:4px 6px; border-radius:6px; cursor:pointer; font-size:11px; }
+    /* rarity tint classes (fallback border colors) */
+    .slot-rarity-common { border-color: rgba(255,255,255,0.06) !important; }
+    .slot-rarity-uncommon { border-color: rgba(100,255,100,0.45) !important; }
+    .slot-rarity-rare { border-color: rgba(100,170,255,0.45) !important; }
+    .slot-rarity-epic { border-color: rgba(200,100,255,0.5) !important; }
+    .slot-rarity-legendary { border-color: rgba(255,200,80,0.55) !important; }
     `;
     document.head.appendChild(s);
 }
@@ -146,8 +161,17 @@ function buildStatLines(def) {
     if (def.statBonus) {
         for (const k of Object.keys(def.statBonus)) lines.push(`+${def.statBonus[k]} ${k.toUpperCase()}`);
     }
-    if (def.defense) lines.push(`+${def.defense} DEF`);
-    if (def.weaponDamage) lines.push(`DMG: ${def.weaponDamage}`);
+    // Support alternate spellings/keys for defense (defence, def) and top-level defense value
+    const defVal = (typeof def.defense !== 'undefined' && def.defense !== null) ? def.defense :
+                   (typeof def.defence !== 'undefined' && def.defence !== null) ? def.defence :
+                   (typeof def.def !== 'undefined' && def.def !== null) ? def.def : null;
+    if (defVal !== null) lines.push(`+${defVal} DEF`);
+    // Support damage arrays (most items use `damage: [min,max]`) and single-value weaponDamage
+    if (Array.isArray(def.damage) && def.damage.length >= 2) {
+        lines.push(`DMG: ${def.damage[0]}-${def.damage[1]}`);
+    } else if (typeof def.weaponDamage !== 'undefined' && def.weaponDamage !== null) {
+        lines.push(`DMG: ${def.weaponDamage}`);
+    }
     return lines;
 }
 
@@ -564,7 +588,8 @@ export function openEquipmentModal(scene) {
     modal.style.borderRadius = '12px';
     modal.style.color = '#fff';
     modal.style.minWidth = '360px';
-    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Equipment</strong><button id='equip-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='equip-list' style='display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto;'></div>`;
+    // Equipment grid (no details pane) — we will use the floating tooltip on hover
+    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Equipment</strong><button id='equip-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='equip-body' class='modal-body'><div class='equip-grid'><div class='equip-slots' id='equip-slots'></div></div></div>`;
     document.body.appendChild(modal);
     scene._equipmentModal = modal;
     const closeBtn = modal.querySelector('#equip-close'); if (closeBtn) closeBtn.onclick = () => closeEquipmentModal(scene);
@@ -580,36 +605,60 @@ export function closeEquipmentModal(scene) {
 
 export function refreshEquipmentModal(scene) {
     if (!scene || !scene._equipmentModal) return;
-    const container = scene._equipmentModal.querySelector('#equip-list');
-    container.innerHTML = '';
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
     const equip = scene.char.equipment || {};
-    const slots = ['weapon','head','armor','legs','boots','ring1','ring2','amulet'];
-    for (const s of slots) {
+    const slotOrder = ['weapon','head','armor','legs','boots','ring1','ring2','amulet'];
+    const slotsContainer = scene._equipmentModal.querySelector('#equip-slots');
+    if (!slotsContainer) return;
+    slotsContainer.innerHTML = '';
+    // layout mapping to place slots in visually meaningful positions
+    const slotDisplayNames = { weapon: 'Weapon', head: 'Head', armor: 'Body', legs: 'Legs', boots: 'Boots', ring1: 'Ring', ring2: 'Ring', amulet: 'Amulet' };
+    for (const s of slotOrder) {
         const eq = equip[s];
-        const el = document.createElement('div'); el.style.display='flex'; el.style.justifyContent='space-between'; el.style.alignItems='center'; el.style.padding='6px'; el.style.background='rgba(255,255,255,0.02)'; el.style.borderRadius='8px';
-        const left = document.createElement('div');
-        const eqName = eq && defs[eq.id] ? defs[eq.id].name : (eq ? eq.name : 'Empty');
-        let icon = '';
+        const slotEl = document.createElement('div'); slotEl.className = 'equip-slot';
+        if (!eq) slotEl.classList.add('empty');
+    // assign grid area so slots follow requested layout
+    const areaMap = { head: 'head', weapon: 'weapon', amulet: 'amulet', armor: 'armor', ring1: 'ring1', ring2: 'ring2', legs: 'legs', boots: 'boots' };
+        const area = areaMap[s] || null;
+        if (area) slotEl.style.gridArea = area;
+        const iconSpan = document.createElement('div'); iconSpan.className = 'slot-icon';
+        const nameSpan = document.createElement('div'); nameSpan.className = 'slot-name';
+        // determine icon and tooltipable name
         if (eq && defs && defs[eq.id]) {
-            const d = defs[eq.id]; if (d.weapon) icon = `<span class='item-icon'>⚔️</span>`; else if (d.armor) icon = `<span class='item-icon'>🛡️</span>`; else icon = `<span class='item-icon'>📦</span>`;
+            const d = defs[eq.id]; iconSpan.innerHTML = d.weapon ? '⚔️' : (d.armor ? '🛡️' : '📦');
+            nameSpan.textContent = d.name || eq.name || eq.id;
+            // apply rarity tint via class or inline border color
+            try {
+                const rarity = (d && d.rarity) || 'common';
+                const className = 'slot-rarity-' + (rarity || 'common');
+                slotEl.classList.add(className);
+                // fallback: if RARITY_COLORS is defined, set a subtle border tint using that color
+                if (typeof RARITY_COLORS !== 'undefined' && RARITY_COLORS[rarity]) {
+                    const c = RARITY_COLORS[rarity];
+                    // use a translucent border color derived from the rarity tint
+                    slotEl.style.borderColor = c.replace('0.9', '0.45');
+                }
+            } catch (e) {}
+            // restore floating tooltip on hover/click
+            slotEl.addEventListener('mouseenter', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(scene, eq, slotEl); } catch(e) {} });
+            slotEl.addEventListener('mouseleave', () => { try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch(e) {} });
+            slotEl.addEventListener('click', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(scene, eq, slotEl); } catch(e) {} });
+        } else {
+            iconSpan.innerHTML = '—';
+            nameSpan.textContent = slotDisplayNames[s] || s;
+            slotEl.addEventListener('mouseenter', () => { try { if (window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(scene, { id: null, name: slotDisplayNames[s] || s, description: '' }, slotEl); } catch(e) {} });
+            slotEl.addEventListener('mouseleave', () => { try { if (window && window.__shared_ui && window.__shared_ui.hideItemTooltip) window.__shared_ui.hideItemTooltip(); } catch(e) {} });
         }
-        let eqBonus = '';
-        let eqBonusTitle = '';
-        if (eq && defs && defs[eq.id] && defs[eq.id].statBonus) {
-            const parts = [];
-            for (const k of Object.keys(defs[eq.id].statBonus)) parts.push('+' + defs[eq.id].statBonus[k] + ' ' + k.toUpperCase());
-            eqBonus = parts.map(p => `<span class='pill' title='${p}'>${p}</span>`).join(' ');
-            eqBonusTitle = parts.join(', ');
-        }
-    left.innerHTML = `<strong>${s.toUpperCase()}</strong><div style='font-size:0.85em;color:#ccc;' title='${eqBonusTitle}'>${icon}${eqName}${eqBonus ? ' ' + eqBonus : ''}</div>`;
-        const right = document.createElement('div');
+        slotEl.appendChild(iconSpan); slotEl.appendChild(nameSpan);
+        // unequip button when occupied
         if (eq) {
-            const btn = document.createElement('button'); btn.textContent = 'Unequip'; btn.style.padding='6px 8px'; btn.style.border='none'; btn.style.borderRadius='6px'; btn.style.cursor='pointer';
-            btn.onclick = () => { unequipItem(scene, s); refreshEquipmentModal(scene); refreshInventoryModal(scene); };
-            right.appendChild(btn);
+            const btn = document.createElement('button'); btn.className = 'unequip-btn'; btn.textContent = 'Unequip';
+            btn.onclick = (ev) => { ev.stopPropagation(); unequipItem(scene, s); refreshEquipmentModal(scene); refreshInventoryModal(scene); };
+            slotEl.appendChild(btn);
         }
-        el.appendChild(left); el.appendChild(right); container.appendChild(el);
+        // clicking the slot focuses details (simulate hover)
+        slotEl.onclick = () => { try { if (eq && window && window.__shared_ui && window.__shared_ui.showItemTooltip) window.__shared_ui.showItemTooltip(scene, eq, slotEl); } catch(e) {} };
+        slotsContainer.appendChild(slotEl);
     }
 }
 
