@@ -324,49 +324,67 @@ export class BrokenDock extends Phaser.Scene {
         // simple modal: list available bait items from ITEM_DEFS and allow adding to inventory via purchase
         if (typeof document === 'undefined') return;
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        // use shared modal styles
-        const overlay = document.createElement('div'); overlay.className = 'modal-overlay show'; overlay.style.zIndex = 260;
-        const card = document.createElement('div'); card.className = 'modal-card'; card.style.minWidth = '360px';
-        card.innerHTML = `<div class='modal-head'><div class='modal-title'>Bait Bucket</div><div><button id='bucket-close' class='btn btn-ghost'>Close</button></div></div><div class='modal-body' style='flex-direction:column;gap:10px;'><div id='bucket-list' style='display:flex;flex-direction:column;gap:8px;min-width:300px;'></div></div>`;
-        overlay.appendChild(card);
-        const list = card.querySelector('#bucket-list');
-        // dynamically list bait options from ITEM_DEFS (ids that include '_bait' or explicit bait rarity)
+        // use shared modal styles and a cleaner layout: left selectable bait list, right preview, footer buy button
         const baitKeys = Object.keys(defs).filter(k => k && k.toLowerCase().includes('_bait'));
+        const overlay = document.createElement('div'); overlay.className = 'modal-overlay show'; overlay.style.zIndex = 260;
+        const card = document.createElement('div'); card.className = 'modal-card'; card.style.minWidth = '700px';
+        card.innerHTML = `<div class='modal-head'><div style='display:flex;align-items:center;gap:12px'><div class='modal-title'>Bait Bucket</div></div><div><button id='bucket-close' class='btn btn-ghost'>Close</button></div></div><div class='modal-body' style='display:flex;gap:18px;align-items:flex-start;'></div><div class='modal-foot' style='display:flex;justify-content:flex-end;gap:10px;padding-top:12px;'></div>`;
+        overlay.appendChild(card);
+        const body = card.querySelector('.modal-body');
+        const left = document.createElement('div'); left.style.flex = '1'; left.style.display='flex'; left.style.flexDirection='column'; left.style.gap='8px';
+        const right = document.createElement('div'); right.style.width='300px'; right.style.display='flex'; right.style.flexDirection='column'; right.style.gap='8px';
+        body.appendChild(left); body.appendChild(right);
+
+        left.innerHTML = `<div style='font-weight:700;margin-bottom:6px'>Available Baits</div>`;
+        const baitList = document.createElement('div'); baitList.style.display='flex'; baitList.style.flexDirection='column'; baitList.style.gap='6px'; left.appendChild(baitList);
+
+        // preview panel
+        right.innerHTML = `<div style='font-weight:700'>Bait Preview</div><div id='bait-preview' style='font-size:13px;opacity:0.95;padding-top:6px;'></div>`;
+
+        // footer: buy selected bait
+        const footer = card.querySelector('.modal-foot');
+        const buyBtn = document.createElement('button'); buyBtn.className = 'btn btn-primary'; buyBtn.textContent = 'Buy Selected'; buyBtn.disabled = true;
+        const closeBtn = card.querySelector('#bucket-close');
+        footer.appendChild(buyBtn);
+
+        let selectedBait = null;
+        const chooseBait = (id) => {
+            selectedBait = id;
+            buyBtn.disabled = !selectedBait;
+            // highlight selection
+            Array.from(baitList.children).forEach(el => { el.style.background = (el.dataset && el.dataset.id === id) ? 'rgba(255,255,255,0.04)' : 'transparent'; });
+            const d = defs[id]; const pv = card.querySelector('#bait-preview'); if (pv) pv.innerHTML = `<div style='font-weight:700'>${d.name}</div><div style='opacity:0.9;margin-top:6px'>${d.description}</div><div style='margin-top:8px;font-weight:800;color:#ffd27a'>Price: ${d.value}g</div>`;
+        };
+
         for (const id of baitKeys) {
             const d = defs[id]; if (!d) continue;
-            const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center';
-            row.innerHTML = `<div><strong>${d.name}</strong><div style='font-size:12px;opacity:0.9'>${d.description}</div></div><div style='display:flex;flex-direction:column;gap:6px;align-items:flex-end;'><div style='font-weight:800;color:#ffd27a'>${d.value}g</div></div>`;
-            const buyBtn = document.createElement('button'); buyBtn.textContent = 'Buy 1'; buyBtn.style.marginLeft='8px';
-            buyBtn.onclick = () => {
-                try {
-                    const price = Number(d.value || 0);
-                    const gold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
-                    if (gold < price) { this._showToast && this._showToast('Not enough gold'); return; }
-                    // deduct gold and persist
-                    this.char.gold = gold - price;
-                    try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
-                    // add to inventory
-                    let added = false;
-                    try { if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) { added = window.__shared_ui.addItemToInventory(this, id, 1); } } catch (e) { added = false; }
-                    if (!added) {
-                        const inv = this.char.inventory = this.char.inventory || [];
-                        if (d && d.stackable) {
-                            const slot = inv.find(x => x && x.id === id);
-                            if (slot) slot.qty = (slot.qty || 0) + 1; else inv.push({ id: id, name: d.name, qty: 1 });
-                        } else {
-                            inv.push({ id: id, name: d.name, qty: 1 });
-                        }
-                    }
-                    this._showToast && this._showToast('Bought 1 ' + d.name);
-                    try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
-                    try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
-                } catch (e) { console.error('Buy bait failed', e); }
-            };
-            row.querySelector('div:nth-child(2)').appendChild(buyBtn);
-            list.appendChild(row);
+            const row = document.createElement('button'); row.type='button'; row.className='btn btn-ghost'; row.dataset.id = id;
+            row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.padding='10px'; row.style.textAlign='left';
+            row.innerHTML = `<div><strong>${d.name}</strong><div style='font-size:12px;opacity:0.85'>${d.description}</div></div><div style='text-align:right'><div style='font-weight:800;color:#ffd27a'>${d.value}g</div></div>`;
+            row.onclick = () => { chooseBait(id); };
+            baitList.appendChild(row);
         }
+
+        // Buy handler: buy 1 of the currently selected bait
+        buyBtn.onclick = () => {
+            try {
+                if (!selectedBait) return; const d = defs[selectedBait]; if (!d) return;
+                const price = Number(d.value || 0);
+                const gold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
+                if (gold < price) { this._showToast && this._showToast('Not enough gold'); return; }
+                this.char.gold = gold - price;
+                try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                let added = false;
+                try { if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) added = window.__shared_ui.addItemToInventory(this, selectedBait, 1); } catch (e) { added = false; }
+                if (!added) { const inv = this.char.inventory = this.char.inventory || []; if (d && d.stackable) { let slot = inv.find(x => x && x.id === selectedBait); if (slot) slot.qty = (slot.qty || 0) + 1; else inv.push({ id: selectedBait, name: d.name, qty: 1 }); } else { inv.push({ id: selectedBait, name: d.name, qty: 1 }); } }
+                this._showToast && this._showToast('Bought 1 ' + d.name);
+                try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
+                try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
+            } catch (e) { console.error('Buy bait failed', e); }
+        };
+
+        if (closeBtn) closeBtn.onclick = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
         document.body.appendChild(overlay);
-        const closeBtn = card.querySelector('#bucket-close'); if (closeBtn) closeBtn.onclick = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
     }
 
     _openFishingModal() {
@@ -374,24 +392,22 @@ export class BrokenDock extends Phaser.Scene {
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
         const fishingDefs = (window && window.FISHING_DEFS) ? window.FISHING_DEFS : FISHING_DEFS;
 
-        // find bait items present in inventory
+        // inventory and bait counts
         const inv = (this.char && this.char.inventory) ? this.char.inventory : [];
         const flatInv = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(inv) : (Array.isArray(inv) ? inv.slice() : []);
-        // compute counts for baits
+        const baitKeys = Object.keys(defs).filter(k => k && k.toLowerCase().includes('_bait'));
         const baitCounts = {};
-        for (const it of flatInv) {
-            if (!it) continue; if (!it.id) continue; if (it.id === 'worm_bait' || it.id === 'insect_bait') baitCounts[it.id] = (baitCounts[it.id]||0) + (it.qty||1);
-        }
+        for (const it of flatInv) { if (!it || !it.id) continue; if (baitKeys.includes(it.id)) baitCounts[it.id] = (baitCounts[it.id]||0) + (it.qty||1); }
 
+    // create single modal overlay/card using shared styles, left/right layout
     const overlay = document.createElement('div'); overlay.className = 'modal-overlay show'; overlay.style.zIndex = 265;
     const card = document.createElement('div'); card.className = 'modal-card'; card.style.minWidth = '760px';
-    card.innerHTML = `<div class='modal-head'><div style='display:flex;align-items:center;gap:12px'><div class='modal-title'>Fishing</div><div id='fish-status' style='font-size:12px;color:#dcdcdc;opacity:0.9'>Idle</div></div><div><button id='fish-close' class='btn btn-ghost'>Close</button></div></div><div id='fish-body' class='modal-body' style='display:flex;gap:18px;align-items:flex-start;'></div>`;
+    card.innerHTML = `<div class='modal-head'><div style='display:flex;align-items:center;gap:12px'><div class='modal-title'>Fishing</div><div id='fish-status' style='font-size:12px;color:#dcdcdc;opacity:0.9'>Idle</div></div><div><button id='fish-close' class='btn btn-ghost'>Close</button></div></div><div id='fish-body' class='modal-body' style='display:flex;gap:18px;align-items:flex-start;'></div><div class='modal-foot' style='display:flex;justify-content:flex-end;gap:10px;padding-top:12px;'></div>`;
     overlay.appendChild(card);
     document.body.appendChild(overlay);
-    const closeBtn = card.querySelector('#fish-close'); if (closeBtn) closeBtn.onclick = () => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); };
     const body = card.querySelector('#fish-body');
-    const left = document.createElement('div'); left.style.flex='1';
-    const right = document.createElement('div'); right.style.width='300px'; right.style.display='flex'; right.style.flexDirection='column'; right.style.gap='8px';
+    const left = document.createElement('div'); left.style.flex='1'; left.style.display='flex'; left.style.flexDirection='column'; left.style.gap='8px';
+    const right = document.createElement('div'); right.style.width='340px'; right.style.display='flex'; right.style.flexDirection='column'; right.style.gap='8px';
     body.appendChild(left); body.appendChild(right);
 
         // Rod detection
@@ -399,71 +415,189 @@ export class BrokenDock extends Phaser.Scene {
         const rodDef = (equippedRodId && defs[equippedRodId]) ? defs[equippedRodId] : null;
         left.innerHTML = `<div style='margin-bottom:8px;'><strong>Equipped Rod:</strong> ${rodDef ? rodDef.name : '<em>None</em>'}</div>`;
 
-        // bait selector
+        // bait selector: single-select list (shows counts) and updates possible catches
         const baitSel = document.createElement('div'); baitSel.style.display='flex'; baitSel.style.flexDirection='column'; baitSel.style.gap='6px';
         baitSel.innerHTML = `<div style='font-weight:700'>Select bait to deposit:</div>`;
-        const baitOptions = [];
-        // selected bait state (null = none)
+        const baitList = document.createElement('div'); baitList.style.display='flex'; baitList.style.flexDirection='column'; baitList.style.gap='6px'; baitSel.appendChild(baitList);
+        left.appendChild(baitSel);
         let selectedBait = null;
-        const buildPossible = (baitId) => {
-            const poss = [];
+
+        const updatePossible = (baitId) => {
+            const catchList = right.querySelector('#catch-list');
+            catchList.innerHTML = '';
             const rodRarity = (rodDef && rodDef.rarity) || 'common';
             const rarities = ['common','uncommon','rare','epic','legendary'];
             for (const fid of Object.keys(fishingDefs)) {
                 const f = fishingDefs[fid]; if (!f) continue;
                 if (baitId && f.allowedBaits && !f.allowedBaits.includes(baitId)) continue;
                 if (rarities.indexOf(rodRarity) < rarities.indexOf(f.minRodRarity || 'common')) continue;
-                poss.push(f);
-            }
-            return poss;
-        };
-
-        for (const bid of ['worm_bait','insect_bait']) {
-            const d = defs[bid]; if (!d) continue;
-            const available = baitCounts[bid] || 0;
-            const btn = document.createElement('button'); btn.textContent = `${d.name} (${available})`; btn.dataset.bait = bid; btn.disabled = (available <= 0);
-            btn.style.textAlign = 'left';
-            btn.onclick = (ev) => {
-                const b = ev.currentTarget && ev.currentTarget.dataset && ev.currentTarget.dataset.bait;
-                if (!b) return;
-                // mark selection UI
-                selectedBait = b;
-                for (const bo of baitOptions) { bo.style.background = ''; }
-                try { ev.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } catch (e) {}
-                // update possible catches list in-place
-                updatePossible(selectedBait);
-                // enable/disable cast button depending on availability
-                try { if (typeof castBtn !== 'undefined' && castBtn) castBtn.disabled = !( (window && window.__shared_ui && window.__shared_ui.getQtyInSlots) ? window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), selectedBait) > 0 : (baitCounts[selectedBait] || 0) > 0 ); } catch (e) {}
-            };
-            baitSel.appendChild(btn); baitOptions.push(btn);
-        }
-        left.appendChild(baitSel);
-
-        // information pane
-        const info = document.createElement('div'); info.style.marginTop='8px'; info.innerHTML = `<div style='font-weight:700'>Notes</div><div style='font-size:12px;opacity:0.9'>Deposit one bait to attempt fishing. Different bait + rod combos affect what fish can be caught. Success depends on your Fishing level, LUK, and fish difficulty.</div>`;
-        left.appendChild(info);
-
-        // right: preview slot for potential catches (updates when bait clicked)
-        right.innerHTML = `<div style='font-weight:700'>Possible Catches</div><div id='catch-list' style='display:flex;flex-direction:column;gap:6px;margin-top:6px;'></div>`;
-        const catchList = right.querySelector('#catch-list');
-        // initial show all possible for current rod (none selected)
-        const updatePossible = (baitId) => {
-            catchList.innerHTML = '';
-            const rodRarity = (rodDef && rodDef.rarity) || 'common';
-            for (const fid of Object.keys(fishingDefs)) {
-                const f = fishingDefs[fid];
-                if (!f) continue;
-                // allowed by bait and rod
-                if (baitId && f.allowedBaits && !f.allowedBaits.includes(baitId)) continue;
-                // check rod rarity min
-                const rarities = ['common','uncommon','rare','epic','legendary'];
-                if (rarities.indexOf(rodRarity) < rarities.indexOf(f.minRodRarity || 'common')) continue;
-                const div = document.createElement('div');
-                div.textContent = `${f.name} — difficulty ${f.difficulty}`;
+                const div = document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between'; div.style.alignItems='center'; div.style.padding='6px 0';
+                div.dataset.fid = f.id || fid;
+                div.innerHTML = `<div><strong>${f.name}</strong><div style='font-size:12px;opacity:0.9'>Difficulty: ${f.difficulty}</div></div><div style='text-align:right'><div style='font-weight:800;color:#ffd27a'>${f.baseValue}g</div><div style='font-size:12px;opacity:0.9'>${f.rarity}</div></div>`;
                 catchList.appendChild(div);
             }
         };
-        updatePossible(null);
+
+        for (const bid of baitKeys) {
+            const d = defs[bid]; if (!d) continue;
+            const available = baitCounts[bid] || 0;
+            const row = document.createElement('button'); row.type='button'; row.className='btn btn-ghost'; row.dataset.bait = bid;
+            row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.padding='10px'; row.style.textAlign='left';
+            // add a count span we can update reactively
+            row.innerHTML = `<div><strong>${d.name}</strong><div style='font-size:12px;opacity:0.85'>${d.description}</div></div><div style='text-align:right'><div id='bait-count-${bid}' style='font-weight:800;color:#cfcf8a'>${available}</div></div>`;
+            row.disabled = (available <= 0);
+            row.onclick = (ev) => { selectedBait = bid; updatePossible(selectedBait); // highlight
+                Array.from(baitList.children).forEach(el => { el.style.background = (el.dataset && el.dataset.bait === selectedBait) ? 'rgba(255,255,255,0.04)' : 'transparent'; });
+                // enable/disable cast
+                try { if (castBtn) castBtn.disabled = !((window && window.__shared_ui && window.__shared_ui.getQtyInSlots) ? window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), selectedBait) > 0 : (baitCounts[selectedBait] || 0) > 0); } catch (e) {}
+            };
+            baitList.appendChild(row);
+        }
+
+        // info
+        const info = document.createElement('div'); info.style.marginTop='8px'; info.innerHTML = `<div style='font-weight:700'>Notes</div><div style='font-size:12px;opacity:0.9'>Deposit one bait to attempt fishing. Different bait + rod combos affect what fish can be caught. Success depends on your Fishing level, LUK, and fish difficulty.</div>`;
+        left.appendChild(info);
+        // helper to update displayed bait counts reactively
+        const updateBaitCount = (bid, newCount) => {
+            try {
+                if (!bid) return;
+                // update snapshot
+                baitCounts[bid] = (typeof newCount === 'number') ? newCount : (baitCounts[bid] || 0);
+                const el = card.querySelector(`#bait-count-${bid}`);
+                if (el) el.textContent = String(baitCounts[bid] || 0);
+                // disable the row if none left
+                const rowEl = Array.from(baitList.children).find(c => c && c.dataset && c.dataset.bait === bid);
+                if (rowEl) rowEl.disabled = (baitCounts[bid] || 0) <= 0;
+                // if the currently selected bait is depleted, disable Cast
+                try { if (selectedBait === bid && castBtn) castBtn.disabled = !((baitCounts[bid] || 0) > 0); } catch (e) {}
+            } catch (e) { /* ignore UI update failures */ }
+        };
+
+    // right: possible catches
+    right.innerHTML = `<div style='font-weight:700'>Possible Catches</div><div id='catch-list' style='display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:420px;overflow:auto;'></div>`;
+    updatePossible(null);
+
+    // actions footer (use shared footer area)
+    const footer = card.querySelector('.modal-foot');
+    const statusLabel = card.querySelector('#fish-status');
+    const stopBtn = document.createElement('button'); stopBtn.type = 'button'; stopBtn.className = 'btn btn-secondary'; stopBtn.textContent = 'Stop'; stopBtn.disabled = true;
+    const castBtn = document.createElement('button'); castBtn.type = 'button'; castBtn.className = 'btn btn-primary'; castBtn.textContent = 'Cast (Attempt)';
+    footer.appendChild(stopBtn); footer.appendChild(castBtn);
+    // ensure we have a reference to the modal close button
+    const closeBtn = card.querySelector('#fish-close');
+
+        // fishing attempt function factory will be created when Cast is pressed
+        let activePossible = null;
+
+        const safeRemoveOverlay = () => { try { if (this.fishingActive) this._stopFishingLoop(); } catch (e) {} try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {} };
+    if (closeBtn) closeBtn.onclick = () => { safeRemoveOverlay(); };
+
+        // Cast behavior
+        castBtn.addEventListener('click', () => {
+            try {
+                if (!selectedBait) { this._showToast && this._showToast('Select a bait first'); return; }
+                const have = (window && window.__shared_ui && window.__shared_ui.getQtyInSlots) ? window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), selectedBait) : (baitCounts[selectedBait] || 0);
+                if (!have || have <= 0) { this._showToast && this._showToast('No bait available'); return; }
+                // build possible now
+                activePossible = [];
+                const rarities = ['common','uncommon','rare','epic','legendary']; const rodRarity = (rodDef && rodDef.rarity) || 'common';
+                for (const fid of Object.keys(fishingDefs)) {
+                    const f = fishingDefs[fid]; if (!f) continue;
+                    if (f.allowedBaits && !f.allowedBaits.includes(selectedBait)) continue;
+                    if (rarities.indexOf(rodRarity) < rarities.indexOf(f.minRodRarity || 'common')) continue;
+                    activePossible.push(f);
+                }
+                if (!activePossible.length) { this._showToast && this._showToast('Nothing to catch with that bait/rod combo'); return; }
+
+                castBtn.disabled = true; stopBtn.disabled = false; if (statusLabel) statusLabel.textContent = 'Fishing...';
+
+                const tryOnce = () => {
+                    // ensure bait still present
+                    const qtyNow = (window && window.__shared_ui && window.__shared_ui.getQtyInSlots) ? window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), selectedBait) : (baitCounts[selectedBait] || 0);
+                    if (!qtyNow || qtyNow <= 0) { this._showToast && this._showToast('Out of bait.'); this._stopFishingLoop(); stopBtn.disabled = true; castBtn.disabled = false; if (statusLabel) statusLabel.textContent = 'Idle'; return; }
+                    // consume one bait
+                    try {
+                        if (window && window.__shared_ui && window.__shared_ui.removeItemFromInventory) window.__shared_ui.removeItemFromInventory(this, selectedBait, 1);
+                        else {
+                            const si = (this.char.inventory || []).findIndex(s => s && s.id === selectedBait);
+                            if (si >= 0) { const slot = this.char.inventory[si]; if (slot.qty && slot.qty > 1) slot.qty--; else this.char.inventory.splice(si,1); }
+                        }
+                        // persist change and update UI counts
+                        try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                        try { updateBaitCount(selectedBait, (window && window.__shared_ui && window.__shared_ui.getQtyInSlots) ? window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), selectedBait) : ((this.char.inventory || []).filter(s => s && s.id === selectedBait).reduce((s,x)=>s+(x.qty||1),0))); } catch (e) {}
+                    } catch (e) {}
+                    // prepare fishing XP container (XP will be awarded on fail or on success below)
+                    const fishing = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
+
+                    const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : null;
+                    const luk = (eff && typeof eff.luk === 'number') ? eff.luk : ((this.char && this.char.stats && this.char.stats.luk) || 0);
+                    const fishingSkill = (eff && typeof eff.fishingSkill === 'number') ? eff.fishingSkill : ((this.char && this.char.fishing && this.char.fishing.level) || 1);
+                    const rodSkillBonus = (rodDef && rodDef.fishingBonus && rodDef.fishingBonus.skill) ? rodDef.fishingBonus.skill : 0;
+                    const effectiveSkill = Math.max(0, fishingSkill + rodSkillBonus + Math.floor(luk * 0.2));
+
+                    const avgDiff = activePossible.reduce((s, x) => s + (x.difficulty || 10), 0) / Math.max(1, activePossible.length);
+                    const chanceAny = Math.max(0.05, Math.min(0.98, effectiveSkill / (effectiveSkill + avgDiff)));
+                    if (Math.random() > chanceAny) {
+                        this._showToast && this._showToast('no bite this time +1xp');
+                        // failed attempt still grants a small XP reward
+                        try {
+                            fishing.exp = (fishing.exp || 0) + 1;
+                            while (fishing.exp >= fishing.expToLevel) { fishing.exp -= fishing.expToLevel; fishing.level = (fishing.level || 1) + 1; fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800); }
+                            try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                        } catch (e) {}
+                        try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
+                        return;
+                    }
+
+                    // weighted pick
+                    const weights = []; let total = 0;
+                    for (const f of activePossible) {
+                        const base = (effectiveSkill / (effectiveSkill + (f.difficulty || 10)));
+                        const baitMod = (f.baitModifiers && f.baitModifiers[selectedBait]) ? f.baitModifiers[selectedBait] : 1;
+                        const w = Math.max(0.001, base * baitMod);
+                        weights.push({ fish: f, w }); total += w;
+                    }
+                    let pick = Math.random() * total; let chosen = null;
+                    for (const entry of weights) { pick -= entry.w; if (pick <= 0) { chosen = entry.fish; break; } }
+                    if (!chosen) chosen = weights.length ? weights[weights.length-1].fish : null;
+
+                    if (chosen) {
+                        const itemId = chosen.id; const itemDef = (window && window.ITEM_DEFS) ? window.ITEM_DEFS[itemId] : null; let added = false;
+                        try { if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) added = window.__shared_ui.addItemToInventory(this, itemId, 1); } catch (e) { added = false; }
+                        if (!added) { const invList = this.char.inventory = this.char.inventory || []; if (itemDef && itemDef.stackable) { let slot = invList.find(x => x && x.id === itemId); if (slot) slot.qty = (slot.qty || 0) + 1; else invList.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 }); } else { invList.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 }); } }
+                        // award XP equal to fish difficulty (clamped to at least 1)
+                        const xpGain = Math.max(1, (chosen.difficulty || chosen.baseValue || chosen.value || 1));
+                        fishing.exp = (fishing.exp || 0) + xpGain;
+                        while (fishing.exp >= fishing.expToLevel) { fishing.exp -= fishing.expToLevel; fishing.level = (fishing.level || 1) + 1; fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800); }
+                        try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                        this._showToast && this._showToast(`Caught ${chosen.name}! +${xpGain} fishing XP`, 2200);
+                        // visual confirmation: flash the caught fish in the Possible Catches list
+                        try {
+                            const fid = chosen.id;
+                            const row = card.querySelector(`#catch-list [data-fid='${fid}']`);
+                            if (row) {
+                                row.style.transition = 'background 180ms ease, transform 160ms ease';
+                                row.style.background = 'rgba(255,255,255,0.08)';
+                                row.style.transform = 'scale(1.01)';
+                                setTimeout(() => { try { row.style.background = ''; row.style.transform = ''; } catch (e) {} }, 420);
+                            }
+                        } catch (e) {}
+                        try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
+                        try { if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+                        try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
+                        try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                    }
+                };
+
+                // start loop
+                this._startFishingLoop(selectedBait, tryOnce);
+            } catch (ee) { console.error('Fishing start error', ee); castBtn.disabled = false; stopBtn.disabled = true; if (statusLabel) statusLabel.textContent = 'Idle'; }
+        });
+
+        // Stop button
+        stopBtn.addEventListener('click', () => {
+            try { this._stopFishingLoop(); stopBtn.disabled = true; castBtn.disabled = false; if (statusLabel) statusLabel.textContent = 'Idle'; } catch (e) { console.warn('Stop fishing failed', e); }
+        });
     }
 
     _depositBaitAndShowCatch(modal, baitId, rodDef, fishingDefs, baitCounts) {
@@ -502,6 +636,7 @@ export class BrokenDock extends Phaser.Scene {
             const base = effectiveSkill / (effectiveSkill + f.difficulty);
             const pct = Math.round(Math.max(1, Math.min(95, base * 100)));
             const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.marginBottom='6px';
+            row.dataset.fid = f.id || fid;
             row.innerHTML = `<div><strong>${f.name}</strong><div style='font-size:12px;opacity:0.9'>Difficulty: ${f.difficulty}</div></div><div style='text-align:right'><div style='font-weight:800;color:#ffd27a'>${pct}%</div><div style='font-size:12px;opacity:0.9'>Chance</div></div>`;
             body.appendChild(row);
         }
@@ -552,12 +687,13 @@ export class BrokenDock extends Phaser.Scene {
                                 const slot = inv[si]; if (slot.qty && slot.qty > 1) slot.qty = slot.qty - 1; else inv.splice(si, 1);
                             }
                         }
+                        // persist change and update UI counts
+                        try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                        try { updateBaitCount(selectedBait, (window && window.__shared_ui && window.__shared_ui.getQtyInSlots) ? window.__shared_ui.getQtyInSlots(window.__shared_ui.initSlots(this.char.inventory || []), selectedBait) : ((this.char.inventory || []).filter(s => s && s.id === selectedBait).reduce((s,x)=>s+(x.qty||1),0))); } catch (e) {}
                     } catch (e) {}
 
-                    // award 1 xp attempt
+                    // prepare fishing XP container (XP will be awarded on fail or on success below)
                     const fishing = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
-                    fishing.exp = (fishing.exp || 0) + 1;
-                    while (fishing.exp >= fishing.expToLevel) { fishing.exp -= fishing.expToLevel; fishing.level = (fishing.level || 1) + 1; fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800); }
 
                     // recompute dynamic stats
                     const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(this.char) : null;
@@ -569,7 +705,17 @@ export class BrokenDock extends Phaser.Scene {
                     const avgDiff = possibleNow.reduce((s, x) => s + (x.difficulty || 10), 0) / Math.max(1, possibleNow.length);
                     const chanceAny = Math.max(0.05, Math.min(0.98, effectiveSkill / (effectiveSkill + avgDiff)));
                     const roll = Math.random();
-                    if (roll > chanceAny) { this._showToast && this._showToast('No bite this time.'); try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {} try { if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {} return; }
+                    if (roll > chanceAny) {
+                        this._showToast && this._showToast('no bite this time +1xp');
+                        // failed attempt still grants a small XP reward
+                        try {
+                            fishing.exp = (fishing.exp || 0) + 1;
+                            while (fishing.exp >= fishing.expToLevel) { fishing.exp -= fishing.expToLevel; fishing.level = (fishing.level || 1) + 1; fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800); }
+                            try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                        } catch (e) {}
+                        try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {} try { if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+                        return;
+                    }
 
                     // pick fish by weighted chance
                     const weights = []; let total = 0;
@@ -587,10 +733,23 @@ export class BrokenDock extends Phaser.Scene {
                         const itemId = chosen.id; const itemDef = (window && window.ITEM_DEFS) ? window.ITEM_DEFS[itemId] : null; let added = false;
                         try { if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) added = window.__shared_ui.addItemToInventory(this, itemId, 1); } catch (e) { added = false; }
                         if (!added) { const inv = this.char.inventory = this.char.inventory || []; if (itemDef && itemDef.stackable) { let slot = inv.find(x => x && x.id === itemId); if (slot) slot.qty = (slot.qty || 0) + 1; else inv.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 }); } else { inv.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 }); } }
-                        const xpGain = Math.max(1, Math.round(((chosen.baseValue || chosen.value || 10) / 10)));
+                        // award XP equal to fish difficulty (clamped to at least 1)
+                        const xpGain = Math.max(1, (chosen.difficulty || chosen.baseValue || chosen.value || 1));
                         fishing.exp = (fishing.exp || 0) + xpGain;
                         while (fishing.exp >= fishing.expToLevel) { fishing.exp -= fishing.expToLevel; fishing.level = (fishing.level || 1) + 1; fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800); }
+                        try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
                         this._showToast && this._showToast(`Caught ${chosen.name}! +${xpGain} fishing XP`, 2200);
+                        // flash the caught fish in the results modal list if visible
+                        try {
+                            const fid = chosen.id;
+                            const row = cardRes.querySelector(`#fres-body [data-fid='${fid}']`);
+                            if (row) {
+                                row.style.transition = 'background 180ms ease, transform 160ms ease';
+                                row.style.background = 'rgba(255,255,255,0.08)';
+                                row.style.transform = 'scale(1.01)';
+                                setTimeout(() => { try { row.style.background = ''; row.style.transform = ''; } catch (e) {} }, 420);
+                            }
+                        } catch (e) {}
                         try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
                         try { if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
                         try { if (this._updateHUD) this._updateHUD(); } catch (e) {}

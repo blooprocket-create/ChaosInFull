@@ -94,7 +94,7 @@ export const ENEMY_DEFS = {
         damage: [8, 14],
         exp: 75,
         drops: [
-            { itemId: 'bronze_ore', minQty: 1, maxQty: 4, baseChance: 0.9, luckBonus: 0.0015 },
+            { itemId: 'bronze_bar', minQty: 1, maxQty: 4, baseChance: 0.9, luckBonus: 0.0015 },
             { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0006 },
             { itemId: 'copper_armor', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0006 }
         ]
@@ -113,7 +113,7 @@ export const ENEMY_DEFS = {
         damage: [15, 25],
         exp: 300,
         drops: [
-            { itemId: 'bronze_ore', minQty: 2, maxQty: 6, baseChance: 1.0, luckBonus: 0.002 },
+            { itemId: 'bronze_bar', minQty: 2, maxQty: 6, baseChance: 1.0, luckBonus: 0.002 },
             { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0012 }
         ]
         ,

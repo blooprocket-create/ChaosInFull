@@ -6,6 +6,11 @@ import { effectiveStats, makeStatPill, formatSkillLine, checkClassLevelUps } fro
 if (typeof document !== 'undefined' && !document.getElementById('shared-ui-styles')) {
     const s = document.createElement('style'); s.id = 'shared-ui-styles';
     s.innerHTML = `
+        /* Prevent horizontal scrollbars globally (and ensure modals don't cause page scroll) */
+        html, body { overflow-x: hidden !important; }
+        /* Also explicitly prevent horizontal scrolling inside overlay/modal elements */
+        .modal-overlay, .modal-card { overflow-x: hidden; }
+
         #inventory-modal, #equipment-modal, #stats-modal, #workbench-modal, #furnace-modal, #storage-modal { box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-family: Arial, Helvetica, sans-serif; }
         #inventory-modal button, #equipment-modal button, #stats-modal button, #workbench-modal button { transition: background 140ms ease, transform 120ms ease; }
         #inventory-modal button:hover, #equipment-modal button:hover, #stats-modal button:hover, #workbench-modal button:hover { transform: translateY(-2px); filter:brightness(1.05); }
