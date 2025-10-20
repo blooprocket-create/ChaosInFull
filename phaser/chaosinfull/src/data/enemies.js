@@ -151,6 +151,7 @@ export const ENEMY_DEFS = {
         exp: 10,
         drops: [
             { itemId: 'rat_tail', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 }
+            { itemId: 'rat_meat', minQty: 1, maxQty: 1, baseChance: 0.5, luckBonus: 0.0005 }
         ]
         ,
         gold: { min: 1, max: 2, chance: 0.75, luckBonus: 0.0008 }
@@ -169,6 +170,7 @@ export const ENEMY_DEFS = {
         drops: [
             { itemId: 'rat_tail', minQty: 1, maxQty: 3, baseChance: 0.95, luckBonus: 0.0012 },
             { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0005 }
+            { itemId: 'rat_meat', minQty: 1, maxQty: 1, baseChance: 0.4, luckBonus: 0.0004 }
         ]
         ,
         gold: { min: 2, max: 4, chance: 0.8, luckBonus: 0.001 }
@@ -187,7 +189,8 @@ export const ENEMY_DEFS = {
         drops: [
             { itemId: 'rat_tail', minQty: 2, maxQty: 4, baseChance: 1.0, luckBonus: 0.0015 },
             { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0008 },
-            { itemId: 'spectral_essence', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0007 }
+            { itemId: 'spectral_essence', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0007 },
+            { itemId: 'rat_meat', minQty: 1, maxQty: 1, baseChance: 0.4, luckBonus: 0.0004 }
         ]
         ,
         gold: { min: 6, max: 15, chance: 0.9, luckBonus: 0.0016 }
