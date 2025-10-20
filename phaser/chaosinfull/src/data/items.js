@@ -7,6 +7,7 @@ export const ITEM_DEFS = {
     'tin_ore': { id: 'tin_ore', name: 'Tin Ore', rarity: 'common', stackable: true, maxStack: 9999, description: 'A soft, panicked metal that melted before it could make better life choices.' },
     'copper_bar': { id: 'copper_bar', name: 'Copper Bar', rarity: 'common', stackable: true, maxStack: 9999, description: 'Forged from ore and broken promises. Good for crafting and dulling your enemies\' expectations.' },
     'bronze_bar': { id: 'bronze_bar', name: 'Bronze Bar', rarity: 'common', stackable: true, maxStack: 9999, description: 'Alloyed from two metals and one existential crisis. Holds together until it doesn\'t.' },
+    // Weapons and armor
     'copper_dagger': { id: 'copper_dagger', name: 'Copper Dagger', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [1,3], statBonus: { agi: 1 }, description: 'Sharp enough to ruin someone\'s day, but still mostly useful for opening suspiciously labeled crates.' },
     'bronze_dagger': { id: 'bronze_dagger', name: 'Bronze Dagger', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [2,4], statBonus: { agi: 1 }, description: 'A stabby object with commitment issues — looks menacing until it meets armor.' },
     'copper_armor': { id: 'copper_armor', name: 'Copper Armor', rarity: 'common', stackable: false, maxStack: 1, armor: true, defense: 3, description: 'Fashioned to protect you from insults and low-level goblin attacks. Slightly mismatched to your soul.' },
@@ -26,7 +27,7 @@ export const ITEM_DEFS = {
     'starter_staff': { id: 'starter_staff', name: 'Staff', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [1,1], statBonus: { int: 3 }, description: 'A stick with opinions. Channels magic and passive-aggressive commentary.' },
     'starter_dagger': { id: 'starter_dagger', name: 'Dagger', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [1,1], statBonus: { agi: 3 }, description: 'Small, angular, and excellent at popping egos and balloons.' },
     'starter_dice': { id: 'starter_dice', name: 'Dice in a Bag', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [1,1], statBonus: { luk: 3 }, description: 'Fate in soft, rattly form. Roll well and maybe the universe will owe you one.' },
-    // Slime drops
+    // Slime drops and items
     'slime_gel': { id: 'slime_gel', name: 'Slime Gel', rarity: 'common', stackable: true, maxStack: 999, description: 'Sticky residue left behind by common slimes. Smells faintly of regret and old socks.' },
     'slime_core': { id: 'slime_core', name: 'Glowing Slime Core', rarity: 'rare', stackable: true, maxStack: 99, description: 'A pulsing core that hums with condensed mana. Slightly warm, like a tiny sun of poor decisions.' },
     'slime_crown_shard': { id: 'slime_crown_shard', name: 'Royal Slime Crown Shard', rarity: 'epic', stackable: false, maxStack: 1, description: 'A fragment of a monarch slime crown. It radiates confidence and the faint whiff of tyranny.', statBonus: { luk: 2 } },
@@ -36,7 +37,10 @@ export const ITEM_DEFS = {
     'major_health_potion': { id: 'major_health_potion', name: 'Major Health Potion', rarity: 'uncommon', stackable: true, maxStack: 99, healAmount: 75, description: 'A large bottle of crimson concoction that smells like victory. Heals a significant portion of health.' },
     'minor_mana_potion': { id: 'minor_mana_potion', name: 'Minor Mana Potion', rarity: 'common', stackable: true, maxStack: 99, manaAmount: 15, description: 'A small vial of blue liquid that tastes like blueberry dreams. Restores a modest amount of mana.' },
     'major_mana_potion': { id: 'major_mana_potion', name: 'Major Mana Potion', rarity: 'uncommon', stackable: true, maxStack: 99, manaAmount: 60, description: 'A large bottle of azure elixir that smells like arcane triumph. Replenishes a significant portion of mana.' },
+    'blue_bull': { id: 'blue_bull', name: 'Blue Bull Energy Drink', rarity: 'common', stackable: true, maxStack: 50, description: 'A can of energy drink that promises to boost your stamina and focus. Side effects may include jitteriness and spontaneous dance outbreaks.' },
     // Quest items
     'strange_slime_egg': { id: 'strange_slime_egg', name: 'Strange Slime Egg', rarity: 'epic', stackable: false, maxStack: 1, description: 'An egg pulsating with mysterious energy. It\'s warm to the touch and occasionally jiggles on its own. What could be inside?' },
-    // Miscellaneous
+    // usage items
+    'teleport_scroll': { id: 'teleport_scroll', name: 'Teleportation Scroll', rarity: 'rare', stackable: true, maxStack: 10, description: 'A magical scroll that allows instant travel to a known location. Perfect for avoiding awkward social situations or dangerous monsters.' },
+    'bag_of_gold': { id: 'bag_of_gold', name: 'Bag of Gold', rarity: 'common', stackable: true, maxStack: 50, description: 'A hefty bag filled with gleaming gold coins. Heavy enough to make you feel wealthy, but light enough to carry without a mule.' }
 };

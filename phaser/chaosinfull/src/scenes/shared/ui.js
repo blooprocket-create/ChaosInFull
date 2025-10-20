@@ -68,13 +68,13 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
 
         /* Workbench specific */
         #workbench-modal { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .workbench-body { display:grid; grid-template-columns:160px minmax(0,1fr) 320px; gap:16px; height:100%; max-height:520px; }
-        .workbench-categories { gap:8px; overflow-y:auto; padding-right:4px; }
+        .workbench-body { display:grid; grid-template-columns:160px minmax(0,1fr) 320px; gap:16px; height:100%; max-height:520px; align-items:stretch; }
+        .workbench-categories { display:flex; flex-direction:column; gap:10px; overflow-y:auto; background:rgba(0,0,0,0.22); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:12px; }
         .wb-cat-btn { border:none; border-radius:12px; padding:10px 12px; background:rgba(255,255,255,0.05); color:#dcdcdc; font-weight:600; text-align:left; cursor:pointer; transition:background 150ms ease, transform 120ms ease; }
         .wb-cat-btn:hover { background:rgba(255,255,255,0.12); transform:translateX(2px); }
         .wb-cat-btn.is-active { background:#6b8f4a; color:#fff; box-shadow:0 8px 22px rgba(107,143,74,0.26); }
 
-        .workbench-recipes { gap:10px; overflow-y:auto; padding-right:6px; }
+        .workbench-recipes { display:flex; flex-direction:column; gap:10px; overflow-y:auto; background:rgba(0,0,0,0.18); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:12px; }
         .wb-recipe-btn { border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:10px 12px; background:rgba(255,255,255,0.04); color:#f7f7f7; display:flex; flex-direction:column; align-items:flex-start; gap:4px; cursor:pointer; transition:border-color 140ms ease, background 140ms ease, transform 120ms ease; }
         .wb-recipe-btn:hover:not(:disabled) { border-color:rgba(255,210,122,0.35); background:rgba(255,210,122,0.12); transform:translateY(-1px); }
         .wb-recipe-btn.is-active { border-color:rgba(255,210,122,0.6); background:rgba(255,210,122,0.16); box-shadow:0 10px 26px rgba(255,210,122,0.18); }
@@ -95,13 +95,13 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
         .workbench-categories::-webkit-scrollbar-thumb,
         .workbench-details::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.14); border-radius:999px; }
 
-        .workbench-details { gap:12px; background:rgba(0,0,0,0.28); border-radius:16px; padding:14px; overflow-y:auto; }
+        .workbench-details { gap:12px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:14px; overflow-y:auto; }
         .workbench-recipe-header { display:flex; flex-direction:column; gap:4px; }
         .workbench-recipe-header .workbench-recipe-title { font-size:18px; font-weight:800; color:#fff; }
         .workbench-recipe-header .workbench-recipe-sub { font-size:13px; color:rgba(255,255,255,0.72); display:flex; gap:10px; flex-wrap:wrap; }
         .workbench-section-heading { font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255,255,255,0.58); }
         .workbench-reqs { display:flex; flex-direction:column; gap:8px; }
-        .wb-req { border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:10px 12px; background:rgba(255,255,255,0.04); display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:border-color 140ms ease, background 140ms ease, transform 120ms ease; text-align:left; }
+        .wb-req { border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:10px 12px; background:rgba(255,255,255,0.04); display:flex; justify-content:space-between; align-items:center; cursor:default; transition:border-color 140ms ease, background 140ms ease, transform 120ms ease; text-align:left; }
         .wb-req:hover { transform:translateY(-1px); }
         .wb-req:disabled { cursor:not-allowed; opacity:0.55; transform:none; }
         .wb-req.is-ready { border-color:rgba(107,143,74,0.55); background:rgba(107,143,74,0.18); }
@@ -551,3 +551,5 @@ export function reconcileEquipmentBonuses(scene) {
 
 // expose stats helpers to the shared UI export so callers can compute effective stats
 export const stats = { effectiveStats, makeStatPill, formatSkillLine, checkClassLevelUps };
+
+
