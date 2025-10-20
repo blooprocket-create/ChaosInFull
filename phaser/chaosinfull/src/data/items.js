@@ -103,6 +103,8 @@ export const ITEM_DEFS = {
     'seaweed': { id: 'seaweed', name: 'Seaweed', rarity: 'common', stackable: true, maxStack: 100, value: 3, description: 'Fresh seaweed harvested from the ocean. Can be eaten raw or used in cooking.' },
     'dried_seaweed': { id: 'dried_seaweed', name: 'Dried Seaweed', rarity: 'common', stackable: true, maxStack: 100, value: 9, healAmount: 15, usable: true, description: 'Seaweed that has been dried for preservation. Restores a small amount of health when eaten.' },
     'kelp_salad': { id: 'kelp_salad', name: 'Kelp Salad', rarity: 'uncommon', stackable: true, maxStack: 50, value: 20, healAmount: 40, usable: true, description: 'A fresh salad made from kelp and other sea vegetables. Restores a moderate amount of health when eaten.' },
+    'burnt_fish': { id: 'burnt_fish', name: 'Burnt Fish', rarity: 'common', stackable: true, maxStack: 50, value: 1, healAmount: 5, usable: true, description: 'A fish that has been overcooked to the point of being inedible. Restores a tiny amount of health when eaten, mostly just disappointment.' },
+    'burnt_meat': { id: 'burnt_meat', name: 'Burnt Meat', rarity: 'common', stackable: true, maxStack: 50, value: 1, healAmount: 5, usable: true, description: 'Meat that has been charred beyond recognition. Restores a tiny amount of health when eaten, mostly just regret.' },
 
     // Fishing bait
     'worm_bait': { id: 'worm_bait', name: 'Worm Bait', rarity: 'common', stackable: true, maxStack: 200, value: 25, description: 'A wriggling worm, perfect for attracting common fish.' },

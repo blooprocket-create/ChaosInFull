@@ -261,8 +261,105 @@ export class BrokenDock extends Phaser.Scene {
             row.innerHTML = `<div><strong>${f.name}</strong><div style='font-size:12px;opacity:0.9'>Difficulty: ${f.difficulty}</div></div><div style='text-align:right'><div style='font-weight:800;color:#ffd27a'>${pct}%</div><div style='font-size:12px;opacity:0.9'>Chance</div></div>`;
             body.appendChild(row);
         }
+        // add Cast button to perform the actual fishing attempt (bait already removed earlier)
+        const actions = document.createElement('div'); actions.style.display = 'flex'; actions.style.justifyContent = 'flex-end'; actions.style.gap = '8px'; actions.style.marginTop = '10px';
+        const castBtn = document.createElement('button'); castBtn.type = 'button'; castBtn.className = 'btn btn-primary'; castBtn.textContent = 'Cast (Attempt)';
+        const closeBtn = document.createElement('button'); closeBtn.type = 'button'; closeBtn.className = 'btn btn-ghost'; closeBtn.textContent = 'Close';
+        actions.appendChild(closeBtn); actions.appendChild(castBtn);
+        body.appendChild(actions);
+
+        // Perform the fishing attempt when Cast clicked
+        castBtn.addEventListener('click', () => {
+            try {
+                castBtn.disabled = true;
+                // Award 1 XP per attempt
+                const fishing = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
+                fishing.exp = (fishing.exp || 0) + 1;
+                while (fishing.exp >= fishing.expToLevel) {
+                    fishing.exp -= fishing.expToLevel;
+                    fishing.level = (fishing.level || 1) + 1;
+                    fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25);
+                    this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800);
+                }
+
+                // recompute effective skill and chance
+                const effectiveSkill = Math.max(0, fishingSkill + rodSkillBonus + Math.floor(luk * 0.2));
+                // average difficulty for miss chance
+                const avgDiff = possible.reduce((s, x) => s + (x.difficulty || 10), 0) / Math.max(1, possible.length);
+                const chanceAny = Math.max(0.05, Math.min(0.98, effectiveSkill / (effectiveSkill + avgDiff)));
+                const roll = Math.random();
+                if (roll > chanceAny) {
+                    this._showToast && this._showToast('No bite this time.');
+                    try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
+                    try { if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+                    // close result modal and fishing modal
+                    if (res.parentNode) res.parentNode.removeChild(res);
+                    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+                    return;
+                }
+
+                // pick a fish by weighted chance (weight = skillFactor * baitModifier)
+                const weights = [];
+                let total = 0;
+                for (const f of possible) {
+                    const base = (effectiveSkill / (effectiveSkill + (f.difficulty || 10)));
+                    const baitMod = (f.baitModifiers && f.baitModifiers[baitId]) ? f.baitModifiers[baitId] : 1;
+                    const w = Math.max(0.001, base * baitMod);
+                    weights.push({ fish: f, w }); total += w;
+                }
+                // normalize and choose
+                let pick = Math.random() * total; let chosen = null;
+                for (const entry of weights) { pick -= entry.w; if (pick <= 0) { chosen = entry.fish; break; } }
+                if (!chosen) chosen = weights.length ? weights[weights.length - 1].fish : null;
+
+                if (chosen) {
+                    // grant item to inventory
+                    const itemId = chosen.id;
+                    const itemDef = (window && window.ITEM_DEFS) ? window.ITEM_DEFS[itemId] : null;
+                    let added = false;
+                    try {
+                        if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
+                            added = window.__shared_ui.addItemToInventory(this, itemId, 1);
+                        }
+                    } catch (e) { added = false; }
+                    if (!added) {
+                        const inv = this.char.inventory = this.char.inventory || [];
+                        if (itemDef && itemDef.stackable) {
+                            let slot = inv.find(x => x && x.id === itemId);
+                            if (slot) slot.qty = (slot.qty || 0) + 1; else inv.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 });
+                        } else {
+                            inv.push({ id: itemId, name: (itemDef && itemDef.name) || itemId, qty: 1 });
+                        }
+                    }
+
+                    // award fish XP based on baseValue
+                    const xpGain = Math.max(1, Math.round(((chosen.baseValue || chosen.value || 10) / 10)));
+                    fishing.exp = (fishing.exp || 0) + xpGain;
+                    while (fishing.exp >= fishing.expToLevel) {
+                        fishing.exp -= fishing.expToLevel;
+                        fishing.level = (fishing.level || 1) + 1;
+                        fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25);
+                        this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 1800);
+                    }
+
+                    this._showToast && this._showToast(`Caught ${chosen.name}! +${xpGain} fishing XP`, 2200);
+                    try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
+                    try { if (this._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+                    try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
+                    try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
+                }
+
+                // close modals after attempt
+                if (res.parentNode) res.parentNode.removeChild(res);
+                if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+            } catch (ee) {
+                console.error('Fishing attempt error', ee);
+                castBtn.disabled = false;
+            }
+        });
+
+        closeBtn.addEventListener('click', () => { if (res.parentNode) res.parentNode.removeChild(res); if (modal && modal.parentNode) modal.parentNode.removeChild(modal); });
         document.body.appendChild(res);
-        res.querySelector('#fres-close').onclick = () => { if (res.parentNode) res.parentNode.removeChild(res); if (modal && modal.parentNode) modal.parentNode.removeChild(modal); };
     }
 
     _showToast(text, timeout = 1600) {

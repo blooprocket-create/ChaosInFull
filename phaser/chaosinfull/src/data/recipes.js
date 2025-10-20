@@ -22,7 +22,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_rat_meat',
         name: 'Cooked Rat Meat',
         tool: 'furnace',
-        category: 'food',
+        category: 'meat',
         requires: [ { id: 'rat_meat', qty: 1 } ],
         reqLevel: 1,
         cookingXp: 8
@@ -31,7 +31,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_minnow',
         name: 'Cooked Minnow',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'minnow', qty: 1 } ],
         reqLevel: 1,
         cookingXp: 8
@@ -40,7 +40,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_salmon',
         name: 'Cooked Salmon',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'salmon', qty: 1 } ],
         reqLevel: 5,
         cookingXp: 40
@@ -49,7 +49,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_tuna',
         name: 'Cooked Tuna',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'tuna', qty: 1 } ],
         reqLevel: 5,
         cookingXp: 42
@@ -58,7 +58,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_bass',
         name: 'Cooked Bass',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'bass', qty: 1 } ],
         reqLevel: 3,
         cookingXp: 18
@@ -67,7 +67,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_mackerel',
         name: 'Cooked Mackerel',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'mackerel', qty: 1 } ],
         reqLevel: 2,
         cookingXp: 12
@@ -76,7 +76,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_sardine',
         name: 'Cooked Sardine',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'sardine', qty: 1 } ],
         reqLevel: 1,
         cookingXp: 8
@@ -85,7 +85,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_anchovy',
         name: 'Cooked Anchovy',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'anchovy', qty: 1 } ],
         reqLevel: 1,
         cookingXp: 8
@@ -94,7 +94,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_herring',
         name: 'Cooked Herring',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'herring', qty: 1 } ],
         reqLevel: 1,
         cookingXp: 10
@@ -103,7 +103,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_catfish',
         name: 'Cooked Catfish',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'catfish', qty: 1 } ],
         reqLevel: 4,
         cookingXp: 30
@@ -112,7 +112,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_crab',
         name: 'Cooked Crab',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'crab', qty: 1 } ],
         reqLevel: 4,
         cookingXp: 32
@@ -121,7 +121,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_lobster',
         name: 'Cooked Lobster',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'lobster', qty: 1 } ],
         reqLevel: 6,
         cookingXp: 45
@@ -130,7 +130,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_marlin',
         name: 'Cooked Marlin',
         tool: 'furnace',
-        category: 'food',
+        category: 'fish',
         requires: [ { id: 'marlin', qty: 1 } ],
         reqLevel: 10,
         cookingXp: 120
@@ -139,7 +139,7 @@ export const RECIPE_DEFS = {
         id: 'cooked_giant_turtle',
         name: 'Cooked Giant Turtle',
         tool: 'furnace',
-        category: 'food',
+        category: 'meat',
         requires: [ { id: 'giant_turtle', qty: 1 } ],
         reqLevel: 12,
         cookingXp: 160
