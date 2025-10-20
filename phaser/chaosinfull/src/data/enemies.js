@@ -116,6 +116,54 @@ export const ENEMY_DEFS = {
             { itemId: 'copper_ore', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 },
             { itemId: 'copper_dagger', minQty: 1, maxQty: 1, baseChance: 0.015, luckBonus: 0.0005 }
         ]
+    },
+    rat: {
+        id: 'rat',
+        name: 'Giant Rat',
+        tier: 'common',
+        level: 1,
+        maxhp: 30,
+        moveSpeed: 70,
+        attackRange: 30,
+        attackCooldown: 1500,
+        damage: [2, 4],
+        exp: 10,
+        drops: [
+            { itemId: 'rat_tail', minQty: 1, maxQty: 2, baseChance: 0.9, luckBonus: 0.001 }
+        ]
+    },
+    zombie_rat: {
+        id: 'zombie_rat',
+        name: 'Zombie Rat',
+        tier: 'uncommon',
+        level: 2,
+        maxhp: 40,
+        moveSpeed: 60,
+        attackRange: 30,
+        attackCooldown: 1400,
+        damage: [3, 5],
+        exp: 15,
+        drops: [
+            { itemId: 'rat_tail', minQty: 1, maxQty: 3, baseChance: 0.95, luckBonus: 0.0012 },
+            { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.02, luckBonus: 0.0005 }
+        ]
+    },
+    ghost_rat: {
+        id: 'ghost_rat',
+        name: 'Ghost Rat',
+        tier: 'rare',
+        level: 5,
+        maxhp: 80,
+        moveSpeed: 80,
+        attackRange: 35,
+        attackCooldown: 1300,
+        damage: [6, 10],
+        exp: 40,
+        drops: [
+            { itemId: 'rat_tail', minQty: 2, maxQty: 4, baseChance: 1.0, luckBonus: 0.0015 },
+            { itemId: 'rotting_fang', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0008 },
+            { itemId: 'spectral_essence', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0007 }
+        ]
     }
 };
 

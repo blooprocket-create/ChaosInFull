@@ -22,6 +22,7 @@ export const ITEM_DEFS = {
     'bronze_legs': { id: 'bronze_legs', name: 'Bronze Leggings', rarity: 'uncommon', stackable: false, maxStack: 1, armor: true, defense: 4, description: 'Sturdy leggings that provide solid defense. Ideal for adventurers who take their legwear seriously.' },
     'copper_boots': { id: 'copper_boots', name: 'Copper Boots', rarity: 'common', stackable: false, maxStack: 1, armor: true, defense: 2, description: 'Basic boots that offer minimal protection. Great for those who want to look the part without risking too much.' },
     'bronze_boots': { id: 'bronze_boots', name: 'Bronze Boots', rarity: 'uncommon', stackable: false, maxStack: 1, armor: true, defense: 4, description: 'Sturdy boots that provide solid defense. Ideal for adventurers who take their footwear seriously.' },
+    'sticky_dice': { id: 'sticky_dice', name: 'Sticky Dice', rarity: 'uncommon', stackable: false, maxStack: 1, weapon: true, damage: [2,5], statBonus: { luk: 2 }, description: 'A pair of dice that seem to favor the user. Perfect for those who believe in luck and the occasional rigged game.' },
     // Starter weapons (used as item defs for starting choices)
     'starter_sword': { id: 'starter_sword', name: 'Sword', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [1,1], statBonus: { str: 3 }, description: 'Your first lesson in brutally honest conflict resolution. Also great for slicing cake.' },
     'starter_staff': { id: 'starter_staff', name: 'Staff', rarity: 'common', stackable: false, maxStack: 1, weapon: true, damage: [1,1], statBonus: { int: 3 }, description: 'A stick with opinions. Channels magic and passive-aggressive commentary.' },
@@ -32,6 +33,14 @@ export const ITEM_DEFS = {
     'slime_core': { id: 'slime_core', name: 'Glowing Slime Core', rarity: 'rare', stackable: true, maxStack: 99, description: 'A pulsing core that hums with condensed mana. Slightly warm, like a tiny sun of poor decisions.' },
     'slime_crown_shard': { id: 'slime_crown_shard', name: 'Royal Slime Crown Shard', rarity: 'epic', stackable: false, maxStack: 1, description: 'A fragment of a monarch slime crown. It radiates confidence and the faint whiff of tyranny.', statBonus: { luk: 2 } },
     'slime_whip': { id: 'slime_whip', name: 'Gel Lash', rarity: 'rare', stackable: false, maxStack: 1, weapon: true, damage: [3,6], statBonus: { agi: 2, luk: 1 }, description: 'A whip that slaps enemies and occasionally apologizes in gooey tones.' },
+    // Rat drops and items
+    'rat_tail': { id: 'rat_tail', name: 'Rat Tail', rarity: 'common', stackable: true, maxStack: 99, description: 'A scruffy tail from a common rat. Surprisingly flexible and mildly unsettling.' },
+    'rotting_fang': { id: 'rotting_fang', name: 'Rotting Fang', rarity: 'uncommon', stackable: true, maxStack: 99, description: 'A fang that has been left to rot. It\'s sharp and slightly toxic.' },
+    'spectral_essence': { id: 'spectral_essence', name: 'Spectral Essence', rarity: 'rare', stackable: true, maxStack: 99, description: 'A ghostly essence that crackles with otherworldly energy. It\'s faintly cold and gives off an eerie glow.' },
+    // Wooden Items
+    'normal_log': { id: 'normal_log', name: 'Normal Log', rarity: 'common', stackable: true, maxStack: 999, description: 'A sturdy log, perfect for building fires or impromptu furniture.' },
+    'oak_log': { id: 'oak_log', name: 'Oak Log', rarity: 'uncommon', stackable: true, maxStack: 999, description: 'A strong oak log, ideal for crafting durable items and structures.' },
+    'green_staff': { id: 'green_staff', name: 'Green Staff', rarity: 'uncommon', stackable: false, maxStack: 1, weapon: true, damage: [2,4], statBonus: { int: 2 }, description: 'A staff imbued with the essence of nature. It hums softly and feels alive to the touch.' },
     // Health and mana items
     'minor_health_potion': { id: 'minor_health_potion', name: 'Minor Health Potion', rarity: 'common', stackable: true, maxStack: 99, healAmount: 20, description: 'A small vial of red liquid that tastes like cherry-flavored hope. Restores a modest amount of health.' },
     'major_health_potion': { id: 'major_health_potion', name: 'Major Health Potion', rarity: 'uncommon', stackable: true, maxStack: 99, healAmount: 75, description: 'A large bottle of crimson concoction that smells like victory. Heals a significant portion of health.' },

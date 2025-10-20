@@ -126,6 +126,7 @@ export function refreshWorkbench(scene) {
     if (!scene._workbenchModal) return;
     renderCategories(scene);
     renderRecipeColumn(scene);
+    updateCraftProgress(scene, scene._workbenchActiveCraft);
 }
 
 export function cancelWorkbench(scene, silent = false) {
@@ -150,6 +151,7 @@ export function cancelWorkbench(scene, silent = false) {
     state.countManual = false;
     const newMax = getCraftableCount(scene, active.recipe);
     state.count = Math.max(1, Math.min(state.count || 1, newMax || 1));
+    updateCraftProgress(scene, null);
     refreshWorkbench(scene);
 }
 
@@ -159,31 +161,11 @@ function renderCategories(scene) {
     if (!catsEl) return;
     const state = getWorkbenchState(scene);
     const recipes = getRecipeDefs();
-    const categoryMap = new Map();
-    for (const key of Object.keys(recipes || {})) {
-        const recipe = recipes[key];
-        if (!recipe || recipe.tool !== 'workbench') continue;
-        const normalized = normalizeCategory(recipe.category);
-        if (!categoryMap.has(normalized)) {
-            const raw = (typeof recipe.category === 'string' && recipe.category.trim().length)
-                ? recipe.category.trim()
-                : normalized;
-            const label = raw.charAt(0).toUpperCase() + raw.slice(1);
-            categoryMap.set(normalized, label);
-        }
-    }
-    const categories = Array.from(categoryMap.keys());
-    const preferred = ['weapon', 'armor', 'helm', 'boots', 'legs', 'rings', 'amulets', 'misc'];
-    categories.sort((a, b) => {
-        const ai = preferred.indexOf(a);
-        const bi = preferred.indexOf(b);
-        if (ai === -1 && bi === -1) return a.localeCompare(b);
-        if (ai === -1) return 1;
-        if (bi === -1) return -1;
-        return ai - bi;
-    });
+    const { ordered, labels } = buildCategoryData(recipes);
+    state.categoryLabels = labels;
+
     catsEl.innerHTML = '';
-    if (!categories.length) {
+    if (!ordered.length) {
         const empty = document.createElement('div');
         empty.className = 'workbench-alert';
         empty.textContent = 'No workbench recipes unlocked yet.';
@@ -191,15 +173,17 @@ function renderCategories(scene) {
         state.selectedCategory = null;
         return;
     }
-    if (!state.selectedCategory || !categoryMap.has(state.selectedCategory)) {
-        state.selectedCategory = categories[0];
+
+    if (!state.selectedCategory || !labels[state.selectedCategory]) {
+        state.selectedCategory = ordered[0];
     }
-    categories.forEach((category) => {
+
+    ordered.forEach((category) => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'wb-cat-btn';
         if (category === state.selectedCategory) btn.classList.add('is-active');
-        const label = categoryMap.get(category) || (category.charAt(0).toUpperCase() + category.slice(1));
+        const label = labels[category] || toTitleCase(category);
         btn.textContent = label;
         btn.addEventListener('click', () => {
             const activeCat = (scene._workbenchActiveCraft && scene._workbenchActiveCraft.recipe)
@@ -213,11 +197,60 @@ function renderCategories(scene) {
             state.selectedRecipe = null;
             state.countManual = false;
             updateMessage(scene, '');
-            renderCategories(scene);
             refreshWorkbench(scene);
         });
         catsEl.appendChild(btn);
     });
+}
+
+function buildCategoryData(recipes) {
+    const map = new Map();
+    for (const key of Object.keys(recipes || {})) {
+        const recipe = recipes[key];
+        if (!recipe || recipe.tool !== 'workbench') continue;
+        const normalized = normalizeCategory(recipe.category);
+        if (!map.has(normalized)) {
+            map.set(normalized, { label: formatCategoryLabel(normalized, recipe.category), count: 0 });
+        }
+        map.get(normalized).count += 1;
+    }
+    const preferred = ['weapon', 'armor', 'helm', 'boots', 'legs', 'rings', 'amulets', 'misc'];
+    const preferredSet = new Set(preferred);
+    const ordered = preferred.filter(cat => map.has(cat));
+    const extras = [];
+    map.forEach((value, key) => {
+        if (!preferredSet.has(key)) extras.push(key);
+    });
+    extras.sort((a, b) => {
+        const labelA = map.get(a)?.label || toTitleCase(a);
+        const labelB = map.get(b)?.label || toTitleCase(b);
+        return labelA.localeCompare(labelB);
+    });
+    const labels = {};
+    map.forEach((value, key) => { labels[key] = value.label; });
+    return { ordered: ordered.concat(extras), labels };
+}
+
+function formatCategoryLabel(normalized, raw) {
+    if (raw && typeof raw === 'string' && raw.trim().length) {
+        return toTitleCase(raw.trim());
+    }
+    switch (normalized) {
+        case 'weapon': return 'Weapons';
+        case 'armor': return 'Armor';
+        case 'helm': return 'Helms';
+        case 'boots': return 'Boots';
+        case 'legs': return 'Legs';
+        case 'rings': return 'Rings';
+        case 'amulets': return 'Amulets';
+        case 'misc':
+        default:
+            return 'Misc';
+    }
+}
+
+function toTitleCase(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
 function renderRecipeColumn(scene) {
@@ -474,7 +507,6 @@ function renderDetails(scene, recipe) {
     progress.id = 'workbench-progress';
     progress.className = 'workbench-progress';
     details.appendChild(progress);
-    if (active && active.recipe && active.recipe.id === recipe.id) active.progressContainer = progress;
 
     const actions = document.createElement('div');
     actions.className = 'workbench-actions';
@@ -758,6 +790,19 @@ function countInventoryItems(scene, itemId) {
         if (slot && slot.id === itemId) total += slot.qty || 1;
     }
     return total;
+}
+
+function updateCraftProgress(scene, active) {
+    if (!scene || !scene._workbenchModal) return;
+    const progressEl = scene._workbenchModal.querySelector('#workbench-progress');
+    if (!progressEl) return;
+    if (!active || active.cancelled || active.remaining <= 0) {
+        progressEl.innerHTML = '';
+        return;
+    }
+    const completed = active.total - active.remaining;
+    const total = active.total;
+    progressEl.innerHTML = `<div class="workbench-progress-text">Crafting… ${completed}/${total} complete</div>`;
 }
 
 function updateMessage(scene, text = '', tone) {

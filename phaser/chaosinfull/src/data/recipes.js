@@ -144,5 +144,23 @@ export const RECIPE_DEFS = {
         requires: [ { id: 'slime_core', qty: 1 }, { id: 'slime_gel', qty: 5 }, { id: 'copper_bar', qty: 1 } ],
         reqLevel: 5,
         smithingXp: 180
-    }
+    },
+    'sticky_dice': {
+        id: 'sticky_dice',
+        name: 'Sticky Dice',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'slime_core', qty: 6 }, { id: 'slime_gel', qty: 6 } ],
+        reqLevel: 5,
+        smithingXp: 250
+    },
+    'green_staff': {
+        id: 'green_staff',
+        name: 'Green Staff',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'slime_core', qty: 1 }, { id: 'spectral_essence', qty: 3 }, { id: 'normal_log', qty: 3 } ],
+        reqLevel: 5,
+        smithingXp: 150
+    },
 };
