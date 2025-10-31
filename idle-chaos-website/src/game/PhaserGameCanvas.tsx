@@ -19,6 +19,33 @@ export default function PhaserGameCanvas({
     // Initialize the Phaser game
     const initGame = async () => {
       try {
+        // Defensive: clean up any lingering global UI from a previous session before starting
+        try {
+          if (typeof document !== 'undefined') {
+            const ids = [
+              'global-skill-bar',
+              'shared-item-tooltip',
+              'shared-skill-tooltip',
+              'shared-stat-tooltip',
+              'inventory-modal',
+              'equipment-modal',
+              'stats-modal',
+              'workbench-modal',
+              'furnace-modal',
+              'storage-modal',
+              'settings-modal',
+            ];
+            for (const id of ids) {
+              const el = document.getElementById(id);
+              if (el && el.parentNode) el.parentNode.removeChild(el);
+            }
+            // Remove any generic modal overlays left behind
+            document.querySelectorAll('.modal-overlay').forEach((n) => {
+              try { n.parentNode && n.parentNode.removeChild(n); } catch {}
+            });
+          }
+        } catch {}
+
         const game = await createPhaserGame({
           parent: ref.current!,
           character,
@@ -60,12 +87,38 @@ export default function PhaserGameCanvas({
       }
       gameRef.current?.destroy(true);
       gameRef.current = null;
+      // Aggressively clean up any DOM UI created outside the canvas (HUD, modals, tooltips, skill bar)
+      try {
+        if (typeof document !== 'undefined') {
+          const ids = [
+            'global-skill-bar',
+            'shared-item-tooltip',
+            'shared-skill-tooltip',
+            'shared-stat-tooltip',
+            'inventory-modal',
+            'equipment-modal',
+            'stats-modal',
+            'workbench-modal',
+            'furnace-modal',
+            'storage-modal',
+            'settings-modal',
+          ];
+          for (const id of ids) {
+            const node = document.getElementById(id);
+            if (node && node.parentNode) node.parentNode.removeChild(node);
+          }
+          document.querySelectorAll('.modal-overlay').forEach((n) => {
+            try { n.parentNode && n.parentNode.removeChild(n); } catch {}
+          });
+        }
+      } catch {}
     };
   }, [character, initialScene]);
 
   return (
     <div 
-      ref={ref} 
+      ref={ref}
+      id="game-container"
       className="relative rounded-xl border border-white/10 overflow-hidden"
       style={{ 
         width: "100%", 
