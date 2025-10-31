@@ -66,7 +66,7 @@ export default async function RootLayout({
               <Link href="/news" className="hover:text-white nav-underline">News</Link>
               <Link href="/classes" className="hover:text-white nav-underline">Classes</Link>
               <Link href="/world" className="hover:text-white nav-underline">World</Link>
-              <Link href="/phaser" className="hover:text-white nav-underline">Veil Keeper</Link>
+              <Link href="/phaser" className="hover:text-white nav-underline">Play</Link>
               <Link href="/about" className="hover:text-white nav-underline">About</Link>
               <div className="hidden sm:block"><AudioToggle /></div>
               <NavAuth initial={session} />
