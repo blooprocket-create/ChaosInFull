@@ -7,6 +7,14 @@ export interface ClassArchetype {
   synopsis: string;
   blurb: string;
   color: string; // tailwind gradient from-*
+  // Optional stat hints (from game data)
+  base?: { str?: number; int?: number; agi?: number; luk?: number };
+  perLevel?: { str?: number; int?: number; agi?: number; luk?: number };
+  talentsByTab?: Array<{
+    tabId: string;
+    label: string;
+    talents: Array<{ id: string; name: string; kind?: string; activeType?: string; description?: string }>;
+  }>;
   paths: Array<{
     key: string;
     name: string;
@@ -68,12 +76,17 @@ export const archetypes: ClassArchetype[] = [
   },
 ];
 
-export default function ClassesExplorer() {
-  const [active, setActive] = useState<ClassArchetype>(archetypes[0]);
+export interface ClassesExplorerProps {
+  data?: ClassArchetype[];
+}
+
+export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
+  const dataList = (props.data && props.data.length ? props.data : archetypes);
+  const [active, setActive] = useState<ClassArchetype>(dataList[0]);
   const [activePathKey, setActivePathKey] = useState<string | null>(null);
   const activePath = active.paths.find(p => p.key === activePathKey) || null;
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeIndex = useMemo(() => archetypes.findIndex(a => a.key === active.key), [active]);
+  const activeIndex = useMemo(() => dataList.findIndex(a => a.key === active.key), [active, dataList]);
   // Keyboard navigation between archetypes and paths
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -82,12 +95,12 @@ export default function ClassesExplorer() {
       if (tag === "input" || tag === "textarea") return;
       if (e.key === "ArrowUp" || e.key === "w") {
         e.preventDefault();
-        const next = (activeIndex - 1 + archetypes.length) % archetypes.length;
-        setActive(archetypes[next]); setActivePathKey(null);
+        const next = (activeIndex - 1 + dataList.length) % dataList.length;
+        setActive(dataList[next]); setActivePathKey(null);
       } else if (e.key === "ArrowDown" || e.key === "s") {
         e.preventDefault();
-        const next = (activeIndex + 1) % archetypes.length;
-        setActive(archetypes[next]); setActivePathKey(null);
+        const next = (activeIndex + 1) % dataList.length;
+        setActive(dataList[next]); setActivePathKey(null);
       } else if (e.key === "ArrowRight" || e.key === "d") {
         if (!active.paths.length) return;
         e.preventDefault();
@@ -106,11 +119,11 @@ export default function ClassesExplorer() {
     el.tabIndex = 0;
     el.focus({ preventScroll: true });
     return () => el.removeEventListener("keydown", onKey);
-  }, [activeIndex, active, activePathKey]);
+  }, [activeIndex, active, activePathKey, dataList]);
   return (
     <div ref={containerRef} className="mt-8 grid lg:grid-cols-12 gap-6">
       <div className="lg:col-span-5 space-y-4">
-        {archetypes.map(a => {
+        {dataList.map(a => {
           const selected = a.key === active.key;
           return (
             <button
@@ -165,6 +178,56 @@ export default function ClassesExplorer() {
             )}
           </div>
         </div>
+        {(active.base || active.perLevel) && (
+          <div className="rounded-lg bg-black/30 border border-white/10 p-4">
+            <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Stats</div>
+            <div className="grid grid-cols-2 gap-4 text-xs text-gray-300">
+              <div>
+                <div className="text-gray-400 mb-1">Base</div>
+                <ul className="space-y-0.5">
+                  <li>STR: {active.base?.str ?? 0}</li>
+                  <li>INT: {active.base?.int ?? 0}</li>
+                  <li>AGI: {active.base?.agi ?? 0}</li>
+                  <li>LUK: {active.base?.luk ?? 0}</li>
+                </ul>
+              </div>
+              <div>
+                <div className="text-gray-400 mb-1">Per Level</div>
+                <ul className="space-y-0.5">
+                  <li>STR: {active.perLevel?.str ?? 0}</li>
+                  <li>INT: {active.perLevel?.int ?? 0}</li>
+                  <li>AGI: {active.perLevel?.agi ?? 0}</li>
+                  <li>LUK: {active.perLevel?.luk ?? 0}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+        {active.talentsByTab && active.talentsByTab.length > 0 && (
+          <div className="rounded-lg bg-black/30 border border-white/10 p-4">
+            <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">All Talents</div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {active.talentsByTab.map(group => (
+                <div key={group.tabId} className="text-xs">
+                  <div className="font-medium text-gray-200 mb-1">{group.label}</div>
+                  <ul className="space-y-1 text-gray-300 list-disc pl-5">
+                    {group.talents.map(t => (
+                      <li key={t.id}>
+                        <span className="text-gray-200">{t.name}</span>
+                        {t.kind === 'active' && (
+                          <span className="ml-2 inline-block rounded px-1 py-0.5 text-[10px] bg-violet-600/20 border border-violet-600/40 text-violet-200 align-middle">active{t.activeType ? `/${t.activeType}` : ''}</span>
+                        )}
+                        {t.description && (
+                          <div className="text-[11px] text-gray-400 mt-0.5">{t.description}</div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="rounded-lg bg-black/30 border border-white/10 p-4">
           <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Advancement Notes</div>
           <p className="text-xs text-gray-400">Further branches (Tier 2+) unlock after meeting zone milestones & stat gates. Numbers subject to ritual balancing.</p>

@@ -1,7 +1,84 @@
 export const metadata = { title: "Classes • Veil Keeper", description: "A wiki-style overview of archetypes and talent paths.", openGraph: { title: "Veil Keeper Classes", images: ["/og/classes.png"] } };
-import ClassesExplorer from "@/src/components/ClassesExplorer";
+import ClassesExplorer, { ClassArchetype } from "@/src/components/ClassesExplorer";
+
+// Import live game class definitions (pure data module)
+// Note: this .js data file exports CLASS_DEFS as a plain object
+import { CLASS_DEFS as GAME_CLASS_DEFS } from "@/src/game/phaser/data/classes.js";
+import { TALENT_TABS, getTabsForClass } from "@/src/game/phaser/data/talents.js";
+
+function toArchetypesFromGame(): ClassArchetype[] {
+  // Normalize game class defs into the explorer shape
+  const defs: Record<string, any> = (GAME_CLASS_DEFS as any) || {};
+  const byId = defs;
+  const roots = Object.values(byId).filter((d: any) => !d.requiredClass);
+  const t1 = Object.values(byId).filter((d: any) => d.requiredClass === "beginner");
+
+  // Helper to children of a given parent id
+  const childrenOf = (pid: string) => Object.values(byId).filter((d: any) => d.requiredClass === pid);
+
+  const colorForTier = (tier: number) => tier >= 2 ? "from-violet-900/40" : tier === 1 ? "from-red-900/40" : "from-gray-700/40";
+
+  const computeTalentsByTab = (classId: string) => {
+    try {
+      const tabIds = (getTabsForClass as any)(classId) as string[];
+      return (tabIds || []).map(tid => {
+        const tab: any = (TALENT_TABS as any)[tid];
+        if (!tab || !Array.isArray(tab.talents)) return null as any;
+        return {
+          tabId: tab.id,
+          label: tab.label || tid,
+          talents: tab.talents.map((t: any) => ({ id: t.id, name: t.name, kind: t.kind, activeType: t.activeType, description: t.description }))
+        };
+      }).filter(Boolean);
+    } catch (e) {
+      return [] as any[];
+    }
+  };
+
+  const makePath = (d: any) => ({
+    key: d.id,
+    name: d.name,
+    focus: d.description || "",
+    talents: [] as string[],
+  });
+
+  const out: ClassArchetype[] = [];
+  // Beginner first, then tier-1 classes, each with their children as paths
+  const beginner = roots.find((r: any) => r.id === "beginner") as any;
+  if (beginner) {
+    out.push({
+      key: beginner.id,
+      name: beginner.name,
+      synopsis: beginner.description || "",
+      blurb: beginner.description || "",
+      color: colorForTier(beginner.tier || 0),
+      base: beginner.base || undefined,
+      perLevel: beginner.perLevel || undefined,
+      talentsByTab: computeTalentsByTab(beginner.id),
+      starterTalents: [],
+      paths: t1.map(makePath),
+    });
+  }
+  // Each T1 class section, with Tier-2 children as paths
+  for (const d of t1 as any[]) {
+    out.push({
+      key: d.id,
+      name: d.name,
+      synopsis: d.description || "",
+      blurb: d.description || "",
+      color: colorForTier(d.tier || 1),
+      base: d.base || undefined,
+      perLevel: d.perLevel || undefined,
+      talentsByTab: computeTalentsByTab(d.id),
+      starterTalents: [],
+      paths: childrenOf(d.id).map(makePath),
+    });
+  }
+  return out;
+}
 
 export default function ClassesPage() {
+  const liveData = toArchetypesFromGame();
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-12 animate-fade-in">
       {/* Spooky overlay */}
@@ -22,7 +99,7 @@ export default function ClassesPage() {
       </div>
 
       <div className="mt-6">
-        <ClassesExplorer />
+        <ClassesExplorer data={liveData} />
       </div>
 
       <div className="mt-12 rounded-xl border border-white/10 bg-black/40 p-6">
