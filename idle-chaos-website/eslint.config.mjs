@@ -18,6 +18,7 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "src/game/phaser/**", // Ignore Phaser game files (legacy JavaScript)
     ],
   },
 ];

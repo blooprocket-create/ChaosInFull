@@ -5,6 +5,33 @@ import * as Phaser from "phaser";
 
 export type CharacterHUD = { id: string; name: string; class: string; level: number };
 
+// Extend Window interface for game globals
+declare global {
+  interface Window {
+    ITEM_DEFS: unknown;
+    RECIPE_DEFS: unknown;
+    RACE_DEFS: unknown;
+    CLASS_DEFS: unknown;
+    ENEMY_DEFS: unknown;
+    QUEST_DEFS: unknown;
+    PLOT_DEFS: unknown;
+    getQuestById: unknown;
+    startQuest: unknown;
+    updateQuestProgress: unknown;
+    checkQuestCompletion: unknown;
+    completeQuest: unknown;
+    getQuestObjectiveState: unknown;
+    __shared_ui: unknown;
+    __furnace_shared: unknown;
+    __hud_shared: unknown;
+    __shared_keys: unknown;
+    __overlays_shared: unknown;
+    __portal_shared: unknown;
+    __workbench_shared: unknown;
+    GAME: Phaser.Game;
+  }
+}
+
 export async function createPhaserGame(opts: { 
   parent: HTMLElement; 
   character?: CharacterHUD; 
@@ -95,26 +122,26 @@ export async function createPhaserGame(opts: {
 
   // Expose definitions to window for the game to access
   if (typeof window !== 'undefined') {
-    (window as any).ITEM_DEFS = ITEM_DEFS;
-    (window as any).RECIPE_DEFS = RECIPE_DEFS;
-    (window as any).RACE_DEFS = RACE_DEFS;
-    (window as any).CLASS_DEFS = CLASS_DEFS;
-    (window as any).ENEMY_DEFS = ENEMY_DEFS;
-    (window as any).QUEST_DEFS = QUEST_DEFS;
-    (window as any).PLOT_DEFS = PLOT_DEFS;
-    (window as any).getQuestById = getQuestById;
-    (window as any).startQuest = startQuest;
-    (window as any).updateQuestProgress = updateQuestProgress;
-    (window as any).checkQuestCompletion = checkQuestCompletion;
-    (window as any).completeQuest = completeQuest;
-    (window as any).getQuestObjectiveState = getQuestObjectiveState;
-    (window as any).__shared_ui = SharedUI;
-    (window as any).__furnace_shared = furnaceShared.default || furnaceShared;
-    (window as any).__hud_shared = hudShared.default || hudShared;
-    (window as any).__shared_keys = keysShared.default || keysShared;
-    (window as any).__overlays_shared = overlaysShared.default || overlaysShared;
-    (window as any).__portal_shared = portalShared.default || portalShared;
-    (window as any).__workbench_shared = workbenchShared.default || workbenchShared;
+    window.ITEM_DEFS = ITEM_DEFS;
+    window.RECIPE_DEFS = RECIPE_DEFS;
+    window.RACE_DEFS = RACE_DEFS;
+    window.CLASS_DEFS = CLASS_DEFS;
+    window.ENEMY_DEFS = ENEMY_DEFS;
+    window.QUEST_DEFS = QUEST_DEFS;
+    window.PLOT_DEFS = PLOT_DEFS;
+    window.getQuestById = getQuestById;
+    window.startQuest = startQuest;
+    window.updateQuestProgress = updateQuestProgress;
+    window.checkQuestCompletion = checkQuestCompletion;
+    window.completeQuest = completeQuest;
+    window.getQuestObjectiveState = getQuestObjectiveState;
+    window.__shared_ui = SharedUI;
+    window.__furnace_shared = furnaceShared.default || furnaceShared;
+    window.__hud_shared = hudShared.default || hudShared;
+    window.__shared_keys = keysShared.default || keysShared;
+    window.__overlays_shared = overlaysShared.default || overlaysShared;
+    window.__portal_shared = portalShared.default || portalShared;
+    window.__workbench_shared = workbenchShared.default || workbenchShared;
     
     try {
       if (diagnostics && typeof diagnostics.installDiagnostics === 'function') {
@@ -177,7 +204,7 @@ export async function createPhaserGame(opts: {
 
   // Expose game instance
   if (typeof window !== 'undefined') {
-    (window as any).GAME = game;
+    window.GAME = game;
   }
 
   // Start with the specified scene or Boot

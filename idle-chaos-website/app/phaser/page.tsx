@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getSession } from "@/src/lib/auth";
 import PhaserGameCanvas from "@/src/game/PhaserGameCanvas";
 import JsonLd from "@/src/components/JsonLd";
