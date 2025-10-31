@@ -6,7 +6,7 @@ import FlickerOnView from "@/src/components/FlickerOnView";
 import EventsCarousel from "@/src/components/EventsCarousel";
 import ParallaxHero from "@/src/components/ParallaxHero";
 import JsonLd from "@/src/components/JsonLd";
-export const metadata = { title: "Chaos In Full • Idle RPG", description: "A darkly humorous idle RPG in your browser.", openGraph: { title: "Chaos In Full", description: "A darkly humorous idle RPG", images: ["/og/home.png"] } };
+export const metadata = { title: "Veil Keeper • Action RPG", description: "A dark, fast, and slightly unhinged browser ARPG.", openGraph: { title: "Veil Keeper", description: "A dark, fast, and slightly unhinged browser ARPG", images: ["/og/home.png"] } };
 
 export default async function Home() {
   let latest = staticNotes[0];
@@ -26,7 +26,7 @@ export default async function Home() {
       <JsonLd data={{
         "@context": "https://schema.org",
         "@type": "VideoGame",
-        name: "Chaos In Full",
+        name: "Veil Keeper",
         url: "https://chaos-in-full.vercel.app/",
         operatingSystem: "Web",
         applicationCategory: "Game",
@@ -55,32 +55,32 @@ export default async function Home() {
       <section className="mx-auto max-w-6xl px-4 py-16">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-            A Cheerfully Miserable Idle Action RPG
+            Veil Keeper — A Dark Action RPG for the Browser
           </h2>
           <p className="mt-4 text-lg text-gray-300">
-            Build a dysfunctional roster of characters, abandon them in hostile maps, then return for ores, bars,
-            and existential questions. Your progress doesn’t pause—only your willingness to look at the EXP bars again.
+            Cross the threshold, brave twisted regions, and stitch power from what you survive. Robust offline progress,
+            crafting loops, and talent-driven builds—made to be picked up, put down, and obsessed over.
           </p>
         </div>
         <div className="mt-12 grid md:grid-cols-3 gap-6">
           {[{
-            title: "Mutate Your Class",
-            text: "Start as a harmless Beginner and branch toward something the gods would immediately patch out if they could.",
+            title: "Evolve Your Build",
+            text: "Begin humbly and branch into specialized archetypes. Synergize stats, talents, and gear to bend the Veil.",
           },{
-            title: "AFK With Consequences",
-            text: "Log off in the Cave and come back rich. Or come back and find a mining pick lodged where hope used to be.",
+            title: "Offline Progress",
+            text: "Leave characters in safe pockets and return to rewards. Time advances—even when you don’t.",
           },{
-            title: "Portals & Punchlines",
-            text: "Town, Cave, Slime Field, and the new Slime Meadow—each a lovingly unbalanced stage for leveling, crafting, and poorly timed jumps.",
+            title: "Portals & Regions",
+            text: "Town, Cave, Slime Meadows, Goblin Camp and beyond—each region with resources, threats, and secrets.",
           },{
-            title: "Crafting Grind (Refined)",
-            text: "Queue bars and gear: furnace ticks, workbench clinks. Offline fast-forward means time still hurts productively.",
+            title: "Crafting, Refined",
+            text: "Smelt, forge, and assemble. Furnaces and benches keep ticking while you’re away.",
           },{
-            title: "Account Storage",
-            text: "Drop entire stacks into the abyss we call ‘shared stash’. Atomic, reliable, disappointingly organized.",
+            title: "Shared Stash",
+            text: "Move resources and gear across characters. Plan builds; gear them fast.",
           },{
-            title: "Skills That Escalate",
-            text: "Mining, Crafting and more climbing from ‘meh’ to ‘mildly superhuman’. Numbers go up; standards go down.",
+            title: "Talents That Matter",
+            text: "Active and passive choices that meaningfully change moment-to-moment play and long-term scaling.",
           }].map(card => (
             <div key={card.title} className="rounded-xl border border-white/10 bg-black/40 p-6 hover:border-purple-500/60 transition-colors">
               <h3 className="text-xl font-semibold text-white/90">{card.title}</h3>
@@ -94,12 +94,11 @@ export default async function Home() {
       <section className="mx-auto max-w-6xl px-4 py-12">
         <div className="rounded-2xl border border-purple-800/40 bg-gradient-to-br from-purple-950/40 to-black p-8 text-center relative overflow-hidden">
           <div className="absolute -right-10 -top-10 size-40 rounded-full blur-3xl bg-purple-700/10" />
-          <h2 className="text-2xl md:text-3xl font-bold tracking-wide blood-underline inline-block">Town: Your Questionable Sanctuary</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-wide blood-underline inline-block">Town: Anchor Beyond the Veil</h2>
           <p className="mt-3 text-gray-300 max-w-2xl mx-auto text-sm md:text-base">
-            Craft gear, stash loot, poke the Tutorial NPC (he’s still buffering a name), and decide which portal looks least fatal today.
-            Everything you build here fuels your next ill-advised expedition.
+            Craft gear, stash loot, and choose the next portal. Town is where plans are made and mistakes are funded.
           </p>
-          <div className="mt-6"><BloodLinkButton href="/classes">View Classes Before They Nerf Themselves</BloodLinkButton></div>
+          <div className="mt-6"><BloodLinkButton href="/classes">Browse Classes and Talents</BloodLinkButton></div>
         </div>
       </section>
 
@@ -121,8 +120,8 @@ export default async function Home() {
       <section className="border-t border-white/10">
         <div className="mx-auto max-w-6xl px-4 py-10 grid md:grid-cols-3 gap-6 text-sm">
           <div>
-            <div className="text-lg font-bold tracking-widest">CHAOS IN FULL</div>
-            <p className="text-gray-400 mt-2">An earnest attempt to automate your obsession. Crafted in TypeScript, seasoned with regret.</p>
+            <div className="text-lg font-bold tracking-widest">VEIL KEEPER</div>
+            <p className="text-gray-400 mt-2">A browser ARPG built for momentum and tinkering. Crafted in TypeScript, tested against the unknown.</p>
           </div>
           <div>
             <div className="font-semibold">Follow</div>

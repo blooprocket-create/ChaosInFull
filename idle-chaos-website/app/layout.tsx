@@ -14,8 +14,8 @@ const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight:
 const mono = Roboto_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400","700"] });
 
 export const metadata: Metadata = {
-  title: "Chaos In Full",
-  description: "A darkly humorous idle RPG",
+  title: "Veil Keeper",
+  description: "A dark action RPG for the browser",
 };
 
 export const dynamic = "force-dynamic";
@@ -61,7 +61,7 @@ export default async function RootLayout({
   <TelemetryInit />
         <header className="sticky top-0 z-20 backdrop-blur border-b border-white/10 bg-black/50">
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold tracking-widest">CHAOS IN FULL</Link>
+            <Link href="/" className="text-xl font-bold tracking-widest">VEIL KEEPER</Link>
             <div className="flex gap-6 text-sm items-center">
               <Link href="/news" className="hover:text-white nav-underline">News</Link>
               <Link href="/classes" className="hover:text-white nav-underline">Classes</Link>
@@ -76,7 +76,7 @@ export default async function RootLayout({
   <main className="min-h-[calc(100vh-64px)]">{children}</main>
         <footer className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
           <div className="mx-auto max-w-6xl px-4 flex items-center justify-between gap-3">
-            <div title="v0.0.11">© {new Date().getFullYear()} Chaos In Full</div>
+            <div title="v0.0.11">© {new Date().getFullYear()} Veil Keeper</div>
             <StatusChip />
           </div>
         </footer>

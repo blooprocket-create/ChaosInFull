@@ -39,7 +39,7 @@ export default function ParallaxHero() {
       <div className="pointer-events-none absolute top-40 -left-10 size-72 rounded-full blur-3xl bg-red-700/10" />
       <div className="mx-auto max-w-6xl px-4 py-24 md:py-32 grid md:grid-cols-2 gap-12 items-center">
         <div>
-          <h1 ref={titleRef} className="text-5xl md:text-7xl font-bold tracking-widest leading-[1.05] glitch flicker-target will-change-transform" data-text="Chaos In Full">Chaos In Full</h1>
+          <h1 ref={titleRef} className="text-5xl md:text-7xl font-bold tracking-widest leading-[1.05] glitch flicker-target will-change-transform" data-text="Veil Keeper">Veil Keeper</h1>
           <p className="mt-6 text-lg text-gray-300 max-w-prose">
             A 2D platformer idle RPG where darkness has a sense of humor. Carve your path through haunted mines, gooey fields, and absurd monstrosities.
           </p>

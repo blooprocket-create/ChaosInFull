@@ -3,9 +3,9 @@ import PhaserGameCanvas from "@/src/game/PhaserGameCanvas";
 import JsonLd from "@/src/components/JsonLd";
 
 export const metadata = { 
-  title: "Veil Keeper • Chaos In Full", 
-  description: "Play the Phaser-powered adventure game Veil Keeper.", 
-  openGraph: { title: "Veil Keeper - Chaos In Full", images: ["/og/play.png"] } 
+  title: "Veil Keeper • Play", 
+  description: "Play Veil Keeper in your browser.", 
+  openGraph: { title: "Veil Keeper", images: ["/og/play.png"] } 
 };
 
 export const dynamic = "force-dynamic";
@@ -21,16 +21,16 @@ export default async function PhaserGamePage() {
       <JsonLd data={[{
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        name: "Veil Keeper",
-        applicationCategory: "Game",
+  name: "Veil Keeper",
+  applicationCategory: "Game",
         operatingSystem: "Web",
         offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
         url: "https://chaos-in-full.vercel.app/phaser"
       },{
         "@context": "https://schema.org",
         "@type": "VideoGame",
-        name: "Veil Keeper",
-        gamePlatform: "Web",
+  name: "Veil Keeper",
+  gamePlatform: "Web",
         url: "https://chaos-in-full.vercel.app/phaser"
       }]} />
       

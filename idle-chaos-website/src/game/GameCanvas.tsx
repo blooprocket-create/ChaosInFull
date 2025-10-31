@@ -1650,7 +1650,7 @@ export default function GameCanvas({ character, initialSeenWelcome, initialScene
       {!readonly && !welcomeSeen && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70">
           <div className="w-[min(560px,92vw)] rounded-lg border border-white/10 bg-black/80 p-5 text-gray-200 shadow-xl">
-            <h3 className="text-xl font-semibold text-white">Welcome to Chaos In Full</h3>
+            <h3 className="text-xl font-semibold text-white">Welcome to Veil Keeper</h3>
             <p className="mt-2 text-sm text-gray-300">This is a 2D Platformer IDLE RPG.</p>
             <div className="mt-4 space-y-2 text-sm">
               <p>Movement: WASD</p>

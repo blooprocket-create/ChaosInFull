@@ -1,6 +1,6 @@
 import { patchNotes as staticNotes } from "@/src/data/patchNotes";
 import { sql } from "@/src/lib/db";
-export const metadata = { title: "News • Chaos In Full", description: "Development dispatches and patch notes.", openGraph: { title: "Chaos In Full News", images: ["/og/news.png"] } };
+export const metadata = { title: "News • Veil Keeper", description: "Development dispatches and patch notes.", openGraph: { title: "Veil Keeper News", images: ["/og/news.png"] } };
 
 export default async function NewsPage() {
   // Load patch notes from DB; merge with static notes (dedupe by version)
