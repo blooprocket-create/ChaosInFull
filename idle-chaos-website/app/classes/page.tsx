@@ -3,39 +3,47 @@ import ClassesExplorer, { ClassArchetype } from "@/src/components/ClassesExplore
 
 // Import live game class definitions (pure data module)
 // Note: this .js data file exports CLASS_DEFS as a plain object
+import type { GameClassDef, TalentTab, TalentDef } from "@/src/types/phaser-data";
 import { CLASS_DEFS as GAME_CLASS_DEFS } from "@/src/game/phaser/data/classes.js";
 import { TALENT_TABS, getTabsForClass } from "@/src/game/phaser/data/talents.js";
 
 function toArchetypesFromGame(): ClassArchetype[] {
   // Normalize game class defs into the explorer shape
-  const defs: Record<string, any> = (GAME_CLASS_DEFS as any) || {};
-  const byId = defs;
-  const roots = Object.values(byId).filter((d: any) => !d.requiredClass);
-  const t1 = Object.values(byId).filter((d: any) => d.requiredClass === "beginner");
+  const defs: Record<string, GameClassDef> = GAME_CLASS_DEFS || {};
+  const roots: GameClassDef[] = Object.values(defs).filter((d) => !d.requiredClass);
+  const t1: GameClassDef[] = Object.values(defs).filter((d) => d.requiredClass === "beginner");
 
   // Helper to children of a given parent id
-  const childrenOf = (pid: string) => Object.values(byId).filter((d: any) => d.requiredClass === pid);
+  const childrenOf = (pid: string): GameClassDef[] => Object.values(defs).filter((d) => d.requiredClass === pid);
 
   const colorForTier = (tier: number) => tier >= 2 ? "from-violet-900/40" : tier === 1 ? "from-red-900/40" : "from-gray-700/40";
 
   const computeTalentsByTab = (classId: string) => {
     try {
-      const tabIds = (getTabsForClass as any)(classId) as string[];
-      return (tabIds || []).map(tid => {
-        const tab: any = (TALENT_TABS as any)[tid];
-        if (!tab || !Array.isArray(tab.talents)) return null as any;
-        return {
-          tabId: tab.id,
-          label: tab.label || tid,
-          talents: tab.talents.map((t: any) => ({ id: t.id, name: t.name, kind: t.kind, activeType: t.activeType, description: t.description }))
-        };
-      }).filter(Boolean);
+  const tabIds: string[] = getTabsForClass(classId) || [];
+      return tabIds
+        .map((tid) => {
+          const tab: TalentTab | undefined = (TALENT_TABS as unknown as Record<string, TalentTab>)[tid];
+          if (!tab || !Array.isArray(tab.talents)) return null;
+          return {
+            tabId: tab.id,
+            label: tab.label || tid,
+            talents: (tab.talents as TalentDef[]).map((t) => ({
+              id: t.id,
+              name: t.name,
+              kind: t.kind,
+              activeType: t.activeType || undefined,
+              description: t.description,
+            })),
+          };
+        })
+        .filter((g): g is NonNullable<typeof g> => Boolean(g));
     } catch (e) {
-      return [] as any[];
+      return [] as { tabId: string; label: string; talents: { id: string; name: string; kind?: string; activeType?: string; description?: string }[] }[];
     }
   };
 
-  const makePath = (d: any) => ({
+  const makePath = (d: GameClassDef) => ({
     key: d.id,
     name: d.name,
     focus: d.description || "",
@@ -44,7 +52,7 @@ function toArchetypesFromGame(): ClassArchetype[] {
 
   const out: ClassArchetype[] = [];
   // Beginner first, then tier-1 classes, each with their children as paths
-  const beginner = roots.find((r: any) => r.id === "beginner") as any;
+  const beginner = roots.find((r) => r.id === "beginner");
   if (beginner) {
     out.push({
       key: beginner.id,
@@ -60,7 +68,7 @@ function toArchetypesFromGame(): ClassArchetype[] {
     });
   }
   // Each T1 class section, with Tier-2 children as paths
-  for (const d of t1 as any[]) {
+  for (const d of t1) {
     out.push({
       key: d.id,
       name: d.name,
