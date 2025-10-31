@@ -71,6 +71,9 @@ export default async function PhaserGamePage() {
               <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">Space</kbd> Basic Attack</li>
               <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">1-0</kbd> Active Skills</li>
               <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">I</kbd> Inventory</li>
+              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">U</kbd> Equipment</li>
+              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">T</kbd> Talents</li>
+              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">X</kbd> Stats &amp; Skills</li>
             </ul>
           </div>
         </div>
