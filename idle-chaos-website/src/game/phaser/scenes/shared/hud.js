@@ -12,14 +12,11 @@ const ACTIVITY_META = {
 function applyThemeStyles(hud, theme = 'calm') {
     if (!hud) return;
     hud.dataset.theme = theme;
+    // Update only the left border color for theme - keep the Login scene base styling
     if (theme === 'hellscape') {
-        hud.style.background = 'rgba(60, 12, 12, 0.7)';
-        hud.style.boxShadow = '0 0 14px rgba(255, 64, 64, 0.35)';
-        hud.style.border = '1px solid rgba(255,80,80,0.4)';
+        hud.style.borderLeft = '10px solid rgba(120,10,10,0.95)';
     } else {
-        hud.style.background = 'rgba(20, 10, 30, 0.55)';
-        hud.style.boxShadow = '0 0 14px rgba(80, 120, 255, 0.3)';
-        hud.style.border = '1px solid rgba(255,255,255,0.08)';
+        hud.style.borderLeft = '10px solid rgba(80,10,10,0.95)';
     }
 }
 
@@ -48,42 +45,30 @@ export function createHUD(scene) {
     const hud = document.createElement('div');
     hud.id = hudId;
     hud.style.position = 'fixed';
-    // Position: top offset should respect the app's navbar height
-    // We'll compute this dynamically and update on resize
-    hud.style.left = '8px';
-    hud.style.width = '200px';
-    hud.style.padding = '8px';
+    hud.style.bottom = '60px';
+    hud.style.left = '50%';
+    hud.style.transform = 'translateX(-50%)';
+    hud.style.width = '640px';
+    hud.style.maxWidth = 'calc(100vw - 32px)';
+    hud.style.padding = '12px 16px';
     hud.style.zIndex = '100';
     hud.style.pointerEvents = 'auto';
     hud.style.display = 'flex';
     hud.style.flexDirection = 'column';
-    hud.style.alignItems = 'flex-start';
-    hud.style.backdropFilter = 'blur(8px)';
-    hud.style.borderRadius = '16px';
-    hud.style.color = '#eee';
-    hud.style.fontFamily = 'UnifrakturCook, cursive';
-    applyThemeStyles(hud, getGameState().theme);
-
-    // Compute HUD top offset based on <header> height
-    const recalcHudTop = () => {
-        try {
-            const header = document.querySelector('header');
-            const navH = header && header.getBoundingClientRect ? Math.max(0, Math.round(header.getBoundingClientRect().height)) : 0;
-            const topPx = Math.max(8, navH + 8);
-            hud.style.top = topPx + 'px';
-        } catch (e) {
-            hud.style.top = '8px';
-        }
-    };
-    recalcHudTop();
-    // Bind resize handler and clean up on scene shutdown
-    const boundResize = () => recalcHudTop();
-    window.addEventListener('resize', boundResize);
-    try {
-        scene.events && scene.events.once && scene.events.once('shutdown', () => {
-            try { window.removeEventListener('resize', boundResize); } catch (_) {}
-        });
-    } catch (_) {}
+    hud.style.alignItems = 'stretch';
+    hud.style.color = '#f0c9b0';
+    hud.style.fontFamily = "'Share Tech Mono', monospace";
+    hud.style.background = 'linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%)';
+    hud.style.border = '4px solid #111';
+    hud.style.borderLeft = '10px solid rgba(80,10,10,0.95)';
+    hud.style.borderRight = '2px solid #222';
+    hud.style.boxShadow = '0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02)';
+    hud.style.borderRadius = '6px';
+    hud.style.overflow = 'hidden';
+    const currentTheme = getGameState().theme;
+    if (currentTheme === 'hellscape') {
+        hud.style.borderLeft = '10px solid rgba(120,10,10,0.95)';
+    }
 
     const charBtnId = idBase + '-hud-charselect-btn';
     const settingsBtnId = idBase + '-hud-settings-btn';
