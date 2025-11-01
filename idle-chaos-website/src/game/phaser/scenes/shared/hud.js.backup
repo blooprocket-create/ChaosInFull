@@ -393,4 +393,3 @@ export function destroyHUD(scene) {
 }
 
 export default { createHUD, updateHUD, destroyHUD };
-

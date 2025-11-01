@@ -1,7 +1,6 @@
 import { getSession } from "@/src/lib/auth";
 import PhaserGameCanvas from "@/src/game/PhaserGameCanvas";
 import JsonLd from "@/src/components/JsonLd";
-import PhaserHUDPanel from "@/src/game/PhaserHUDPanel";
 
 export const metadata = { 
   title: "Veil Keeper • Play", 
@@ -46,7 +45,6 @@ export default async function PhaserGamePage() {
           initialScene="Boot"
         />
       </div>
-      <PhaserHUDPanel />
     </section>
   );
 }
