@@ -8,6 +8,27 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-11-01",
+    version: "0.0.14",
+    title: "HUD makeover, DnD inventory, dbl‑click use, and fog/nav fix",
+    highlights: [
+      "HUD moved to bottom‑center above the skill bar with Login/Character‑Select styling (dark panel, red accent, mono font)",
+      "Inventory and Equipment modals restyled to match site panels without breaking layout",
+      "Drag‑and‑drop reordering for inventory slots (swap items in the grid)",
+      "Usable items can be double‑clicked to use; Enter/Space works too — no more tiny Use button",
+      "Navbar links are clickable again on Login/Character‑Select (overlays sit below the header)",
+      "Buffs clean up across scene transitions — no more frozen/lingering buff displays"
+    ],
+    notes: [
+      "HUD shows name, level, and class; bars are larger with centered labels; theme left border adjusts for Hellscape",
+      "HUD and skill bar DOM are removed on scene shutdown; HUD recreated cleanly per scene",
+      "Inventory drag handlers use native HTML5 DnD with visual feedback and index‑swap logic",
+      "Double‑click handler calls useItemFromSlot directly; keyboard Enter/Space triggers use and refreshes UI",
+      "Login/Character‑Select overlays/container z‑index lowered so site header (z‑20) is always above",
+      "Expired buffs are pruned on HUD/skill‑bar refresh and on HUD creation to handle missed timers after scene changes"
+    ]
+  },
+  {
     date: "2025-10-31",
     version: "0.0.13",
     title: "World revamp, scene-accurate data, Classes wiki, and UI polish",

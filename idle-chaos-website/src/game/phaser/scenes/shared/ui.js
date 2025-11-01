@@ -3,6 +3,32 @@ import { getTabsForClass, TALENT_TAB_ORDER, getTalentTab, ensureCharTalents, pro
 // Shared UI utilities: Inventory, Equipment, and Stats modals.
 // Each function accepts a Phaser.Scene instance as the first arg and operates on scene.char.
 
+// Prune any expired temporary buffs on a character; returns number removed
+function pruneExpiredBuffs(scene) {
+    try {
+        if (!scene || !scene.char) return 0;
+        const arr = Array.isArray(scene.char._buffs) ? scene.char._buffs : (Array.isArray(scene.char.buffs) ? scene.char.buffs : null);
+        if (!Array.isArray(arr) || arr.length === 0) return 0;
+        const now = Date.now();
+        const before = arr.length;
+        const next = arr.filter(b => {
+            try {
+                if (!b) return false;
+                if (typeof b.expiresAt === 'number') return b.expiresAt > now;
+                return true; // no expiry -> keep
+            } catch (e) { return true; }
+        });
+        if (next.length !== before) {
+            scene.char._buffs = next;
+            // also mirror to legacy field if used
+            try { if (Array.isArray(scene.char.buffs)) scene.char.buffs = next.slice(); } catch (e) {}
+            try { if (scene._updateHUD) scene._updateHUD(); } catch (e) {}
+            return before - next.length;
+        }
+        return 0;
+    } catch (e) { return 0; }
+}
+
 // inject light shared styles once
 if (typeof document !== 'undefined' && !document.getElementById('shared-ui-styles')) {
     const s = document.createElement('style'); s.id = 'shared-ui-styles';
@@ -2406,6 +2432,8 @@ export function refreshSkillBarHUD(scene) {
     if (typeof document === 'undefined') return;
     if (!scene || !scene.char) return;
     try {
+        // Ensure we don't render stale buffs from a previous scene: drop any expired entries first
+        try { pruneExpiredBuffs(scene); } catch (e) {}
         ensureCharTalents && ensureCharTalents(scene.char);
         const containerId = 'global-skill-bar';
         let el = document.getElementById(containerId);
@@ -2751,6 +2779,8 @@ export function unbindTalentKey(scene) {
 try {
     if (typeof window !== 'undefined') {
         window.__shared_ui = window.__shared_ui || {};
+        // expose buff maintenance so scenes or other modules can force a cleanup on transitions
+        window.__shared_ui.pruneExpiredBuffs = pruneExpiredBuffs;
         window.__shared_ui.refreshSkillBarHUD = refreshSkillBarHUD;
         window.__shared_ui.assignActiveToNextSlot = assignActiveToNextSlot;
         window.__shared_ui.unassignSkillBarSlot = unassignSkillBarSlot;

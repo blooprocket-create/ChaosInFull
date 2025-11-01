@@ -101,6 +101,14 @@ export function createHUD(scene) {
     document.body.appendChild(hud);
     scene.hud = hud;
 
+    // Defensive: on scene shutdown, tear down this HUD so UI never persists across scenes
+    try {
+        if (scene.events && scene.events.once) {
+            scene.events.once('shutdown', () => { try { destroyHUD(scene); } catch (e) {} });
+            scene.events.once('destroy', () => { try { destroyHUD(scene); } catch (e) {} });
+        }
+    } catch (e) {}
+
     setTimeout(() => {
     const btn = document.getElementById(charBtnId);
         if (btn) {
@@ -235,6 +243,8 @@ export function createHUD(scene) {
         updateHUD(scene, { activity: gs.activity, theme: gs.theme });
     });
 
+    // Drop any expired buffs that may have lost their timers during a scene transition
+    try { if (typeof window !== 'undefined' && window.__shared_ui && typeof window.__shared_ui.pruneExpiredBuffs === 'function') { window.__shared_ui.pruneExpiredBuffs(scene); } } catch (e) {}
     updateHUD(scene);
     // Ensure the global skill bar is created for this scene and keybindings bound.
     try {
