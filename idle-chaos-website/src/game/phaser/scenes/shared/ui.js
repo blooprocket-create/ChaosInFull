@@ -953,7 +953,7 @@ export function openSettingsModal(scene) {
     const current = Object.assign({ musicVolume: 1, sfxVolume: 1, alwaysRun: false, showAtkRange: false, autoUseHP: false, autoUseHPThreshold: 35, autoUseMana: false, autoUseManaThreshold: 20 }, loadSettings());
     const modal = document.createElement('div'); modal.id = 'settings-modal'; modal.className = 'modal-overlay show'; modal.style.zIndex = '260';
     modal.innerHTML = `
-        <div class='modal-card' style='min-width:520px; max-width:760px;'>
+        <div class='modal-card' style='min-width:520px; max-width:760px; background: linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%); border: 4px solid #111; border-left: 10px solid rgba(80,10,10,0.95); border-right: 2px solid #222; box-shadow: 0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02); border-radius: 6px; overflow: hidden; color: #f0c9b0; font-family: "Share Tech Mono", monospace;'>
             <div class='modal-head'>
                 <div>
                     <div class='modal-title'>Settings</div>
