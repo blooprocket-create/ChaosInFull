@@ -31,7 +31,8 @@ export class CharacterSelect extends Phaser.Scene {
             } catch (e) {}
         } catch (e) { /* ignore cleanup errors */ }
 
-        this._atmosphere = createAtmosphericOverlays(this, { idPrefix: 'charselect', zIndexBase: 50 });
+    // Lower overlay z-index to stay beneath the site header (z-20)
+    this._atmosphere = createAtmosphericOverlays(this, { idPrefix: 'charselect', zIndexBase: 5 });
         this._cleanupCallbacks = [];
         this._previousBodyStyle = captureBodyStyle();
         applyDefaultBackground();
@@ -110,7 +111,8 @@ export class CharacterSelect extends Phaser.Scene {
         container.style.display = 'flex';
         container.style.justifyContent = 'center';
         container.style.alignItems = 'center';
-        container.style.zIndex = '100';
+    // Ensure the panel is below the navbar so top links remain clickable
+    container.style.zIndex = '10';
 
         let characters = (userObj && userObj.characters) ? userObj.characters : [];
 

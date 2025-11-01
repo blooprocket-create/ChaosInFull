@@ -12,7 +12,9 @@ export class Login extends Phaser.Scene {
 
     create() {
     // On the Login screen the Phaser canvas is hidden; force DOM-based overlays for fog.
-    this._atmosphere = createAtmosphericOverlays(this, { idPrefix: 'login', zIndexBase: 50, useParticleFog: false });
+    // Keep atmospheric layers below the app header (header has z-index: 20 in layout)
+    // Lower zIndexBase so canvases sit under the navbar and don't intercept clicks
+    this._atmosphere = createAtmosphericOverlays(this, { idPrefix: 'login', zIndexBase: 5, useParticleFog: false });
 
         const gameContainer = document.getElementById('game-container');
         if (gameContainer) {
@@ -36,7 +38,8 @@ export class Login extends Phaser.Scene {
         container.style.alignItems = 'center';
         container.style.background = 'transparent';
         container.style.backdropFilter = 'none';
-        container.style.zIndex = '100';
+    // Container should also sit below the navbar to keep header links clickable
+    container.style.zIndex = '10';
 
         container.innerHTML = `
             <style>
