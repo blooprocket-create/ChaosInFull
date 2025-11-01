@@ -8,6 +8,30 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-10-31",
+    version: "0.0.13",
+    title: "World revamp, scene-accurate data, Classes wiki, and UI polish",
+    highlights: [
+      "World page rebuilt to reflect the actual game scenes (Town, Cave, Inner Field, Outer Field, Goblin Camp, Grave Forest) with correct portals, NPCs, enemies, and resources",
+      "New world graph surfaced: Town ↔ Cave/Inner Field, Inner Field ↔ Outer Field, Outer Field ↔ Goblin Camp/Grave Forest, Grave Forest ↔ Broken Dock, Goblin Camp ↔ Gloamway Bastion",
+      "Classes page becomes a wiki-style explorer with an interactive talent rank simulator (0–5) that previews real scaling bonuses",
+      "Game UI polish: Inventory and Equipment modals moved to screen edges with glassy site styling; HUD is navbar-aware and resizes cleanly",
+      "Enemy tables upgraded: expandable loot with friendlier item names, category badges, and gold entries"
+    ],
+    notes: [
+      "World data source replaced: zones now mirror the authoritative scene definitions so portals, NPCs, and enemies match gameplay",
+      "Zones mapped: Inner Field → Slimes (common/epic/boss); Outer Field → Rats (rat/zombie/ghost); Cave and Grave Forest show resources and NPCs only",
+      "ClassesExplorer pulls talent scaling from live data (scaling/secondScaling) and computes bonus text per simulated rank",
+      "Inventory (I) and Equipment (U) modals: anchored at middle-right and middle-left respectively; layout preserved; site glass panel styling applied",
+      "HUD offset respects the site header; resizes on viewport changes and cleans up on scene shutdown",
+      "Cave scene polish: organic wall colliders, centered furnace with smelting loop, mining prompts and yield/XP tuned; Wayne Mineson dialogue and quest hooks",
+      "Grave Forest scene: clustered trees with colliders, ambient fog/decor, Rowan Boneaxe dialogue and tutorial woodcutting; portal to Broken Dock",
+      "Enemies table: expand a row to see loot ranges and luck bonuses; gold drop shows min–max and chance",
+      "Portals show consistent proximity prompts and spawn you in sensible entry points per scene",
+      "Refactor note: removed stale world shims; the World page now stays accurate as scenes evolve"
+    ]
+  },
+  {
     date: "2025-10-17",
     version: "0.0.12",
     title: "Neon nights, bug stomps, and quest triage",
