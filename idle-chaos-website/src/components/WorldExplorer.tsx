@@ -5,11 +5,6 @@ import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
 import type { EnemyDef, EnemyDrop } from "@/src/types/phaser-data";
 import { itemByKey } from "@/src/data/items";
 
-function formatMobStat(v: number | null, unit?: string) {
-  if (v == null) return "?";
-  return unit ? `${v} ${unit}` : String(v);
-}
-
 export default function WorldExplorer() {
   const [active, setActive] = useState<ZoneDefinition>(zones[0]);
   const [openEnemyId, setOpenEnemyId] = useState<string | null>(null);
@@ -124,36 +119,7 @@ export default function WorldExplorer() {
             </ul>
           </div>
         )}
-        <div className="rounded-lg bg-black/30 border border-white/10 p-4">
-          <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Mobs</div>
-          {active.mobs.length === 0 ? (
-            <p className="text-sm text-gray-400">No mobs present.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-400 text-xs">
-                  <th className="text-left font-medium">Name</th>
-                  <th className="text-left font-medium">HP</th>
-                  <th className="text-left font-medium">DMG</th>
-                  <th className="text-left font-medium">Spawn/min</th>
-                  <th className="text-left font-medium">Max</th>
-                </tr>
-              </thead>
-              <tbody>
-                {active.mobs.map(m => (
-                  <tr key={m.name} className="border-t border-white/5">
-                    <td className="py-1 pr-2 text-gray-200">{m.name}</td>
-                    <td className="py-1 pr-2 text-gray-300">{formatMobStat(m.hp)}</td>
-                    <td className="py-1 pr-2 text-gray-300">{formatMobStat(m.damage)}</td>
-                    <td className="py-1 pr-2 text-gray-300">{formatMobStat(m.spawnRatePerMin)}</td>
-                    <td className="py-1 pr-2 text-gray-300">{formatMobStat(m.maxConcurrent)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <p className="mt-2 text-xs text-gray-500">Values marked ? will populate once systems are implemented.</p>
-        </div>
+        
         <div className="rounded-lg bg-black/30 border border-white/10 p-4">
           <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Enemies</div>
           {enemiesForZone.length === 0 ? (
