@@ -39,6 +39,14 @@ export default function PhaserGameCanvas({
               const el = document.getElementById(id);
               if (el && el.parentNode) el.parentNode.removeChild(el);
             }
+            // Remove any HUD elements from previous sessions
+            document.querySelectorAll('[id$="-hud"]').forEach((node) => {
+              try {
+                if (node.parentNode) {
+                  node.parentNode.removeChild(node);
+                }
+              } catch {}
+            });
             // Remove any generic modal overlays left behind
             document.querySelectorAll('.modal-overlay').forEach((n) => {
               try {
@@ -111,6 +119,14 @@ export default function PhaserGameCanvas({
             const node = document.getElementById(id);
             if (node && node.parentNode) node.parentNode.removeChild(node);
           }
+          // Remove HUD elements (they have dynamic IDs like 'town-hud', 'cave-hud', etc.)
+          document.querySelectorAll('[id$="-hud"]').forEach((node) => {
+            try {
+              if (node.parentNode) {
+                node.parentNode.removeChild(node);
+              }
+            } catch {}
+          });
           document.querySelectorAll('.modal-overlay').forEach((n) => {
             try {
               if (n.parentNode) {

@@ -45,7 +45,7 @@ export function createHUD(scene) {
     const hud = document.createElement('div');
     hud.id = hudId;
     hud.style.position = 'fixed';
-    hud.style.bottom = '72px';
+    hud.style.bottom = '150px';
     hud.style.left = '50%';
     hud.style.transform = 'translateX(-50%)';
     hud.style.width = '640px';
