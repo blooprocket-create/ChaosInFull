@@ -34,12 +34,7 @@ export default async function PhaserGamePage() {
         url: "https://chaos-in-full.vercel.app/phaser"
       }]} />
       
-      <div className="mb-6">
-        <h1 className="text-4xl font-bold">Veil Keeper</h1>
-        <p className="mt-2 text-gray-300">
-          A Phaser-powered adventure game. Explore zones, battle enemies, and complete quests.
-        </p>
-      </div>
+      {/* Removed page heading/description to reduce clutter above the game canvas */}
 
       <div className="mb-4">
         <PhaserGameCanvas 

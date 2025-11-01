@@ -48,7 +48,16 @@ export function createHUD(scene) {
     const hud = document.createElement('div');
     hud.id = hudId;
     hud.style.position = 'fixed';
-    hud.style.top = '8px';
+    // Compute top offset to avoid overlap with site navbar (sticky header)
+    const computeHudTop = () => {
+        try {
+            const header = document.querySelector('header');
+            const h = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
+            // add small margin below header
+            return Math.max(8, h + 8);
+        } catch (e) { return 8; }
+    };
+    hud.style.top = computeHudTop() + 'px';
     hud.style.left = '8px';
     hud.style.width = '200px';
     hud.style.padding = '8px';
@@ -224,6 +233,12 @@ export function createHUD(scene) {
         }
     }, 0);
 
+    // Recompute top offset on resize to respect responsive header height
+    const onResize = () => {
+        try { hud.style.top = computeHudTop() + 'px'; } catch (e) {}
+    };
+    try { window.addEventListener('resize', onResize); scene._hudResizeHandler = onResize; } catch (e) { scene._hudResizeHandler = null; }
+
     scene._hudStateUnsub = subscribeGameState((gs) => {
         updateHUD(scene, { activity: gs.activity, theme: gs.theme });
     });
@@ -366,6 +381,9 @@ export function destroyHUD(scene) {
         try { scene._hudStateUnsub(); } catch (e) { /* ignore */ }
     }
     scene._hudStateUnsub = null;
+    // Remove resize listener if present
+    try { if (typeof window !== 'undefined' && scene._hudResizeHandler) window.removeEventListener('resize', scene._hudResizeHandler); } catch (e) {}
+    scene._hudResizeHandler = null;
     try { if (scene.hud && scene.hud.parentNode) scene.hud.parentNode.removeChild(scene.hud); } catch (e) { /* ignore */ }
     scene.hud = null;
 }
