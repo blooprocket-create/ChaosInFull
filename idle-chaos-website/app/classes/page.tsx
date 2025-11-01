@@ -1,5 +1,6 @@
 export const metadata = { title: "Classes • Veil Keeper", description: "A wiki-style overview of archetypes and talent paths.", openGraph: { title: "Veil Keeper Classes", images: ["/og/classes.png"] } };
 import ClassesExplorer, { ClassArchetype } from "@/src/components/ClassesExplorer";
+import ClassDetails from "@/src/components/ClassDetails";
 
 // Import live game class definitions (pure data module)
 // Note: this .js data file exports CLASS_DEFS as a plain object
@@ -113,8 +114,42 @@ export default function ClassesPage() {
         </div>
       </div>
 
-      <div className="mt-6">
-        <ClassesExplorer data={liveData} />
+      {/* Wiki layout: sticky contents + full class sections */}
+      <div className="mt-8 grid lg:grid-cols-12 gap-6">
+        <nav className="lg:col-span-4 xl:col-span-3 lg:sticky lg:self-start top-24">
+          <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+            <div className="text-sm font-semibold text-white/90">Contents</div>
+            <ul className="mt-2 space-y-1 text-sm text-violet-200/90">
+              {liveData.map((a) => (
+                <li key={a.key}>
+                  <a className="hover:underline" href={`#class-${a.key}`}>{a.name}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-4">
+            <div className="text-xs uppercase tracking-wide text-gray-400">Tips</div>
+            <ul className="mt-2 list-disc list-inside text-gray-300 text-sm">
+              <li>Use the anchor links to share exact class sections.</li>
+              <li>See the simulator at the bottom to preview talent ranks.</li>
+            </ul>
+          </div>
+        </nav>
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+          {liveData.map((a) => (
+            // Render per-class wiki section
+            <ClassDetails key={a.key} archetype={a} />
+          ))}
+
+          {/* Optional: Interactive simulator remains available */}
+          <div className="rounded-xl border border-white/10 bg-black/40 p-6">
+            <h2 className="text-xl font-semibold blood-underline inline-block">Interactive Talent Simulator</h2>
+            <p className="text-sm text-gray-400 mt-1">Use this panel to quickly test rank allocations and read scaling numbers.</p>
+            <div className="mt-4">
+              <ClassesExplorer data={liveData} />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="mt-12 rounded-xl border border-white/10 bg-black/40 p-6">
