@@ -5,7 +5,7 @@ import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
 import type { EnemyDef, EnemyDrop, EnemyGoldDrop } from "@/src/types/phaser-data";
 import { itemByKey } from "@/src/data/items";
 // Use dynamic enemy stat formulas from the original scene data (pure math, safe for client)
-import { computeEnemyStats } from "../../chaosinfull/src/data/statFormulas.js";
+import { computeEnemyStats } from "@/chaosinfull/src/data/statFormulas.js";
 import type { ScaledEnemy } from "@/src/types/stat-formulas";
 
 export default function WorldExplorer() {

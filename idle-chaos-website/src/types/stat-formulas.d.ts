@@ -11,7 +11,7 @@ export type ScaledEnemy = EnemyDef & {
   attackRange?: number;
 };
 
-declare module "../../chaosinfull/src/data/statFormulas.js" {
+declare module "@/chaosinfull/src/data/statFormulas.js" {
   import type { EnemyDef } from "@/src/types/phaser-data";
   import type { ScaledEnemy } from "@/src/types/stat-formulas";
   export function computeEnemyStats(def: EnemyDef): ScaledEnemy;
