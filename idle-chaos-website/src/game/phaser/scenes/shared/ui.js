@@ -1150,10 +1150,11 @@ export function openInventoryModal(scene) {
     const modal = document.createElement('div');
     modal.id = 'inventory-modal';
     modal.style.position = 'fixed';
-    // Position: middle-right (request)
-    modal.style.left = '75%';
+    // Position: far right, vertically centered
+    modal.style.right = '16px';
+    modal.style.left = '';
     modal.style.top = '50%';
-    modal.style.transform = 'translate(-50%,-50%)';
+    modal.style.transform = 'translateY(-50%)';
     modal.style.zIndex = '230';
     modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
     modal.style.padding = '12px';
@@ -1361,10 +1362,10 @@ export function openEquipmentModal(scene) {
     const modal = document.createElement('div');
     modal.id = 'equipment-modal';
     modal.style.position = 'fixed';
-    // Position: middle-left (request)
-    modal.style.left = '25%';
+    // Position: far left, vertically centered
+    modal.style.left = '16px';
     modal.style.top = '50%';
-    modal.style.transform = 'translate(-50%,-50%)';
+    modal.style.transform = 'translateY(-50%)';
     modal.style.zIndex = '235';
     modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
     modal.style.padding = '12px';
