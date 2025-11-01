@@ -45,12 +45,12 @@ export function createHUD(scene) {
     const hud = document.createElement('div');
     hud.id = hudId;
     hud.style.position = 'fixed';
-    hud.style.bottom = '60px';
+    hud.style.bottom = '72px';
     hud.style.left = '50%';
     hud.style.transform = 'translateX(-50%)';
     hud.style.width = '640px';
     hud.style.maxWidth = 'calc(100vw - 32px)';
-    hud.style.padding = '12px 16px';
+    hud.style.padding = '10px 16px';
     hud.style.zIndex = '100';
     hud.style.pointerEvents = 'auto';
     hud.style.display = 'flex';
@@ -74,26 +74,26 @@ export function createHUD(scene) {
     const settingsBtnId = idBase + '-hud-settings-btn';
     const returnBtnId = idBase + '-hud-return-btn';
     hud.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:2px;">
-            <span id="${hudId}-name" style="font-size:1em; font-weight:700; color:#e44; letter-spacing:1px;">${char.name || 'Character'} <span id="${hudId}-level" style='color:#fff; font-size:0.9em;'>- Lv ${char.level || 1}</span></span>
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:3px;">
+            <span id="${hudId}-name" style="font-size:0.85em; font-weight:700; color:#e44; letter-spacing:0.5px;">${char.name || 'Character'} <span id="${hudId}-level" style='color:#fff; font-size:0.95em;'>- Lv ${char.level || 1}</span> <span id="${hudId}-class" style='color:#aaa; font-size:0.9em;'>(${char.class || 'Adventurer'})</span></span>
                 <div style="display:flex; gap:6px; align-items:center;">
-                <button id="${charBtnId}" title="Save character" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.8em; padding:2px 6px; margin-left:8px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85;">💾</button>
-                <button id="${settingsBtnId}" title="Settings" style="pointer-events:auto; background:#1b2430; color:#ffd27a; border:none; border-radius:6px; font-size:0.8em; padding:2px 6px; margin-left:2px; box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:pointer; font-family:inherit; opacity:0.95;">⚙️</button>
-                <button id="${returnBtnId}" title="Return to character select" style="pointer-events:auto; background:#111; color:#fff; border:none; border-radius:6px; font-size:0.8em; padding:2px 6px; margin-left:2px; box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:pointer; font-family:inherit; opacity:0.95;">⤺</button>
+                <button id="${charBtnId}" title="Save character" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85;">💾</button>
+                <button id="${settingsBtnId}" title="Settings" style="pointer-events:auto; background:#1b2430; color:#ffd27a; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:pointer; font-family:inherit; opacity:0.95;">⚙️</button>
+                <button id="${returnBtnId}" title="Return to character select" style="pointer-events:auto; background:#111; color:#fff; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:pointer; font-family:inherit; opacity:0.95;">⤺</button>
             </div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:2px; width:100%;">
-            <div style="height:12px; background:#2a0a16; border-radius:6px; overflow:hidden; position:relative;">
+        <div style="display:flex; flex-direction:column; gap:3px; width:100%;">
+            <div style="height:18px; background:#2a0a16; border-radius:6px; overflow:hidden; position:relative; display:flex; align-items:center;">
                 <div id="${hudId}-hp-bar" style="height:100%; width:100%; background:#e44; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                <span id="${hudId}-hp-text" style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">0/0</span>
+                <span id="${hudId}-hp-text" style="position:relative; z-index:1; margin:0 auto; color:#fff; font-size:0.7em; text-shadow:0 1px 2px rgba(0,0,0,0.8);">0/0</span>
             </div>
-            <div style="height:12px; background:#181a2a; border-radius:6px; overflow:hidden; position:relative;">
+            <div style="height:18px; background:#181a2a; border-radius:6px; overflow:hidden; position:relative; display:flex; align-items:center;">
                 <div id="${hudId}-mana-bar" style="height:100%; width:100%; background:#44e; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                <span id="${hudId}-mana-text" style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">0/0</span>
+                <span id="${hudId}-mana-text" style="position:relative; z-index:1; margin:0 auto; color:#fff; font-size:0.7em; text-shadow:0 1px 2px rgba(0,0,0,0.8);">0/0</span>
             </div>
-            <div style="height:12px; background:#222a18; border-radius:6px; overflow:hidden; position:relative;">
+            <div style="height:18px; background:#222a18; border-radius:6px; overflow:hidden; position:relative; display:flex; align-items:center;">
                 <div id="${hudId}-xp-bar" style="height:100%; width:100%; background:#ee4; border-radius:6px; position:absolute; left:0; top:0;"></div>
-                <span id="${hudId}-xp-text" style="position:absolute; right:6px; top:0; color:#fff; font-size:0.8em;">0/0</span>
+                <span id="${hudId}-xp-text" style="position:relative; z-index:1; margin:0 auto; color:#fff; font-size:0.7em; text-shadow:0 1px 2px rgba(0,0,0,0.8);">0/0</span>
             </div>
         </div>
     `;
@@ -323,6 +323,7 @@ export function updateHUD(scene, options = {}) {
 
     const nameEl = document.getElementById(`${hudId}-name`);
     const levelEl = document.getElementById(`${hudId}-level`);
+    const classEl = document.getElementById(`${hudId}-class`);
     const hpBar = document.getElementById(`${hudId}-hp-bar`);
     const hpText = document.getElementById(`${hudId}-hp-text`);
     const manaBar = document.getElementById(`${hudId}-mana-bar`);
@@ -345,6 +346,7 @@ export function updateHUD(scene, options = {}) {
         }
     }
     if (levelEl) levelEl.textContent = `- Lv ${level}`;
+    if (classEl) classEl.textContent = `(${char.class || 'Adventurer'})`;
 
     if (hpBar) hpBar.style.width = `${maxhp > 0 ? Math.max(0, Math.min(100, (hp / maxhp) * 100)) : 0}%`;
     if (hpText) hpText.textContent = `${hp}/${maxhp}`;
