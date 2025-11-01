@@ -1,6 +1,7 @@
 import { getSession } from "@/src/lib/auth";
 import PhaserGameCanvas from "@/src/game/PhaserGameCanvas";
 import JsonLd from "@/src/components/JsonLd";
+import PhaserHUDPanel from "@/src/game/PhaserHUDPanel";
 
 export const metadata = { 
   title: "Veil Keeper • Play", 
@@ -45,32 +46,7 @@ export default async function PhaserGamePage() {
           initialScene="Boot"
         />
       </div>
-
-      <div className="mt-6 rounded-lg border border-white/10 bg-black/40 p-4">
-        <h2 className="text-xl font-semibold mb-3">Controls</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
-          <div>
-            <h3 className="font-semibold text-white mb-2">Movement</h3>
-            <ul className="space-y-1">
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">W</kbd> Move Up</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">A</kbd> Move Left</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">S</kbd> Move Down</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">D</kbd> Move Right</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-2">Actions</h3>
-            <ul className="space-y-1">
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">Space</kbd> Basic Attack</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">1-0</kbd> Active Skills</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">I</kbd> Inventory</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">U</kbd> Equipment</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">T</kbd> Talents</li>
-              <li><kbd className="px-2 py-1 bg-black/40 rounded border border-white/10">X</kbd> Stats &amp; Skills</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      <PhaserHUDPanel />
     </section>
   );
 }
