@@ -8,6 +8,23 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-10-31",
+    version: "0.0.13",
+    title: "World sync: chaosinfull data, portals, and NPCs now reflected on the site",
+    highlights: [
+      "World page now mirrors the live game: scenes, portals, NPCs, and enemies sourced from the chaosinfull runtime",
+      "Enemy tables use authoritative ENEMY_DEFS (damage/EXP/gold/drops) from the game data",
+      "Cave and Grave Forest details surfaced (mining + Wayne; woodcutting + Rowan); portal graph updated (Goblin path, Grave Forest → Broken Dock)",
+      "Build hygiene: added typings for the new enemy data path; typecheck/lint/build are clean"
+    ],
+    notes: [
+      "New adapter: src/data/world-chaosinfull.ts replaces the outdated zones model",
+      "WorldExplorer retargeted to the new adapter; SSR-safe client behavior preserved",
+      "Added Broken Dock placeholder in the world list for portal consistency",
+      "No gameplay balance changes in this patch—this is a data/UX sync across website and game"
+    ]
+  },
+  {
     date: "2025-10-17",
     version: "0.0.12",
     title: "Neon nights, bug stomps, and quest triage",
