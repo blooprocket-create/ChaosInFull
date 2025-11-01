@@ -1794,8 +1794,13 @@ export class Cave extends Phaser.Scene {
 
             let addedToShared = false;
             try {
-                if (window && window.__shared_ui && typeof window.__shared_ui.addItemToInventory === 'function') {
-                    window.__shared_ui.addItemToInventory(this, node.item.id, quantity);
+                // Prefer shared combat mixin wrapper so it also refreshes the inventory modal when open
+                if (this._addItemToInventory && typeof this._addItemToInventory === 'function') {
+                    this._addItemToInventory(node.item.id, quantity);
+                    addedToShared = true;
+                } else if (window && window.__shared_ui && typeof window.__shared_ui.addItemToInventory === 'function') {
+                    const ok = window.__shared_ui.addItemToInventory(this, node.item.id, quantity);
+                    if (!ok && this._showToast) this._showToast('Inventory full');
                     addedToShared = true;
                 }
             } catch (e) {}
@@ -1805,6 +1810,8 @@ export class Cave extends Phaser.Scene {
                 if (slot && typeof slot.qty === 'number') slot.qty += quantity;
                 else this.char.inventory.push({ id: node.item.id, name: itemName, qty: quantity });
             }
+            // If the inventory modal is open, refresh it immediately so new ore appears live
+            try { if (this._inventoryModal) this._refreshInventoryModal && this._refreshInventoryModal(); } catch (e) {}
 
             try {
                 updateQuestProgress(this.char, 'mine', node.item.id, quantity);
