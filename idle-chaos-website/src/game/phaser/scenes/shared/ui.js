@@ -1255,6 +1255,59 @@ export function refreshInventoryModal(scene) {
     const slotEl = document.createElement('div'); slotEl.className = 'slot'; slotEl.dataset.slotIndex = i;
     // ensure the slot is positioned and sits above potential overlays so clicks/dblclicks reach it
     try { slotEl.style.position = slotEl.style.position || 'relative'; slotEl.style.zIndex = '20'; slotEl.style.userSelect = 'none'; } catch (e) {}
+        
+        // Make slots draggable if they have an item
+        if (s) {
+            slotEl.draggable = true;
+            slotEl.style.cursor = 'grab';
+            
+            // Drag start
+            slotEl.addEventListener('dragstart', (ev) => {
+                ev.dataTransfer.effectAllowed = 'move';
+                ev.dataTransfer.setData('text/plain', i.toString());
+                slotEl.style.opacity = '0.5';
+                slotEl.style.cursor = 'grabbing';
+            });
+            
+            // Drag end
+            slotEl.addEventListener('dragend', (ev) => {
+                slotEl.style.opacity = '1';
+                slotEl.style.cursor = 'grab';
+            });
+        }
+        
+        // Allow all slots to be drop targets
+        slotEl.addEventListener('dragover', (ev) => {
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = 'move';
+            slotEl.style.background = 'rgba(80,10,10,0.3)';
+        });
+        
+        slotEl.addEventListener('dragleave', (ev) => {
+            slotEl.style.background = '';
+        });
+        
+        slotEl.addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            slotEl.style.background = '';
+            
+            const fromIndex = parseInt(ev.dataTransfer.getData('text/plain'));
+            const toIndex = parseInt(slotEl.dataset.slotIndex);
+            
+            if (fromIndex === toIndex || isNaN(fromIndex) || isNaN(toIndex)) return;
+            
+            // Swap the items
+            const temp = inv[fromIndex];
+            inv[fromIndex] = inv[toIndex];
+            inv[toIndex] = temp;
+            
+            // Update the character's inventory
+            scene.char.inventory = inv;
+            
+            // Refresh the display
+            refreshInventoryModal(scene);
+        });
+        
         if (s) {
             const def = defs && defs[s.id];
             let iconHtml = '📦';
