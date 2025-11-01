@@ -6,6 +6,8 @@ export type ZoneMobStats = {
   maxConcurrent: number | null;
 };
 
+export type ZoneNpc = { id: string; name: string; role?: string };
+
 export type ZoneDefinition = {
   key: string;
   name: string;
@@ -14,6 +16,8 @@ export type ZoneDefinition = {
   mobs: ZoneMobStats[];
   resources: string[]; // nodes or gatherables
   connections: string[]; // zone keys reachable via portal
+  npcs?: ZoneNpc[];
+  enemyIds?: string[]; // references into ENEMY_DEFS for richer data
 };
 
 export const zones: ZoneDefinition[] = [
@@ -21,10 +25,14 @@ export const zones: ZoneDefinition[] = [
     key: "town",
     name: "Town",
   description: "Central refuge: crafting, storage, tutorial guidance, mild existential onboarding.",
-    features: ["Workbench", "Furnace", "Account Storage", "Tutorial NPC (name TBD)", "Portals to Cave & Slime Field (when unlocked)"],
+    features: ["Workbench", "Furnace", "Account Storage", "Tutorial NPC (Mayor Grimsley)", "Portals to Cave & Slime Field (when unlocked)"],
     mobs: [],
     resources: [],
     connections: ["cave", "slime"],
+    npcs: [
+      { id: "mayor_grimsley", name: "Mayor Grimsley", role: "Quest giver" },
+      { id: "shopkeeper_generic", name: "Shopkeeper", role: "Merchant" },
+    ],
   },
   {
     key: "cave",
@@ -34,6 +42,7 @@ export const zones: ZoneDefinition[] = [
     mobs: [],
     resources: ["Copper Ore", "Tin Ore"],
     connections: ["town"],
+    npcs: [ { id: "wayne_mineson", name: "Wayne \"The Vein\" Mineson", role: "Mining tutor" } ],
   },
   {
     key: "slime",
@@ -45,6 +54,7 @@ export const zones: ZoneDefinition[] = [
     ],
     resources: [],
     connections: ["town", "slime-meadow"],
+    enemyIds: ["slime_common"],
   },
   {
     key: "slime-meadow",
@@ -58,6 +68,7 @@ export const zones: ZoneDefinition[] = [
     ],
     resources: [],
     connections: ["slime"],
+    enemyIds: ["slime_common", "slime_epic", "slime_boss"],
   },
 ];
 
