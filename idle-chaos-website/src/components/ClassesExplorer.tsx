@@ -90,6 +90,12 @@ export interface ClassesExplorerProps {
 
 export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
   const dataList = (props.data && props.data.length ? props.data : archetypes);
+  // Search/filter state for wiki-like navigation
+  const [query, setQuery] = useState("");
+  const [showActives, setShowActives] = useState(true);
+  const [showPassives, setShowPassives] = useState(true);
+  const [collapsedTabs, setCollapsedTabs] = useState<Record<string, boolean>>({});
+
   const [active, setActive] = useState<ClassArchetype>(dataList[0]);
   const [activePathKey, setActivePathKey] = useState<string | null>(null);
   const activePath = active.paths.find(p => p.key === activePathKey) || null;
@@ -108,6 +114,52 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
     if (r <= 0) return `(+0 ${s.type === 'percent' ? '%' : ''} ${s.target})`;
     return s.type === 'percent' ? `(+${v}% ${s.target})` : `(+${v} ${s.target})`;
   };
+  // Compute filtered left-hand list
+  const visibleList = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return dataList;
+    return dataList.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      a.synopsis.toLowerCase().includes(q) ||
+      a.paths.some(p => p.name.toLowerCase().includes(q))
+    );
+  }, [dataList, query]);
+  // Ensure selection stays valid when filtering by hash or search
+  useEffect(() => {
+    if (!visibleList.length) return; // don't change if nothing visible
+    if (!visibleList.find(a => a.key === active.key)) {
+      setActive(visibleList[0]);
+      setActivePathKey(null);
+    }
+  }, [visibleList]);
+  // Hash navigation: #class-<key>[-path-<pathKey>]
+  useEffect(() => {
+    const parseHash = () => {
+      const raw = (typeof window !== 'undefined' ? window.location.hash : '') || '';
+      const m = raw.match(/^#class-([a-z0-9_-]+)(?:-path-([a-z0-9_-]+))?$/i);
+      if (!m) return;
+      const [, cKey, pKey] = m;
+      const found = dataList.find(a => a.key === cKey);
+      if (found) {
+        setActive(found);
+        if (pKey && found.paths.find(p => p.key === pKey)) setActivePathKey(pKey);
+        else setActivePathKey(null);
+      }
+    };
+    parseHash();
+    const onHash = () => parseHash();
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [dataList]);
+  useEffect(() => {
+    // Update hash when selection changes (avoid scroll jump with replaceState)
+    const hash = `#class-${active.key}${activePathKey ? `-path-${activePathKey}` : ''}`;
+    try {
+      history.replaceState(null, "", hash);
+    } catch {
+      window.location.hash = hash;
+    }
+  }, [active.key, activePathKey]);
   // Keyboard navigation between archetypes and paths
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -141,10 +193,57 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
     el.focus({ preventScroll: true });
     return () => el.removeEventListener("keydown", onKey);
   }, [activeIndex, active, activePathKey, dataList]);
+  // Utility for tag chips based on class key (lightweight wiki hinting)
+  const roleChips = (key: string): string[] => {
+    if (key === 'horror' || key === 'ravager' || key === 'sanguine') return ['frontline', 'control'];
+    if (key === 'occultist' || key === 'hexweaver' || key === 'astral') return ['caster', 'debuff'];
+    if (key === 'stalker' || key === 'nightblade' || key === 'shade') return ['dps', 'mobility'];
+    return ['generalist'];
+  };
+  // Talent filters
+  const talentVisible = (t: { kind?: string }) => {
+    const isActive = t.kind === 'active';
+    if (isActive && !showActives) return false;
+    if (!isActive && !showPassives) return false;
+    return true;
+  };
+  // Bulk rank helpers for visible talents
+  const currentVisibleTalentIds = useMemo(() => {
+    if (!active.talentsByTab) return [] as string[];
+    const ids: string[] = [];
+    for (const group of active.talentsByTab) {
+      if (collapsedTabs[group.tabId]) continue;
+      for (const t of group.talents) {
+        if (talentVisible(t)) ids.push(t.id);
+      }
+    }
+    return ids;
+  }, [active.talentsByTab, collapsedTabs, showActives, showPassives]);
+  const resetRanks = () => setRanks(prev => {
+    const next = { ...prev };
+    for (const id of currentVisibleTalentIds) next[id] = 0;
+    return next;
+  });
+  const maxAllRanks = () => setRanks(prev => {
+    const next = { ...prev };
+    for (const id of currentVisibleTalentIds) next[id] = maxRank;
+    return next;
+  });
+
   return (
     <div ref={containerRef} className="mt-8 grid lg:grid-cols-12 gap-6">
-      <div className="lg:col-span-5 space-y-4">
-        {dataList.map(a => {
+      <div className="lg:col-span-5 space-y-4 lg:sticky lg:self-start top-24">
+        <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+          <label htmlFor="class-search" className="block text-[11px] text-gray-400 mb-1">Search classes</label>
+          <input
+            id="class-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find an archetype or path..."
+            className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          />
+        </div>
+        {visibleList.map(a => {
           const selected = a.key === active.key;
           return (
             <button
@@ -158,13 +257,18 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
                 <span className="text-xs px-2 py-1 rounded bg-white/10 text-gray-300">{a.paths.length} paths</span>
               </div>
               <p className="mt-1 text-xs text-gray-400">{a.synopsis}</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {roleChips(a.key).map(tag => (
+                  <span key={tag} className="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 bg-white/5 border border-white/10 text-gray-300">{tag}</span>
+                ))}
+              </div>
             </button>
           );
         })}
       </div>
-      <div className="lg:col-span-7 rounded-xl border border-white/10 bg-black/40 p-6 flex flex-col gap-5 relative overflow-hidden animate-scale-in">
+      <div id={`class-${active.key}`} className="lg:col-span-7 rounded-xl border border-white/10 bg-black/40 p-6 flex flex-col gap-5 relative overflow-hidden animate-scale-in">
         <div className="absolute -right-10 -top-10 size-32 rounded-full blur-2xl bg-violet-500/10" />
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <h3 className="text-xl font-semibold blood-underline inline-block">{active.name}</h3>
           <div className="flex gap-2 flex-wrap justify-end">
             {active.paths.map(p => (
@@ -177,6 +281,32 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
           </div>
         </div>
         <p className="text-sm text-gray-300 max-w-prose">{active.blurb}</p>
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex items-center gap-2 text-[11px] text-gray-300">
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" className="accent-violet-500" checked={showActives} onChange={e => setShowActives(e.target.checked)} />
+              Actives
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" className="accent-violet-500" checked={showPassives} onChange={e => setShowPassives(e.target.checked)} />
+              Passives
+            </label>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <button onClick={resetRanks} className="rounded border border-white/10 bg-white/5 hover:bg-white/10 px-2 py-1 text-gray-200">Reset ranks</button>
+            <button onClick={maxAllRanks} className="rounded border border-white/10 bg-white/5 hover:bg-white/10 px-2 py-1 text-gray-200">Max visible</button>
+            <button
+              onClick={async () => {
+                try {
+                  const hash = `#class-${active.key}${activePathKey ? `-path-${activePathKey}` : ''}`;
+                  const url = `${window.location.origin}${window.location.pathname}${hash}`;
+                  await navigator.clipboard.writeText(url);
+                } catch { /* noop */ }
+              }}
+              className="rounded border border-white/10 bg-white/5 hover:bg-white/10 px-2 py-1 text-gray-200"
+            >Copy link</button>
+          </div>
+        </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="rounded-lg bg-black/30 border border-white/10 p-4">
             <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Starter Talents</div>
@@ -228,11 +358,22 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
           <div className="rounded-lg bg-black/30 border border-white/10 p-4">
             <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">All Talents</div>
             <div className="grid sm:grid-cols-2 gap-4">
-              {active.talentsByTab.map(group => (
-                <div key={group.tabId} className="text-xs">
-                  <div className="font-medium text-gray-200 mb-1">{group.label}</div>
-                  <ul className="space-y-1 text-gray-300">
-                    {group.talents.map(t => {
+              {active.talentsByTab.map(group => {
+                const collapsed = !!collapsedTabs[group.tabId];
+                return (
+                  <div key={group.tabId} className="text-xs">
+                    <button
+                      className="w-full flex items-center justify-between mb-1 font-medium text-gray-200 hover:text-white"
+                      onClick={() => setCollapsedTabs(prev => ({ ...prev, [group.tabId]: !prev[group.tabId] }))}
+                      aria-expanded={!collapsed}
+                      aria-controls={`tab-${group.tabId}`}
+                    >
+                      <span>{group.label}</span>
+                      <span className="text-[10px] uppercase tracking-wide text-gray-400">{collapsed ? 'show' : 'hide'}</span>
+                    </button>
+                    {!collapsed && (
+                      <ul id={`tab-${group.tabId}`} className="space-y-1 text-gray-300">
+                        {group.talents.filter(talentVisible).map(t => {
                       const r = ranks[t.id] ?? 0;
                       const primary = describeScaling(t.scaling, r);
                       const secondary = describeScaling(t.secondScaling, r);
@@ -271,10 +412,12 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
                           </div>
                         </li>
                       );
-                    })}
-                  </ul>
-                </div>
-              ))}
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
