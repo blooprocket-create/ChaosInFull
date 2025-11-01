@@ -1,7 +1,7 @@
 import { checkClassLevelUps } from './stats.js';
 import { persistCharacter } from './persistence.js';
 import { getTalentDefById, ensureCharTalents, computeTalentModifiers } from '../../data/talents.js';
-import { bindSkillBarKeys, unbindSkillBarKeys, bindTalentKey, unbindTalentKey, refreshSkillBarHUD } from './ui.js';
+import { bindSkillBarKeys, unbindSkillBarKeys, bindTalentKey, unbindTalentKey, refreshSkillBarHUD, maybeAutoUsePotions } from './ui.js';
 import { setCircleCentered, setBodySizeCentered } from '../../shared/physicsHelpers.js';
 import { addPhysicsOverlap } from '../../shared/cleanupManager.js';
 import { enableInvertCircle, updateInvertCircle, disableInvertCircle, enableHellscape, disableHellscape } from './pipelines.js';
@@ -3850,6 +3850,8 @@ export function registerTalentHandlers(scene) {
                     try { char.hp = (typeof char.hp === 'number') ? Math.min(char.maxhp, char.hp + (eff.hpRegen || 0)) : Math.min(char.maxhp, (eff.maxhp || char.maxhp || 1)); } catch (e) {}
                     try { char.mana = (typeof char.mana === 'number') ? Math.min(char.maxmana, char.mana + (eff.manaRegen || 0)) : Math.min(char.maxmana, (eff.maxmana || char.maxmana || 0)); } catch (e) {}
                     try { if (scene._updateHUD) scene._updateHUD(); } catch (e) {}
+                    // Auto-use potions (HP/Mana) if enabled in settings; rate-limited inside helper
+                    try { if (typeof maybeAutoUsePotions === 'function') maybeAutoUsePotions(scene); else if (window && window.__shared_ui && typeof window.__shared_ui.maybeAutoUsePotions === 'function') window.__shared_ui.maybeAutoUsePotions(scene); } catch (e) {}
                     // Mana Shield passive regen: only regen when out of combat
                     try {
                         const tmods = (char && char._talentModifiers) ? char._talentModifiers : {};

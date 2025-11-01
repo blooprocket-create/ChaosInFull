@@ -278,6 +278,12 @@ export class Login extends Phaser.Scene {
             // Do not stop shared background music here (shared manager controls lifecycle).
             this._cleanupDom();
         });
+        // Also clean up if the scene is destroyed directly (e.g., game destroy)
+        try {
+            this.events.once('destroy', () => {
+                this._cleanupDom();
+            });
+        } catch (e) { /* ignore */ }
     }
 
     _findLastLoggedInUser() {

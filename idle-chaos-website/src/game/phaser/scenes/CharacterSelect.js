@@ -448,6 +448,12 @@ export class CharacterSelect extends Phaser.Scene {
             // Do not stop shared background music here (shared manager controls lifecycle).
             this._cleanupDom();
         });
+        // Also handle direct scene destruction (e.g., when destroying the game)
+        try {
+            this.events.once('destroy', () => {
+                this._cleanupDom();
+            });
+        } catch (e) { /* ignore */ }
     }
 
     _cleanupDom() {

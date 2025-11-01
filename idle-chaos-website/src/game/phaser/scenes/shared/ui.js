@@ -678,6 +678,84 @@ export function applySettingsToScene(scene, settings) {
     } catch (e) {}
 }
 
+// Auto-use potions helper: checks current HP/Mana vs thresholds and consumes the smallest suitable potion.
+// Rate-limited per type to avoid spam. Uses the centralized useItemFromSlot for consistent behavior.
+export function maybeAutoUsePotions(scene) {
+    try {
+        if (!scene || !scene.char) return false;
+        const settings = (typeof window !== 'undefined' && window.__game_settings) ? window.__game_settings : loadSettings();
+        const autoHP = !!settings.autoUseHP;
+        const autoMP = !!settings.autoUseMana;
+        const hpThresh = Math.max(1, Math.min(99, Number(settings.autoUseHPThreshold != null ? settings.autoUseHPThreshold : 35)));
+        const mpThresh = Math.max(1, Math.min(99, Number(settings.autoUseManaThreshold != null ? settings.autoUseManaThreshold : 20)));
+
+        // Compute max/current via effective stats (fallbacks if missing)
+        let eff = null;
+        try { if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(scene.char); } catch (e) {}
+        const maxhp = (eff && typeof eff.maxhp === 'number') ? eff.maxhp : ((typeof scene.char.maxhp === 'number' && scene.char.maxhp > 0) ? scene.char.maxhp : Math.max(1, 100 + (scene.char.level || 1) * 10));
+        const maxmana = (eff && typeof eff.maxmana === 'number') ? eff.maxmana : ((typeof scene.char.maxmana === 'number' && scene.char.maxmana > 0) ? scene.char.maxmana : Math.max(0, Math.floor(50 + (scene.char.level || 1) * 5 + (((scene.char.stats && scene.char.stats.int) || 0) * 10))));
+        const curHp = (typeof scene.char.hp === 'number') ? scene.char.hp : maxhp;
+        const curMp = (typeof scene.char.mana === 'number') ? scene.char.mana : maxmana;
+        const hpPct = Math.max(0, Math.min(100, Math.floor((curHp / Math.max(1, maxhp)) * 100)));
+        const mpPct = Math.max(0, Math.min(100, Math.floor((curMp / Math.max(1, maxmana)) * 100)));
+
+        // Inventory slots
+        scene.char.inventory = initSlots(scene.char.inventory || []);
+        const slots = scene.char.inventory;
+        const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+
+        // Helper: find best potion slot index of a given type ('hp' or 'mana')
+        function findBestPotionSlot(type) {
+            const isHP = type === 'hp';
+            const needed = isHP ? Math.max(0, maxhp - curHp) : Math.max(0, maxmana - curMp);
+            const candidates = [];
+            for (let i = 0; i < slots.length; i++) {
+                const s = slots[i];
+                if (!s || !s.id) continue;
+                const d = defs[s.id] || {};
+                if (!d.usable) continue;
+                const amt = isHP ? Number(d.healAmount || 0) : Number(d.manaAmount || 0);
+                if (!amt) continue;
+                candidates.push({ idx: i, amount: amt });
+            }
+            if (!candidates.length) return -1;
+            // sort ascending by amount to minimize overheal
+            candidates.sort((a,b) => a.amount - b.amount);
+            // choose the smallest that covers at least 60% of needed (avoid wasting super small pots when critically low)
+            const minUseful = Math.max(1, Math.floor(needed * 0.6));
+            const exact = candidates.find(c => c.amount >= minUseful);
+            if (exact) return exact.idx;
+            // fallback: smallest available
+            return candidates[0].idx;
+        }
+
+        let used = false;
+        const now = Date.now();
+        const minInterval = 1500; // ms per type
+        // HP
+        if (autoHP && hpPct <= hpThresh && curHp < maxhp) {
+            if (!scene._lastAutoHPUseAt || (now - scene._lastAutoHPUseAt) >= minInterval) {
+                const slot = findBestPotionSlot('hp');
+                if (slot >= 0) {
+                    const ok = useItemFromSlot(scene, slot);
+                    if (ok) { scene._lastAutoHPUseAt = now; used = true; }
+                }
+            }
+        }
+        // Mana
+        if (autoMP && mpPct <= mpThresh && curMp < maxmana) {
+            if (!scene._lastAutoManaUseAt || (now - scene._lastAutoManaUseAt) >= minInterval) {
+                const slot = findBestPotionSlot('mana');
+                if (slot >= 0) {
+                    const ok = useItemFromSlot(scene, slot);
+                    if (ok) { scene._lastAutoManaUseAt = now; used = true; }
+                }
+            }
+        }
+        return used;
+    } catch (e) { return false; }
+}
+
 // Background music helper: play/stop/set-volume a persistent background track managed via the game's sound manager.
 export function playBackgroundMusic(scene, key, opts = {}) {
     if (!scene || !key) return null;
@@ -872,7 +950,7 @@ export function ensureAttackRangeIndicator(scene, enabled) {
 export function openSettingsModal(scene) {
     if (!scene) return;
     if (scene._settingsModal) return;
-    const current = Object.assign({ musicVolume: 1, sfxVolume: 1, alwaysRun: false, showAtkRange: false }, loadSettings());
+    const current = Object.assign({ musicVolume: 1, sfxVolume: 1, alwaysRun: false, showAtkRange: false, autoUseHP: false, autoUseHPThreshold: 35, autoUseMana: false, autoUseManaThreshold: 20 }, loadSettings());
     const modal = document.createElement('div'); modal.id = 'settings-modal'; modal.className = 'modal-overlay show'; modal.style.zIndex = '260';
     modal.innerHTML = `
         <div class='modal-card' style='min-width:520px; max-width:760px;'>
@@ -884,13 +962,19 @@ export function openSettingsModal(scene) {
                 <div class='modal-close'><button id='settings-close' class='btn btn-ghost'>Close</button></div>
             </div>
             <div class='modal-body'>
-                <div style='flex:0 0 260px; display:flex; flex-direction:column; gap:12px;'>
+                <div style='flex:0 0 320px; display:flex; flex-direction:column; gap:12px;'>
                     <div><strong>Sound</strong></div>
                     <div>Music Volume: <input id='settings-music' type='range' min='0' max='1' step='0.01' value='${current.musicVolume}' class='input-small' /></div>
                     <div>SFX Volume: <input id='settings-sfx' type='range' min='0' max='1' step='0.01' value='${current.sfxVolume}' class='input-small' /></div>
                     <div style='margin-top:8px;'><strong>Gameplay</strong></div>
                     <div><label><input id='settings-alwaysrun' type='checkbox' ${current.alwaysRun ? 'checked' : ''} /> Always run</label></div>
                     <div><label><input id='settings-showatk' type='checkbox' ${current.showAtkRange ? 'checked' : ''} /> Show attack range</label></div>
+                    <div style='margin-top:8px;'><strong>Auto-Use</strong></div>
+                    <div style='display:flex;flex-direction:column;gap:6px;'>
+                        <label style='display:flex;align-items:center;gap:8px;'><input id='settings-autohp' type='checkbox' ${current.autoUseHP ? 'checked' : ''} /> Auto-use Health Potions at or below <input id='settings-autohp-th' type='number' min='1' max='99' step='1' value='${current.autoUseHPThreshold}' class='input-small' style='width:64px;' />%</label>
+                        <label style='display:flex;align-items:center;gap:8px;'><input id='settings-automp' type='checkbox' ${current.autoUseMana ? 'checked' : ''} /> Auto-use Mana Potions at or below <input id='settings-automp-th' type='number' min='1' max='99' step='1' value='${current.autoUseManaThreshold}' class='input-small' style='width:64px;' />%</label>
+                        <div style='font-size:12px;color:rgba(255,255,255,0.7)'>Auto-use is rate-limited and picks the smallest potion that helps.</div>
+                    </div>
                 </div>
                 <div style='flex:1 1 360px; display:flex; flex-direction:column; gap:12px;'>
                     <div><strong>Misc</strong></div>
@@ -906,6 +990,8 @@ export function openSettingsModal(scene) {
     // wire controls
     const music = modal.querySelector('#settings-music'); const sfx = modal.querySelector('#settings-sfx');
     const always = modal.querySelector('#settings-alwaysrun'); const showatk = modal.querySelector('#settings-showatk');
+    const autohp = modal.querySelector('#settings-autohp'); const autohpTh = modal.querySelector('#settings-autohp-th');
+    const automp = modal.querySelector('#settings-automp'); const autompTh = modal.querySelector('#settings-automp-th');
     if (music) music.oninput = music.onchange = () => {
         try {
             current.musicVolume = Number(music.value);
@@ -922,6 +1008,28 @@ export function openSettingsModal(scene) {
     };
     if (showatk) showatk.onchange = () => {
         try { current.showAtkRange = Boolean(showatk.checked); saveSettings(current); applySettingsToScene(scene, current); } catch (e) {}
+    };
+    if (autohp) autohp.onchange = () => {
+        try { current.autoUseHP = Boolean(autohp.checked); saveSettings(current); if (typeof window !== 'undefined') window.__game_settings = Object.assign({}, window.__game_settings || {}, { autoUseHP: current.autoUseHP }); } catch (e) {}
+    };
+    if (autohpTh) autohpTh.onchange = autohpTh.oninput = () => {
+        try {
+            const v = Math.max(1, Math.min(99, Number(autohpTh.value || 35)));
+            current.autoUseHPThreshold = v; autohpTh.value = String(v);
+            saveSettings(current);
+            if (typeof window !== 'undefined') window.__game_settings = Object.assign({}, window.__game_settings || {}, { autoUseHPThreshold: current.autoUseHPThreshold });
+        } catch (e) {}
+    };
+    if (automp) automp.onchange = () => {
+        try { current.autoUseMana = Boolean(automp.checked); saveSettings(current); if (typeof window !== 'undefined') window.__game_settings = Object.assign({}, window.__game_settings || {}, { autoUseMana: current.autoUseMana }); } catch (e) {}
+    };
+    if (autompTh) autompTh.onchange = autompTh.oninput = () => {
+        try {
+            const v = Math.max(1, Math.min(99, Number(autompTh.value || 20)));
+            current.autoUseManaThreshold = v; autompTh.value = String(v);
+            saveSettings(current);
+            if (typeof window !== 'undefined') window.__game_settings = Object.assign({}, window.__game_settings || {}, { autoUseManaThreshold: current.autoUseManaThreshold });
+        } catch (e) {}
     };
     const switchBtn = modal.querySelector('#settings-switchchar'); if (switchBtn) switchBtn.onclick = () => {
         try {
@@ -949,7 +1057,7 @@ export function closeSettingsModal(scene) {
 
 // expose settings helper globally
 try { if (typeof window !== 'undefined') { window.__shared_ui = window.__shared_ui || {}; window.__shared_ui.openSettingsModal = openSettingsModal; window.__shared_ui.applySettingsToScene = applySettingsToScene; window.__shared_ui.ensureAttackRangeIndicator = ensureAttackRangeIndicator; } } catch (e) {}
-try { if (typeof window !== 'undefined') { window.__shared_ui = window.__shared_ui || {}; window.__shared_ui.playBackgroundMusic = playBackgroundMusic; window.__shared_ui.stopBackgroundMusic = stopBackgroundMusic; window.__shared_ui.setBackgroundMusicVolume = setBackgroundMusicVolume; } } catch (e) {}
+try { if (typeof window !== 'undefined') { window.__shared_ui = window.__shared_ui || {}; window.__shared_ui.playBackgroundMusic = playBackgroundMusic; window.__shared_ui.stopBackgroundMusic = stopBackgroundMusic; window.__shared_ui.setBackgroundMusicVolume = setBackgroundMusicVolume; window.__shared_ui.maybeAutoUsePotions = maybeAutoUsePotions; } } catch (e) {}
 
 // Initialize global settings object from storage so other modules (movement.js) can read it
 try { if (typeof window !== 'undefined') { window.__game_settings = Object.assign({}, window.__game_settings || {}, loadSettings()); } } catch (e) {}

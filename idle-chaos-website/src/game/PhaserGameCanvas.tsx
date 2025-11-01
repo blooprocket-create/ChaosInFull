@@ -34,6 +34,9 @@ export default function PhaserGameCanvas({
               'furnace-modal',
               'storage-modal',
               'settings-modal',
+              // Login/Character Select scene roots
+              'login-container',
+              'character-select-root',
             ];
             for (const id of ids) {
               const el = document.getElementById(id);
@@ -53,6 +56,12 @@ export default function PhaserGameCanvas({
                 if (n.parentNode) {
                   n.parentNode.removeChild(n);
                 }
+              } catch {}
+            });
+            // Remove atmospheric canvases created by Login/CharacterSelect (idPrefix: login/charselect)
+            document.querySelectorAll('[id^="login-"], [id^="charselect-"]').forEach((n) => {
+              try {
+                if (n.parentNode) n.parentNode.removeChild(n);
               } catch {}
             });
           }
@@ -114,6 +123,9 @@ export default function PhaserGameCanvas({
             'furnace-modal',
             'storage-modal',
             'settings-modal',
+            // Login/Character Select scene roots
+            'login-container',
+            'character-select-root',
           ];
           for (const id of ids) {
             const node = document.getElementById(id);
@@ -132,6 +144,12 @@ export default function PhaserGameCanvas({
               if (n.parentNode) {
                 n.parentNode.removeChild(n);
               }
+            } catch {}
+          });
+          // Remove atmospheric canvases created by Login/CharacterSelect (idPrefix: login/charselect)
+          document.querySelectorAll('[id^="login-"], [id^="charselect-"]').forEach((n) => {
+            try {
+              if (n.parentNode) n.parentNode.removeChild(n);
             } catch {}
           });
         }

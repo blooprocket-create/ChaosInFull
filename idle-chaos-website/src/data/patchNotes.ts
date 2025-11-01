@@ -9,6 +9,23 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-11-01",
+    version: "0.0.15",
+    title: "Login/Character-Select HUD cleanup, New Setting Options, Styling for the setting panel",
+    highlights: [
+      "Cleanup HUD and skill bar DOM on Login/Character-Select scene shutdown to prevent leaks",
+      "New settings: toggle Auto-Use Potions",
+      "New settings: toggle Auto-Eat Food",
+      "Styling improvements for the Settings panel to match site aesthetics"
+    ],
+    notes: [
+      "Login and Character-Select scenes now remove their DOM elements when the scene ends or is destroyed, ensuring no lingering UI artifacts remain when transitioning between scenes or when the game instance is destroyed.",
+      "Added a new setting that allows players to enable or disable automatic potion usage during gameplay, providing more control over their character's health management.",
+      "Added a new setting that allows players to enable or disable automatic food consumption, giving players the option to manage their character's health more effectively.",
+      "The Settings panel has been restyled to align with the overall site design, featuring improved layout, typography, and color schemes for a more cohesive user experience."
+    ]
+  },
+  {
+    date: "2025-11-01",
     version: "0.0.14",
     title: "HUD makeover, DnD inventory, dbl‑click use, and fog/nav fix",
     highlights: [
