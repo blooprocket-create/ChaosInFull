@@ -41,7 +41,7 @@ function toArchetypesFromGame(): ClassArchetype[] {
           };
         })
         .filter((g): g is NonNullable<typeof g> => Boolean(g));
-    } catch (e) {
+    } catch {
       return [] as { tabId: string; label: string; talents: { id: string; name: string; kind?: string; activeType?: string; description?: string }[] }[];
     }
   };

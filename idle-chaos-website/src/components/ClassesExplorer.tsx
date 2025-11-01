@@ -131,7 +131,7 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
       setActive(visibleList[0]);
       setActivePathKey(null);
     }
-  }, [visibleList]);
+  }, [visibleList, active.key]);
   // Hash navigation: #class-<key>[-path-<pathKey>]
   useEffect(() => {
     const parseHash = () => {
@@ -218,7 +218,7 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
       }
     }
     return ids;
-  }, [active.talentsByTab, collapsedTabs, showActives, showPassives]);
+  }, [active.talentsByTab, collapsedTabs, showActives, showPassives, talentVisible]);
   const resetRanks = () => setRanks(prev => {
     const next = { ...prev };
     for (const id of currentVisibleTalentIds) next[id] = 0;

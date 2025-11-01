@@ -41,7 +41,11 @@ export default function PhaserGameCanvas({
             }
             // Remove any generic modal overlays left behind
             document.querySelectorAll('.modal-overlay').forEach((n) => {
-              try { n.parentNode && n.parentNode.removeChild(n); } catch {}
+              try {
+                if (n.parentNode) {
+                  n.parentNode.removeChild(n);
+                }
+              } catch {}
             });
           }
         } catch {}
@@ -108,7 +112,11 @@ export default function PhaserGameCanvas({
             if (node && node.parentNode) node.parentNode.removeChild(node);
           }
           document.querySelectorAll('.modal-overlay').forEach((n) => {
-            try { n.parentNode && n.parentNode.removeChild(n); } catch {}
+            try {
+              if (n.parentNode) {
+                n.parentNode.removeChild(n);
+              }
+            } catch {}
           });
         }
       } catch {}
