@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { zones, ZoneDefinition } from "@/src/data/zones";
 import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
 import type { EnemyDef, EnemyDrop } from "@/src/types/phaser-data";
+import { itemByKey } from "@/src/data/items";
 
 function formatMobStat(v: number | null, unit?: string) {
   if (v == null) return "?";
@@ -20,6 +21,49 @@ export default function WorldExplorer() {
       .map((id) => enemyMap[id])
       .filter((e): e is EnemyDef => Boolean(e));
   }, [active]);
+
+  // Human-friendly item name resolution for loot tables
+  const ITEM_NAME_ALIASES: Record<string, string> = {
+    slime_gel: "Slime Gel",
+    slime_goop: "Slime Goop",
+    slime_core: "Slime Core",
+    slime_whip: "Slime Whip",
+    minor_health_potion: "Minor Health Potion",
+    minor_mana_potion: "Minor Mana Potion",
+    major_health_potion: "Major Health Potion",
+    major_mana_potion: "Major Mana Potion",
+    copper_ore: "Copper Ore",
+    tin_ore: "Tin Ore",
+    rat_tail: "Rat Tail",
+    rat_meat: "Rat Meat",
+    toxic_essence: "Toxic Essence",
+    rotting_fang: "Rotting Fang",
+    spectral_essence: "Spectral Essence",
+    shadow_essence: "Shadow Essence",
+    slime_crown_shard: "Slime Crown Shard",
+    strange_slime_egg: "Strange Slime Egg",
+  };
+
+  const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  const friendlyItemName = (id?: string) => {
+    if (!id) return "?";
+    const fromCatalog = itemByKey[id]?.name;
+    if (fromCatalog) return fromCatalog;
+    const alias = ITEM_NAME_ALIASES[id];
+    if (alias) return alias;
+    return titleCase(id);
+  };
+  const itemCategoryBadge = (id?: string) => {
+    if (!id) return null;
+    const def = itemByKey[id];
+    if (!def) return null;
+    const color = def.category === 'ore' ? 'bg-amber-600/20 border-amber-500/30 text-amber-200'
+      : def.category === 'bar' ? 'bg-amber-500/20 border-amber-400/30 text-amber-100'
+      : def.category === 'weapon' ? 'bg-red-600/20 border-red-500/30 text-red-200'
+      : def.category === 'armor' ? 'bg-blue-600/20 border-blue-500/30 text-blue-200'
+      : 'bg-white/10 border-white/20 text-gray-200';
+    return <span className={`ml-2 inline-block rounded px-1 py-0.5 text-[10px] border ${color}`}>{def.category}</span>;
+  };
   return (
     <div className="mt-8 grid lg:grid-cols-12 gap-6">
       <div className="lg:col-span-5 space-y-4">
@@ -160,7 +204,10 @@ export default function WorldExplorer() {
                             <tbody>
                               {(e.drops || []).map((d: EnemyDrop, idx: number) => (
                                 <tr key={`${e.id}-drop-${idx}`} className="border-t border-white/5">
-                                  <td className="py-1 pr-2 text-gray-200">{d.itemId || d.itemID || '?'}</td>
+                                  <td className="py-1 pr-2 text-gray-200">
+                                    {friendlyItemName(d.itemId || d.itemID)}
+                                    {itemCategoryBadge(d.itemId || d.itemID)}
+                                  </td>
                                   <td className="py-1 pr-2 text-gray-300">{d.minQty}–{d.maxQty}</td>
                                   <td className="py-1 pr-2 text-gray-300">{d.baseChance != null ? `${Math.round(d.baseChance * 1000)/10}%` : '-'}</td>
                                   <td className="py-1 pr-2 text-gray-300">{d.luckBonus != null ? `+${Math.round(d.luckBonus * 10000)/100}%/luck` : '-'}</td>
