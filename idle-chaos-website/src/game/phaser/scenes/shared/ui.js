@@ -1339,8 +1339,8 @@ export function refreshInventoryModal(scene) {
                     const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
                     try { console.log && console.log('[slot dblclick] idx', idx, 'itemId', (def && def.id) || (s && s.id)); } catch(e) {}
                     // If item is usable, attempt to use it first
-                    if (def && def.usable && !isNaN(idx) && window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
-                        const used = window.__shared_ui.useItemFromSlot(scene, idx);
+                    if (def && def.usable && !isNaN(idx)) {
+                        const used = useItemFromSlot(scene, idx);
                         try { console.log && console.log('[slot dblclick] useItemFromSlot returned', used); } catch(e) {}
                         if (used) {
                             // refresh UI after use
@@ -1384,37 +1384,18 @@ export function refreshInventoryModal(scene) {
                     if (ev.key === 'Enter' || ev.key === ' ') {
                         ev.preventDefault();
                         const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
-                        if (!isNaN(idx) && window && window.__shared_ui && typeof window.__shared_ui.useItemFromSlot === 'function') {
-                            try { const ok = window.__shared_ui.useItemFromSlot(scene, idx); try { console.debug && console.debug('[inventory] slot key use returned', ok); } catch(e) {} } catch(e) {}
+                        if (!isNaN(idx)) {
+                            try { 
+                                const ok = useItemFromSlot(scene, idx); 
+                                try { console.debug && console.debug('[inventory] slot key use returned', ok); } catch(e) {} 
+                                if (ok) {
+                                    try { refreshInventoryModal(scene); } catch (e) {}
+                                    try { refreshEquipmentModal(scene); } catch (e) {}
+                                }
+                            } catch(e) {}
                         }
                     }
                 });
-            } catch (e) {}
-            // Add a small 'Use' button for usable items (clicking stops propagation so it doesn't trigger dblclick)
-            try {
-                if (def && def.usable) {
-                    const useBtn = document.createElement('button');
-                    useBtn.className = 'use-btn';
-                    useBtn.textContent = 'Use';
-                    useBtn.style.cssText = 'position:absolute;left:6px;bottom:6px;background:#2b6be6;color:#fff;border:none;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px;z-index:50;pointer-events:auto;';
-                    useBtn.onclick = (ev) => {
-                        ev.stopPropagation();
-                        try {
-                            const idx = Number(slotEl.dataset && slotEl.dataset.slotIndex);
-                            if (isNaN(idx)) return;
-                            console.log && console.log('[use-btn] clicked slot', idx, 'item', s && s.id);
-                            // Call the local function directly (same as debug header) to avoid
-                            // relying on window.__shared_ui being present or stale.
-                            const ok = typeof useItemFromSlot === 'function' ? useItemFromSlot(scene, idx) : false;
-                            console.log && console.log('[use-btn] useItemFromSlot returned', ok);
-                            if (ok) {
-                                try { refreshInventoryModal(scene); } catch (e) {}
-                                try { refreshEquipmentModal(scene); } catch (e) {}
-                            }
-                        } catch (e) { console.warn && console.warn('[use-btn] error', e); }
-                    };
-                    slotEl.appendChild(useBtn);
-                }
             } catch (e) {}
         }
         grid.appendChild(slotEl);
