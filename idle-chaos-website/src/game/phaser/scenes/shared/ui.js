@@ -1156,15 +1156,17 @@ export function openInventoryModal(scene) {
     modal.style.top = '50%';
     modal.style.transform = 'translateY(-50%)';
     modal.style.zIndex = '230';
-    // Apply site login/character-select style: glassy dark panel with subtle border and shadow
-    modal.style.background = 'rgba(0,0,0,0.40)';
-    modal.style.border = '1px solid rgba(255,255,255,0.10)';
-    modal.style.backdropFilter = 'blur(8px)';
-    modal.style.webkitBackdropFilter = 'blur(8px)';
+    // Apply Login scene styling
+    modal.style.background = 'linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%)';
+    modal.style.border = '4px solid #111';
+    modal.style.borderLeft = '10px solid rgba(80,10,10,0.95)';
+    modal.style.borderRight = '2px solid #222';
+    modal.style.boxShadow = '0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02)';
+    modal.style.borderRadius = '6px';
+    modal.style.overflow = 'hidden';
     modal.style.padding = '12px';
-    modal.style.borderRadius = '12px';
-    modal.style.boxShadow = '0 0 18px rgba(0,0,0,0.35), inset 0 0 12px rgba(0,0,0,0.50)';
-    modal.style.color = '#e5e7eb';
+    modal.style.color = '#f0c9b0';
+    modal.style.fontFamily = "'Share Tech Mono', monospace";
     modal.style.minWidth = '420px';
     // include gold display in header so players can see current gold in inventory modal
     const currentGold = (char && typeof char.gold === 'number') ? char.gold : 0;
@@ -1380,15 +1382,17 @@ export function openEquipmentModal(scene) {
     modal.style.top = '50%';
     modal.style.transform = 'translateY(-50%)';
     modal.style.zIndex = '235';
-    // Apply site login/character-select style: glassy dark panel with subtle border and shadow
-    modal.style.background = 'rgba(0,0,0,0.40)';
-    modal.style.border = '1px solid rgba(255,255,255,0.10)';
-    modal.style.backdropFilter = 'blur(8px)';
-    modal.style.webkitBackdropFilter = 'blur(8px)';
+    // Apply Login scene styling
+    modal.style.background = 'linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%)';
+    modal.style.border = '4px solid #111';
+    modal.style.borderLeft = '10px solid rgba(80,10,10,0.95)';
+    modal.style.borderRight = '2px solid #222';
+    modal.style.boxShadow = '0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02)';
+    modal.style.borderRadius = '6px';
+    modal.style.overflow = 'hidden';
     modal.style.padding = '12px';
-    modal.style.borderRadius = '12px';
-    modal.style.boxShadow = '0 0 18px rgba(0,0,0,0.35), inset 0 0 12px rgba(0,0,0,0.50)';
-    modal.style.color = '#e5e7eb';
+    modal.style.color = '#f0c9b0';
+    modal.style.fontFamily = "'Share Tech Mono', monospace";
     modal.style.minWidth = '360px';
     // Equipment grid (no details pane) — preserve layout/structure, update header/button styling
     modal.innerHTML = `
