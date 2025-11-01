@@ -98,20 +98,26 @@ export const zones: ZoneDefinition[] = [
   {
     key: "gloamway-bastion",
     name: "Gloamway Bastion",
-    description: "A fortified stronghold deeper in the world. Details pending dedicated scene data.",
-    features: ["Deep progression"],
+    description: "Fortified goblin stronghold past the Camp. Expect elite patrols, tighter choke points, and the Chieftain's guards.",
+    features: ["Elite goblins", "Choke points", "Harder patrol loops"],
     mobs: [],
     resources: [],
     connections: ["goblin-camp"],
-    enemyIds: [],
+    // Tougher goblin set lives here
+    enemyIds: [
+      "goblin_epic",
+      "goblin_flamebinder",
+      "goblin_ironhowl",
+      "goblin_boss"
+    ],
   },
   {
     key: "broken-dock",
     name: "Broken Dock",
-    description: "A ruined dock accessible from the Grave Forest. Details pending dedicated scene data.",
-    features: ["Exploration"],
+    description: "A ruined shoreline off the Grave Forest. No active enemies; a quiet spot planned for future gathering routes.",
+    features: ["Exploration", "Ambient shoreline"],
     mobs: [],
-    resources: [],
+    resources: ["Driftwood (planned)", "Fishing (planned)"],
     connections: ["grave-forest"],
     enemyIds: [],
   },
