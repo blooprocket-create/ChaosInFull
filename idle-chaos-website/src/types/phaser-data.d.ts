@@ -94,3 +94,10 @@ declare module "@/src/game/phaser/data/enemies.js" {
   export const ENEMY_DEFS: Record<string, EnemyDef>;
   export default ENEMY_DEFS;
 }
+
+// Authoritative enemies in the new runtime under chaosinfull
+declare module "@/chaosinfull/src/data/enemies.js" {
+  import type { EnemyDef } from "@/src/types/phaser-data";
+  export const ENEMY_DEFS: Record<string, EnemyDef>;
+  export default ENEMY_DEFS;
+}

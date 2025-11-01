@@ -1,11 +1,11 @@
 "use client";
 import React, { useState } from "react";
-import { zones, ZoneDefinition } from "@/src/data/zones";
+import { zones, ZoneDefinition } from "@/src/data/world-chaosinfull";
 import { EnemyDef } from "@/src/types/phaser-data"; // types only
-// Runtime import of enemy data (JS module)
+// Runtime import of enemy data (JS module from chaosinfull)
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore-next-line - module declared in phaser-data.d.ts
-import ENEMY_DATA from "@/src/game/phaser/data/enemies.js";
+import ENEMY_DATA from "@/chaosinfull/src/data/enemies.js";
 
 function formatMobStat(v: number | null, unit?: string) {
   if (v == null) return "?";
