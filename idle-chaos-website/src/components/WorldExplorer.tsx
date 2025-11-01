@@ -2,12 +2,16 @@
 import React, { useMemo, useState } from "react";
 import { zones, ZoneDefinition } from "@/src/data/zones";
 import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
-import type { EnemyDef, EnemyDrop } from "@/src/types/phaser-data";
+import type { EnemyDef, EnemyDrop, EnemyGoldDrop } from "@/src/types/phaser-data";
 import { itemByKey } from "@/src/data/items";
+// Use dynamic enemy stat formulas from the original scene data (pure math, safe for client)
+import { computeEnemyStats } from "../../chaosinfull/src/data/statFormulas.js";
+import type { ScaledEnemy } from "@/src/types/stat-formulas";
 
 export default function WorldExplorer() {
   const [active, setActive] = useState<ZoneDefinition>(zones[0]);
   const [openEnemyId, setOpenEnemyId] = useState<string | null>(null);
+  // Always display dynamically scaled stats using statFormulas.js
 
   const enemiesForZone = useMemo<EnemyDef[]>(() => {
     const ids = active.enemyIds || [];
@@ -138,15 +142,18 @@ export default function WorldExplorer() {
                 </tr>
               </thead>
               <tbody>
-                {enemiesForZone.map((e: EnemyDef) => (
+                {enemiesForZone.map((e: EnemyDef) => {
+                  // Always compute dynamic/scaled stats
+                  const rowScaled: ScaledEnemy = computeEnemyStats(e);
+                  return (
                   <>
                     <tr key={e.id} className="border-t border-white/5">
-                      <td className="py-1 pr-2 text-gray-200">{e.name}</td>
-                      <td className="py-1 pr-2 text-gray-300 capitalize">{e.tier}</td>
-                      <td className="py-1 pr-2 text-gray-300">{e.level ?? '-'}</td>
-                      <td className="py-1 pr-2 text-gray-300">{e.maxhp ?? '-'}</td>
-                      <td className="py-1 pr-2 text-gray-300">{Array.isArray(e.damage) ? `${e.damage[0]}–${e.damage[1]}` : (e.damage ?? '-')}</td>
-                      <td className="py-1 pr-2 text-gray-300">{e.exp ?? '-'}</td>
+                      <td className="py-1 pr-2 text-gray-200">{rowScaled.name}</td>
+                      <td className="py-1 pr-2 text-gray-300 capitalize">{rowScaled.tier}</td>
+                      <td className="py-1 pr-2 text-gray-300">{rowScaled.level ?? '-'}</td>
+                      <td className="py-1 pr-2 text-gray-300">{rowScaled.maxhp ?? '-'}</td>
+                      <td className="py-1 pr-2 text-gray-300">{`${rowScaled.damage[0]}–${rowScaled.damage[1]}`}</td>
+                      <td className="py-1 pr-2 text-gray-300">{rowScaled.exp ?? '-'}</td>
                       <td className="py-1 pr-2 text-gray-300">
                         <button
                           className="text-xs px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
@@ -179,12 +186,12 @@ export default function WorldExplorer() {
                                   <td className="py-1 pr-2 text-gray-300">{d.luckBonus != null ? `+${Math.round(d.luckBonus * 10000)/100}%/luck` : '-'}</td>
                                 </tr>
                               ))}
-                              {e.gold && (
+                              {(rowScaled.gold as EnemyGoldDrop | undefined) && (
                                 <tr className="border-t border-white/5">
                                   <td className="py-1 pr-2 text-yellow-300">Gold</td>
-                                  <td className="py-1 pr-2 text-gray-300">{e.gold.min}–{e.gold.max}</td>
-                                  <td className="py-1 pr-2 text-gray-300">{e.gold.chance != null ? `${Math.round(e.gold.chance * 1000)/10}%` : '-'}</td>
-                                  <td className="py-1 pr-2 text-gray-300">{e.gold.luckBonus != null ? `+${Math.round(e.gold.luckBonus * 10000)/100}%/luck` : '-'}</td>
+                                  <td className="py-1 pr-2 text-gray-300">{rowScaled.gold.min}–{rowScaled.gold.max}</td>
+                                  <td className="py-1 pr-2 text-gray-300">{rowScaled.gold.chance != null ? `${Math.round((rowScaled.gold.chance as number) * 1000)/10}%` : '-'}</td>
+                                  <td className="py-1 pr-2 text-gray-300">{rowScaled.gold.luckBonus != null ? `+${Math.round((rowScaled.gold.luckBonus as number) * 10000)/100}%/luck` : '-'}</td>
                                 </tr>
                               )}
                             </tbody>
@@ -193,7 +200,8 @@ export default function WorldExplorer() {
                       </tr>
                     )}
                   </>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
