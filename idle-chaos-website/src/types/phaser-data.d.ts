@@ -60,3 +60,43 @@ declare module "@/src/game/phaser/data/talents.js" {
   export const TALENT_TABS: Record<string, TalentTab>;
   export function getTabsForClass(classId: string): string[];
 }
+
+// Enemy data (JS module) and types used by the website
+export interface EnemyDrop {
+  // Some entries use itemId, one uses itemID; tolerate both to keep type-safe.
+  itemId?: string;
+  itemID?: string;
+  minQty: number;
+  maxQty: number;
+  baseChance?: number; // 0..1
+  luckBonus?: number;  // per-luck percent in 0..1
+}
+
+export interface EnemyGoldDrop {
+  min: number;
+  max: number;
+  chance?: number;   // 0..1
+  luckBonus?: number; // 0..1
+}
+
+export interface EnemyDef {
+  id: string;
+  name: string;
+  tier?: string;
+  dynamicStats?: boolean;
+  level?: number;
+  maxhp?: number;
+  moveSpeed?: number;
+  attackRange?: number;
+  attackCooldown?: number;
+  damage?: number | [number, number];
+  exp?: number;
+  drops?: EnemyDrop[];
+  gold?: EnemyGoldDrop | null;
+}
+
+declare module "@/src/game/phaser/data/enemies.js" {
+  import type { EnemyDef } from "@/src/types/phaser-data";
+  export const ENEMY_DEFS: Record<string, EnemyDef>;
+  export default ENEMY_DEFS;
+}

@@ -34,6 +34,9 @@ function toArchetypesFromGame(): ClassArchetype[] {
               kind: t.kind,
               activeType: t.activeType || undefined,
               description: t.description,
+              // include scaling metadata for simulator
+              scaling: t.scaling || null,
+              secondScaling: t.secondScaling || null,
             })),
           };
         })

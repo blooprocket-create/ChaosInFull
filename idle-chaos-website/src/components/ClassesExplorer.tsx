@@ -13,7 +13,15 @@ export interface ClassArchetype {
   talentsByTab?: Array<{
     tabId: string;
     label: string;
-    talents: Array<{ id: string; name: string; kind?: string; activeType?: string; description?: string }>;
+    talents: Array<{
+      id: string;
+      name: string;
+      kind?: string;
+      activeType?: string;
+      description?: string;
+      scaling?: { type: 'flat' | 'percent'; target: string; base: number; perRank: number } | null;
+      secondScaling?: { type: 'flat' | 'percent'; target: string; base: number; perRank: number } | null;
+    }>;
   }>;
   paths: Array<{
     key: string;
@@ -87,6 +95,19 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
   const activePath = active.paths.find(p => p.key === activePathKey) || null;
   const containerRef = useRef<HTMLDivElement>(null);
   const activeIndex = useMemo(() => dataList.findIndex(a => a.key === active.key), [active, dataList]);
+  // Ephemeral rank allocation for previewing talent bonuses (0..5)
+  const [ranks, setRanks] = useState<Record<string, number>>({});
+  const maxRank = 5;
+  const valueAtRank = (base: number, perRank: number, r: number) => {
+    if (!r || r <= 0) return 0;
+    return base + (r - 1) * perRank;
+  };
+  const describeScaling = (s: { type: 'flat' | 'percent'; target: string; base: number; perRank: number } | null | undefined, r: number) => {
+    if (!s) return null;
+    const v = valueAtRank(s.base, s.perRank, r);
+    if (r <= 0) return `(+0 ${s.type === 'percent' ? '%' : ''} ${s.target})`;
+    return s.type === 'percent' ? `(+${v}% ${s.target})` : `(+${v} ${s.target})`;
+  };
   // Keyboard navigation between archetypes and paths
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -210,18 +231,47 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
               {active.talentsByTab.map(group => (
                 <div key={group.tabId} className="text-xs">
                   <div className="font-medium text-gray-200 mb-1">{group.label}</div>
-                  <ul className="space-y-1 text-gray-300 list-disc pl-5">
-                    {group.talents.map(t => (
-                      <li key={t.id}>
-                        <span className="text-gray-200">{t.name}</span>
-                        {t.kind === 'active' && (
-                          <span className="ml-2 inline-block rounded px-1 py-0.5 text-[10px] bg-violet-600/20 border border-violet-600/40 text-violet-200 align-middle">active{t.activeType ? `/${t.activeType}` : ''}</span>
-                        )}
-                        {t.description && (
-                          <div className="text-[11px] text-gray-400 mt-0.5">{t.description}</div>
-                        )}
-                      </li>
-                    ))}
+                  <ul className="space-y-1 text-gray-300">
+                    {group.talents.map(t => {
+                      const r = ranks[t.id] ?? 0;
+                      const primary = describeScaling(t.scaling, r);
+                      const secondary = describeScaling(t.secondScaling, r);
+                      return (
+                        <li key={t.id} className="border border-white/5 rounded p-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-gray-200">
+                                {t.name}
+                                {t.kind === 'active' && (
+                                  <span className="ml-2 inline-block rounded px-1 py-0.5 text-[10px] bg-violet-600/20 border border-violet-600/40 text-violet-200 align-middle">active{t.activeType ? `/${t.activeType}` : ''}</span>
+                                )}
+                              </div>
+                              {t.description && (<div className="text-[11px] text-gray-400 mt-0.5 line-clamp-3">{t.description}</div>)}
+                              {(t.scaling || t.secondScaling) && (
+                                <div className="text-[11px] text-emerald-300/90 mt-1">
+                                  <span className="mr-2">Rank {r}</span>
+                                  {primary && <span className="mr-2">{primary}</span>}
+                                  {secondary && <span>{secondary}</span>}
+                                </div>
+                              )}
+                            </div>
+                            <div className="shrink-0 flex items-center gap-1">
+                              <button
+                                className="size-6 grid place-content-center rounded border border-white/10 bg-white/5 hover:bg-white/10 text-gray-200"
+                                onClick={() => setRanks(prev => ({ ...prev, [t.id]: Math.max(0, (prev[t.id] ?? 0) - 1) }))}
+                                aria-label={`Decrease ${t.name} rank`}
+                              >−</button>
+                              <div className="text-xs w-6 text-center">{r}</div>
+                              <button
+                                className="size-6 grid place-content-center rounded border border-white/10 bg-white/5 hover:bg-white/10 text-gray-200"
+                                onClick={() => setRanks(prev => ({ ...prev, [t.id]: Math.min(maxRank, (prev[t.id] ?? 0) + 1) }))}
+                                aria-label={`Increase ${t.name} rank`}
+                              >+</button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}

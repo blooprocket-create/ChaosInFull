@@ -1,5 +1,5 @@
 export const metadata = { title: "World • Veil Keeper", description: "A field guide to regions, portals, and resources.", openGraph: { title: "Veil Keeper World", images: ["/og/world.png"] } };
-import { WORLD_SCENES } from "@/src/game/worldMeta";
+import WorldExplorer from "@/src/components/WorldExplorer";
 
 export default function WorldPage() {
   return (
@@ -12,13 +12,8 @@ export default function WorldPage() {
         certain resources, enemies, and leveling loops. Town anchors your progression with crafting and storage.
       </p>
 
-      <div className="mt-8 grid md:grid-cols-2 gap-6">
-        {WORLD_SCENES.map(zone => (
-          <div key={zone.key} className="rounded-xl border border-white/10 bg-black/40 p-5">
-            <h2 className="text-xl font-semibold text-white">{zone.label}</h2>
-            {zone.description && <p className="text-gray-300 text-sm mt-2">{zone.description}</p>}
-          </div>
-        ))}
+      <div className="mt-6">
+        <WorldExplorer />
       </div>
 
       <div className="mt-12 rounded-xl border border-white/10 bg-black/40 p-6">

@@ -14,6 +14,9 @@ export type ZoneDefinition = {
   mobs: ZoneMobStats[];
   resources: string[]; // nodes or gatherables
   connections: string[]; // zone keys reachable via portal
+  // Optional expansions for richer world wiki
+  enemyIds?: string[]; // ids from ENEMY_DEFS for this zone
+  npcs?: string[]; // notable NPCs present
 };
 
 export const zones: ZoneDefinition[] = [
@@ -25,6 +28,7 @@ export const zones: ZoneDefinition[] = [
     mobs: [],
     resources: [],
     connections: ["cave", "slime"],
+    npcs: ["Blacksmith", "Quartermaster", "Tutorial Guide"],
   },
   {
     key: "cave",
@@ -34,6 +38,7 @@ export const zones: ZoneDefinition[] = [
     mobs: [],
     resources: ["Copper Ore", "Tin Ore"],
     connections: ["town"],
+    enemyIds: ["rat", "zombie_rat", "ghost_rat"],
   },
   {
     key: "slime",
@@ -45,6 +50,7 @@ export const zones: ZoneDefinition[] = [
     ],
     resources: [],
     connections: ["town", "slime-meadow"],
+    enemyIds: ["slime_common"],
   },
   {
     key: "slime-meadow",
@@ -58,6 +64,7 @@ export const zones: ZoneDefinition[] = [
     ],
     resources: [],
     connections: ["slime"],
+    enemyIds: ["slime_common", "slime_epic"],
   },
 ];
 
