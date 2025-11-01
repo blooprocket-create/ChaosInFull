@@ -48,7 +48,8 @@ export function createHUD(scene) {
     const hud = document.createElement('div');
     hud.id = hudId;
     hud.style.position = 'fixed';
-    hud.style.top = '8px';
+    // Position: top offset should respect the app's navbar height
+    // We'll compute this dynamically and update on resize
     hud.style.left = '8px';
     hud.style.width = '200px';
     hud.style.padding = '8px';
@@ -62,6 +63,27 @@ export function createHUD(scene) {
     hud.style.color = '#eee';
     hud.style.fontFamily = 'UnifrakturCook, cursive';
     applyThemeStyles(hud, getGameState().theme);
+
+    // Compute HUD top offset based on <header> height
+    const recalcHudTop = () => {
+        try {
+            const header = document.querySelector('header');
+            const navH = header && header.getBoundingClientRect ? Math.max(0, Math.round(header.getBoundingClientRect().height)) : 0;
+            const topPx = Math.max(8, navH + 8);
+            hud.style.top = topPx + 'px';
+        } catch (e) {
+            hud.style.top = '8px';
+        }
+    };
+    recalcHudTop();
+    // Bind resize handler and clean up on scene shutdown
+    const boundResize = () => recalcHudTop();
+    window.addEventListener('resize', boundResize);
+    try {
+        scene.events && scene.events.once && scene.events.once('shutdown', () => {
+            try { window.removeEventListener('resize', boundResize); } catch (_) {}
+        });
+    } catch (_) {}
 
     const charBtnId = idBase + '-hud-charselect-btn';
     const settingsBtnId = idBase + '-hud-settings-btn';

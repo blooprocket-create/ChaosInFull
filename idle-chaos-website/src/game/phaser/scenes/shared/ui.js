@@ -1150,7 +1150,8 @@ export function openInventoryModal(scene) {
     const modal = document.createElement('div');
     modal.id = 'inventory-modal';
     modal.style.position = 'fixed';
-    modal.style.left = '50%';
+    // Position: middle-right (request)
+    modal.style.left = '75%';
     modal.style.top = '50%';
     modal.style.transform = 'translate(-50%,-50%)';
     modal.style.zIndex = '230';
@@ -1360,7 +1361,8 @@ export function openEquipmentModal(scene) {
     const modal = document.createElement('div');
     modal.id = 'equipment-modal';
     modal.style.position = 'fixed';
-    modal.style.left = '50%';
+    // Position: middle-left (request)
+    modal.style.left = '25%';
     modal.style.top = '50%';
     modal.style.transform = 'translate(-50%,-50%)';
     modal.style.zIndex = '235';
