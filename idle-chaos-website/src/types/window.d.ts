@@ -24,5 +24,9 @@ declare global {
     __closeStorage?: () => void;
 
     __phaserRegistry?: import("phaser").Data.DataManager | { get?: (key: string) => unknown };
+    
+    // Phaser game instance and HUD shared API
+    GAME?: unknown;
+    __hud_shared?: unknown;
   }
 }

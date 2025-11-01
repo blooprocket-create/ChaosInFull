@@ -23,12 +23,10 @@ declare global {
     getQuestObjectiveState: unknown;
     __shared_ui: unknown;
     __furnace_shared: unknown;
-    __hud_shared: unknown;
     __shared_keys: unknown;
     __overlays_shared: unknown;
     __portal_shared: unknown;
     __workbench_shared: unknown;
-    GAME: Phaser.Game;
   }
 }
 

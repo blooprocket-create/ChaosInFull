@@ -1,6 +1,20 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
+interface PhaserScene {
+  hud?: HTMLElement;
+  _createHUD?: () => void;
+  sys?: {
+    settings?: unknown;
+  };
+}
+
+interface PhaserGame {
+  scene?: {
+    getScenes?: (active: boolean) => PhaserScene[];
+  };
+}
+
 /**
  * PhaserHUDPanel
  * 
@@ -15,30 +29,37 @@ export default function PhaserHUDPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    let scene: any = null;
+    let scene: PhaserScene | null = null;
     let hudEl: HTMLElement | null = null;
+    const container = mountRef.current;
 
     const attachHud = () => {
-      if (!mountRef.current) return false;
+      if (!container) return false;
       // Try to get an active scene. Prefer the scene that already created HUD.
       try {
-        const game: any = (typeof window !== 'undefined' && (window as any).GAME) || null;
-        if (game && game.scene && typeof game.scene.getScenes === 'function') {
-          const running = game.scene.getScenes(true) as any[];
+        const game = (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).GAME) as PhaserGame | undefined;
+        if (game?.scene && typeof game.scene.getScenes === 'function') {
+          const running = game.scene.getScenes(true);
           // Find a scene that has a HUD or has helper methods
-          scene = running.find(s => s && (s.hud || s._createHUD || (s.sys && s.sys.settings))) || running[0] || null;
+          scene = running.find(s => s && (s.hud || s._createHUD || s.sys?.settings)) || running[0] || null;
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
 
       // If no scene yet, retry shortly
       if (!scene) return false;
 
       try {
-        const hudApi = (typeof window !== 'undefined' && (window as any).__hud_shared) || null;
+        const hudApi = (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__hud_shared) as { createHUD?: (scene: PhaserScene) => void } | undefined;
         if (!scene.hud && hudApi && typeof hudApi.createHUD === 'function') {
-          try { hudApi.createHUD(scene); } catch {}
+          try { hudApi.createHUD(scene); } catch {
+            // ignore
+          }
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
 
       hudEl = scene && scene.hud ? (scene.hud as HTMLElement) : null;
       if (!hudEl) return false;
@@ -52,11 +73,15 @@ export default function PhaserHUDPanel() {
         hudEl.style.width = '100%';
         hudEl.style.maxWidth = '100%';
         hudEl.style.zIndex = '0';
-        // Slightly tighten padding for panel fit
+        // Slightly tighten padding for panel fit and remove its own card chrome
         hudEl.style.padding = '10px';
+        hudEl.style.background = 'transparent';
+        hudEl.style.boxShadow = 'none';
+        hudEl.style.border = 'none';
+        hudEl.style.borderRadius = '0px';
         // Append into our container
-        if (mountRef.current && hudEl.parentElement !== mountRef.current) {
-          mountRef.current.appendChild(hudEl);
+        if (container && hudEl.parentElement !== container) {
+          container.appendChild(hudEl);
         }
         if (!cancelled) setAttached(true);
         return true;
@@ -82,19 +107,31 @@ export default function PhaserHUDPanel() {
       // On unmount, leave the HUD to Phaser cleanup. If it's still mounted here,
       // remove it to avoid stray nodes after navigation.
       try {
-        if (hudEl && mountRef.current && mountRef.current.contains(hudEl)) {
+        if (hudEl && container && container.contains(hudEl)) {
           hudEl.remove();
         }
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
   return (
-    <div className="mt-6 rounded-lg border border-white/10 bg-black/40 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xl font-semibold">HUD</h2>
+    <div
+      style={{
+        marginTop: '1.5rem',
+        borderLeft: '8px solid rgba(120,20,20,0.95)',
+        border: '3px solid #111',
+        background: 'linear-gradient(180deg, rgba(12,12,14,0.98), rgba(18,18,20,0.98))',
+        borderRadius: '8px',
+        padding: '12px',
+        boxShadow: '0 30px 80px rgba(0,0,0,0.9)'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <div style={{ fontFamily: 'Metal Mania, cursive', fontSize: '1.25rem', color: '#f0c9b0' }}>HUD</div>
         {!attached && (
-          <span className="text-xs text-gray-400">Preparing…</span>
+          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)' }}>Preparing…</span>
         )}
       </div>
       <div ref={mountRef} />
