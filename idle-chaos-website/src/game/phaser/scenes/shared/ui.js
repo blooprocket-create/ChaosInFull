@@ -1156,14 +1156,27 @@ export function openInventoryModal(scene) {
     modal.style.top = '50%';
     modal.style.transform = 'translateY(-50%)';
     modal.style.zIndex = '230';
-    modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
+    // Apply site login/character-select style: glassy dark panel with subtle border and shadow
+    modal.style.background = 'rgba(0,0,0,0.40)';
+    modal.style.border = '1px solid rgba(255,255,255,0.10)';
+    modal.style.backdropFilter = 'blur(8px)';
+    modal.style.webkitBackdropFilter = 'blur(8px)';
     modal.style.padding = '12px';
     modal.style.borderRadius = '12px';
-    modal.style.color = '#fff';
+    modal.style.boxShadow = '0 0 18px rgba(0,0,0,0.35), inset 0 0 12px rgba(0,0,0,0.50)';
+    modal.style.color = '#e5e7eb';
     modal.style.minWidth = '420px';
     // include gold display in header so players can see current gold in inventory modal
     const currentGold = (char && typeof char.gold === 'number') ? char.gold : 0;
-    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;'><div style='display:flex;align-items:center;gap:10px;'><strong>Inventory</strong><div style='display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);padding:6px 8px;border-radius:8px;font-weight:700;color:#ffd27a;'>💰<span id='inv-gold'>${currentGold}</span></div></div><button id='inv-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='inv-items' class='grid-scroll'><div id='inv-grid' class='slot-grid'></div></div>`;
+    modal.innerHTML = `
+        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;'>
+            <div style='display:flex;align-items:center;gap:10px;'>
+                <strong style="font-weight:800; letter-spacing:0.02em;">Inventory</strong>
+                <div style='display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);padding:6px 8px;border-radius:8px;font-weight:700;color:#ffd27a;border:1px solid rgba(255,255,255,0.08);'>💰<span id='inv-gold'>${currentGold}</span></div>
+            </div>
+            <button id='inv-close' class='btn' style='padding:6px 10px; font-size:12px;'>Close</button>
+        </div>
+        <div id='inv-items' class='grid-scroll'><div id='inv-grid' class='slot-grid'></div></div>`;
     document.body.appendChild(modal);
     scene._inventoryModal = modal;
     const closeBtn = modal.querySelector('#inv-close');
@@ -1367,13 +1380,23 @@ export function openEquipmentModal(scene) {
     modal.style.top = '50%';
     modal.style.transform = 'translateY(-50%)';
     modal.style.zIndex = '235';
-    modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)';
+    // Apply site login/character-select style: glassy dark panel with subtle border and shadow
+    modal.style.background = 'rgba(0,0,0,0.40)';
+    modal.style.border = '1px solid rgba(255,255,255,0.10)';
+    modal.style.backdropFilter = 'blur(8px)';
+    modal.style.webkitBackdropFilter = 'blur(8px)';
     modal.style.padding = '12px';
     modal.style.borderRadius = '12px';
-    modal.style.color = '#fff';
+    modal.style.boxShadow = '0 0 18px rgba(0,0,0,0.35), inset 0 0 12px rgba(0,0,0,0.50)';
+    modal.style.color = '#e5e7eb';
     modal.style.minWidth = '360px';
-    // Equipment grid (no details pane) — we will use the floating tooltip on hover
-    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Equipment</strong><button id='equip-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='equip-body' class='modal-body'><div class='equip-grid'><div class='equip-slots' id='equip-slots'></div></div></div>`;
+    // Equipment grid (no details pane) — preserve layout/structure, update header/button styling
+    modal.innerHTML = `
+        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>
+            <strong style="font-weight:800; letter-spacing:0.02em;">Equipment</strong>
+            <button id='equip-close' class='btn' style='padding:6px 10px; font-size:12px;'>Close</button>
+        </div>
+        <div id='equip-body' class='modal-body'><div class='equip-grid'><div class='equip-slots' id='equip-slots'></div></div></div>`;
     document.body.appendChild(modal);
     scene._equipmentModal = modal;
     const closeBtn = modal.querySelector('#equip-close'); if (closeBtn) closeBtn.onclick = () => closeEquipmentModal(scene);
