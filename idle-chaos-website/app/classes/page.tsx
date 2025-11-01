@@ -100,13 +100,17 @@ export default function ClassesPage() {
 
       <div className="mt-6 rounded-xl border border-white/10 bg-black/40 p-6">
         <h2 className="text-xl font-semibold">Archetypes at a Glance</h2>
-        <ul className="mt-2 grid md:grid-cols-2 gap-3 text-sm text-gray-300 list-disc list-inside">
-          <li><span className="text-white">Vanguard</span> — front-line control and sustain; weapon and armor scaling.</li>
-          <li><span className="text-white">Arcanist</span> — ranged damage, burst windows, and resource manipulation.</li>
-          <li><span className="text-white">Stalker</span> — mobility, crit pressure, and evasion tools.</li>
-          <li><span className="text-white">Warden</span> — defensive aura support and damage smoothing.</li>
-          <li><span className="text-white">Artificer</span> — crafting synergies and utility actives woven into combat.</li>
-        </ul>
+        <div className="mt-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {liveData.map((a) => (
+            <div key={a.key} className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium text-white/90 truncate" title={a.name}>{a.name}</div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300">{a.paths.length} paths</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-400 line-clamp-2" title={a.synopsis}>{a.synopsis}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-6">
