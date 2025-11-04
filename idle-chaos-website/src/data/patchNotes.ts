@@ -9,6 +9,27 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-11-04",
+    version: "0.0.16b",
+    title: "Quest Indicator Polish & Tracker Reliability",
+    highlights: [
+      "Quest indicators now show ❗ when you need to talk to an NPC (not just when quest is 100% complete)",
+      "Quest tracker updates every 3 seconds as a fallback—no more stale progress displays",
+      "Fixed quest indicators reading wrong scene location (was null, now uses scene key)",
+      "Auto-finds active scene when quest actions trigger—tracker/modal update even without explicit scene reference",
+      "Reduced log spam: indicators only log when they change state, not every frame"
+    ],
+    notes: [
+      "Quest indicators (❓/❗) now check for two conditions: (1) quest fully complete OR (2) active quest has a 'talk' objective for this NPC. This means Wayne shows ❗ when you need to speak to him, even if other objectives aren't done yet.",
+      "Quest tracker refreshes every 3 seconds automatically via setInterval—ensures progress stays visible even if event-driven updates fail. Timer cleaned up on scene shutdown.",
+      "Fixed registerQuestIndicators to use scene.sys.settings.key (e.g., 'Town', 'Cave') instead of scene.sys.settings.data.location (which was always null). Now getAvailableQuests correctly filters by location.",
+      "updateQuestTracker() and refreshQuestLogModal() now auto-detect the active scene when called with null. They search window.__phaserGame.scene.scenes for the first active scene with a tracker/modal, so quest functions (startQuest, updateQuestProgress, completeQuest) can trigger UI updates without passing a scene.",
+      "Added state tracking (Map) to quest indicator update function: only logs when indicator visibility, text, or quest name changes—eliminates console spam from every-frame updates.",
+      "Initial quest indicator update now logs character data (hasChar, activeQuests count, completedQuests count, level) for debugging on registration.",
+      "All quest UI updates now work immediately on action (equip item, complete objective, start quest) PLUS have the 3-second polling fallback for reliability."
+    ]
+  },
+  {
+    date: "2025-11-04",
     version: "0.0.16",
     title: "Quest Renaissance: The NPCs Actually Remember You Now",
     highlights: [

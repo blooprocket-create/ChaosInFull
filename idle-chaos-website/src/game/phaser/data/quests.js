@@ -424,12 +424,15 @@ export function canStartQuest(character, questId) {
     if (activeIds.includes(quest.id) || completed.includes(quest.id)) return false;
 
     // Prerequisites met
-    // Special-case: allow mother_lumen_request to become available after the player has chosen a class
+    // Special-case: mother_lumen_request requires BOTH quest chain completion AND class selection
     if (quest.id === 'mother_lumen_request') {
         try {
             const hasClass = character && character.class && character.class !== 'beginner';
-            if (hasClass) return true;
-        } catch (e) {}
+            const hasPrereqs = quest.prerequisites.every(prereq => completed.includes(prereq));
+            return hasClass && hasPrereqs;
+        } catch (e) {
+            return false;
+        }
     }
     return quest.prerequisites.every(prereq => completed.includes(prereq));
 }

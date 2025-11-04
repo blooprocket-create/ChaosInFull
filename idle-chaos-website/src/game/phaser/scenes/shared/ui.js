@@ -3920,6 +3920,101 @@ export function createDialogueParagraph(text) {
 }
 
 /**
+ * Render multi-page dialogue with Next/Back navigation
+ * @param {string} npcName - NPC display name
+ * @param {string} npcPortrait - Emoji/icon for NPC
+ * @param {Array<{bodyNodes: Array, optionConfigs?: Array}>} pages - Array of page objects
+ * @param {string} themeColor - Theme color for styling
+ * @param {Function} onComplete - Callback when all pages are viewed (optional)
+ */
+export function renderDialoguePages(npcName, npcPortrait, pages, themeColor = '#ffd27a', onComplete = null) {
+    if (!pages || pages.length === 0) return;
+    
+    let currentPageIndex = 0;
+    
+    const renderCurrentPage = () => {
+        const page = pages[currentPageIndex];
+        const isLastPage = currentPageIndex === pages.length - 1;
+        const isFirstPage = currentPageIndex === 0;
+        
+        // Build navigation options
+        const navOptions = [];
+        
+        // Back button (if not first page)
+        if (!isFirstPage) {
+            navOptions.push({
+                label: '← Back',
+                onClick: () => {
+                    currentPageIndex--;
+                    renderCurrentPage();
+                },
+                variant: 'primary'
+            });
+        }
+        
+        // Next button (if not last page) OR final page options
+        if (isLastPage) {
+            // Last page: show its custom options or a default close button
+            if (page.optionConfigs && page.optionConfigs.length > 0) {
+                navOptions.push(...page.optionConfigs.map(opt => ({
+                    ...opt,
+                    onClick: () => {
+                        if (opt.onClick) opt.onClick();
+                        closeDialogue();
+                        if (onComplete) onComplete();
+                    }
+                })));
+            } else {
+                navOptions.push({
+                    label: 'Understood',
+                    onClick: () => {
+                        closeDialogue();
+                        if (onComplete) onComplete();
+                    },
+                    variant: 'success'
+                });
+            }
+        } else {
+            // Not last page: show Next button
+            navOptions.push({
+                label: 'Next →',
+                onClick: () => {
+                    currentPageIndex++;
+                    renderCurrentPage();
+                },
+                variant: 'success'
+            });
+        }
+        
+        renderDialogue(npcName, npcPortrait, page.bodyNodes, navOptions, themeColor);
+        
+        // Add page indicator if multiple pages
+        if (pages.length > 1) {
+            const card = ensureDialogueOverlay(null, themeColor);
+            if (card) {
+                const pageIndicator = document.createElement('div');
+                pageIndicator.style.cssText = `
+                    position: absolute;
+                    top: 16px;
+                    right: 16px;
+                    font-family: 'Share Tech Mono', monospace;
+                    font-size: 0.85em;
+                    color: ${themeColor}80;
+                    padding: 6px 12px;
+                    background: rgba(0,0,0,0.4);
+                    border-radius: 12px;
+                    border: 1px solid ${themeColor}30;
+                `;
+                pageIndicator.textContent = `${currentPageIndex + 1} / ${pages.length}`;
+                card.appendChild(pageIndicator);
+            }
+        }
+    };
+    
+    renderCurrentPage();
+}
+
+/**
  * Build MMO-style objective list with progress bars
  * @param {object} questDef - Quest definition with objectives array
  * @param {Array} progressStates - Current progress for each objective
@@ -4013,6 +4108,249 @@ export function buildObjectiveList(questDef, progressStates, themeColor = '#ffd2
     return container;
 }
 
+/**
+ * Creates a beautiful full-screen modal for class selection.
+ * Shows 3 class cards (Horror, Occultist, Stalker) with stats and descriptions.
+ * @param {Phaser.Scene} scene - The calling scene
+ * @param {Function} onClassSelected - Callback(classId) when user picks a class
+ */
+function createClassSelectionModal(scene, onClassSelected) {
+    const CHARACTER = window.__characterModule?.character;
+    if (!CHARACTER) {
+        console.warn('[createClassSelectionModal] No character loaded');
+        return;
+    }
+
+    // Get class definitions from global registry
+    const CLASS_DEFS = window.__classData?.CLASS_DEFINITIONS || {};
+    const TIER_1_CLASSES = ['horror', 'occultist', 'stalker'];
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'class-selection-modal';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.92);
+        z-index: 100000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow-y: auto;
+    `;
+
+    // Title
+    const title = document.createElement('div');
+    title.textContent = 'Choose Your Path';
+    title.style.cssText = `
+        font-family: 'Cinzel Decorative', serif;
+        font-size: 2.5em;
+        color: #FFD700;
+        text-shadow: 0 0 12px rgba(255, 215, 0, 0.7);
+        margin-bottom: 30px;
+        text-align: center;
+    `;
+    overlay.appendChild(title);
+
+    // Container for class cards
+    const cardsContainer = document.createElement('div');
+    cardsContainer.style.cssText = `
+        display: flex;
+        gap: 30px;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 1400px;
+        width: 100%;
+    `;
+
+    // Build cards for each Tier 1 class
+    for (const classId of TIER_1_CLASSES) {
+        const classDef = CLASS_DEFS[classId];
+        if (!classDef) continue;
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+            flex: 1 1 350px;
+            max-width: 420px;
+            min-height: 500px;
+            background: linear-gradient(145deg, #1a1a2e, #0f0f1e);
+            border: 2px solid #444;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        `;
+        card.onmouseenter = () => {
+            card.style.borderColor = '#FFD700';
+            card.style.boxShadow = '0 12px 32px rgba(255, 215, 0, 0.4)';
+        };
+        card.onmouseleave = () => {
+            card.style.borderColor = '#444';
+            card.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.6)';
+        };
+
+        // Class name
+        const className = document.createElement('div');
+        className.textContent = classDef.name || classId.charAt(0).toUpperCase() + classId.slice(1);
+        className.style.cssText = `
+            font-family: 'Cinzel', serif;
+            font-size: 1.8em;
+            color: #FFD700;
+            text-align: center;
+            margin-bottom: 8px;
+        `;
+        card.appendChild(className);
+
+        // Class description
+        const desc = document.createElement('div');
+        desc.textContent = classDef.description || '';
+        desc.style.cssText = `
+            font-size: 0.95em;
+            color: #aaa;
+            line-height: 1.5;
+            text-align: center;
+            margin-bottom: 12px;
+        `;
+        card.appendChild(desc);
+
+        // Base stats section
+        const baseStatsTitle = document.createElement('div');
+        baseStatsTitle.textContent = 'Base Stats';
+        baseStatsTitle.style.cssText = `
+            font-size: 1em;
+            color: #FFD700;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        `;
+        card.appendChild(baseStatsTitle);
+
+        const baseStats = classDef.baseStats || {};
+        const baseStatsList = document.createElement('div');
+        baseStatsList.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.9em;
+            color: #ccc;
+        `;
+        for (const [stat, value] of Object.entries(baseStats)) {
+            if (value === 0) continue;
+            const line = document.createElement('div');
+            const sign = value > 0 ? '+' : '';
+            line.innerHTML = `<span style="color:#888;">${stat.toUpperCase()}:</span> ${sign}${value}`;
+            baseStatsList.appendChild(line);
+        }
+        card.appendChild(baseStatsList);
+
+        // Per-level stats section
+        const levelStatsTitle = document.createElement('div');
+        levelStatsTitle.textContent = 'Per Level';
+        levelStatsTitle.style.cssText = `
+            font-size: 1em;
+            color: #4FC3F7;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+            margin-top: 12px;
+            margin-bottom: 8px;
+        `;
+        card.appendChild(levelStatsTitle);
+
+        const levelStats = classDef.perLevel || {};
+        const levelStatsList = document.createElement('div');
+        levelStatsList.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.9em;
+            color: #ccc;
+        `;
+        for (const [stat, value] of Object.entries(levelStats)) {
+            if (value === 0) continue;
+            const line = document.createElement('div');
+            const sign = value > 0 ? '+' : '';
+            line.innerHTML = `<span style="color:#888;">${stat.toUpperCase()}:</span> ${sign}${value}`;
+            levelStatsList.appendChild(line);
+        }
+        card.appendChild(levelStatsList);
+
+        // Spacer
+        const spacer = document.createElement('div');
+        spacer.style.flexGrow = '1';
+        card.appendChild(spacer);
+
+        // Choose button
+        const chooseBtn = document.createElement('button');
+        chooseBtn.textContent = 'Choose This Path';
+        chooseBtn.style.cssText = `
+            padding: 12px 20px;
+            background: linear-gradient(145deg, #FFD700, #FFA500);
+            color: #000;
+            font-family: 'Cinzel', serif;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+            transition: all 0.2s ease;
+        `;
+        chooseBtn.onmouseenter = () => {
+            chooseBtn.style.transform = 'scale(1.05)';
+            chooseBtn.style.boxShadow = '0 6px 16px rgba(255, 215, 0, 0.7)';
+        };
+        chooseBtn.onmouseleave = () => {
+            chooseBtn.style.transform = 'scale(1)';
+            chooseBtn.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.5)';
+        };
+        chooseBtn.onclick = () => {
+            overlay.remove();
+            onClassSelected(classId);
+        };
+        card.appendChild(chooseBtn);
+
+        cardsContainer.appendChild(card);
+    }
+
+    overlay.appendChild(cardsContainer);
+
+    // Close button (top-right X)
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 20px; right: 20px;
+        width: 40px; height: 40px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid #666;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 1.5em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+    closeBtn.onmouseenter = () => {
+        closeBtn.style.background = 'rgba(255, 0, 0, 0.3)';
+    };
+    closeBtn.onmouseleave = () => {
+        closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+    };
+    closeBtn.onclick = () => overlay.remove();
+    overlay.appendChild(closeBtn);
+
+    document.body.appendChild(overlay);
+}
+
 // Expose dialogue system to window.__shared_ui
 try {
     if (typeof window !== 'undefined') {
@@ -4020,8 +4358,10 @@ try {
         window.__shared_ui.ensureDialogueOverlay = ensureDialogueOverlay;
         window.__shared_ui.closeDialogue = closeDialogue;
         window.__shared_ui.renderDialogue = renderDialogue;
+        window.__shared_ui.renderDialoguePages = renderDialoguePages;
         window.__shared_ui.createDialogueParagraph = createDialogueParagraph;
         window.__shared_ui.buildObjectiveList = buildObjectiveList;
+        window.__shared_ui.createClassSelectionModal = createClassSelectionModal;
     }
 } catch (e) {}
 

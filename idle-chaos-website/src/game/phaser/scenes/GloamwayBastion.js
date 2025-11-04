@@ -518,6 +518,19 @@ export class GloamwayBastion extends Phaser.Scene {
         const activeQuest = active.find(q => q && QUEST_CHAIN.includes(q.id));
         const readyQuestId = activeQuest && checkQuestCompletion(this.char, activeQuest.id) ? activeQuest.id : null;
         const nextQuestId = !activeQuest ? QUEST_CHAIN.find(id => !completed.includes(id)) : null;
+        const hasChosenClass = this.char.class && this.char.class !== 'beginner';
+        const hasCompletedGoblinCull = completed.includes('mother_lumen_goblin_cull');
+        
+        // Check if this is the first time meeting Mother Lumen
+        const hasMetMotherLumen = this.char.hasMetMotherLumen || false;
+        
+        if (!hasMetMotherLumen) {
+            // First visit: show introduction pages about class progression
+            this.char.hasMetMotherLumen = true;
+            if (this._persistCharacter) this._persistCharacter(this.username);
+            this._showMotherLumenIntroduction();
+            return;
+        }
 
         const bodyNodes = [];
         const optionConfigs = [];
@@ -560,8 +573,19 @@ export class GloamwayBastion extends Phaser.Scene {
                 variant: 'success'
             });
             optionConfigs.push({ label: 'Another time.', onClick: () => {} });
+        } else if (hasCompletedGoblinCull && !hasChosenClass) {
+            // Player finished goblin cull but hasn't chosen a class yet
+            bodyNodes.push(ui.createDialogueParagraph('You have proven your resolve. Now you must choose the path that calls to you.'));
+            optionConfigs.push({
+                label: 'Show me the paths',
+                onClick: () => {
+                    this._openClassSelectionModal();
+                },
+                variant: 'success'
+            });
+            optionConfigs.push({ label: 'I need more time.', onClick: () => {} });
         } else {
-            // If no chain quest is active/available, check for special post-class-selection request (chieftain)
+            // Check for special post-class-selection request (chieftain)
             let offeredSpecial = false;
             try {
                 const ui = window.__shared_ui;
@@ -582,22 +606,130 @@ export class GloamwayBastion extends Phaser.Scene {
                 }
             } catch (e) {}
             if (offeredSpecial) {
-                // skip the default class-upgrade/closing text when special quest is offered
                 window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
                 return;
             }
             const ui = window.__shared_ui;
-            if (this.char.class === 'beginner') {
-                bodyNodes.push(ui.createDialogueParagraph('Your service steadied the paths. Choose the mantle that calls to you.'));
-                this._presentClassUpgradeOptions(bodyNodes, optionConfigs);
-                optionConfigs.push({ label: 'I need more time.', onClick: () => {} });
-            } else {
-                bodyNodes.push(ui.createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
-                optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => {} });
-            }
+            bodyNodes.push(ui.createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
+            optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => {} });
         }
 
         window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
+    }
+    
+    _showMotherLumenIntroduction() {
+        const ui = window.__shared_ui;
+        const pages = [
+            {
+                bodyNodes: [
+                    ui.createDialogueParagraph('Traveler... you stand at the threshold. The lantern sees what you do not yet know about yourself.'),
+                    ui.createDialogueParagraph('This bastion shelters those who walk between—those who have glimpsed the Gloam and chosen to carry its weight rather than flee.'),
+                    ui.createDialogueParagraph('But first, you must prove you can endure. Then, and only then, will the paths reveal themselves.')
+                ]
+            },
+            {
+                bodyNodes: [
+                    ui.createDialogueParagraph('There are three paths beyond the beginner\'s gate. Each reshapes the body, the mind, the very hunger that drives you forward.'),
+                    ui.createDialogueParagraph('The Horror - a guilt-powered wrecking suit. They monetize collision, turning violence into momentum. Strength and endurance are their currency.'),
+                    ui.createDialogueParagraph('The Occultis - one who refuses normal spell schools. They trade stability for layered hex engines, weaving curses that compound and corrupt. Intelligence and cunning guide their craft.')
+                ]
+            },
+            {
+                bodyNodes: [
+                    ui.createDialogueParagraph('The Stalker - one who thrives on motion debt. High critical windows gated by positional discipline. Speed and fortune favor their blade.'),
+                    ui.createDialogueParagraph('Each path offers unique strengths, unique frailties. Choose wisely, traveler - this decision cannot be undone.')
+                ]
+            },
+            {
+                bodyNodes: [
+                    ui.createDialogueParagraph('Before you can walk any path, you must first prove yourself worthy. The fractures around this camp pulse with unnatural life.'),
+                    ui.createDialogueParagraph('Thin the chaos. Complete my trials. When you have steadied the paths, return to me, and I will open the gate to your transformation.'),
+                    ui.createDialogueParagraph('Are you ready to begin?')
+                ],
+                optionConfigs: [
+                    {
+                        label: 'I am ready.',
+                        onClick: () => {
+                            addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
+                        },
+                        variant: 'success'
+                    },
+                    {
+                        label: 'Tell me more about the paths',
+                        onClick: () => {
+                            // Loop back to page 2 (class descriptions)
+                            addTimeEvent(this, { delay: 50, callback: () => {
+                                const ui = window.__shared_ui;
+                                const classPages = [
+                                    {
+                                        bodyNodes: [
+                                            ui.createDialogueParagraph('The Horror - a guilt-powered wrecking suit. They monetize collision, turning violence into momentum. Strength and endurance are their currency.'),
+                                            ui.createDialogueParagraph('Base: +2 STR, +1 AGI | Per Level: +0.6 STR, +0.2 AGI'),
+                                            ui.createDialogueParagraph('They excel in sustained combat, absorbing damage while delivering brutal strikes. Their path leads to even greater physical dominance.')
+                                        ]
+                                    },
+                                    {
+                                        bodyNodes: [
+                                            ui.createDialogueParagraph('The Occultis - one who refuses normal spell schools. They trade stability for layered hex engines, weaving curses that compound and corrupt. Intelligence and cunning guide their craft.'),
+                                            ui.createDialogueParagraph('Base: +3 INT | Per Level: +0.7 INT, +0.1 LUK'),
+                                            ui.createDialogueParagraph('Masters of manipulation and control, they debilitate enemies before striking. Their path leads to mastery over cosmic and blood magics.')
+                                        ]
+                                    },
+                                    {
+                                        bodyNodes: [
+                                            ui.createDialogueParagraph('The Stalker - one who thrives on motion debt. High critical windows gated by positional discipline. Speed and fortune favor their blade.'),
+                                            ui.createDialogueParagraph('Base: +3 AGI, +1 LUK | Per Level: +0.6 AGI, +0.2 LUK'),
+                                            ui.createDialogueParagraph('They strike from the shadows, leveraging position and timing for devastating critical hits. Their path leads to even greater stealth and lethality.')
+                                        ],
+                                        optionConfigs: [
+                                            {
+                                                label: 'I understand. Let\'s begin.',
+                                                onClick: () => {
+                                                    addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
+                                                },
+                                                variant: 'success'
+                                            }
+                                        ]
+                                    }
+                                ];
+                                ui.renderDialoguePages('Mother Lumen, Keeper of Paths', '🔮', classPages, '#5c86ff');
+                            } });
+                        },
+                        variant: 'primary'
+                    }
+                ]
+            }
+        ];
+        
+        ui.renderDialoguePages('Mother Lumen, Keeper of Paths', '🔮', pages, '#5c86ff');
+    }
+
+    _openClassSelectionModal() {
+        // Close current dialogue
+        if (window.__shared_ui?.closeDialogue) {
+            window.__shared_ui.closeDialogue();
+        }
+
+        // Open class selection modal
+        if (!window.__shared_ui?.createClassSelectionModal) {
+            console.warn('[GloamwayBastion] createClassSelectionModal not available');
+            return;
+        }
+
+        window.__shared_ui.createClassSelectionModal(this, (classId) => {
+            // Apply the chosen class
+            this._applyClassUpgrade(classId);
+            
+            // Persist character
+            if (window.__characterModule?.saveCharacter) {
+                window.__characterModule.saveCharacter();
+            }
+
+            // Reopen Mother Lumen dialogue (now she'll offer mother_lumen_request)
+            setTimeout(() => {
+                this._openMotherLumenDialogue();
+            }, 300);
+        });
     }
 
     _presentClassUpgradeOptions(bodyNodes, optionConfigs) {
@@ -625,7 +757,7 @@ export class GloamwayBastion extends Phaser.Scene {
     _completeMotherLumenQuest(questId) {
         const questDef = getQuestById(questId);
         completeQuest(this.char, questId);
-        this._refreshQuestUi();
+        // Quest UI updates handled automatically by completeQuest in quest module
         this._refreshInventoryUi();
         this._recalculateVitals();
         if (typeof this.char.hp !== 'number' || this.char.hp > this.char.maxhp) this.char.hp = this.char.maxhp;
@@ -638,7 +770,7 @@ export class GloamwayBastion extends Phaser.Scene {
 
     _acceptMotherLumenQuest(questId) {
         if (!startQuest(this.char, questId)) return;
-        this._refreshQuestUi();
+        // Quest UI updates handled automatically by startQuest in quest module
         if (this._persistCharacter) this._persistCharacter(this.username);
         const questDef = getQuestById(questId);
         const questName = (questDef && questDef.name) || questId;
@@ -678,14 +810,6 @@ export class GloamwayBastion extends Phaser.Scene {
 
         if (this._persistCharacter) this._persistCharacter(this.username);
         this._showToast(`You have embraced the path of the ${classDef.name}`, 2800);
-    }
-
-    _refreshQuestUi() {
-        try {
-            if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) {
-                window.__shared_ui.refreshQuestLogModal(this);
-            }
-        } catch (e) {}
     }
 
     _refreshInventoryUi() {
