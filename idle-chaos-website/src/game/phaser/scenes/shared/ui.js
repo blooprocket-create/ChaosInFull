@@ -538,8 +538,9 @@ export function registerQuestIndicators(scene, mapping) {
                             // determine available/active quests for this giver
                             let available = [];
                             try {
-                                if (typeof window.getAvailableQuests === 'function') {
-                                    available = window.getAvailableQuests(scene.char, (scene && scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.location) || null) || [];
+                                const questModule = window.__questModule;
+                                if (questModule && typeof questModule.getAvailableQuests === 'function') {
+                                    available = questModule.getAvailableQuests(scene.char, (scene && scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.location) || null) || [];
                                 }
                             } catch (e) { available = []; }
                             available = (available || []).filter(q => q && q.giver === giver);
@@ -547,8 +548,9 @@ export function registerQuestIndicators(scene, mapping) {
                             let active = (scene.char && Array.isArray(scene.char.activeQuests)) ? (scene.char.activeQuests || []) : [];
                             // Filter active quests relevant to this NPC: either given by this NPC OR handed in to this NPC.
                             try {
-                                if (typeof window.getQuestById === 'function') {
-                                    active = active.filter(aq => { try { const d = window.getQuestById(aq.id); return d && (d.giver === giver || d.handInNpc === giver); } catch (e) { return false; } });
+                                const questModule = window.__questModule;
+                                if (questModule && typeof questModule.getQuestById === 'function') {
+                                    active = active.filter(aq => { try { const d = questModule.getQuestById(aq.id); return d && (d.giver === giver || d.handInNpc === giver); } catch (e) { return false; } });
                                 } else {
                                     active = active.filter(aq => { try { const def = (window && window.QUEST_DEFS && window.QUEST_DEFS[aq.id]) ? window.QUEST_DEFS[aq.id] : null; return def && (def.giver === giver || def.handInNpc === giver); } catch (e) { return false; } });
                                 }
@@ -557,13 +559,15 @@ export function registerQuestIndicators(scene, mapping) {
                             let ready = null;
                             for (const a of (active || [])) {
                                 try {
-                                    if (typeof window.checkQuestCompletion === 'function' && window.checkQuestCompletion(scene.char, a.id)) { ready = a; break; }
+                                    const questModule = window.__questModule;
+                                    if (questModule && typeof questModule.checkQuestCompletion === 'function' && questModule.checkQuestCompletion(scene.char, a.id)) { ready = a; break; }
                                 } catch (e) {}
                             }
 
                             if (ready) {
                                 ind.setText('❗'); ind.setVisible(true);
-                                const def = (typeof window.getQuestById === 'function') ? window.getQuestById(ready.id) : ((window && window.QUEST_DEFS && window.QUEST_DEFS[ready.id]) ? window.QUEST_DEFS[ready.id] : null);
+                                const questModule = window.__questModule;
+                                const def = (questModule && typeof questModule.getQuestById === 'function') ? questModule.getQuestById(ready.id) : ((window && window.QUEST_DEFS && window.QUEST_DEFS[ready.id]) ? window.QUEST_DEFS[ready.id] : null);
                                 bub.setText((def && def.name) ? def.name : (ready.id || 'Quest'));
                                 bub.setVisible(true);
                             } else if (available && available.length) {
@@ -1815,8 +1819,9 @@ export function refreshQuestLogModal(scene) {
     const char = scene.char || {};
     const active = char.activeQuests || [];
     const completed = char.completedQuests || [];
+    const questModule = window.__questModule;
     const quests = (window && window.QUEST_DEFS) ? window.QUEST_DEFS : {};
-    const objectiveStateFn = (window && window.getQuestObjectiveState) ? window.getQuestObjectiveState : null;
+    const objectiveStateFn = (questModule && typeof questModule.getQuestObjectiveState === 'function') ? questModule.getQuestObjectiveState : null;
     const currentTab = scene._questLogCurrentTab || 'active';
 
     if (currentTab === 'active') {
@@ -2131,11 +2136,12 @@ export function updateQuestTracker(scene) {
         return;
     }
 
-    const getObjectiveState = (typeof window !== 'undefined' && window.getQuestObjectiveState) 
-        ? window.getQuestObjectiveState 
+    const questModule = window.__questModule;
+    const getObjectiveState = (questModule && typeof questModule.getQuestObjectiveState === 'function') 
+        ? questModule.getQuestObjectiveState 
         : null;
-    const getQuestDef = (typeof window !== 'undefined' && window.getQuestById) 
-        ? window.getQuestById 
+    const getQuestDef = (questModule && typeof questModule.getQuestById === 'function') 
+        ? questModule.getQuestById 
         : ((id) => (window.QUEST_DEFS && window.QUEST_DEFS[id]) ? window.QUEST_DEFS[id] : null);
 
     let html = '';
