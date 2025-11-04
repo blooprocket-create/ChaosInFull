@@ -4114,16 +4114,16 @@ export function buildObjectiveList(questDef, progressStates, themeColor = '#ffd2
  * @param {Phaser.Scene} scene - The calling scene
  * @param {Function} onClassSelected - Callback(classId) when user picks a class
  */
-function createClassSelectionModal(scene, onClassSelected) {
+export function createClassSelectionModal(scene, onClassSelected) {
     const CHARACTER = window.__characterModule?.character;
     if (!CHARACTER) {
         console.warn('[createClassSelectionModal] No character loaded');
         return;
     }
 
-    // Get class definitions from global registry
-    const CLASS_DEFS = window.__classData?.CLASS_DEFINITIONS || {};
-    const TIER_1_CLASSES = ['horror', 'occultist', 'stalker'];
+    // Get class definitions from global registry (Next exposes window.CLASS_DEFS)
+    const CLASS_DEFS = (typeof window !== 'undefined' && window.CLASS_DEFS) ? window.CLASS_DEFS : (window.__classData?.CLASS_DEFINITIONS || {});
+    const TIER_1_CLASSES = ['horror', 'occultis', 'stalker'];
 
     // Create modal overlay
     const overlay = document.createElement('div');
@@ -4234,7 +4234,7 @@ function createClassSelectionModal(scene, onClassSelected) {
         `;
         card.appendChild(baseStatsTitle);
 
-        const baseStats = classDef.baseStats || {};
+    const baseStats = classDef.base || {};
         const baseStatsList = document.createElement('div');
         baseStatsList.style.cssText = `
             display: flex;
