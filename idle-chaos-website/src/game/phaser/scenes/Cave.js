@@ -696,15 +696,20 @@ export class Cave extends Phaser.Scene {
         let usedDef = null;
         if (defs && defs[type]) {
             usedDef = defs[type];
-            node.baseChance = (usedDef.baseChance != null) ? usedDef.baseChance : 0.35;
+            // NEW SYSTEM: Read new professional MMO properties
+            node.reqLevel = (usedDef.reqLevel != null) ? usedDef.reqLevel : 1;
+            node.maxHealth = (usedDef.maxHealth != null) ? usedDef.maxHealth : 5;
+            node.currentHealth = node.maxHealth; // Initialize health
+            node.yieldPerHit = (usedDef.yieldPerHit != null) ? usedDef.yieldPerHit : 1;
+            node.xpPerHit = (usedDef.xpPerHit != null) ? usedDef.xpPerHit : 15;
+            node.baseSpeed = (usedDef.baseSpeed != null) ? usedDef.baseSpeed : 2500;
+            node.respawnTime = (usedDef.respawnTime != null) ? usedDef.respawnTime : 60000;
+            
             node.item = { id: (usedDef.itemId || (type + '_ore')), name: (usedDef.label || (type || 'Ore')) };
             node.color = usedDef.color || 0x776655;
             node.label = usedDef.label || (type.charAt(0).toUpperCase() + type.slice(1));
-            node.minEfficiency = (usedDef.minEfficiency != null) ? usedDef.minEfficiency : 15;
-            node.baseExp = (usedDef.baseExp != null) ? usedDef.baseExp : 15;
-            node.baseYield = (usedDef.baseYield != null) ? usedDef.baseYield : 1;
-            if (usedDef.failExp != null) node.failExp = usedDef.failExp;
-            if (usedDef.maxMultiplier != null) node.maxMultiplier = usedDef.maxMultiplier;
+            node.depleted = false; // Track depletion state
+            
             // use sprite key if available and loaded
             const spriteKey = usedDef.sprite || null;
             if (spriteKey && this.textures && this.textures.exists && this.textures.exists(spriteKey)) {
@@ -726,19 +731,44 @@ export class Cave extends Phaser.Scene {
                 node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
             }
         } else {
-            // fallback legacy mapping for tin/copper
+            // fallback legacy mapping for tin/copper with NEW SYSTEM defaults
             const config = {
-                tin: { color: 0x9bb7c9, baseChance: 0.45, item: { id: 'tin_ore', name: 'Tin Ore' }, label: 'Tin', minEfficiency: 12, baseExp: 12 },
-                copper: { color: 0x8a7766, baseChance: 0.35, item: { id: 'copper_ore', name: 'Copper Ore' }, label: 'Copper', minEfficiency: 18, baseExp: 18 }
+                tin: { 
+                    color: 0x9bb7c9, 
+                    item: { id: 'tin_ore', name: 'Tin Ore' }, 
+                    label: 'Tin',
+                    reqLevel: 1,
+                    maxHealth: 3,
+                    yieldPerHit: 1,
+                    xpPerHit: 10,
+                    baseSpeed: 2500,
+                    respawnTime: 45000
+                },
+                copper: { 
+                    color: 0x8a7766, 
+                    item: { id: 'copper_ore', name: 'Copper Ore' }, 
+                    label: 'Copper',
+                    reqLevel: 1,
+                    maxHealth: 4,
+                    yieldPerHit: 1,
+                    xpPerHit: 15,
+                    baseSpeed: 2600,
+                    respawnTime: 50000
+                }
             };
             const cfg = config[type] || config.copper;
-            node.baseChance = cfg.baseChance;
+            node.reqLevel = cfg.reqLevel || 1;
+            node.maxHealth = cfg.maxHealth || 5;
+            node.currentHealth = node.maxHealth;
+            node.yieldPerHit = cfg.yieldPerHit || 1;
+            node.xpPerHit = cfg.xpPerHit || 15;
+            node.baseSpeed = cfg.baseSpeed || 2500;
+            node.respawnTime = cfg.respawnTime || 60000;
             node.item = cfg.item;
             node.color = cfg.color;
             node.label = cfg.label;
-            node.minEfficiency = cfg.minEfficiency || 15;
-            node.baseExp = cfg.baseExp || 15;
-            node.baseYield = 1;
+            node.depleted = false;
+            
             if (type === 'tin' && this.textures.exists && this.textures.exists('tin')) {
                 try {
                     node.sprite = this.add.sprite(x, y, 'tin').setOrigin(0.5).setDepth(1.2);
@@ -767,10 +797,26 @@ export class Cave extends Phaser.Scene {
                 node.sprite = this.add.circle(x, y, node.r, node.color, 1).setDepth(1.2);
             }
         }
-        const promptText = node.minEfficiency
-            ? `[E] Mine ${node.label}\n(Req Eff ${node.minEfficiency})`
-            : `[E] Mine ${node.label}`;
-    node.prompt = this.add.text(node.x, node.y - 60, promptText, { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 }, align: 'center' }).setOrigin(0.5).setDepth(2);
+        
+        // Create health bar (35px wide, 4px tall, positioned above sprite)
+        const barWidth = 35;
+        const barHeight = 4;
+        const barX = node.x - (barWidth / 2);
+        const barY = node.y - node.r - 12; // Position above node
+        
+        // Background (grey)
+        node.healthBarBg = this.add.rectangle(barX, barY, barWidth, barHeight, 0x333333)
+            .setOrigin(0, 0.5)
+            .setDepth(1.9);
+        
+        // Fill (green, updates with health)
+        node.healthBar = this.add.rectangle(barX, barY, barWidth, barHeight, 0x44cc44)
+            .setOrigin(0, 0.5)
+            .setDepth(2.0);
+        
+        // Update prompt to show level requirement
+        const promptText = `[E] Mine ${node.label}\n(Req Level ${node.reqLevel})`;
+        node.prompt = this.add.text(node.x, node.y - 60, promptText, { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 }, align: 'center' }).setOrigin(0.5).setDepth(2);
         node.prompt.setVisible(false);
         // create a physics collider so the player bumps into the node instead of walking through it
         try {
@@ -852,7 +898,6 @@ export class Cave extends Phaser.Scene {
         const baseStr = (this.char.stats && this.char.stats.str) || 0;
         const str = (effStats && typeof effStats.str === 'number') ? effStats.str : baseStr;
 
-        let toolSkill = 0;
         let toolSpeed = 0;
         try {
             const equip = (this.char && this.char.equipment && this.char.equipment.mining) ? this.char.equipment.mining : null;
@@ -861,13 +906,9 @@ export class Cave extends Phaser.Scene {
             if (equip && equip.id && defs) equipDef = defs[equip.id] || null;
             const bonusSource = (equipDef && equipDef.miningBonus) || (equip && equip.miningBonus) || null;
             if (bonusSource) {
-                toolSkill += Number(bonusSource.skill || 0);
                 toolSpeed += Number(bonusSource.speedReductionMs || 0);
             }
         } catch (e) {}
-        if (this.char && this.char._equipBonuses && typeof this.char._equipBonuses.mining === 'number') {
-            toolSkill += this.char._equipBonuses.mining;
-        }
 
         // Apply miningSpeed talent modifiers to toolSpeed
         try {
@@ -887,13 +928,11 @@ export class Cave extends Phaser.Scene {
         } catch (e) {}
 
         const miningLevel = mining.level || 1;
-        const efficiency = Math.max(0, Math.round(miningLevel * 3 + str * 1.5 + toolSkill * 5));
 
+        // NEW SYSTEM: Return only speed-related stats (no efficiency/success chance)
         return {
-            efficiency,
             miningLevel,
             str,
-            toolSkill,
             toolSpeed
         };
     }
@@ -1719,13 +1758,28 @@ export class Cave extends Phaser.Scene {
         }
     }
 
-    // Mining attempt logic: success grants 15 exp + item, failure 5 exp
+    // Mining attempt logic: Professional MMO-style (guaranteed success, node depletion)
     _attemptMine() {
         const node = this._activeNode;
         if (!node) return;
+        
+        // Check if node is depleted
+        if (node.depleted) {
+            this._stopContinuousMining();
+            this._showToast('Node depleted - it will respawn soon');
+            return;
+        }
+        
+        // Check level requirement
         const mining = this.char.mining = this.char.mining || { level: 1, exp: 0, expToLevel: 100 };
-        const snapshot = this._getMiningSnapshot();
+        const reqLevel = node.reqLevel || 1;
+        if (mining.level < reqLevel) {
+            this._stopContinuousMining();
+            this._showToast(`Mining level ${reqLevel} required for ${node.label}`);
+            return;
+        }
 
+        // Play mining animation
         const intervalMs = Math.max(200, this._currentMiningInterval || this.miningInterval || 2800);
         try {
             const mineKey = (this.char && this.char._terrorFormEnabled) ? 'dude_mine_terror' : 'dude_mine';
@@ -1763,125 +1817,95 @@ export class Cave extends Phaser.Scene {
             }
         } catch (e) {}
 
-        const requiredEff = Math.max(1, node.minEfficiency || 10);
-        const ratioRaw = requiredEff > 0 ? snapshot.efficiency / requiredEff : snapshot.efficiency;
-        const ratio = (Number.isFinite(ratioRaw) && ratioRaw > 0) ? ratioRaw : 0;
-        const successChance = Math.min(1, Math.max(0, ratio));
-        const success = Math.random() < successChance;
-
-        const baseYield = Math.max(1, node.baseYield || 1);
-        const baseExp = (node.baseExp != null) ? node.baseExp : 15;
-        const maxMultiplier = (node.maxMultiplier != null) ? node.maxMultiplier : null;
-
-        if (success) {
-            const guaranteed = Math.max(1, Math.floor(ratio));
-            const fractional = ratio - Math.floor(ratio);
-            let multiplier = guaranteed;
-            if (Math.random() < Math.max(0, Math.min(1, fractional))) multiplier += 1;
-            if (maxMultiplier != null) multiplier = Math.min(maxMultiplier, multiplier);
-            multiplier = Math.max(1, multiplier);
-
-            node.item = node.item || { id: `${node.type || 'ore'}_ore`, name: node.label || 'Ore' };
-            if (!node.item.name) node.item.name = node.label || 'Ore';
-            let itemName = node.item.name;
-            try {
-                if (window && window.ITEM_DEFS && window.ITEM_DEFS[node.item.id] && window.ITEM_DEFS[node.item.id].name) {
-                    itemName = window.ITEM_DEFS[node.item.id].name;
-                }
-            } catch (e) {}
-
-            const quantity = Math.max(1, Math.round(baseYield * multiplier));
-
-            let addedToShared = false;
-            try {
-                // Prefer shared combat mixin wrapper so it also refreshes the inventory modal when open
-                if (this._addItemToInventory && typeof this._addItemToInventory === 'function') {
-                    this._addItemToInventory(node.item.id, quantity);
-                    addedToShared = true;
-                } else if (window && window.__shared_ui && typeof window.__shared_ui.addItemToInventory === 'function') {
-                    const ok = window.__shared_ui.addItemToInventory(this, node.item.id, quantity);
-                    if (!ok && this._showToast) this._showToast('Inventory full');
-                    addedToShared = true;
-                }
-            } catch (e) {}
-            if (!addedToShared) {
-                this.char.inventory = this.char.inventory || [];
-                const slot = this.char.inventory.find(it => it && it.id === node.item.id);
-                if (slot && typeof slot.qty === 'number') slot.qty += quantity;
-                else this.char.inventory.push({ id: node.item.id, name: itemName, qty: quantity });
+        // GUARANTEED SUCCESS - get item data
+        node.item = node.item || { id: node.itemId || `${node.type || 'ore'}_ore`, name: node.label || 'Ore' };
+        if (!node.item.name) node.item.name = node.label || 'Ore';
+        let itemName = node.item.name;
+        try {
+            if (window && window.ITEM_DEFS && window.ITEM_DEFS[node.item.id] && window.ITEM_DEFS[node.item.id].name) {
+                itemName = window.ITEM_DEFS[node.item.id].name;
             }
-            // If the inventory modal is open, refresh it immediately so new ore appears live
-            try { if (this._inventoryModal) this._refreshInventoryModal && this._refreshInventoryModal(); } catch (e) {}
+        } catch (e) {}
 
-            try {
-                updateQuestProgress(this.char, 'mine', node.item.id, quantity);
-                if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal && this._questLogModal) {
-                    window.__shared_ui.refreshQuestLogModal(this);
-                }
-            } catch (e) {}
+        // Guaranteed yield per hit
+        const quantity = node.yieldPerHit || 1;
 
-            let xpGain = Math.max(1, Math.round(baseExp * multiplier));
-            // Apply skillXpGain and miningXpGain talent modifiers
-            try {
-                const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats)
-                    ? window.__shared_ui.stats.effectiveStats(this.char)
-                    : null;
-                const tmods = (this.char && this.char._talentModifiers) ? this.char._talentModifiers : {};
-                
-                // General skill XP gain bonus
-                if (eff && (eff.skillXpBonusPercent || eff.skillXpFlatBonus)) {
-                    const flatBonus = Number(eff.skillXpFlatBonus || 0);
-                    const pctBonus = Number(eff.skillXpBonusPercent || 0);
-                    xpGain = Math.max(1, Math.round((xpGain + flatBonus) * (1 + (pctBonus / 100))));
-                }
-                
-                // Mining-specific XP gain bonus
-                const miningXpMod = tmods['miningXpGain'] || null;
-                if (miningXpMod) {
-                    const flatBonus = Number(miningXpMod.flat || 0);
-                    const pctBonus = Number(miningXpMod.percent || 0);
-                    xpGain = Math.max(1, Math.round((xpGain + flatBonus) * (1 + (pctBonus / 100))));
-                }
-            } catch (e) {}
-            mining.exp = (mining.exp || 0) + xpGain;
-            this._showToast(`You mined ${quantity}x ${itemName}! (+${xpGain} mining XP)`);
-            this._playMiningSwingEffect(node, true);
-            if (multiplier > 1 && node.sprite) {
-                this.tweens.add({ targets: node.sprite, scale: { from: 1.12, to: 1.24 }, yoyo: true, duration: 220, ease: 'Sine.easeOut' });
+        // Add to inventory
+        let addedToShared = false;
+        try {
+            if (this._addItemToInventory && typeof this._addItemToInventory === 'function') {
+                this._addItemToInventory(node.item.id, quantity);
+                addedToShared = true;
+            } else if (window && window.__shared_ui && typeof window.__shared_ui.addItemToInventory === 'function') {
+                const ok = window.__shared_ui.addItemToInventory(this, node.item.id, quantity);
+                if (!ok && this._showToast) this._showToast('Inventory full');
+                addedToShared = true;
             }
-            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
-        } else {
-            let failExp = (node.failExp != null) ? node.failExp : Math.max(1, Math.round(baseExp * 0.3));
-            // Apply skillXpGain and miningXpGain talent modifiers
-            try {
-                const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats)
-                    ? window.__shared_ui.stats.effectiveStats(this.char)
-                    : null;
-                const tmods = (this.char && this.char._talentModifiers) ? this.char._talentModifiers : {};
-                
-                // General skill XP gain bonus
-                if (eff && (eff.skillXpBonusPercent || eff.skillXpFlatBonus)) {
-                    const flatBonus = Number(eff.skillXpFlatBonus || 0);
-                    const pctBonus = Number(eff.skillXpBonusPercent || 0);
-                    failExp = Math.max(1, Math.round((failExp + flatBonus) * (1 + (pctBonus / 100))));
-                }
-                
-                // Mining-specific XP gain bonus
-                const miningXpMod = tmods['miningXpGain'] || null;
-                if (miningXpMod) {
-                    const flatBonus = Number(miningXpMod.flat || 0);
-                    const pctBonus = Number(miningXpMod.percent || 0);
-                    failExp = Math.max(1, Math.round((failExp + flatBonus) * (1 + (pctBonus / 100))));
-                }
-            } catch (e) {}
-            mining.exp = (mining.exp || 0) + failExp;
-            const deficit = Math.max(0, Math.ceil(requiredEff - snapshot.efficiency));
-            if (deficit > 0) this._showToast(`The vein resists (need +${deficit} efficiency). (+${failExp} mining XP)`);
-            else this._showToast(`You swing and miss the sweet spot. (+${failExp} mining XP)`);
-            this._playMiningSwingEffect(node, false);
-            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+        } catch (e) {}
+        if (!addedToShared) {
+            this.char.inventory = this.char.inventory || [];
+            const slot = this.char.inventory.find(it => it && it.id === node.item.id);
+            if (slot && typeof slot.qty === 'number') slot.qty += quantity;
+            else this.char.inventory.push({ id: node.item.id, name: itemName, qty: quantity });
         }
+        
+        // Refresh inventory modal if open
+        try { if (this._inventoryModal) this._refreshInventoryModal && this._refreshInventoryModal(); } catch (e) {}
 
+        // Quest progress
+        try {
+            updateQuestProgress(this.char, 'mine', node.item.id, quantity);
+            if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal && this._questLogModal) {
+                window.__shared_ui.refreshQuestLogModal(this);
+            }
+        } catch (e) {}
+
+        // Grant XP (from node definition)
+        let xpGain = node.xpPerHit || 10;
+        
+        // Apply skill XP talent modifiers
+        try {
+            const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats)
+                ? window.__shared_ui.stats.effectiveStats(this.char)
+                : null;
+            const tmods = (this.char && this.char._talentModifiers) ? this.char._talentModifiers : {};
+            
+            if (eff && (eff.skillXpBonusPercent || eff.skillXpFlatBonus)) {
+                const flatBonus = Number(eff.skillXpFlatBonus || 0);
+                const pctBonus = Number(eff.skillXpBonusPercent || 0);
+                xpGain = Math.max(1, Math.round((xpGain + flatBonus) * (1 + (pctBonus / 100))));
+            }
+            
+            const miningXpMod = tmods['miningXpGain'] || null;
+            if (miningXpMod) {
+                const flatBonus = Number(miningXpMod.flat || 0);
+                const pctBonus = Number(miningXpMod.percent || 0);
+                xpGain = Math.max(1, Math.round((xpGain + flatBonus) * (1 + (pctBonus / 100))));
+            }
+        } catch (e) {}
+        
+        mining.exp = (mining.exp || 0) + xpGain;
+
+        // Deplete node health
+        node.currentHealth = (node.currentHealth || node.maxHealth) - 1;
+        
+        // Update health bar visual
+        try { this._updateNodeHealthBar(node); } catch (e) {}
+        
+        if (node.currentHealth <= 0) {
+            node.depleted = true;
+            node.currentHealth = 0;
+            this._showToast(`${node.label} depleted! (+${xpGain} XP)`);
+            this._depleteNode(node);
+        } else {
+            this._showToast(`${quantity}x ${itemName}! [${node.currentHealth}/${node.maxHealth}] (+${xpGain} XP)`);
+        }
+        
+        // Visual feedback
+        this._playMiningSwingEffect(node, true);
+        try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+
+        // Check for level ups
         while (mining.exp >= mining.expToLevel) {
             mining.exp -= mining.expToLevel;
             mining.level = (mining.level || 1) + 1;
@@ -1891,18 +1915,116 @@ export class Cave extends Phaser.Scene {
             try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
         }
 
+        // Persist and update HUD
         this.char.mining = mining;
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
         this._persistCharacter(username);
         try { this._updateHUD(); } catch (e) { try { this._destroyHUD(); this._createHUD(); } catch (_) {} }
+        
+        // Update node health bar if exists
+        try { if (node.healthBar) this._updateNodeHealthBar(node); } catch (e) {}
     }
+    
+    // Deplete a node and schedule respawn
+    _depleteNode(node) {
+        if (!node) return;
+        node.depleted = true;
+        node.currentHealth = 0;
+        
+        // Hide/fade sprite
+        if (node.sprite) {
+            this.tweens.add({
+                targets: node.sprite,
+                alpha: 0.2,
+                duration: 400,
+                ease: 'Cubic.easeOut'
+            });
+        }
+        
+        // Hide prompt
+        if (node.prompt) node.prompt.setVisible(false);
+        
+        // Hide health bar
+        if (node.healthBar) node.healthBar.setVisible(false);
+        if (node.healthBarBg) node.healthBarBg.setVisible(false);
+        
+        // Schedule respawn
+        const respawnTime = node.respawnTime || 60000;
+        const respawnEvent = addTimeEvent(this, {
+            delay: respawnTime,
+            callback: () => {
+                this._respawnNode(node);
+            },
+            callbackScope: this
+        });
+        node._respawnEvent = respawnEvent;
+    }
+    
+    // Respawn a depleted node
+    _respawnNode(node) {
+        if (!node) return;
+        node.depleted = false;
+        node.currentHealth = node.maxHealth;
+        
+        // Show/restore sprite
+        if (node.sprite) {
+            this.tweens.add({
+                targets: node.sprite,
+                alpha: 1,
+                duration: 600,
+                ease: 'Cubic.easeIn'
+            });
+        }
+        
+        // Update health bar
+        try { if (node.healthBar) this._updateNodeHealthBar(node); } catch (e) {}
+        
+        // Clean up respawn event reference
+        if (node._respawnEvent) {
+            node._respawnEvent = null;
+        }
+    }
+
+    _updateNodeHealthBar(node) {
+        if (!node || !node.healthBar) return;
+        
+        const healthRatio = Math.max(0, Math.min(1, node.currentHealth / node.maxHealth));
+        const barWidth = 35;
+        const newWidth = barWidth * healthRatio;
+        
+        // Update fill width
+        node.healthBar.width = newWidth;
+        
+        // Change color based on health (green → yellow → red)
+        let color = 0x44cc44; // Green
+        if (healthRatio < 0.3) {
+            color = 0xcc4444; // Red
+        } else if (healthRatio < 0.6) {
+            color = 0xcccc44; // Yellow
+        }
+        node.healthBar.setFillStyle(color);
+        
+        // Show/hide health bar based on depletion state
+        if (node.depleted) {
+            if (node.healthBar) node.healthBar.setVisible(false);
+            if (node.healthBarBg) node.healthBarBg.setVisible(false);
+        } else {
+            if (node.healthBar) node.healthBar.setVisible(true);
+            if (node.healthBarBg) node.healthBarBg.setVisible(true);
+        }
+    }
+
     _startContinuousMining() {
         if (this.miningActive) return;
         this.miningActive = true;
         // mark activity as mining so HUD shows mining progress
         setSceneActivity(this, 'mining', { source: 'mining-start', timeout: 0 });
         const snapshot = this._getMiningSnapshot();
-        const baseInterval = this.miningInterval || 2800;
+        
+        // Use node's baseSpeed property (NEW SYSTEM)
+        const node = this._activeNode;
+        const baseInterval = (node && node.baseSpeed) ? node.baseSpeed : (this.miningInterval || 2800);
+        
         const statReduction = Math.round((snapshot.miningLevel || 1) * 20 + (snapshot.str || 0) * 8);
         const toolReduction = Math.round(snapshot.toolSpeed || 0);
         let calculatedInterval = Math.max(800, baseInterval - statReduction - toolReduction);

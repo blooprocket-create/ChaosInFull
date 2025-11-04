@@ -1,5 +1,5 @@
 export const RECIPE_DEFS = {
-    // furnace recipes
+    // furnace recipes (aligned with new mining level gates)
     'copper_bar': {
         id: 'copper_bar',
         name: 'Copper Bar',
@@ -7,7 +7,7 @@ export const RECIPE_DEFS = {
         category: 'material',
         requires: [ { id: 'copper_ore', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 12
+        smithingXp: 70 // Balanced with mining (2 copper ore = 70 XP each = 140 mining XP)
     },
     'bronze_bar': {
         id: 'bronze_bar',
@@ -16,7 +16,43 @@ export const RECIPE_DEFS = {
         category: 'material',
         requires: [ { id: 'copper_ore', qty: 1 }, { id: 'tin_ore', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 15
+        smithingXp: 100 // Balanced (35+25 mining XP = 60, smelting adds skill)
+    },
+    'iron_bar':{
+        id: 'iron_bar',
+        name: 'Iron Bar',
+        tool: 'furnace',
+        category: 'material',
+        requires: [ { id: 'iron_ore', qty: 2 }, { id: 'coal_ore', qty: 1 } ],
+        reqLevel: 15, // Aligned with iron_ore reqLevel
+        smithingXp: 300 // Balanced (2x80 + 55 = 215 mining XP)
+    },
+    'steel_bar':{
+        id: 'steel_bar',
+        name: 'Steel Bar',
+        tool: 'furnace',
+        category: 'material',
+        requires: [ { id: 'iron_ore', qty: 3 }, { id: 'coal_ore', qty: 2 } ],
+        reqLevel: 20, // Higher than iron
+        smithingXp: 500 // Balanced (3x80 + 2x55 = 350 mining XP)
+    },
+    'mythril_bar':{
+        id: 'mythril_bar',
+        name: 'Mythril Bar',
+        tool: 'furnace',
+        category: 'material',
+        requires: [ { id: 'mythril_ore', qty: 2 }, { id: 'coal_ore', qty: 1 } ],
+        reqLevel: 30, // Aligned with mythril_ore reqLevel
+        smithingXp: 800 // Balanced (2x200 + 55 = 455 mining XP)
+    },
+    'gold_ingot':{
+        id: 'gold_ingot',
+        name: 'Gold Ingot',
+        tool: 'furnace',
+        category: 'material',
+        requires: [ { id: 'gold_ore', qty: 1 }, { id: 'coal_ore', qty: 1 } ],
+        reqLevel: 40, // Aligned with gold_ore reqLevel
+        smithingXp: 1200 // Balanced (350 + 55 = 405 mining XP)
     },
     'cooked_rat_meat': {
         id: 'cooked_rat_meat',
@@ -170,7 +206,7 @@ export const RECIPE_DEFS = {
     'cooked_leviathan_spawn': { id: 'cooked_leviathan_spawn', name: 'Cooked Leviathan Spawn', tool: 'furnace', category: 'meat', requires: [ { id: 'leviathan_spawn', qty: 1 } ], reqLevel: 15, cookingXp: 1000 },
     'cooked_celestial_whale': { id: 'cooked_celestial_whale', name: 'Cooked Celestial Whale', tool: 'furnace', category: 'meat', requires: [ { id: 'celestial_whale', qty: 1 } ], reqLevel: 16, cookingXp: 1200 },
 
-    // workbench recipes (craft weapons)
+    // workbench recipes (craft weapons, aligned with bar requirements)
     'copper_dagger': {
         id: 'copper_dagger',
         name: 'Copper Dagger',
@@ -178,7 +214,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'copper_bar', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 20
+        smithingXp: 80
     },
     'bronze_dagger': {
         id: 'bronze_dagger',
@@ -187,7 +223,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'bronze_bar', qty: 1 } ],
         reqLevel: 1,
-        smithingXp: 25
+        smithingXp: 110
     },
     'copper_armor': {
         id: 'copper_armor',
@@ -196,7 +232,7 @@ export const RECIPE_DEFS = {
         category: 'armor',
         requires: [ { id: 'copper_bar', qty: 4 } ],
         reqLevel: 2,
-        smithingXp: 40
+        smithingXp: 160
     },
     'bronze_armor': {
         id: 'bronze_armor',
@@ -205,7 +241,7 @@ export const RECIPE_DEFS = {
         category: 'armor',
         requires: [ { id: 'bronze_bar', qty: 4 } ],
         reqLevel: 2,
-        smithingXp: 70
+        smithingXp: 240
     },
     'copper_sword': {
         id: 'copper_sword',
@@ -214,7 +250,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'copper_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 20
+        smithingXp: 80
     },
     'bronze_sword': {
         id: 'bronze_sword',
@@ -223,7 +259,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'bronze_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 25
+        smithingXp: 110
     },
     'copper_helmet': {
         id: 'copper_helmet',
@@ -232,7 +268,7 @@ export const RECIPE_DEFS = {
         category: 'helm',
         requires: [ { id: 'copper_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 20
+        smithingXp: 80
     },
     'bronze_helmet': {
         id: 'bronze_helmet',
@@ -241,7 +277,7 @@ export const RECIPE_DEFS = {
         category: 'helm',
         requires: [ { id: 'bronze_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 25
+        smithingXp: 110
     },
     'copper_legs': {
         id: 'copper_legs',
@@ -250,7 +286,7 @@ export const RECIPE_DEFS = {
         category: 'legs',
         requires: [ { id: 'copper_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 20
+        smithingXp: 80
     },
     'bronze_legs': {
         id: 'bronze_legs',
@@ -259,7 +295,7 @@ export const RECIPE_DEFS = {
         category: 'legs',
         requires: [ { id: 'bronze_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 25
+        smithingXp: 110
     },
     'copper_boots': {
         id: 'copper_boots',
@@ -268,7 +304,7 @@ export const RECIPE_DEFS = {
         category: 'boots',
         requires: [ { id: 'copper_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 20
+        smithingXp: 80
     },
     'bronze_boots': {
         id: 'bronze_boots',
@@ -277,7 +313,7 @@ export const RECIPE_DEFS = {
         category: 'boots',
         requires: [ { id: 'bronze_bar', qty: 2 } ],
         reqLevel: 1,
-        smithingXp: 25
+        smithingXp: 110
     },
     'slime_ring': {
         id: 'slime_ring',
@@ -286,7 +322,7 @@ export const RECIPE_DEFS = {
         category: 'rings',
         requires: [ { id: 'slime_core', qty: 1 }, { id: 'slime_gel', qty: 5 } ],
         reqLevel: 5,
-        smithingXp: 150
+        smithingXp: 300 // Early-game accessory (2x from 150)
     },
     'slime_amulet': {
         id: 'slime_amulet',
@@ -295,7 +331,7 @@ export const RECIPE_DEFS = {
         category: 'amulets',
         requires: [ { id: 'slime_core', qty: 1 }, { id: 'slime_gel', qty: 5 }, { id: 'copper_bar', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 180
+        smithingXp: 360 // Early accessory + bar requirement (2x from 180)
     },
     'sticky_dice': {
         id: 'sticky_dice',
@@ -304,7 +340,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'slime_core', qty: 6 }, { id: 'slime_gel', qty: 6 } ],
         reqLevel: 5,
-        smithingXp: 250
+        smithingXp: 500 // Special weapon with high material cost (2x from 250)
     },
     'green_staff': {
         id: 'green_staff',
@@ -313,16 +349,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'slime_core', qty: 1 }, { id: 'spectral_essence', qty: 3 }, { id: 'normal_log', qty: 3 } ],
         reqLevel: 5,
-        smithingXp: 150
-    },
-    'iron_bar':{
-        id: 'iron_bar',
-        name: 'Iron Bar',
-        tool: 'furnace',
-        category: 'material',
-        requires: [ { id: 'iron_ore', qty: 2 }, { id: 'coal_ore', qty: 1 } ],
-        reqLevel: 3,
-        smithingXp: 40
+        smithingXp: 300 // Early-game staff (2x from 150)
     },
     'iron_sword': {
         id: 'iron_sword',
@@ -330,8 +357,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'weapon',
         requires: [ { id: 'iron_bar', qty: 2 } ],
-        reqLevel: 3,
-        smithingXp: 60
+        reqLevel: 15, // Aligned with iron bar
+        smithingXp: 360
     },
     'iron_armor': {
         id: 'iron_armor',
@@ -339,8 +366,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'armor',
         requires: [ { id: 'iron_bar', qty: 5 } ],
-        reqLevel: 4,
-        smithingXp: 120
+        reqLevel: 16,
+        smithingXp: 600
     },
     'iron_helmet': {
         id: 'iron_helmet',
@@ -348,8 +375,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'helm',
         requires: [ { id: 'iron_bar', qty: 3 } ],
-        reqLevel: 5,
-        smithingXp: 75
+        reqLevel: 15,
+        smithingXp: 400
     },
     'iron_legs': {
         id: 'iron_legs',
@@ -357,8 +384,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'legs',
         requires: [ { id: 'iron_bar', qty: 5 } ],
-        reqLevel: 5,
-        smithingXp: 100
+        reqLevel: 16,
+        smithingXp: 560
     },
     'iron_boots': {
         id: 'iron_boots',
@@ -366,17 +393,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'boots',
         requires: [ { id: 'iron_bar', qty: 3 } ],
-        reqLevel: 5,
-        smithingXp: 75
-    },
-    'steel_bar':{
-        id: 'steel_bar',
-        name: 'Steel Bar',
-        tool: 'furnace',
-        category: 'material',
-        requires: [ { id: 'iron_ore', qty: 3 }, { id: 'coal_ore', qty: 2 } ],
-        reqLevel: 6,
-        smithingXp: 80
+        reqLevel: 15,
+        smithingXp: 400
     },
     'steel_sword': {
         id: 'steel_sword',
@@ -384,8 +402,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'weapon',
         requires: [ { id: 'steel_bar', qty: 2 } ],
-        reqLevel: 6,
-        smithingXp: 140
+        reqLevel: 20, // Aligned with steel bar
+        smithingXp: 640
     },
     'steel_dagger': {
         id: 'steel_dagger',
@@ -393,8 +411,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'weapon',
         requires: [ { id: 'steel_bar', qty: 1 } ],
-        reqLevel: 5,
-        smithingXp: 50
+        reqLevel: 20,
+        smithingXp: 320
     },
     'steel_armor': {
         id: 'steel_armor',
@@ -402,8 +420,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'armor',
         requires: [ { id: 'steel_bar', qty: 5 } ],
-        reqLevel: 6,
-        smithingXp: 260
+        reqLevel: 22,
+        smithingXp: 1040
     },
     'steel_helmet': {
         id: 'steel_helmet',
@@ -411,8 +429,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'helm',
         requires: [ { id: 'steel_bar', qty: 3 } ],
-        reqLevel: 5,
-        smithingXp: 75
+        reqLevel: 20,
+        smithingXp: 560
     },
     'steel_legs': {
         id: 'steel_legs',
@@ -420,8 +438,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'legs',
         requires: [ { id: 'steel_bar', qty: 5 } ],
-        reqLevel: 5,
-        smithingXp: 100
+        reqLevel: 22,
+        smithingXp: 960
     },
     'steel_boots': {
         id: 'steel_boots',
@@ -429,17 +447,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'boots',
         requires: [ { id: 'steel_bar', qty: 3 } ],
-        reqLevel: 5,
-        smithingXp: 75
-    },
-    'mythril_bar':{
-        id: 'mythril_bar',
-        name: 'Mythril Bar',
-        tool: 'furnace',
-        category: 'material',
-        requires: [ { id: 'mythril_ore', qty: 2 }, { id: 'coal_ore', qty: 1 } ],
-        reqLevel: 10,
-        smithingXp: 220
+        reqLevel: 20,
+        smithingXp: 560
     },
     'mythril_sword': {
         id: 'mythril_sword',
@@ -447,8 +456,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 } ],
-        reqLevel: 10,
-        smithingXp: 360
+        reqLevel: 30, // Aligned with mythril bar
+        smithingXp: 1440
     },
     'mythril_armor': {
         id: 'mythril_armor',
@@ -456,8 +465,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'armor',
         requires: [ { id: 'mythril_bar', qty: 5 } ],
-        reqLevel: 10,
-        smithingXp: 700
+        reqLevel: 32,
+        smithingXp: 2800
     },
     'mythril_helmet': {
         id: 'mythril_helmet',
@@ -465,8 +474,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'helm',
         requires: [ { id: 'mythril_bar', qty: 3 } ],
-        reqLevel: 5,
-        smithingXp: 75
+        reqLevel: 30,
+        smithingXp: 1800
     },
     'mythril_legs': {
         id: 'mythril_legs',
@@ -474,8 +483,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'legs',
         requires: [ { id: 'mythril_bar', qty: 5 } ],
-        reqLevel: 5,
-        smithingXp: 100
+        reqLevel: 32,
+        smithingXp: 2400
     },
     'mythril_boots': {
         id: 'mythril_boots',
@@ -483,8 +492,8 @@ export const RECIPE_DEFS = {
         tool: 'workbench',
         category: 'boots',
         requires: [ { id: 'mythril_bar', qty: 3 } ],
-        reqLevel: 5,
-        smithingXp: 75
+        reqLevel: 30,
+        smithingXp: 1800
     },
     'lucky_dagger': {
         id: 'lucky_dagger',
@@ -493,7 +502,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'emerald', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2000 // Mythril + gem weapon (40x from 50, matches tier)
     },
     'alchemist_staff': {
         id: 'alchemist_staff',
@@ -502,7 +511,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 3 }, { id: 'ruby', qty: 1 }, { id: 'normal_log', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + gem + log staff (44x from 50, higher bar cost)
     },
     'dragon_amulet': {
         id: 'dragon_amulet',
@@ -511,7 +520,7 @@ export const RECIPE_DEFS = {
         category: 'amulets',
         requires: [ { id: 'dragon_scale', qty: 2 }, { id: 'gold_ingot', qty: 1 } ],
         reqLevel: 25,
-        smithingXp: 500
+        smithingXp: 1000 // High-level accessory (2x from 500)
     },
     'dragon_ring': {
         id: 'dragon_ring',
@@ -520,7 +529,7 @@ export const RECIPE_DEFS = {
         category: 'rings',
         requires: [ { id: 'dragon_scale', qty: 1 }, { id: 'gold_ingot', qty: 1 } ],
         reqLevel: 25,
-        smithingXp: 500
+        smithingXp: 1000 // High-level accessory (2x from 500)
     },
     'twisted_dagger': {
         id: 'twisted_dagger',
@@ -529,7 +538,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence weapon (36x from 50)
     },
     'dior_dice': {
         id: 'dior_dice',
@@ -538,7 +547,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'steel_bar', qty: 2 }, { id: 'gold_ingot', qty: 2 },{ id: 'gold_ore', qty: 2 }, { id: 'opal', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2500 // Complex recipe with gems (50x from 50, high material cost)
     },
     'gold_ingot':{
         id: 'gold_ingot',
@@ -556,7 +565,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'emerald', qty: 1 }, { id: 'normal_log', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2000 // Mythril + gem + log staff (40x from 50)
     },
     'shadow_dagger': {
         id: 'shadow_dagger',
@@ -565,7 +574,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence weapon (36x from 50)
     },
     'shadow_armor': {
         id: 'shadow_armor',
@@ -574,7 +583,7 @@ export const RECIPE_DEFS = {
         category: 'armor',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence armor (44x from 50)
     },
     'shadow_helmet': {
         id: 'shadow_helmet',
@@ -583,7 +592,7 @@ export const RECIPE_DEFS = {
         category: 'helm',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence helm (36x from 50)
     },
     'shadow_legs': {
         id: 'shadow_legs',
@@ -592,7 +601,7 @@ export const RECIPE_DEFS = {
         category: 'legs',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence legs (44x from 50)
     },
     'shadow_boots': {
         id: 'shadow_boots',
@@ -601,7 +610,7 @@ export const RECIPE_DEFS = {
         category: 'boots',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence boots (36x from 50)
     },
     'shadow_sword': {
         id: 'shadow_sword',
@@ -610,7 +619,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'shadow_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence sword (36x from 50)
     },
     'healing_staff': {
         id: 'healing_staff',
@@ -619,7 +628,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 1 }, { id: 'emerald', qty: 1 }, { id: 'oak_log', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2400 // Complex mythril + essence + gem + log (48x from 50)
     },
     'healing_amulet': {
         id: 'healing_amulet',
@@ -628,7 +637,7 @@ export const RECIPE_DEFS = {
         category: 'amulets',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 1 } ],
         reqLevel: 15,
-        smithingXp: 250
+        smithingXp: 500 // Mid-game accessory (2x from 250)
     },
     'healing_ring': {
         id: 'healing_ring',
@@ -637,7 +646,7 @@ export const RECIPE_DEFS = {
         category: 'rings',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 1 } ],
         reqLevel: 15,
-        smithingXp: 250
+        smithingXp: 500 // Mid-game accessory (2x from 250)
     },
     'healing_robe': {
         id: 'healing_robe',
@@ -646,7 +655,7 @@ export const RECIPE_DEFS = {
         category: 'armor',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence armor (44x from 50)
     },
     'healing_hat': {
         id: 'healing_hat',
@@ -655,7 +664,7 @@ export const RECIPE_DEFS = {
         category: 'helm',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence helm (36x from 50)
     },
     'healing_pants': {
         id: 'healing_pants',
@@ -664,7 +673,7 @@ export const RECIPE_DEFS = {
         category: 'legs',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence legs (44x from 50)
     },
     'healing_boots': {
         id: 'healing_boots',
@@ -673,7 +682,7 @@ export const RECIPE_DEFS = {
         category: 'boots',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'healing_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence boots (36x from 50)
     },
     'toxic_dagger': {
         id: 'toxic_dagger',
@@ -682,7 +691,7 @@ export const RECIPE_DEFS = {
         category: 'weapon',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'toxic_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence weapon (36x from 50)
     },
     'toxic_armor': {
         id: 'toxic_armor',
@@ -691,7 +700,7 @@ export const RECIPE_DEFS = {
         category: 'armor',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'toxic_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence armor (44x from 50)
     },
     'toxic_helmet': {
         id: 'toxic_helmet',
@@ -700,7 +709,7 @@ export const RECIPE_DEFS = {
         category: 'helm',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'toxic_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence helm (36x from 50)
     },
     'toxic_legs': {
         id: 'toxic_legs',
@@ -709,7 +718,7 @@ export const RECIPE_DEFS = {
         category: 'legs',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'toxic_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence legs (44x from 50)
     },
     'toxic_boots': {
         id: 'toxic_boots',
@@ -718,7 +727,7 @@ export const RECIPE_DEFS = {
         category: 'boots',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'toxic_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence boots (36x from 50)
     },
     'poison_amulet': {
         id: 'poison_amulet',
@@ -727,7 +736,7 @@ export const RECIPE_DEFS = {
         category: 'amulets',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'poison_essence', qty: 1 } ],
         reqLevel: 15,
-        smithingXp: 250
+        smithingXp: 500 // Mid-game accessory (2x from 250)
     },
     'poison_ring': {
         id: 'poison_ring',
@@ -736,7 +745,7 @@ export const RECIPE_DEFS = {
         category: 'rings',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'poison_essence', qty: 1 } ],
         reqLevel: 15,
-        smithingXp: 250
+        smithingXp: 500 // Mid-game accessory (2x from 250)
     },
     'poison_cloak': {
         id: 'poison_cloak',
@@ -745,7 +754,7 @@ export const RECIPE_DEFS = {
         category: 'armor',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'poison_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence armor (44x from 50)
     },
     'poison_hat': {
         id: 'poison_hat',
@@ -754,7 +763,7 @@ export const RECIPE_DEFS = {
         category: 'helm',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'poison_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence helm (36x from 50)
     },
     'poison_legs': {
         id: 'poison_legs',
@@ -763,7 +772,7 @@ export const RECIPE_DEFS = {
         category: 'legs',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'poison_essence', qty: 2 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 2200 // Mythril + 2x essence legs (44x from 50)
     },
     'poison_boots': {
         id: 'poison_boots',
@@ -772,8 +781,6 @@ export const RECIPE_DEFS = {
         category: 'boots',
         requires: [ { id: 'mythril_bar', qty: 2 }, { id: 'poison_essence', qty: 1 } ],
         reqLevel: 5,
-        smithingXp: 50
+        smithingXp: 1800 // Mythril + essence boots (36x from 50)
     },
-    
-
 };

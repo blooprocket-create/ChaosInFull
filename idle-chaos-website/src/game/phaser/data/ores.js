@@ -1,18 +1,27 @@
-// Ore definitions for procedural cave generation
-// Each ore entry can include display properties and cluster generation hints
+// Ore definitions for procedural cave generation (Professional MMO-style)
+// New system: Guaranteed success, node health/depletion, clear level gates, predictable mechanics
 const ORE_DEFS = {
     tin: {
         id: 'tin',
         label: 'Tin',
         sprite: 'tin',
         color: 0x9bb7c9,
-        baseChance: 0.45,
         itemId: 'tin_ore',
-        minEfficiency: 12,
-        baseExp: 12,
-        baseYield: 1,
-        clusters: 2,
-        perCluster: 4,
+        // Level and requirements
+        reqLevel: 1,
+        // Node health (hits to deplete)
+        maxHealth: 3,
+        // Guaranteed yield per hit
+        yieldPerHit: 1,
+        // XP per successful hit (balanced for smooth 1-10 progression)
+        xpPerHit: 25, // Increased from 10 (75 XP per node)
+        // Base mining speed (ms per hit) - reduced by efficiency
+        baseSpeed: 2800,
+        // Respawn time after depletion (ms)
+        respawnTime: 45000, // 45 seconds
+        // Generation settings
+        clusters: 3,
+        perCluster: 5,
         clusterRadius: 90
     },
     copper: {
@@ -20,13 +29,15 @@ const ORE_DEFS = {
         label: 'Copper',
         sprite: 'copper',
         color: 0x8a7766,
-        baseChance: 0.35,
         itemId: 'copper_ore',
-        minEfficiency: 18,
-        baseExp: 18,
-        baseYield: 1,
+        reqLevel: 1,
+        maxHealth: 4,
+        yieldPerHit: 1,
+        xpPerHit: 35, // Increased from 15 (140 XP per node)
+        baseSpeed: 3000,
+        respawnTime: 50000,
         clusters: 2,
-        perCluster: 3,
+        perCluster: 4,
         clusterRadius: 110
     },
     iron: {
@@ -34,11 +45,13 @@ const ORE_DEFS = {
         label: 'Iron',
         sprite: 'iron',
         color: 0x7d7f7d,
-        baseChance: 0.25,
         itemId: 'iron_ore',
-        minEfficiency: 28,
-        baseExp: 28,
-        baseYield: 1,
+        reqLevel: 15,
+        maxHealth: 5,
+        yieldPerHit: 1,
+        xpPerHit: 80, // Increased from 35 (400 XP per node)
+        baseSpeed: 3200,
+        respawnTime: 60000,
         clusters: 2,
         perCluster: 3,
         clusterRadius: 120
@@ -48,11 +61,13 @@ const ORE_DEFS = {
         label: 'Coal',
         sprite: 'coal',
         color: 0x4e4e4e,
-        baseChance: 0.15,
         itemId: 'coal_ore',
-        minEfficiency: 24,
-        baseExp: 20,
-        baseYield: 1,
+        reqLevel: 10,
+        maxHealth: 4,
+        yieldPerHit: 1,
+        xpPerHit: 55, // Increased from 25 (220 XP per node)
+        baseSpeed: 2900,
+        respawnTime: 55000,
         clusters: 2,
         perCluster: 3,
         clusterRadius: 130
@@ -62,11 +77,13 @@ const ORE_DEFS = {
         label: 'Mythril',
         sprite: 'mythril',
         color: 0x9b7c9b,
-        baseChance: 0.05,
         itemId: 'mythril_ore',
-        minEfficiency: 40,
-        baseExp: 40,
-        baseYield: 1,
+        reqLevel: 30,
+        maxHealth: 6,
+        yieldPerHit: 1,
+        xpPerHit: 200, // Increased from 80 (1200 XP per node)
+        baseSpeed: 3500,
+        respawnTime: 90000,
         clusters: 1,
         perCluster: 2,
         clusterRadius: 140
@@ -76,26 +93,30 @@ const ORE_DEFS = {
         label: 'Gold',
         sprite: 'gold',
         color: 0xffd700,
-        baseChance: 0.2,
         itemId: 'gold_ore',
-        minEfficiency: 46,
-        baseExp: 48,
-        baseYield: 1,
+        reqLevel: 40,
+        maxHealth: 7,
+        yieldPerHit: 1,
+        xpPerHit: 350, // Increased from 120 (2450 XP per node)
+        baseSpeed: 3800,
+        respawnTime: 120000,
         clusters: 1,
         perCluster: 1,
         clusterRadius: 160
     },
+    // Gems: Higher level, rare, faster to mine but fewer nodes
     emerald: {
         id: 'emerald',
         label: 'Emerald',
         sprite: 'emerald',
         color: 0x50c878,
-        baseChance: 0.1,
-        maxMultiplier: 1,
         itemId: 'emerald',
-        minEfficiency: 54,
-        baseExp: 65,
-        baseYield: 1,
+        reqLevel: 50,
+        maxHealth: 2,
+        yieldPerHit: 1,
+        xpPerHit: 500, // Increased from 150 (1000 XP per node)
+        baseSpeed: 2500,
+        respawnTime: 180000, // 3 minutes
         clusters: 1,
         perCluster: 1,
         clusterRadius: 180
@@ -105,12 +126,13 @@ const ORE_DEFS = {
         label: 'Ruby',
         sprite: 'ruby',
         color: 0xe0115f,
-        baseChance: 0.05,
-        maxMultiplier: 1,
         itemId: 'ruby',
-        minEfficiency: 58,
-        baseExp: 70,
-        baseYield: 1,
+        reqLevel: 55,
+        maxHealth: 2,
+        yieldPerHit: 1,
+        xpPerHit: 600, // Increased from 180 (1200 XP per node)
+        baseSpeed: 2500,
+        respawnTime: 180000,
         clusters: 1,
         perCluster: 1,
         clusterRadius: 200
@@ -120,12 +142,13 @@ const ORE_DEFS = {
         label: 'Sapphire',
         sprite: 'sapphire',
         color: 0x0f52ba,
-        baseChance: 0.05,
-        maxMultiplier: 1,
         itemId: 'sapphire',
-        minEfficiency: 58,
-        baseExp: 70,
-        baseYield: 1,
+        reqLevel: 55,
+        maxHealth: 2,
+        yieldPerHit: 1,
+        xpPerHit: 600, // Increased from 180 (1200 XP per node)
+        baseSpeed: 2500,
+        respawnTime: 180000,
         clusters: 1,
         perCluster: 1,
         clusterRadius: 200
@@ -135,12 +158,13 @@ const ORE_DEFS = {
         label: 'Opal',
         sprite: 'opal',
         color: 0xA8C3BC,
-        baseChance: 0.02,
-        maxMultiplier: 1,
         itemId: 'opal',
-        minEfficiency: 128,
-        baseExp: 90,
-        baseYield: 1,
+        reqLevel: 70,
+        maxHealth: 3,
+        yieldPerHit: 1,
+        xpPerHit: 900, // Increased from 250 (2700 XP per node)
+        baseSpeed: 2800,
+        respawnTime: 240000, // 4 minutes
         clusters: 1,
         perCluster: 1,
         clusterRadius: 200
@@ -150,12 +174,13 @@ const ORE_DEFS = {
         label: 'Diamond',
         sprite: 'diamond',
         color: 0xb9f2ff,
-        baseChance: 0.01,
-        maxMultiplier: 1,
         itemId: 'diamond',
-        minEfficiency: 150,
-        baseExp: 100,
-        baseYield: 1,
+        reqLevel: 85,
+        maxHealth: 3,
+        yieldPerHit: 1,
+        xpPerHit: 1400, // Increased from 350 (4200 XP per node)
+        baseSpeed: 3000,
+        respawnTime: 300000, // 5 minutes
         clusters: 1,
         perCluster: 1,
         clusterRadius: 220
