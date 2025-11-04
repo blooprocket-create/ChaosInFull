@@ -4115,10 +4115,10 @@ export function buildObjectiveList(questDef, progressStates, themeColor = '#ffd2
  * @param {Function} onClassSelected - Callback(classId) when user picks a class
  */
 export function createClassSelectionModal(scene, onClassSelected) {
+    // Character is helpful for context but not required to render the modal
     const CHARACTER = window.__characterModule?.character;
     if (!CHARACTER) {
-        console.warn('[createClassSelectionModal] No character loaded');
-        return;
+        try { console.warn('[createClassSelectionModal] Proceeding without character context'); } catch (e) {}
     }
 
     // Get class definitions from global registry (Next exposes window.CLASS_DEFS)
