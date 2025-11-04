@@ -518,20 +518,21 @@ export function registerQuestIndicators(scene, mapping) {
         }
 
         if (!scene._registeredQuestIndicators.updateFn) {
+            // Track previous indicator states to reduce log spam
+            const indicatorStates = new Map(); // key: giverId, value: { visible, text }
+            
             const upd = function() {
                 try {
-                    // Debug: Check if quest module is available
+                    // Debug: Check if quest module is available (only warn once)
                     if (!window.__questModule) {
-                        console.warn('[Quest Indicators] window.__questModule not available');
+                        if (!scene._warnedNoQuestModule) {
+                            console.warn('[Quest Indicators] window.__questModule not available');
+                            scene._warnedNoQuestModule = true;
+                        }
                         return;
                     }
                     
                     const regs = (scene._registeredQuestIndicators && scene._registeredQuestIndicators.entries) ? scene._registeredQuestIndicators.entries : [];
-                    
-                    // Debug: Log scene character and active quests
-                    if (scene.char && scene.char.activeQuests && scene.char.activeQuests.length > 0) {
-                        console.log('[Quest Indicators] Active quests:', scene.char.activeQuests.map(q => q.id));
-                    }
                     
                     for (const entry of regs) {
                         try {
@@ -552,20 +553,15 @@ export function registerQuestIndicators(scene, mapping) {
                             try {
                                 const questModule = window.__questModule;
                                 if (questModule && typeof questModule.getAvailableQuests === 'function') {
-                                    const location = (scene && scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.location) || null;
+                                    // Use scene key as location (e.g., 'Town', 'Cave', 'GraveForest')
+                                    const location = (scene && scene.sys && scene.sys.settings && scene.sys.settings.key) || null;
                                     available = questModule.getAvailableQuests(scene.char, location) || [];
-                                    console.log(`[Quest Indicators] ${giver} location=${location} available quests before filter:`, available.map(q => q.id + ' (giver: ' + q.giver + ')'));
                                 }
                             } catch (e) { 
                                 console.warn('[Quest Indicators] Error getting available quests:', e);
                                 available = []; 
                             }
                             available = (available || []).filter(q => q && q.giver === giver);
-                            
-                            // Debug: Log filtered available quests
-                            if (available.length > 0) {
-                                console.log(`[Quest Indicators] ${giver} has ${available.length} available quests:`, available.map(q => q.id));
-                            }
 
                             let active = (scene.char && Array.isArray(scene.char.activeQuests)) ? (scene.char.activeQuests || []) : [];
                             // Filter active quests relevant to this NPC: either given by this NPC OR handed in to this NPC.
@@ -586,27 +582,42 @@ export function registerQuestIndicators(scene, mapping) {
                                 } catch (e) {}
                             }
 
-                            // Debug: Log ready quests
-                            if (ready) {
-                                console.log(`[Quest Indicators] ${giver} has ready quest:`, ready.id);
-                            }
+                            let showIndicator = false;
+                            let indicatorText = '';
+                            let questName = '';
 
                             if (ready) {
-                                ind.setText('❗'); ind.setVisible(true);
+                                showIndicator = true;
+                                indicatorText = '❗';
                                 const questModule = window.__questModule;
                                 const def = (questModule && typeof questModule.getQuestById === 'function') ? questModule.getQuestById(ready.id) : ((window && window.QUEST_DEFS && window.QUEST_DEFS[ready.id]) ? window.QUEST_DEFS[ready.id] : null);
-                                bub.setText((def && def.name) ? def.name : (ready.id || 'Quest'));
+                                questName = (def && def.name) ? def.name : ready.id;
+                                ind.setText('❗'); ind.setVisible(true);
+                                bub.setText(questName);
                                 bub.setVisible(true);
-                                console.log(`[Quest Indicators] Showing ❗ for ${giver}: ${(def && def.name) ? def.name : ready.id}`);
                             } else if (available && available.length) {
-                                ind.setText('❓'); ind.setVisible(true);
+                                showIndicator = true;
+                                indicatorText = '❓';
                                 const def = available[0];
-                                bub.setText((def && def.name) ? def.name : (def && def.id) ? def.id : 'New Quest');
+                                questName = (def && def.name) ? def.name : (def && def.id) ? def.id : 'New Quest';
+                                ind.setText('❓'); ind.setVisible(true);
+                                bub.setText(questName);
                                 bub.setVisible(true);
-                                console.log(`[Quest Indicators] Showing ❓ for ${giver}: ${(def && def.name) ? def.name : def.id}`);
                             } else {
                                 ind.setVisible(false);
                                 bub.setVisible(false);
+                            }
+
+                            // Only log when state changes
+                            const prevState = indicatorStates.get(giver);
+                            const newState = { visible: showIndicator, text: indicatorText, quest: questName };
+                            if (!prevState || prevState.visible !== newState.visible || prevState.text !== newState.text || prevState.quest !== newState.quest) {
+                                indicatorStates.set(giver, newState);
+                                if (showIndicator) {
+                                    console.log(`[Quest Indicators] ${giver}: ${indicatorText} ${questName}`);
+                                } else {
+                                    console.log(`[Quest Indicators] ${giver}: hidden`);
+                                }
                             }
                         } catch (e) { 
                             console.warn('[Quest Indicators] Error processing NPC:', entry.giverId, e);
@@ -1855,6 +1866,26 @@ export function closeQuestLogModal(scene) {
 }
 
 export function refreshQuestLogModal(scene) {
+    // If no scene provided, try to find the active scene with a quest log
+    if (!scene) {
+        try {
+            if (typeof window !== 'undefined' && window.__phaserGame) {
+                const game = window.__phaserGame;
+                if (game && game.scene && game.scene.scenes) {
+                    // Find first active scene with a quest log modal
+                    for (const s of game.scene.scenes) {
+                        if (s && s.scene && s.scene.isActive() && s._questLogModal) {
+                            scene = s;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[Quest Log] Could not find active scene:', e);
+        }
+    }
+    
     if (!scene || !scene._questLogModal) return;
     const body = scene._questLogModal.querySelector('#quest-log-body');
     body.innerHTML = '';
@@ -2172,6 +2203,26 @@ export function createQuestTracker(scene) {
 }
 
 export function updateQuestTracker(scene) {
+    // If no scene provided, try to find the active scene with a tracker
+    if (!scene) {
+        try {
+            if (typeof window !== 'undefined' && window.__phaserGame) {
+                const game = window.__phaserGame;
+                if (game && game.scene && game.scene.scenes) {
+                    // Find first active scene with a quest tracker
+                    for (const s of game.scene.scenes) {
+                        if (s && s.scene && s.scene.isActive() && s._questTracker) {
+                            scene = s;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[Quest Tracker] Could not find active scene:', e);
+        }
+    }
+    
     if (!scene || !scene._questTracker) return;
     const content = scene._questTracker.querySelector('#quest-tracker-content');
     if (!content) return;
