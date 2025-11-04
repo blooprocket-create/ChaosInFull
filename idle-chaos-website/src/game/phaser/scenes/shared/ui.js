@@ -3494,6 +3494,17 @@ export function equipItemFromInventory(scene, itemId) {
     const prev = scene.char.equipment[slot]; if (prev) { addItemToSlots(scene.char.inventory, prev.id, 1); removeEquipmentBonuses(scene, prev); }
     scene.char.equipment[slot] = { id: itemId, name: def.name || itemId };
     applyEquipmentBonuses(scene, scene.char.equipment[slot]);
+    
+    // Update quest progress for equip objectives
+    try {
+        const questModule = window.__questModule || (typeof require !== 'undefined' ? require('../data/quests.js') : null);
+        if (questModule && questModule.updateQuestProgress) {
+            questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
+        }
+    } catch (e) {
+        console.warn('[Quest] Failed to update quest progress for equip:', e);
+    }
+    
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }

@@ -693,4 +693,18 @@ export function completeQuest(character, questId) {
     return true;
 }
 
+// Expose quest module functions to window for use by shared/ui.js
+if (typeof window !== 'undefined') {
+    window.__questModule = {
+        updateQuestProgress,
+        getQuestById,
+        getAvailableQuests,
+        canStartQuest,
+        startQuest,
+        checkQuestCompletion,
+        completeQuest,
+        getQuestObjectiveState
+    };
+}
+
 export default QUEST_DEFS;
