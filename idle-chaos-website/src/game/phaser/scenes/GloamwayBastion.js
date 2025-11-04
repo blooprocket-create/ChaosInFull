@@ -513,11 +513,16 @@ export class GloamwayBastion extends Phaser.Scene {
         const card = this._ensureDialogueOverlay();
         if (!card) return;
 
-        const completed = this.char.completedQuests || [];
-        const active = this.char.activeQuests || [];
-        const activeQuest = active.find(q => q && QUEST_CHAIN.includes(q.id));
-        const readyQuestId = activeQuest && checkQuestCompletion(this.char, activeQuest.id) ? activeQuest.id : null;
-        const nextQuestId = !activeQuest ? QUEST_CHAIN.find(id => !completed.includes(id)) : null;
+    const completed = this.char.completedQuests || [];
+    const active = this.char.activeQuests || [];
+    // Track chain quests and the post-class special separately
+    const activeChainQuest = active.find(q => q && QUEST_CHAIN.includes(q.id));
+    const activeSpecialQuest = active.find(q => q && q.id === 'mother_lumen_request');
+    const readyChain = activeChainQuest && checkQuestCompletion(this.char, activeChainQuest.id);
+    const readySpecial = activeSpecialQuest && checkQuestCompletion(this.char, 'mother_lumen_request');
+    const readyQuestId = readyChain ? activeChainQuest.id : (readySpecial ? 'mother_lumen_request' : null);
+    const activeQuest = activeChainQuest || activeSpecialQuest || null;
+    const nextQuestId = !activeChainQuest ? QUEST_CHAIN.find(id => !completed.includes(id)) : null;
         const hasChosenClass = this.char.class && this.char.class !== 'beginner';
         const hasCompletedGoblinCull = completed.includes('mother_lumen_goblin_cull');
         
