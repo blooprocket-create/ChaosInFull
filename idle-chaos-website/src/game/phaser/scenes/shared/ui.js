@@ -520,7 +520,19 @@ export function registerQuestIndicators(scene, mapping) {
         if (!scene._registeredQuestIndicators.updateFn) {
             const upd = function() {
                 try {
+                    // Debug: Check if quest module is available
+                    if (!window.__questModule) {
+                        console.warn('[Quest Indicators] window.__questModule not available');
+                        return;
+                    }
+                    
                     const regs = (scene._registeredQuestIndicators && scene._registeredQuestIndicators.entries) ? scene._registeredQuestIndicators.entries : [];
+                    
+                    // Debug: Log scene character and active quests
+                    if (scene.char && scene.char.activeQuests && scene.char.activeQuests.length > 0) {
+                        console.log('[Quest Indicators] Active quests:', scene.char.activeQuests.map(q => q.id));
+                    }
+                    
                     for (const entry of regs) {
                         try {
                             const giver = entry.giverId;
@@ -540,10 +552,20 @@ export function registerQuestIndicators(scene, mapping) {
                             try {
                                 const questModule = window.__questModule;
                                 if (questModule && typeof questModule.getAvailableQuests === 'function') {
-                                    available = questModule.getAvailableQuests(scene.char, (scene && scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.location) || null) || [];
+                                    const location = (scene && scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.location) || null;
+                                    available = questModule.getAvailableQuests(scene.char, location) || [];
+                                    console.log(`[Quest Indicators] ${giver} location=${location} available quests before filter:`, available.map(q => q.id + ' (giver: ' + q.giver + ')'));
                                 }
-                            } catch (e) { available = []; }
+                            } catch (e) { 
+                                console.warn('[Quest Indicators] Error getting available quests:', e);
+                                available = []; 
+                            }
                             available = (available || []).filter(q => q && q.giver === giver);
+                            
+                            // Debug: Log filtered available quests
+                            if (available.length > 0) {
+                                console.log(`[Quest Indicators] ${giver} has ${available.length} available quests:`, available.map(q => q.id));
+                            }
 
                             let active = (scene.char && Array.isArray(scene.char.activeQuests)) ? (scene.char.activeQuests || []) : [];
                             // Filter active quests relevant to this NPC: either given by this NPC OR handed in to this NPC.
@@ -564,27 +586,47 @@ export function registerQuestIndicators(scene, mapping) {
                                 } catch (e) {}
                             }
 
+                            // Debug: Log ready quests
+                            if (ready) {
+                                console.log(`[Quest Indicators] ${giver} has ready quest:`, ready.id);
+                            }
+
                             if (ready) {
                                 ind.setText('❗'); ind.setVisible(true);
                                 const questModule = window.__questModule;
                                 const def = (questModule && typeof questModule.getQuestById === 'function') ? questModule.getQuestById(ready.id) : ((window && window.QUEST_DEFS && window.QUEST_DEFS[ready.id]) ? window.QUEST_DEFS[ready.id] : null);
                                 bub.setText((def && def.name) ? def.name : (ready.id || 'Quest'));
                                 bub.setVisible(true);
+                                console.log(`[Quest Indicators] Showing ❗ for ${giver}: ${(def && def.name) ? def.name : ready.id}`);
                             } else if (available && available.length) {
                                 ind.setText('❓'); ind.setVisible(true);
                                 const def = available[0];
                                 bub.setText((def && def.name) ? def.name : (def && def.id) ? def.id : 'New Quest');
                                 bub.setVisible(true);
+                                console.log(`[Quest Indicators] Showing ❓ for ${giver}: ${(def && def.name) ? def.name : def.id}`);
                             } else {
                                 ind.setVisible(false);
                                 bub.setVisible(false);
                             }
-                        } catch (e) { /* per-entry silent */ }
+                        } catch (e) { 
+                            console.warn('[Quest Indicators] Error processing NPC:', entry.giverId, e);
+                        }
                     }
-                } catch (e) { /* global silent */ }
+                } catch (e) { 
+                    console.warn('[Quest Indicators] Global error:', e);
+                }
             };
             scene._registeredQuestIndicators.updateFn = upd;
             scene.events.on('update', upd);
+            
+            // Force initial update so indicators show immediately
+            try {
+                upd();
+                console.log('[Quest Indicators] Initial update completed for', entries.length, 'NPCs');
+            } catch (e) {
+                console.warn('[Quest Indicators] Initial update failed:', e);
+            }
+            
             scene.events.once('shutdown', () => {
                 try {
                     const regs = (scene._registeredQuestIndicators && scene._registeredQuestIndicators.entries) ? scene._registeredQuestIndicators.entries : [];
@@ -2104,9 +2146,26 @@ export function createQuestTracker(scene) {
     // Auto-cleanup on scene shutdown
     try {
         scene.events?.once?.('shutdown', () => {
-            try { destroyQuestTracker(scene); } catch (e) {}
+            try { 
+                if (scene._questTrackerTimer) {
+                    clearInterval(scene._questTrackerTimer);
+                    scene._questTrackerTimer = null;
+                }
+                destroyQuestTracker(scene); 
+            } catch (e) {}
         });
     } catch (e) {}
+
+    // Start 3-second fallback polling
+    if (!scene._questTrackerTimer) {
+        scene._questTrackerTimer = setInterval(() => {
+            try {
+                updateQuestTracker(scene);
+            } catch (e) {
+                console.warn('[Quest Tracker] Timer update failed:', e);
+            }
+        }, 3000);
+    }
 
     updateQuestTracker(scene);
     return tracker;
