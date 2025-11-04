@@ -578,7 +578,13 @@ export function registerQuestIndicators(scene, mapping) {
                             for (const a of (active || [])) {
                                 try {
                                     const questModule = window.__questModule;
-                                    if (questModule && typeof questModule.checkQuestCompletion === 'function' && questModule.checkQuestCompletion(scene.char, a.id)) { ready = a; break; }
+                                    // Show ❗ if quest is complete OR if player needs to talk to this NPC
+                                    const isComplete = questModule && typeof questModule.checkQuestCompletion === 'function' && questModule.checkQuestCompletion(scene.char, a.id);
+                                    const hasTalkObjective = a.progress && a.progress.some(obj => obj.type === 'talk' && obj.target === giver);
+                                    if (isComplete || hasTalkObjective) { 
+                                        ready = a; 
+                                        break; 
+                                    }
                                 } catch (e) {}
                             }
 
@@ -632,6 +638,13 @@ export function registerQuestIndicators(scene, mapping) {
             
             // Force initial update so indicators show immediately
             try {
+                console.log('[Quest Indicators] Registering for scene:', scene.sys.settings.key);
+                console.log('[Quest Indicators] Character data:', {
+                    hasChar: !!scene.char,
+                    activeQuests: scene.char?.activeQuests?.length || 0,
+                    completedQuests: scene.char?.completedQuests?.length || 0,
+                    level: scene.char?.level
+                });
                 upd();
                 console.log('[Quest Indicators] Initial update completed for', entries.length, 'NPCs');
             } catch (e) {
