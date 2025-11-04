@@ -450,6 +450,21 @@ export function startQuest(character, questId) {
 
     character.activeQuests = character.activeQuests || [];
     character.activeQuests.push(activeQuest);
+    
+    // Refresh quest UI when a new quest is started
+    try {
+        if (typeof window !== 'undefined' && window.__shared_ui) {
+            if (window.__shared_ui.updateQuestTracker) {
+                window.__shared_ui.updateQuestTracker(null);
+            }
+            if (window.__shared_ui.refreshQuestLogModal) {
+                window.__shared_ui.refreshQuestLogModal(null);
+            }
+        }
+    } catch (e) {
+        console.warn('[Quest] Failed to refresh quest UI after starting quest:', e);
+    }
+    
     return true;
 }
 
@@ -515,6 +530,22 @@ export function updateQuestProgress(character, type, target, amount = 1) {
 
     // Quests now stay active until manually turned in at NPCs
     // No more auto-complete logic
+    
+    // Refresh quest UI if progress was made
+    if (progressMade) {
+        try {
+            if (typeof window !== 'undefined' && window.__shared_ui) {
+                if (window.__shared_ui.updateQuestTracker) {
+                    window.__shared_ui.updateQuestTracker(null);
+                }
+                if (window.__shared_ui.refreshQuestLogModal) {
+                    window.__shared_ui.refreshQuestLogModal(null);
+                }
+            }
+        } catch (e) {
+            console.warn('[Quest] Failed to refresh quest UI:', e);
+        }
+    }
     
     return progressMade;
 }

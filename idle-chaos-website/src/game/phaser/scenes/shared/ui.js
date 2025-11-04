@@ -3469,6 +3469,13 @@ export function equipItemFromInventory(scene, itemId) {
     let slot = null;
     if (def.slot) {
         slot = def.slot;
+    } else if (def.tool) {
+        // For tools without explicit slot, try to infer from ID
+        const id = (def.id || '').toLowerCase();
+        if (id.includes('pickaxe')) slot = 'mining';
+        else if (id.includes('hatchet') || id.includes('axe')) slot = 'woodcutting';
+        else if (id.includes('rod') || id.includes('pole')) slot = 'fishing';
+        else slot = 'weapon'; // fallback
     } else if (def.weapon) {
         slot = 'weapon';
     } else if (def.armor) {
@@ -3499,7 +3506,8 @@ export function equipItemFromInventory(scene, itemId) {
     try {
         const questModule = window.__questModule || (typeof require !== 'undefined' ? require('../data/quests.js') : null);
         if (questModule && questModule.updateQuestProgress) {
-            questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
+            const progressMade = questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
+            console.log('[Quest] Equipment quest progress update:', { itemId, progressMade });
         }
     } catch (e) {
         console.warn('[Quest] Failed to update quest progress for equip:', e);
