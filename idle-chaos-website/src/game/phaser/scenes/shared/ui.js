@@ -477,6 +477,9 @@ export function updateQuestProgressAndCheckCompletion(scene, type, itemId, amoun
         }
     } catch (e) {}
 
+    // Refresh quest tracker if it exists
+    try { if (window.__shared_ui && window.__shared_ui.updateQuestTracker) window.__shared_ui.updateQuestTracker(scene); } catch (e) {}
+
     // Persist character to save progress
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
     if (scene._persistCharacter) scene._persistCharacter(username);
@@ -620,6 +623,10 @@ try {
         window.__shared_ui.openQuestLogModal = openQuestLogModal;
         window.__shared_ui.closeQuestLogModal = closeQuestLogModal;
         window.__shared_ui.refreshQuestLogModal = refreshQuestLogModal;
+        // quest tracker (on-screen)
+        window.__shared_ui.createQuestTracker = createQuestTracker;
+        window.__shared_ui.updateQuestTracker = updateQuestTracker;
+        window.__shared_ui.destroyQuestTracker = destroyQuestTracker;
         // quest helpers
         window.__shared_ui.updateQuestProgressAndCheckCompletion = updateQuestProgressAndCheckCompletion;
         // equipment helpers
@@ -1700,17 +1707,17 @@ export function refreshQuestLogModal(scene) {
             const objectives = Array.isArray(def && def.objectives) ? def.objectives : [];
             if (objectives.length > 0) {
                 for (const obj of objectives) {
-                    const targetId = obj.itemId || obj.enemyId || obj.id || obj.type;
+                    const targetId = obj.target || obj.id || obj.type;
                     let current = 0;
                     let required = obj.required || 1;
                     if (Array.isArray(progressStates)) {
-                        const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.itemId === targetId : true));
+                        const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
                         if (state) {
                             required = state.required || required;
                             current = Math.min(state.current || 0, required);
                         }
                     } else {
-                        const progressEntry = rawProgress.find(p => p && p.type === obj.type && (!targetId || p.itemId === targetId));
+                        const progressEntry = rawProgress.find(p => p && p.type === obj.type && (!targetId || p.target === targetId));
                         current = progressEntry && typeof progressEntry.current === 'number' ? progressEntry.current : 0;
                         required = progressEntry && typeof progressEntry.required === 'number' ? progressEntry.required : required;
                     }
@@ -1718,7 +1725,7 @@ export function refreshQuestLogModal(scene) {
                 }
             } else if (rawProgress.length > 0) {
                 for (const prog of rawProgress) {
-                    const label = prog && (prog.itemId || prog.type) ? (prog.itemId || prog.type) : 'Objective';
+                    const label = prog && (prog.target || prog.type) ? (prog.target || prog.type) : 'Objective';
                     const current = prog && typeof prog.current === 'number' ? prog.current : 0;
                     const required = prog && typeof prog.required === 'number' ? prog.required : 1;
                     inner += `<br><small>- ${label}: ${current} / ${required}</small>`;
@@ -1742,6 +1749,145 @@ export function refreshQuestLogModal(scene) {
             body.appendChild(div);
         }
     }
+}
+
+// Active Quest Tracker - shows on-screen quest progress
+export function createQuestTracker(scene) {
+    if (!scene) return;
+    if (scene._questTracker) return scene._questTracker;
+
+    const tracker = document.createElement('div');
+    tracker.id = 'quest-tracker';
+    tracker.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 280px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 90;
+        background: linear-gradient(180deg, rgba(12,12,14,0.95), rgba(18,18,20,0.93));
+        border: 3px solid #111;
+        border-left: 6px solid rgba(120,20,20,0.9);
+        border-radius: 6px;
+        padding: 10px;
+        color: #f0c9b0;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.85em;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+        pointer-events: auto;
+    `;
+
+    tracker.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:6px;">
+            <span style="font-family:'Metal Mania', cursive; font-size:1.1em; color:#ffd27a;">Active Quests</span>
+            <button id="quest-tracker-toggle" style="background:transparent; color:#bbb; border:1px solid rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; cursor:pointer; font-size:0.9em;" title="Collapse/Expand">−</button>
+        </div>
+        <div id="quest-tracker-content"></div>
+    `;
+
+    document.body.appendChild(tracker);
+    scene._questTracker = tracker;
+    scene._questTrackerCollapsed = false;
+
+    // Toggle collapse/expand
+    const toggleBtn = tracker.querySelector('#quest-tracker-toggle');
+    const content = tracker.querySelector('#quest-tracker-content');
+    toggleBtn.onclick = () => {
+        scene._questTrackerCollapsed = !scene._questTrackerCollapsed;
+        if (scene._questTrackerCollapsed) {
+            content.style.display = 'none';
+            toggleBtn.textContent = '+';
+        } else {
+            content.style.display = 'block';
+            toggleBtn.textContent = '−';
+        }
+    };
+
+    // Auto-cleanup on scene shutdown
+    try {
+        scene.events?.once?.('shutdown', () => {
+            try { destroyQuestTracker(scene); } catch (e) {}
+        });
+    } catch (e) {}
+
+    updateQuestTracker(scene);
+    return tracker;
+}
+
+export function updateQuestTracker(scene) {
+    if (!scene || !scene._questTracker) return;
+    const content = scene._questTracker.querySelector('#quest-tracker-content');
+    if (!content) return;
+
+    const char = scene.char || {};
+    const activeQuests = char.activeQuests || [];
+    
+    if (activeQuests.length === 0) {
+        content.innerHTML = '<div style="color:#888; font-size:0.9em; text-align:center; padding:12px 0;">No active quests</div>';
+        return;
+    }
+
+    const getObjectiveState = (typeof window !== 'undefined' && window.getQuestObjectiveState) 
+        ? window.getQuestObjectiveState 
+        : null;
+    const getQuestDef = (typeof window !== 'undefined' && window.getQuestById) 
+        ? window.getQuestById 
+        : ((id) => (window.QUEST_DEFS && window.QUEST_DEFS[id]) ? window.QUEST_DEFS[id] : null);
+
+    let html = '';
+    for (const quest of activeQuests) {
+        if (!quest || !quest.id) continue;
+        
+        const def = getQuestDef ? getQuestDef(quest.id) : null;
+        if (!def) continue;
+
+        const states = getObjectiveState ? getObjectiveState(char, quest.id) : [];
+        const allComplete = states.length > 0 && states.every(s => (s.current || 0) >= (s.required || 1));
+
+        html += `
+            <div style="margin-bottom:10px; padding:8px; background:rgba(255,255,255,0.02); border-radius:4px; border-left:3px solid ${allComplete ? '#8ef58a' : '#ffd27a'};">
+                <div style="font-weight:700; color:${allComplete ? '#8ef58a' : '#ffd27a'}; margin-bottom:4px; font-size:0.95em;">${def.name || quest.id}</div>
+        `;
+
+        if (states.length > 0) {
+            for (const obj of states) {
+                const current = obj.current || 0;
+                const required = obj.required || 1;
+                const percent = Math.min(100, Math.floor((current / required) * 100));
+                const isComplete = current >= required;
+                
+                html += `
+                    <div style="margin-bottom:3px; font-size:0.85em;">
+                        <div style="color:#ccc; margin-bottom:2px;">${obj.description || obj.type}</div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <div style="flex:1; height:12px; background:#222; border-radius:3px; overflow:hidden; position:relative;">
+                                <div style="height:100%; width:${percent}%; background:${isComplete ? '#8ef58a' : '#ffd27a'}; border-radius:3px;"></div>
+                            </div>
+                            <span style="color:${isComplete ? '#8ef58a' : '#fff'}; font-size:0.9em; min-width:45px; text-align:right;">${current}/${required}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        if (allComplete && def.handInNpc) {
+            html += `<div style="margin-top:6px; font-size:0.8em; color:#8ef58a;">✓ Ready to turn in!</div>`;
+        }
+
+        html += '</div>';
+    }
+
+    content.innerHTML = html;
+}
+
+export function destroyQuestTracker(scene) {
+    if (!scene) return;
+    if (scene._questTracker && scene._questTracker.parentNode) {
+        scene._questTracker.parentNode.removeChild(scene._questTracker);
+    }
+    scene._questTracker = null;
+    scene._questTrackerCollapsed = false;
 }
 
 // Stats modal

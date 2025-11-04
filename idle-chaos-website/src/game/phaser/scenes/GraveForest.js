@@ -641,8 +641,8 @@ export class GraveForest extends Phaser.Scene {
             const required = obj.required || 1;
             const label = obj.description || obj.type;
             if (progressStates) {
-                const targetId = obj.itemId || obj.enemyId || null;
-                const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.itemId === targetId : true));
+                const targetId = obj.target || null;
+                const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
                 const current = state ? Math.min(state.current || 0, required) : 0;
                 li.textContent = `${label}: ${current} / ${required}`;
             } else {

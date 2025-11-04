@@ -261,6 +261,12 @@ export function createHUD(scene) {
             try { window.__shared_ui.applySettingsToScene(scene, window.__game_settings || {}); } catch (e) {}
         }
     } catch (e) {}
+    // Create quest tracker UI for this scene
+    try {
+        if (typeof window !== 'undefined' && window.__shared_ui && typeof window.__shared_ui.createQuestTracker === 'function') {
+            try { window.__shared_ui.createQuestTracker(scene); } catch (e) {}
+        }
+    } catch (e) {}
     return hud;
 }
 
@@ -387,6 +393,12 @@ export function destroyHUD(scene) {
     scene._hudStateUnsub = null;
     try { if (scene.hud && scene.hud.parentNode) scene.hud.parentNode.removeChild(scene.hud); } catch (e) { /* ignore */ }
     scene.hud = null;
+    // Destroy quest tracker for this scene
+    try {
+        if (typeof window !== 'undefined' && window.__shared_ui && typeof window.__shared_ui.destroyQuestTracker === 'function') {
+            try { window.__shared_ui.destroyQuestTracker(scene); } catch (e) {}
+        }
+    } catch (e) {}
 }
 
 export default { createHUD, updateHUD, destroyHUD };

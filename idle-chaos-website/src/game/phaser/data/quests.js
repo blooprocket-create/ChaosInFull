@@ -1,21 +1,28 @@
 // Quest definitions for the game
 // Each quest has id, name, description, objectives, rewards, prerequisites
+//
+// REFACTORED QUEST SYSTEM:
+// 1. All objectives use 'target' field (not itemId/enemyId) for consistency
+// 2. Progress is stored ONLY in character.activeQuests[].progress[]
+// 3. Single source of truth: getQuestObjectiveState only reads stored progress
+// 4. No auto-complete: quests must be manually turned in at handInNpc
+// 5. Validation added to updateQuestProgress to prevent silent failures
 
 export const QUEST_DEFS = {
     tutorial_meet_wayne: {
         id: 'tutorial_meet_wayne',
         name: 'Copper Mining Basics',
-        description: 'Learn the basics of mining by collecting copper ore from the cave. Go talk to Wayne “The Vein” Mineson in the cave. He will show you how to mine.',
+        description: 'Learn the basics of mining by collecting copper ore from the cave. Go talk to Wayne "The Vein" Mineson in the cave. He will show you how to mine.',
         objectives: [
             {
                 type: 'travel',
-                itemId: 'Cave',
+                target: 'Cave',
                 required: 1,
                 description: 'Travel to the Cave'
             },
             {
                 type: 'talk',
-                itemId: 'wayne_mineson',
+                target: 'wayne_mineson',
                 required: 1,
                 description: 'Speak with Wayne Mineson'
             }
@@ -37,13 +44,13 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'equip',
-                itemId: 'copper_pickaxe',
+                target: 'copper_pickaxe',
                 required: 1,
                 description: 'Equip Copper Pickaxe'
             },
             {
                 type: 'mine',
-                itemId: 'copper_ore',
+                target: 'copper_ore',
                 required: 20,
                 description: 'Mine Copper Ore'
             }
@@ -65,13 +72,13 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'travel',
-                itemId: 'Town',
+                target: 'Town',
                 required: 1,
                 description: 'Travel to Town'
             },
             {
                 type: 'talk',
-                itemId: 'mayor_grimsley',
+                target: 'mayor_grimsley',
                 required: 1,
                 description: 'Speak with Mayor Grimsley'
             }
@@ -92,7 +99,7 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'smelt',
-                itemId: 'copper_bar',
+                target: 'copper_bar',
                 required: 10,
                 description: 'Smelt Copper Bars'
             }
@@ -114,19 +121,19 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'craft',
-                itemId: 'copper_legs',
+                target: 'copper_legs',
                 required: 1,
                 description: 'Craft Copper Leggings'
             },
             {
                 type: 'craft',
-                itemId: 'copper_boots',
+                target: 'copper_boots',
                 required: 1,
                 description: 'Craft Copper Boots'
             },
             {
                 type: 'craft',
-                itemId: 'copper_sword',
+                target: 'copper_sword',
                 required: 1,
                 description: 'Craft Copper Sword'
             }
@@ -148,31 +155,31 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'equip',
-                itemId: 'copper_helmet',
+                target: 'copper_helmet',
                 required: 1,
                 description: 'Equip Copper Helmet'
             },
             {
                 type: 'equip',
-                itemId: 'copper_armor',
+                target: 'copper_armor',
                 required: 1,
                 description: 'Equip Copper Armor'
             },
             {
                 type: 'equip',
-                itemId: 'copper_legs',
+                target: 'copper_legs',
                 required: 1,
                 description: 'Equip Copper Leggings'
             },
             {
                 type: 'equip',
-                itemId: 'copper_boots',
+                target: 'copper_boots',
                 required: 1,
                 description: 'Equip Copper Boots'
             },
             {
                 type: 'equip',
-                itemId: 'copper_sword',
+                target: 'copper_sword',
                 required: 1,
                 description: 'Equip Copper Sword'
             }
@@ -213,7 +220,7 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'kill',
-                enemyId: 'slime',
+                target: 'slime',
                 required: 5,
                 description: 'Kill 5 Slimes'
             }
@@ -235,13 +242,13 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'travel',
-                itemId: 'GraveForest',
+                target: 'GraveForest',
                 required: 1,
                 description: 'Travel to the Grave Forest'
             },
             {
                 type: 'talk',
-                itemId: 'rowan_boneaxe',
+                target: 'rowan_boneaxe',
                 required: 1,
                 description: 'Speak with Rowan Boneaxe'
             }
@@ -263,13 +270,13 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'equip',
-                itemId: 'copper_hatchet',
+                target: 'copper_hatchet',
                 required: 1,
                 description: 'Equip Copper Hatchet'
             },
             {
                 type: 'chop',
-                itemId: 'normal_log',
+                target: 'normal_log',
                 required: 25,
                 description: 'Chop Normal Logs'
             }
@@ -290,7 +297,7 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'kill',
-                enemyId: 'slime',
+                target: 'slime',
                 required: 50,
                 description: 'Kill 50 Slimes'
             }
@@ -302,7 +309,8 @@ export const QUEST_DEFS = {
         },
         prerequisites: [],
         giver: 'mother_lumen',
-        location: 'GloamwayBastion'
+        location: 'GloamwayBastion',
+        handInNpc: 'mother_lumen'
     },
     mother_lumen_rat_cull: {
         id: 'mother_lumen_rat_cull',
@@ -311,19 +319,19 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'kill',
-                enemyId: 'rat',
+                target: 'rat',
                 required: 15,
                 description: 'Kill 15 Rats'
             },
             {
                 type: 'kill',
-                enemyId: 'zombie_rat',
+                target: 'zombie_rat',
                 required: 5,
                 description: 'Kill 5 Zombie Rats'
             },
             {
                 type: 'kill',
-                enemyId: 'ghost_rat',
+                target: 'ghost_rat',
                 required: 3,
                 description: 'Kill 3 Spectral Rats'
             }
@@ -335,7 +343,8 @@ export const QUEST_DEFS = {
         },
         prerequisites: ['mother_lumen_slime_cull'],
         giver: 'mother_lumen',
-        location: 'GloamwayBastion'
+        location: 'GloamwayBastion',
+        handInNpc: 'mother_lumen'
     },
     mother_lumen_goblin_cull: {
         id: 'mother_lumen_goblin_cull',
@@ -344,7 +353,7 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'kill',
-                enemyId: 'goblin',
+                target: 'goblin',
                 required: 15,
                 description: 'Kill 15 Goblins'
             }
@@ -356,7 +365,8 @@ export const QUEST_DEFS = {
         },
         prerequisites: ['mother_lumen_rat_cull'],
         giver: 'mother_lumen',
-        location: 'GloamwayBastion'
+        location: 'GloamwayBastion',
+        handInNpc: 'mother_lumen'
     },
     mother_lumen_request: {
         id: 'mother_lumen_request',
@@ -365,7 +375,7 @@ export const QUEST_DEFS = {
         objectives: [
             {
                 type: 'kill',
-                enemyId: 'goblin_boss',
+                target: 'goblin_boss',
                 required: 1,
                 description: 'Defeat the Goblin Chief'
             }
@@ -377,7 +387,8 @@ export const QUEST_DEFS = {
         },
         prerequisites: ['mother_lumen_goblin_cull'],
         giver: 'mother_lumen',
-        location: 'GloamwayBastion'
+        location: 'GloamwayBastion',
+        handInNpc: 'mother_lumen'
     }
 };
 
@@ -431,7 +442,7 @@ export function startQuest(character, questId) {
         id: quest.id,
         progress: quest.objectives.map(obj => ({
             type: obj.type,
-            itemId: obj.itemId || obj.enemyId,
+            target: obj.target, // Consistent field name
             current: 0,
             required: obj.required
         }))
@@ -442,75 +453,71 @@ export function startQuest(character, questId) {
     return true;
 }
 
-export function updateQuestProgress(character, type, itemId, amount = 1) {
-    if (!character.activeQuests) return;
+export function updateQuestProgress(character, type, target, amount = 1) {
+    // Validation
+    if (!character) {
+        console.warn('[Quest] No character provided to updateQuestProgress');
+        return false;
+    }
+    if (!Array.isArray(character.activeQuests)) {
+        console.warn('[Quest] character.activeQuests is not an array');
+        character.activeQuests = [];
+        return false;
+    }
+    if (!type) {
+        console.warn('[Quest] No type provided to updateQuestProgress');
+        return false;
+    }
 
-    // Update progress entries and collect quests that become completable and
-    // don't require an NPC hand-in so we can auto-complete them.
-    const toAutoComplete = [];
+    let progressMade = false;
+
+    // Update progress for all active quests that have matching objectives
     character.activeQuests.forEach(quest => {
+        if (!quest || !quest.id) {
+            console.warn('[Quest] Invalid quest in activeQuests');
+            return;
+        }
+
         const questDef = getQuestById(quest.id);
-        if (!questDef) return;
+        if (!questDef) {
+            console.warn('[Quest] Quest definition not found:', quest.id);
+            return;
+        }
+
+        if (!Array.isArray(quest.progress)) {
+            console.warn('[Quest] quest.progress is not an array for:', quest.id);
+            return;
+        }
 
         quest.progress.forEach(obj => {
+            if (!obj) return;
             if (obj.type !== type) return;
-            const target = obj.itemId;
-            let matches = !target || target === itemId;
-            if (!matches && type === 'kill' && target && itemId) {
-                matches = itemId === target || itemId.startsWith(target + '_');
+            
+            const objTarget = obj.target;
+            let matches = !objTarget || objTarget === target;
+            if (!matches && type === 'kill' && objTarget && target) {
+                matches = target === objTarget || target.startsWith(objTarget + '_');
             }
+            
             if (matches) {
-                obj.current = Math.min(obj.required, obj.current + amount);
+                const before = obj.current || 0;
+                obj.current = Math.min(obj.required || 1, before + amount);
+                
+                if (obj.current > before) {
+                    progressMade = true;
+                    if (typeof console !== 'undefined' && console.debug) {
+                        console.debug(`[Quest] Progress: ${quest.id} ${type} ${target || 'any'} ${before} → ${obj.current}`);
+                    }
+                }
             }
         });
-
-        // If this quest is now complete and doesn't require a manual hand-in, auto-complete it
-        try {
-            let done = false;
-            try {
-                done = checkQuestCompletion(character, quest.id);
-            } catch (completionErr) {
-                done = quest.progress.every(p => p.current >= (p.required || 1));
-            }
-            if (done && questDef && !questDef.handInNpc) toAutoComplete.push(quest.id);
-        } catch (e) {}
     });
 
-    if (toAutoComplete.length) {
-        for (const qid of toAutoComplete) {
-            try {
-                // double-check and complete
-                if (checkQuestCompletion && checkQuestCompletion(character, qid)) {
-                    completeQuest && completeQuest(character, qid);
-                    try { if (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(null); } catch (e) {}
-                }
-            } catch (e) {}
-        }
-    }
+    // Quests now stay active until manually turned in at NPCs
+    // No more auto-complete logic
+    
+    return progressMade;
 }
-
-function getInventoryQty(character, itemId) {
-    if (!character || !itemId) return 0;
-    const inventory = character.inventory || [];
-    let total = 0;
-    for (const entry of inventory) {
-        if (!entry || entry.id !== itemId) continue;
-        const qty = Number(entry.qty);
-        if (!isNaN(qty)) total += qty;
-        else total += 1;
-    }
-    return total;
-}
-
-// Note: 'equip' is intentionally NOT an inventory-count objective. Equip must be
-// satisfied by checking the character.equipment slots, not by simply having the
-// item in inventory.
-// Important: 'craft' is NOT treated as an inventory-count objective either.
-// Crafting should only progress when an actual craft action occurs (e.g., via
-// updateQuestProgress('craft', ...)). Counting crafted items by inventory would
-// incorrectly satisfy objectives when the player obtains the item by other means
-// (quest rewards, drops, trading), which breaks quests like "Crafting Copper Armor".
-const INVENTORY_OBJECTIVE_TYPES = ['mine', 'smelt', 'gather', 'collect', 'chop'];
 
 function applyCharacterExperience(character, amount) {
     if (!character || !amount) return false;
@@ -568,66 +575,23 @@ export function getQuestObjectiveState(character, questId) {
     const progressEntries = Array.isArray(activeQuest?.progress) ? activeQuest.progress : [];
 
     return quest.objectives.map(obj => {
-        const targetId = obj.itemId || obj.enemyId || obj.id || obj.type;
+        // Find the stored progress entry for this objective
         const stored = progressEntries.find(p => {
             if (!p || p.type !== obj.type) return false;
-            if (!targetId) return true;
-            return p.itemId === targetId;
+            if (!obj.target) return true; // Objectives without a target match by type only
+            return p.target === obj.target;
         });
-        const storedCurrent = stored && typeof stored.current === 'number' ? stored.current : 0;
+
+        // Single source of truth: only use stored progress
+        const current = stored && typeof stored.current === 'number' ? stored.current : 0;
         const required = obj.required || 1;
-        const usesInventory = INVENTORY_OBJECTIVE_TYPES.includes(obj.type) && !!obj.itemId;
-        let current = storedCurrent;
-        if (usesInventory) {
-            const inInventory = getInventoryQty(character, obj.itemId);
-            current = Math.max(current, inInventory);
-        }
-        // For 'equip' objectives, being equipped should count as fulfilling the objective
-        // regardless of whether we treat it as an inventory-type objective.
-        try {
-            if (obj.type === 'equip' && character && character.equipment) {
-                const eq = character.equipment || {};
-                const slots = Object.keys(eq || {});
-                for (const s of slots) {
-                    try {
-                        const it = eq[s];
-                        if (!it) continue;
-                        const iid = (typeof it === 'string') ? it : (it.id || null);
-                        if (iid && iid === obj.itemId) { current = Math.max(current, 1); break; }
-                    } catch (e) {}
-                }
-            }
-        } catch (e) {}
-        // For 'learn_talent' objectives, consider the player's current learned/allocated talents
-        // so that allocating a point BEFORE accepting the quest still counts toward completion.
-        try {
-            if (obj.type === 'learn_talent') {
-                let learnedAny = false;
-                // Check learnedActives array first
-                if (Array.isArray(character.learnedActives) && character.learnedActives.length > 0) learnedAny = true;
-                // Fallback: scan allocations across all tabs for any rank > 0
-                if (!learnedAny && character.talents && character.talents.allocations) {
-                    const tabs = Object.keys(character.talents.allocations || {});
-                    for (const t of tabs) {
-                        try {
-                            const allocs = character.talents.allocations[t] || {};
-                            for (const tid of Object.keys(allocs)) {
-                                if ((allocs[tid] || 0) > 0) { learnedAny = true; break; }
-                            }
-                            if (learnedAny) break;
-                        } catch (e) {}
-                    }
-                }
-                if (learnedAny) current = Math.max(current, 1);
-            }
-        } catch (e) {}
+
         return {
             type: obj.type,
-            itemId: obj.itemId || obj.enemyId || null,
+            target: obj.target || null,
             description: obj.description || '',
             current,
-            required,
-            usesInventory
+            required
         };
     });
 }
@@ -723,6 +687,7 @@ export function completeQuest(character, questId) {
     // unlocked quests are visible at their givers.
     try {
         try { if (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(null); } catch (e) {}
+        try { if (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.updateQuestTracker) window.__shared_ui.updateQuestTracker(null); } catch (e) {}
     } catch (e) {}
 
     return true;

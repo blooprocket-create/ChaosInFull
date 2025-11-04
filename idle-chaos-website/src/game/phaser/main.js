@@ -17,6 +17,7 @@ import { ENEMY_DEFS } from './data/enemies.js';
 import {
     QUEST_DEFS,
     getQuestById,
+    getAvailableQuests,
     startQuest,
     updateQuestProgress,
     checkQuestCompletion,
@@ -45,6 +46,7 @@ if (typeof window !== 'undefined') window.ENEMY_DEFS = ENEMY_DEFS;
 if (typeof window !== 'undefined') window.QUEST_DEFS = QUEST_DEFS;
 if (typeof window !== 'undefined') window.PLOT_DEFS = PLOT_DEFS;
 if (typeof window !== 'undefined') window.getQuestById = getQuestById;
+if (typeof window !== 'undefined') window.getAvailableQuests = getAvailableQuests;
 if (typeof window !== 'undefined') window.startQuest = startQuest;
 if (typeof window !== 'undefined') window.updateQuestProgress = updateQuestProgress;
 if (typeof window !== 'undefined') window.checkQuestCompletion = checkQuestCompletion;
