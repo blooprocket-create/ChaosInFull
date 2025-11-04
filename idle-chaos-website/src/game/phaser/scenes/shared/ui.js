@@ -3541,6 +3541,342 @@ export function reconcileEquipmentBonuses(scene) {
     }
 }
 
+// ============================================
+// Centralized Quest Dialogue System (MMO-style)
+// ============================================
+
+/**
+ * Create or retrieve dialogue overlay with MMO-style backdrop and card
+ * @param {object} scene - The Phaser scene
+ * @param {string} themeColor - Optional theme color (hex) for borders/accents
+ * @returns {HTMLElement} The dialogue card element
+ */
+export function ensureDialogueOverlay(scene, themeColor = '#ffd27a') {
+    if (typeof document === 'undefined') return null;
+    
+    let backdrop = document.getElementById('quest-dialogue-backdrop');
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'quest-dialogue-backdrop';
+        backdrop.style.cssText = `
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease-out;
+        `;
+        
+        const card = document.createElement('div');
+        card.id = 'quest-dialogue-card';
+        card.style.cssText = `
+            background: linear-gradient(135deg, rgba(25,20,15,0.98), rgba(15,12,8,0.98));
+            border: 2px solid ${themeColor};
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.1);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 24px;
+            font-family: 'Share Tech Mono', monospace;
+            color: #e8d8c8;
+            animation: slideUp 0.3s ease-out;
+        `;
+        
+        backdrop.appendChild(card);
+        document.body.appendChild(backdrop);
+        
+        // Click backdrop to close
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) closeDialogue();
+        });
+    } else {
+        // Update theme color if provided
+        const card = backdrop.querySelector('#quest-dialogue-card');
+        if (card && themeColor) {
+            card.style.borderColor = themeColor;
+        }
+    }
+    
+    return backdrop.querySelector('#quest-dialogue-card');
+}
+
+/**
+ * Close and remove dialogue overlay
+ */
+export function closeDialogue() {
+    if (typeof document === 'undefined') return;
+    const backdrop = document.getElementById('quest-dialogue-backdrop');
+    if (backdrop) backdrop.remove();
+}
+
+/**
+ * Render MMO-style dialogue with NPC portrait and professional styling
+ * @param {string} npcName - Name of the NPC
+ * @param {string} npcPortrait - Emoji or icon for NPC portrait
+ * @param {Array<HTMLElement>} bodyNodes - Array of DOM elements for dialogue body
+ * @param {Array<object>} optionConfigs - Button configurations [{label, onClick, variant}]
+ * @param {string} themeColor - Theme color for borders/buttons
+ */
+export function renderDialogue(npcName, npcPortrait, bodyNodes, optionConfigs = [], themeColor = '#ffd27a') {
+    const card = ensureDialogueOverlay(null, themeColor);
+    if (!card) return;
+    
+    card.innerHTML = '';
+    
+    // NPC Header with portrait
+    const header = document.createElement('div');
+    header.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid ${themeColor}40;
+    `;
+    
+    const portrait = document.createElement('div');
+    portrait.style.cssText = `
+        font-size: 3em;
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+        border: 2px solid ${themeColor}60;
+        border-radius: 50%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    `;
+    portrait.textContent = npcPortrait;
+    
+    const nameLabel = document.createElement('div');
+    nameLabel.style.cssText = `
+        flex: 1;
+        font-family: 'Metal Mania', cursive;
+        font-size: 1.6em;
+        color: ${themeColor};
+        text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+        letter-spacing: 0.5px;
+    `;
+    nameLabel.textContent = npcName;
+    
+    header.appendChild(portrait);
+    header.appendChild(nameLabel);
+    card.appendChild(header);
+    
+    // Dialogue body
+    const body = document.createElement('div');
+    body.style.cssText = 'margin-bottom: 20px; line-height: 1.6;';
+    
+    for (const node of bodyNodes) {
+        if (node) body.appendChild(node);
+    }
+    
+    card.appendChild(body);
+    
+    // Action buttons
+    if (optionConfigs && optionConfigs.length > 0) {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 20px;';
+        
+        for (const opt of optionConfigs) {
+            const btn = document.createElement('button');
+            const variant = opt.variant || 'primary';
+            
+            let bgGradient, borderColor, textColor;
+            if (variant === 'success') {
+                bgGradient = 'linear-gradient(90deg, rgba(74,222,128,0.2), rgba(34,197,94,0.15))';
+                borderColor = '#4ade80';
+                textColor = '#4ade80';
+            } else if (variant === 'danger') {
+                bgGradient = 'linear-gradient(90deg, rgba(239,68,68,0.2), rgba(185,28,28,0.15))';
+                borderColor = '#ef4444';
+                textColor = '#ef4444';
+            } else {
+                bgGradient = `linear-gradient(90deg, ${themeColor}30, ${themeColor}20)`;
+                borderColor = themeColor;
+                textColor = themeColor;
+            }
+            
+            btn.style.cssText = `
+                padding: 12px 20px;
+                background: ${bgGradient};
+                border: 2px solid ${borderColor}60;
+                border-radius: 6px;
+                color: ${textColor};
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 1em;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                text-align: left;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            `;
+            
+            btn.innerHTML = `
+                <span>${opt.label}</span>
+                <span style="font-size: 1.2em;">→</span>
+            `;
+            
+            btn.onmouseover = function() {
+                this.style.background = borderColor + '40';
+                this.style.borderColor = borderColor;
+                this.style.transform = 'translateX(4px)';
+            };
+            btn.onmouseout = function() {
+                this.style.background = bgGradient;
+                this.style.borderColor = borderColor + '60';
+                this.style.transform = 'translateX(0)';
+            };
+            
+            if (opt.onClick) {
+                btn.onclick = () => {
+                    opt.onClick();
+                    closeDialogue();
+                };
+            }
+            
+            buttonContainer.appendChild(btn);
+        }
+        
+        card.appendChild(buttonContainer);
+    }
+}
+
+/**
+ * Create styled paragraph for dialogue
+ * @param {string} text - The text content
+ * @returns {HTMLElement} Styled paragraph element
+ */
+export function createDialogueParagraph(text) {
+    if (typeof document === 'undefined') return null;
+    
+    const p = document.createElement('div');
+    p.style.cssText = `
+        margin: 12px 0;
+        padding: 12px;
+        background: rgba(0,0,0,0.3);
+        border-left: 3px solid rgba(255,210,120,0.3);
+        border-radius: 4px;
+        line-height: 1.7;
+    `;
+    p.textContent = text;
+    return p;
+}
+
+/**
+ * Build MMO-style objective list with progress bars
+ * @param {object} questDef - Quest definition with objectives array
+ * @param {Array} progressStates - Current progress for each objective
+ * @param {string} themeColor - Theme color for progress bars
+ * @returns {HTMLElement} Objectives container
+ */
+export function buildObjectiveList(questDef, progressStates, themeColor = '#ffd27a') {
+    if (typeof document === 'undefined') return null;
+    if (!questDef || !Array.isArray(questDef.objectives) || questDef.objectives.length === 0) return null;
+    
+    const container = document.createElement('div');
+    container.style.cssText = `
+        margin: 16px 0;
+        padding: 12px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 6px;
+        border: 1px solid ${themeColor}30;
+    `;
+    
+    const title = document.createElement('div');
+    title.style.cssText = `
+        font-size: 0.85em;
+        color: ${themeColor};
+        font-weight: 700;
+        margin-bottom: 10px;
+        letter-spacing: 0.5px;
+    `;
+    title.textContent = 'OBJECTIVES:';
+    container.appendChild(title);
+    
+    const list = document.createElement('div');
+    list.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+    
+    for (const obj of questDef.objectives) {
+        const required = obj.required || 1;
+        const label = obj.description || obj.type;
+        let current = 0;
+        
+        if (progressStates) {
+            const targetId = obj.target || null;
+            const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
+            current = state ? Math.min(state.current || 0, required) : 0;
+        }
+        
+        const isComplete = current >= required;
+        const percent = progressStates ? Math.min(100, Math.floor((current / required) * 100)) : 0;
+        
+        const objectiveItem = document.createElement('div');
+        objectiveItem.style.cssText = 'padding-left: 4px;';
+        
+        objectiveItem.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="color: ${isComplete ? '#4ade80' : themeColor}; font-weight: bold; font-size: 0.9em;">${isComplete ? '✓' : '○'}</span>
+                <span style="font-size: 0.9em; color: ${isComplete ? '#4ade80' : '#d4c5b9'};">${label}</span>
+            </div>
+            ${progressStates ? `
+            <div style="display: flex; align-items: center; gap: 8px; padding-left: 22px;">
+                <div style="
+                    flex: 1;
+                    height: 14px;
+                    background: rgba(0,0,0,0.5);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 4px;
+                    overflow: hidden;
+                    box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+                ">
+                    <div style="
+                        height: 100%;
+                        width: ${percent}%;
+                        background: ${isComplete ? 'linear-gradient(90deg, #4ade80, #22c55e)' : `linear-gradient(90deg, ${themeColor}, ${themeColor}cc)`};
+                        box-shadow: 0 0 8px ${isComplete ? 'rgba(74,222,128,0.4)' : themeColor + '66'};
+                    "></div>
+                </div>
+                <span style="
+                    font-size: 0.85em;
+                    font-weight: 700;
+                    color: ${isComplete ? '#4ade80' : '#fff'};
+                    min-width: 55px;
+                    text-align: right;
+                ">${current} / ${required}</span>
+            </div>
+            ` : `
+            <div style="padding-left: 22px; font-size: 0.85em; color: #888;">Required: ${required}</div>
+            `}
+        `;
+        
+        list.appendChild(objectiveItem);
+    }
+    
+    container.appendChild(list);
+    return container;
+}
+
+// Expose dialogue system to window.__shared_ui
+try {
+    if (typeof window !== 'undefined') {
+        window.__shared_ui = window.__shared_ui || {};
+        window.__shared_ui.ensureDialogueOverlay = ensureDialogueOverlay;
+        window.__shared_ui.closeDialogue = closeDialogue;
+        window.__shared_ui.renderDialogue = renderDialogue;
+        window.__shared_ui.createDialogueParagraph = createDialogueParagraph;
+        window.__shared_ui.buildObjectiveList = buildObjectiveList;
+    }
+} catch (e) {}
+
 // expose stats helpers to the shared UI export so callers can compute effective stats
 export const stats = { effectiveStats, makeStatPill, formatSkillLine, checkClassLevelUps };
 

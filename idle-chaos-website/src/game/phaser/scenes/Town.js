@@ -1261,63 +1261,70 @@ export class Town extends Phaser.Scene {
 
         if (ready) {
             const def = questDefs[ready.id] || {};
-            bodyNodes.push(this._createDialogueParagraph(`Ah, you're back! Have you finished ${def.name || ready.id}?`));
-            const list = this._buildObjectiveList(def, getQuestObjectiveState(this.char, ready.id));
+            const ui = window.__shared_ui;
+            bodyNodes.push(ui.createDialogueParagraph(`Ah, you're back! Have you finished ${def.name || ready.id}?`));
+            const list = ui.buildObjectiveList(def, getQuestObjectiveState(this.char, ready.id), '#ffd27a');
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: `Turn in "${def.name || ready.id}"`,
-                onClick: () => this._completeMayorQuest(ready.id)
+                onClick: () => this._completeMayorQuest(ready.id),
+                variant: 'success'
             });
             optionConfigs.push({
                 label: 'Maybe later',
-                onClick: () => this._closeDialogueOverlay()
+                onClick: () => {}
             });
         } else if (nextAvailable) {
-            bodyNodes.push(this._createDialogueParagraph(`I have a task that needs attending: ${nextAvailable.name}.`));
-            const desc = this._createDialogueParagraph(nextAvailable.description || '');
+            const ui = window.__shared_ui;
+            bodyNodes.push(ui.createDialogueParagraph(`I have a task that needs attending: ${nextAvailable.name}.`));
+            const desc = ui.createDialogueParagraph(nextAvailable.description || '');
             bodyNodes.push(desc);
-            const list = this._buildObjectiveList(nextAvailable, null);
+            const list = ui.buildObjectiveList(nextAvailable, null, '#ffd27a');
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: `Accept "${nextAvailable.name}"`,
-                onClick: () => this._acceptMayorQuest(nextAvailable.id)
+                onClick: () => this._acceptMayorQuest(nextAvailable.id),
+                variant: 'success'
             });
             optionConfigs.push({
                 label: 'Maybe later',
-                onClick: () => this._closeDialogueOverlay()
+                onClick: () => {}
             });
         } else if (activeQuest) {
             const def = questDefs[activeQuest.id] || {};
-            bodyNodes.push(this._createDialogueParagraph(`You're still working on ${def.name || activeQuest.id}. Here's what you still owe me:`));
-            const list = this._buildObjectiveList(def, getQuestObjectiveState(this.char, activeQuest.id));
+            const ui = window.__shared_ui;
+            bodyNodes.push(ui.createDialogueParagraph(`You're still working on ${def.name || activeQuest.id}. Here's what you still owe me:`));
+            const list = ui.buildObjectiveList(def, getQuestObjectiveState(this.char, activeQuest.id), '#ffd27a');
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: 'I\'ll get back to it',
-                onClick: () => this._closeDialogueOverlay()
+                onClick: () => {}
             });
         } else {
-            bodyNodes.push(this._createDialogueParagraph('Greetings! Stay vigilant out there, and let me know when you are ready for more responsibility.'));
+            const ui = window.__shared_ui;
+            bodyNodes.push(ui.createDialogueParagraph('Greetings! Stay vigilant out there, and let me know when you are ready for more responsibility.'));
             optionConfigs.push({
                 label: 'Leave',
-                onClick: () => this._closeDialogueOverlay()
+                onClick: () => {}
             });
         }
 
-        this._renderDialogue('Mayor Grimsley', bodyNodes, optionConfigs);
+        window.__shared_ui.renderDialogue('Mayor Grimsley', '👔', bodyNodes, optionConfigs, '#ffd27a');
     }
 
     _acceptMayorQuest(questId) {
         const quest = getQuestById(questId);
+        const ui = window.__shared_ui;
         if (!quest) {
-            this._renderDialogue('Mayor Grimsley', [this._createDialogueParagraph('Hmm, I seem to have misplaced that contract.')], [
-                { label: 'Leave', onClick: () => this._closeDialogueOverlay() }
-            ]);
+            ui.renderDialogue('Mayor Grimsley', '👔', [ui.createDialogueParagraph('Hmm, I seem to have misplaced that contract.')], [
+                { label: 'Leave', onClick: () => {} }
+            ], '#ffd27a');
             return;
         }
         if (!startQuest(this.char, questId)) {
-            this._renderDialogue('Mayor Grimsley', [this._createDialogueParagraph('Looks like you cannot take that on right now.')], [
-                { label: 'Understood', onClick: () => this._closeDialogueOverlay() }
-            ]);
+            ui.renderDialogue('Mayor Grimsley', '👔', [ui.createDialogueParagraph('Looks like you cannot take that on right now.')], [
+                { label: 'Understood', onClick: () => {} }
+            ], '#ffd27a');
             return;
         }
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
@@ -1326,22 +1333,23 @@ export class Town extends Phaser.Scene {
         if (this._questLogModal && window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) {
             window.__shared_ui.refreshQuestLogModal(this);
         }
-        this._renderDialogue('Mayor Grimsley', [
-            this._createDialogueParagraph(`Excellent. Bring me what I asked for and we'll speak again.`)
+        ui.renderDialogue('Mayor Grimsley', '👔', [
+            ui.createDialogueParagraph(`Excellent. Bring me what I asked for and we'll speak again.`)
         ], [
-            { label: 'I\'m on it', onClick: () => this._closeDialogueOverlay() }
-        ]);
+            { label: 'I\'m on it', onClick: () => {}, variant: 'success' }
+        ], '#ffd27a');
     }
 
     _completeMayorQuest(questId) {
+        const ui = window.__shared_ui;
         if (!checkQuestCompletion(this.char, questId)) {
             const def = getQuestById(questId);
-            this._renderDialogue('Mayor Grimsley', [
-                this._createDialogueParagraph(`You still have work to finish for ${def ? def.name : questId}.`),
-                this._buildObjectiveList(def, getQuestObjectiveState(this.char, questId))
+            ui.renderDialogue('Mayor Grimsley', '👔', [
+                ui.createDialogueParagraph(`You still have work to finish for ${def ? def.name : questId}.`),
+                ui.buildObjectiveList(def, getQuestObjectiveState(this.char, questId), '#ffd27a')
             ].filter(Boolean), [
-                { label: 'I\'ll finish it', onClick: () => this._closeDialogueOverlay() }
-            ]);
+                { label: 'I\'ll finish it', onClick: () => {} }
+            ], '#ffd27a');
             return;
         }
         completeQuest(this.char, questId);
@@ -1359,13 +1367,13 @@ export class Town extends Phaser.Scene {
         } catch (e) {}
         try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
         this._showToast('Quest completed: ' + (def ? def.name || questId : questId));
-        this._renderDialogue('Mayor Grimsley', [
-            this._createDialogueParagraph(`Well done. Here's your reward for completing ${def ? def.name : questId}.`),
-            this._createDialogueParagraph('Let me know if you want to take on another duty.')
+        ui.renderDialogue('Mayor Grimsley', '👔', [
+            ui.createDialogueParagraph(`Well done. Here's your reward for completing ${def ? def.name : questId}.`),
+            ui.createDialogueParagraph('Let me know if you want to take on another duty.')
         ], [
-            { label: 'Any more work?', onClick: () => this._openMayorDialogue() },
-            { label: 'Thanks', onClick: () => this._closeDialogueOverlay() }
-        ]);
+            { label: 'Any more work?', onClick: () => this._openMayorDialogue(), variant: 'primary' },
+            { label: 'Thanks', onClick: () => {}, variant: 'success' }
+        ], '#ffd27a');
     }
 
     _ensureDialogueOverlay() {

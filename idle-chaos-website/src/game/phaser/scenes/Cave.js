@@ -1202,29 +1202,57 @@ export class Cave extends Phaser.Scene {
             return this._dialogueCard;
         }
         if (typeof document === 'undefined') return null;
+        
         const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
-        overlay.style.left = '0';
-        overlay.style.top = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.background = 'rgba(0,0,0,0.65)';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.style.zIndex = '245';
+        overlay.style.cssText = `
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 245;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
+        `;
 
         const card = document.createElement('div');
-        card.style.background = 'linear-gradient(135deg,#1f2b2f,#0f1619)';
-        card.style.borderRadius = '12px';
-        card.style.padding = '18px';
-        card.style.color = '#fff';
-        card.style.minWidth = '340px';
-        card.style.maxWidth = '480px';
-        card.style.boxShadow = '0 18px 32px rgba(0,0,0,0.55)';
+        card.style.cssText = `
+            background: linear-gradient(135deg, #2a1f1a, #1a0f0a);
+            border-radius: 12px;
+            padding: 0;
+            color: #e8d8c8;
+            min-width: 440px;
+            max-width: 560px;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.9), 0 0 0 2px rgba(255,210,120,0.3);
+            font-family: 'Share Tech Mono', monospace;
+            animation: slideUp 0.3s ease;
+            overflow: hidden;
+        `;
 
         overlay.appendChild(card);
         document.body.appendChild(overlay);
+        
+        // Add animations if not already present
+        if (!document.getElementById('dialogue-animations-cave')) {
+            const style = document.createElement('style');
+            style.id = 'dialogue-animations-cave';
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { transform: translateY(30px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
         this._dialogueOverlay = overlay;
         this._dialogueCard = card;
         return card;
@@ -1235,83 +1263,283 @@ export class Cave extends Phaser.Scene {
         if (!card) return;
         card.innerHTML = '';
 
+        // Header with NPC name and portrait
         const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        const heading = document.createElement('strong');
-        heading.textContent = title;
+        header.style.cssText = `
+            background: linear-gradient(90deg, rgba(60,40,20,0.9), rgba(40,25,10,0.8));
+            padding: 16px 20px;
+            border-bottom: 2px solid rgba(255,210,120,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        
+        const titleSection = document.createElement('div');
+        titleSection.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+        
+        // NPC Portrait
+        const portrait = document.createElement('div');
+        portrait.style.cssText = `
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, rgba(180,107,42,0.3), rgba(140,80,30,0.2));
+            border: 2px solid rgba(180,107,42,0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        `;
+        portrait.textContent = '⛏️'; // Wayne Mineson (miner) icon
+        
+        const heading = document.createElement('div');
+        heading.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        `;
+        
+        const npcName = document.createElement('strong');
+        npcName.style.cssText = `
+            font-family: 'Metal Mania', cursive;
+            font-size: 1.3em;
+            color: #ffd27a;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+        `;
+        npcName.textContent = title;
+        
+        const npcTitle = document.createElement('div');
+        npcTitle.style.cssText = `
+            font-size: 0.75em;
+            color: #888;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        `;
+        npcTitle.textContent = 'Master Miner';
+        
+        heading.appendChild(npcName);
+        heading.appendChild(npcTitle);
+        titleSection.appendChild(portrait);
+        titleSection.appendChild(heading);
+        
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '×';
-        closeBtn.style.background = 'transparent';
-        closeBtn.style.border = 'none';
-        closeBtn.style.color = '#fff';
-        closeBtn.style.fontSize = '20px';
-        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.cssText = `
+            background: rgba(60,30,30,0.6);
+            border: 1px solid rgba(255,100,100,0.4);
+            color: #fff;
+            font-size: 1.5em;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        `;
+        closeBtn.onmouseover = function() { this.style.background = 'rgba(80,40,40,0.8)'; this.style.borderColor = 'rgba(255,100,100,0.6)'; };
+        closeBtn.onmouseout = function() { this.style.background = 'rgba(60,30,30,0.6)'; this.style.borderColor = 'rgba(255,100,100,0.4)'; };
         closeBtn.onclick = () => this._closeDialogueOverlay();
-        header.appendChild(heading);
+        
+        header.appendChild(titleSection);
         header.appendChild(closeBtn);
         card.appendChild(header);
 
+        // Body with dialogue text
         const body = document.createElement('div');
-        body.style.marginTop = '12px';
-        body.style.marginBottom = '16px';
+        body.style.cssText = `
+            padding: 20px;
+            min-height: 120px;
+            max-height: 400px;
+            overflow-y: auto;
+        `;
+        
         for (const node of bodyNodes) {
             if (node) body.appendChild(node);
         }
         card.appendChild(body);
 
-        const buttons = document.createElement('div');
-        buttons.style.display = 'flex';
-        buttons.style.flexDirection = 'column';
-        buttons.style.gap = '8px';
+        // Footer with response options
+        const footer = document.createElement('div');
+        footer.style.cssText = `
+            padding: 16px 20px;
+            background: rgba(20,15,10,0.5);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        `;
+        
         for (const opt of optionConfigs) {
             const btn = document.createElement('button');
             btn.textContent = opt.label;
-            btn.style.padding = '8px 12px';
-            btn.style.border = 'none';
-            btn.style.borderRadius = '8px';
-            btn.style.cursor = 'pointer';
-            btn.style.background = '#b46b2a';
-            btn.style.color = '#fff';
+            btn.style.cssText = `
+                padding: 12px 16px;
+                border: 2px solid rgba(255,210,120,0.4);
+                border-radius: 6px;
+                cursor: pointer;
+                background: linear-gradient(90deg, rgba(180,107,42,0.8), rgba(140,80,30,0.7));
+                color: #fff;
+                font-family: inherit;
+                font-size: 0.95em;
+                font-weight: 600;
+                transition: all 0.2s;
+                text-align: left;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                position: relative;
+                overflow: hidden;
+            `;
+            
+            btn.onmouseover = function() {
+                this.style.background = 'linear-gradient(90deg, rgba(200,120,50,0.9), rgba(160,90,35,0.8))';
+                this.style.borderColor = 'rgba(255,210,120,0.6)';
+                this.style.transform = 'translateX(4px)';
+                this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.6)';
+            };
+            btn.onmouseout = function() {
+                this.style.background = 'linear-gradient(90deg, rgba(180,107,42,0.8), rgba(140,80,30,0.7))';
+                this.style.borderColor = 'rgba(255,210,120,0.4)';
+                this.style.transform = 'translateX(0)';
+                this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
+            };
+            
+            // Add arrow indicator
+            const arrow = document.createElement('span');
+            arrow.textContent = '▶';
+            arrow.style.cssText = `
+                position: absolute;
+                right: 16px;
+                top: 50%;
+                transform: translateY(-50%);
+                opacity: 0;
+                transition: opacity 0.2s, right 0.2s;
+            `;
+            btn.appendChild(arrow);
+            
+            btn.addEventListener('mouseenter', () => {
+                arrow.style.opacity = '1';
+                arrow.style.right = '12px';
+            });
+            btn.addEventListener('mouseleave', () => {
+                arrow.style.opacity = '0';
+                arrow.style.right = '16px';
+            });
+            
             btn.onclick = () => {
                 if (typeof opt.onClick === 'function') opt.onClick();
             };
-            buttons.appendChild(btn);
+            footer.appendChild(btn);
         }
-        card.appendChild(buttons);
+        card.appendChild(footer);
     }
 
     _createDialogueParagraph(text) {
         if (typeof document === 'undefined') return null;
         const p = document.createElement('p');
-        p.style.margin = '0 0 10px 0';
+        p.style.cssText = `
+            margin: 0 0 14px 0;
+            line-height: 1.6;
+            color: #d4c5b9;
+            font-size: 0.95em;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-left: 3px solid rgba(255,210,120,0.3);
+            border-radius: 4px;
+        `;
         p.textContent = text;
+        return p;
         return p;
     }
 
     _buildObjectiveList(questDef, progressStates) {
         if (typeof document === 'undefined') return null;
         if (!questDef || !Array.isArray(questDef.objectives) || questDef.objectives.length === 0) return null;
-        const list = document.createElement('ul');
-        list.style.margin = '8px 0 16px 16px';
-        list.style.padding = '0';
+        
+        const container = document.createElement('div');
+        container.style.cssText = `
+            margin: 16px 0;
+            padding: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            border: 1px solid rgba(255,210,120,0.2);
+        `;
+        
+        const title = document.createElement('div');
+        title.style.cssText = `
+            font-size: 0.85em;
+            color: #fbbf24;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        `;
+        title.textContent = 'OBJECTIVES:';
+        container.appendChild(title);
+        
+        const list = document.createElement('div');
+        list.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+        
         for (const obj of questDef.objectives) {
-            const li = document.createElement('li');
-            li.style.marginBottom = '4px';
             const required = obj.required || 1;
             const label = obj.description || obj.type;
+            let current = 0;
+            
             if (progressStates) {
                 const targetId = obj.target || null;
                 const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
-                const current = state ? Math.min(state.current || 0, required) : 0;
-                li.textContent = `${label}: ${current} / ${required}`;
-            } else {
-                li.textContent = `${label}: ${required}`;
+                current = state ? Math.min(state.current || 0, required) : 0;
             }
-            list.appendChild(li);
+            
+            const isComplete = current >= required;
+            const percent = progressStates ? Math.min(100, Math.floor((current / required) * 100)) : 0;
+            
+            const objectiveItem = document.createElement('div');
+            objectiveItem.style.cssText = 'padding-left: 4px;';
+            
+            objectiveItem.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                    <span style="color: ${isComplete ? '#4ade80' : '#fbbf24'}; font-weight: bold; font-size: 0.9em;">${isComplete ? '✓' : '○'}</span>
+                    <span style="font-size: 0.9em; color: ${isComplete ? '#4ade80' : '#d4c5b9'};">${label}</span>
+                </div>
+                ${progressStates ? `
+                <div style="display: flex; align-items: center; gap: 8px; padding-left: 22px;">
+                    <div style="
+                        flex: 1;
+                        height: 14px;
+                        background: rgba(0,0,0,0.5);
+                        border: 1px solid rgba(255,255,255,0.1);
+                        border-radius: 4px;
+                        overflow: hidden;
+                        box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+                    ">
+                        <div style="
+                            height: 100%;
+                            width: ${percent}%;
+                            background: ${isComplete ? 'linear-gradient(90deg, #4ade80, #22c55e)' : 'linear-gradient(90deg, #fbbf24, #f59e0b)'};
+                            box-shadow: 0 0 8px ${isComplete ? 'rgba(74,222,128,0.4)' : 'rgba(251,191,36,0.4)'};
+                        "></div>
+                    </div>
+                    <span style="
+                        font-size: 0.85em;
+                        font-weight: 700;
+                        color: ${isComplete ? '#4ade80' : '#fff'};
+                        min-width: 55px;
+                        text-align: right;
+                    ">${current} / ${required}</span>
+                </div>
+                ` : `
+                <div style="padding-left: 22px; font-size: 0.85em; color: #888;">Required: ${required}</div>
+                `}
+            `;
+            
+            list.appendChild(objectiveItem);
         }
-        return list;
+        
+        container.appendChild(list);
+        return container;
     }
 
     _closeDialogueOverlay() {
