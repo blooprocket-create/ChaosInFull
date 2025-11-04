@@ -12,7 +12,7 @@ export const QUEST_DEFS = {
     tutorial_meet_wayne: {
         id: 'tutorial_meet_wayne',
         name: 'Copper Mining Basics',
-        description: 'Learn the basics of mining by collecting copper ore from the cave. Go talk to Wayne "The Vein" Mineson in the cave. He will show you how to mine.',
+        description: 'Listen, I need someone who knows their way around a pickaxe. Wayne "The Vein" Mineson runs the mine operation in the caves. He\'s rough around the edges, but the man knows his ore. Go introduce yourself—tell him I sent you.',
         objectives: [
             {
                 type: 'travel',
@@ -40,7 +40,7 @@ export const QUEST_DEFS = {
     tutorial_equip_pickaxe_and_mine: {
         id: 'tutorial_equip_pickaxe_and_mine',
         name: 'Equip Pickaxe and Mine Copper',
-        description: 'Wayne "The Vein" Mineson wants you to: equip your new copper pickaxe and mine some copper ore from the cave.',
+        description: 'Right then. See that pickaxe? Get it on your belt and start swinging. These veins won\'t mine themselves. Twenty copper chunks should do it—enough to see if you\'ve got the feel for it. The rhythm\'s in the stone, yeah? Listen close.',
         objectives: [
             {
                 type: 'equip',
@@ -68,7 +68,7 @@ export const QUEST_DEFS = {
     tutorial_return_to_grimsley: {
         id: 'tutorial_return_to_grimsley',
         name: 'Return to Mayor Grimsley',
-        description: 'Return to Mayor Grimsley in town after your mining lesson with Wayne.',
+        description: 'Not bad work. You\'ve got steady hands. Mayor Grimsley will want to hear you passed the test. Head back topside and give him the good word, yeah?',
         objectives: [
             {
                 type: 'travel',
@@ -95,7 +95,7 @@ export const QUEST_DEFS = {
     tutorial_smelt_copper: {
         id: 'tutorial_smelt_copper',
         name: 'Smelting Copper Ore',
-        description: 'Mayor Grimsley wants you to smelt the copper ore you mined into copper bars using the furnace in town.',
+        description: 'So you can swing a pickaxe. Good. Now let\'s see if you can work a furnace. Raw ore is worthless—we need bars. Ten copper bars should suffice. The furnace is by the town square. Don\'t burn yourself.',
         objectives: [
             {
                 type: 'smelt',
@@ -117,7 +117,7 @@ export const QUEST_DEFS = {
     tutorial_craft_armor: {
         id: 'tutorial_craft_armor',
         name: 'Crafting Copper Armor',
-        description: 'Use the workbench to craft a full set of copper armor and a weapon.',
+        description: 'You\'ll need proper protection before venturing further. Use the workbench to forge yourself some gear: leggings, boots, and a sword. Nothing fancy, but it\'ll keep you alive. Show some care with the hammer work.',
         objectives: [
             {
                 type: 'craft',
@@ -151,7 +151,7 @@ export const QUEST_DEFS = {
     tutorial_equip_weapon_and_armor: {
         id: 'tutorial_equip_weapon_and_armor',
         name: 'Equip Your New Gear',
-        description: 'Equip the copper armor and sword you just crafted.',
+        description: 'Well-crafted pieces, those. Don\'t let them gather dust. Get everything equipped—helmet, armor, leggings, boots, sword. All of it. You represent this town now. Look the part.',
         objectives: [
             {
                 type: 'equip',
@@ -196,7 +196,7 @@ export const QUEST_DEFS = {
     tutorial_learn_talents: {
         id: 'tutorial_learn_talents',
         name: 'Learning Talents',
-        description: 'Mayor Grimsley wants you to open the talents menu and learn your first talent point.',
+        description: 'You\'ve earned your first talent point. Press T to open the talents menu and choose your first specialization. Every choice matters—pick what suits your style. Once you\'ve made your selection, report back.',
         objectives: [
             {
                 type: 'learn_talent',
@@ -216,7 +216,7 @@ export const QUEST_DEFS = {
     tutorial_kill_slimes: {
         id: 'tutorial_kill_slimes',
         name: 'Slime Extermination',
-        description: 'Head to the Inner Field and defeat some slimes to test your new equipment.',
+        description: 'Time to see if that blade is more than decoration. Slimes have been plaguing the Inner Field—disgusting things, but perfect for testing fresh recruits. Kill five of them. Don\'t get careless.',
         objectives: [
             {
                 type: 'kill',
@@ -238,7 +238,7 @@ export const QUEST_DEFS = {
     tutorial_meet_rowan: {
         id: 'tutorial_meet_rowan',
         name: 'Seek Out Rowan Boneaxe',
-        description: 'Mayor Grimsley wants you to meet Rowan Boneaxe. Travel to the Grave Forest and speak with him.',
+        description: 'You\'ve proven yourself capable. There\'s someone I need you to meet: Rowan Boneaxe. He patrols the Grave Forest—grim work, but someone has to do it. Find him and hear what he has to say. The man doesn\'t waste words.',
         objectives: [
             {
                 type: 'travel',
@@ -266,7 +266,7 @@ export const QUEST_DEFS = {
     tutorial_chop_wood: {
         id: 'tutorial_chop_wood',
         name: 'Woodcutting Basics',
-        description: 'Rowan Boneaxe wants you to equip your new hatchet and gather some wood from the Grave Forest.',
+        description: 'Grimsley trusts you. That counts for something. We need timber for watch-fires—keeps the restless dead at bay. Take this hatchet and bring me twenty-five logs. Mind the shadows while you work. Things stir here that don\'t rest easy.',
         objectives: [
             {
                 type: 'equip',
@@ -293,7 +293,7 @@ export const QUEST_DEFS = {
     mother_lumen_slime_cull: {
         id: 'mother_lumen_slime_cull',
         name: 'Seal the Slime Vents',
-        description: 'Mother Lumen asks you to keep the glowing wells from spilling further chaos by cutting down nearby slimes.',
+        description: 'Traveler... the glowing wells near camp pulse with unnatural life. Slimes emerge endlessly, drawn by something beneath. Will you thin their numbers? Fifty should quiet the chaos for a time. The lantern will guide your blade.',
         objectives: [
             {
                 type: 'kill',
@@ -315,7 +315,7 @@ export const QUEST_DEFS = {
     mother_lumen_rat_cull: {
         id: 'mother_lumen_rat_cull',
         name: 'Shadows in the Grain',
-        description: 'Infested grain stores threaten the safe paths. Cull the rats that stalk the approaches.',
+        description: 'The grain stores... infested. Rats—living, dead, and worse—gnaw at the foundations of safety. Fifteen common vermin, five corpse-touched, and three spectral. Cull them all. The paths must remain clear for those who still walk them.',
         objectives: [
             {
                 type: 'kill',
@@ -349,7 +349,7 @@ export const QUEST_DEFS = {
     mother_lumen_goblin_cull: {
         id: 'mother_lumen_goblin_cull',
         name: 'Break the Warband',
-        description: 'Strike at the goblin warbands harrying the camp approaches until their resolve snaps.',
+        description: 'Goblins harry the approach roads—crude, vicious, numerous. Their warband grows bold in the twilight. Strike fifteen of them down. Scatter their resolve. When they break and flee, the travelers can breathe again. Will you carry this burden?',
         objectives: [
             {
                 type: 'kill',
@@ -371,7 +371,7 @@ export const QUEST_DEFS = {
     mother_lumen_request: {
         id: 'mother_lumen_request',
         name: 'A Special Request',
-        description: 'The Goblin Chief has been spotted. He is a absolute brute of a goblin. Defeat him to prove your strength.',
+        description: 'The Goblin Chief... I see him in the lantern\'s glow. A brute twice the size of his kin, wreathed in stolen armor and rage. He leads the raids that fracture our defenses. Face him, if you dare. Prove your new mantle is more than cloth and promise.',
         objectives: [
             {
                 type: 'kill',

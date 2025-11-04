@@ -432,53 +432,57 @@ export class GraveForest extends Phaser.Scene {
         const woodQuestCompleted = (this.char.completedQuests || []).includes(woodQuestId);
         const woodQuestReady = activeWoodQuest && checkQuestCompletion(this.char, woodQuestId);
 
+        const ui = window.__shared_ui;
+
         if (woodQuestReady) {
-            bodyNodes.push(this._createDialogueParagraph('You gathered what I asked for. Those logs will keep the watch-fires burning.'));
+            bodyNodes.push(ui.createDialogueParagraph('You gathered what I asked for. Those logs will keep the watch-fires burning.'));
             const woodStates = objectiveStateFn ? objectiveStateFn(this.char, woodQuestId) : getQuestObjectiveState(this.char, woodQuestId);
-            const list = this._buildObjectiveList(woodQuestDef, woodStates);
+            const list = ui.buildObjectiveList(woodQuestDef, woodStates, '#8b7355');
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: 'Hand over the logs',
                 onClick: () => {
                     this._completeRowanWoodQuest();
-                }
+                },
+                variant: 'success'
             });
-            optionConfigs.push({ label: 'Give me a moment.', onClick: () => this._closeDialogueOverlay() });
+            optionConfigs.push({ label: 'Give me a moment.', onClick: () => {} });
         } else if (activeWoodQuest) {
-            bodyNodes.push(this._createDialogueParagraph('Keep splitting those trunks. The village needs the timber and the calm it brings.'));
+            bodyNodes.push(ui.createDialogueParagraph('Keep splitting those trunks. The village needs the timber and the calm it brings.'));
             const woodStates = objectiveStateFn ? objectiveStateFn(this.char, woodQuestId) : getQuestObjectiveState(this.char, woodQuestId);
-            const list = this._buildObjectiveList(woodQuestDef, woodStates);
+            const list = ui.buildObjectiveList(woodQuestDef, woodStates, '#8b7355');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'Back to chopping.', onClick: () => this._closeDialogueOverlay() });
+            optionConfigs.push({ label: 'Back to chopping.', onClick: () => {} });
         } else if (justCompleted || nowCompleted) {
-            bodyNodes.push(this._createDialogueParagraph('You made it through the forest. Good-Mayor Grimsley can rest easier knowing you\'re here.'));
-            bodyNodes.push(this._createDialogueParagraph('Keep your eyes sharp. The Grave Forest hides more than restless spirits.'));
+            bodyNodes.push(ui.createDialogueParagraph('You made it through the forest. Good-Mayor Grimsley can rest easier knowing you\'re here.'));
+            bodyNodes.push(ui.createDialogueParagraph('Keep your eyes sharp. The Grave Forest hides more than restless spirits.'));
             if (!woodQuestCompleted) {
                 if (woodQuestDef && woodQuestDef.description) {
-                    bodyNodes.push(this._createDialogueParagraph(woodQuestDef.description));
+                    bodyNodes.push(ui.createDialogueParagraph(woodQuestDef.description));
                 }
                 optionConfigs.push({
                     label: 'I can gather your wood.',
                     onClick: () => {
                         this._acceptRowanWoodQuest();
-                    }
+                    },
+                    variant: 'success'
                 });
-                optionConfigs.push({ label: 'Another time.', onClick: () => this._closeDialogueOverlay() });
+                optionConfigs.push({ label: 'Another time.', onClick: () => {} });
             } else {
-                optionConfigs.push({ label: 'I\'ll be ready.', onClick: () => this._closeDialogueOverlay() });
+                optionConfigs.push({ label: 'I\'ll be ready.', onClick: () => {} });
             }
         } else if (activeRowan) {
-            bodyNodes.push(this._createDialogueParagraph('Rowan Boneaxe at your service. The mayor must think highly of you if he sent you here.'));
+            bodyNodes.push(ui.createDialogueParagraph('Rowan Boneaxe at your service. The mayor must think highly of you if he sent you here.'));
             const states = objectiveStateFn ? objectiveStateFn(this.char, questId) : null;
-            const list = this._buildObjectiveList(questDef, states);
+            const list = ui.buildObjectiveList(questDef, states, '#8b7355');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'I\'ll hold the line.', onClick: () => this._closeDialogueOverlay() });
+            optionConfigs.push({ label: 'I\'ll hold the line.', onClick: () => {} });
         } else {
-            bodyNodes.push(this._createDialogueParagraph('Another traveler braving the graves? Stay close to the lantern light and you may survive.'));
-            optionConfigs.push({ label: 'Understood.', onClick: () => this._closeDialogueOverlay() });
+            bodyNodes.push(ui.createDialogueParagraph('Another traveler braving the graves? Stay close to the lantern light and you may survive.'));
+            optionConfigs.push({ label: 'Understood.', onClick: () => {} });
         }
 
-        this._renderDialogue('Rowan Boneaxe', bodyNodes, optionConfigs);
+        ui.renderDialogue('Rowan Boneaxe', '🪓', bodyNodes, optionConfigs, '#8b7355');
     }
 
     _updateRowanQuestProgress(type, itemId, amount = 1) {

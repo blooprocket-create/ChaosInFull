@@ -521,94 +521,104 @@ export class GloamwayBastion extends Phaser.Scene {
 
         const bodyNodes = [];
         const optionConfigs = [];
+        const ui = window.__shared_ui;
 
         if (readyQuestId) {
             const questDef = getQuestById(readyQuestId);
-            bodyNodes.push(this._createDialogueParagraph('The pathstones warm. Your deeds have rippled back to me.'));
+            bodyNodes.push(ui.createDialogueParagraph('The pathstones warm. Your deeds have rippled back to me.'));
             const states = getQuestObjectiveState(this.char, readyQuestId);
-            const list = this._buildObjectiveList(questDef, states);
+            const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: 'Offer the completed tally',
                 onClick: () => {
                     this._completeMotherLumenQuest(readyQuestId);
                     addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
-                }
+                },
+                variant: 'success'
             });
-            optionConfigs.push({ label: 'Not yet', onClick: () => this._closeDialogueOverlay() });
+            optionConfigs.push({ label: 'Not yet', onClick: () => {} });
         } else if (activeQuest) {
             const questDef = getQuestById(activeQuest.id);
-            bodyNodes.push(this._createDialogueParagraph('My lantern tracks your steps. Keep pressing the shadows aside.'));
+            const ui = window.__shared_ui;
+            bodyNodes.push(ui.createDialogueParagraph('My lantern tracks your steps. Keep pressing the shadows aside.'));
             const states = getQuestObjectiveState(this.char, activeQuest.id);
-            const list = this._buildObjectiveList(questDef, states);
+            const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'I will return soon.', onClick: () => this._closeDialogueOverlay() });
+            optionConfigs.push({ label: 'I will return soon.', onClick: () => {} });
         } else if (nextQuestId) {
             const questDef = getQuestById(nextQuestId);
-            bodyNodes.push(this._createDialogueParagraph('Traveler, a fracture widens near the camp. Will you mend it for me?'));
-            if (questDef && questDef.description) bodyNodes.push(this._createDialogueParagraph(questDef.description));
+            const ui = window.__shared_ui;
+            bodyNodes.push(ui.createDialogueParagraph('Traveler, a fracture widens near the camp. Will you mend it for me?'));
+            if (questDef && questDef.description) bodyNodes.push(ui.createDialogueParagraph(questDef.description));
             optionConfigs.push({
                 label: 'I will take this task.',
                 onClick: () => {
                     this._acceptMotherLumenQuest(nextQuestId);
                     addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
-                }
+                },
+                variant: 'success'
             });
-            optionConfigs.push({ label: 'Another time.', onClick: () => this._closeDialogueOverlay() });
+            optionConfigs.push({ label: 'Another time.', onClick: () => {} });
         } else {
             // If no chain quest is active/available, check for special post-class-selection request (chieftain)
             let offeredSpecial = false;
             try {
+                const ui = window.__shared_ui;
                 if (canStartQuest && canStartQuest(this.char, 'mother_lumen_request')) {
                     const qd = getQuestById('mother_lumen_request');
-                    bodyNodes.push(this._createDialogueParagraph('A heavier presence treads the dark. Will you bring down their chieftain?'));
-                    if (qd && qd.description) bodyNodes.push(this._createDialogueParagraph(qd.description));
+                    bodyNodes.push(ui.createDialogueParagraph('A heavier presence treads the dark. Will you bring down their chieftain?'));
+                    if (qd && qd.description) bodyNodes.push(ui.createDialogueParagraph(qd.description));
                     optionConfigs.push({
                         label: 'I will face the chieftain.',
                         onClick: () => {
                             this._acceptMotherLumenQuest('mother_lumen_request');
                             addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
-                        }
+                        },
+                        variant: 'success'
                     });
-                    optionConfigs.push({ label: 'Not yet.', onClick: () => this._closeDialogueOverlay() });
+                    optionConfigs.push({ label: 'Not yet.', onClick: () => {} });
                     offeredSpecial = true;
                 }
             } catch (e) {}
             if (offeredSpecial) {
                 // skip the default class-upgrade/closing text when special quest is offered
-                this._renderDialogue('Mother Lumen, Keeper of Paths', bodyNodes, optionConfigs);
+                window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
                 return;
             }
+            const ui = window.__shared_ui;
             if (this.char.class === 'beginner') {
-                bodyNodes.push(this._createDialogueParagraph('Your service steadied the paths. Choose the mantle that calls to you.'));
+                bodyNodes.push(ui.createDialogueParagraph('Your service steadied the paths. Choose the mantle that calls to you.'));
                 this._presentClassUpgradeOptions(bodyNodes, optionConfigs);
-                optionConfigs.push({ label: 'I need more time.', onClick: () => this._closeDialogueOverlay() });
+                optionConfigs.push({ label: 'I need more time.', onClick: () => {} });
             } else {
-                bodyNodes.push(this._createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
-                optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => this._closeDialogueOverlay() });
+                bodyNodes.push(ui.createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
+                optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => {} });
             }
         }
 
-        this._renderDialogue('Mother Lumen, Keeper of Paths', bodyNodes, optionConfigs);
+        window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
     }
 
     _presentClassUpgradeOptions(bodyNodes, optionConfigs) {
-        const desc = this._createDialogueParagraph('Each path reshapes your body and hunger. Choose only once.');
+        const ui = window.__shared_ui;
+        const desc = ui.createDialogueParagraph('Each path reshapes your body and hunger. Choose only once.');
         bodyNodes.push(desc);
         CLASS_UPGRADE_CHOICES.forEach(classId => {
             const def = CLASS_DEFS[classId];
             if (!def) return;
             const statsSummary = `Base STR ${def.base.str || 0}, INT ${def.base.int || 0}, AGI ${def.base.agi || 0}, LUK ${def.base.luk || 0}`;
             const perLevelSummary = `Per level +${(def.perLevel.str || 0).toFixed(2)} STR, +${(def.perLevel.int || 0).toFixed(2)} INT, +${(def.perLevel.agi || 0).toFixed(2)} AGI, +${(def.perLevel.luk || 0).toFixed(2)} LUK`;
-            bodyNodes.push(this._createDialogueParagraph(`${def.name}: ${def.description || ''}`));
-            bodyNodes.push(this._createDialogueParagraph(statsSummary));
-            bodyNodes.push(this._createDialogueParagraph(perLevelSummary));
+            bodyNodes.push(ui.createDialogueParagraph(`${def.name}: ${def.description || ''}`));
+            bodyNodes.push(ui.createDialogueParagraph(statsSummary));
+            bodyNodes.push(ui.createDialogueParagraph(perLevelSummary));
             optionConfigs.push({
                 label: `Bind with the ${def.name}`,
                 onClick: () => {
                     this._applyClassUpgrade(classId);
                     addTimeEvent(this, { delay: 80, callback: () => this._openMotherLumenDialogue() });
-                }
+                },
+                variant: 'success'
             });
         });
     }
