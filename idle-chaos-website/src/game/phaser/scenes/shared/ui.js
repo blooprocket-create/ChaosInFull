@@ -1654,21 +1654,147 @@ export function refreshEquipmentModal(scene) {
     }
 }
 
-// Quest Log modal
+// Quest Log modal (MMO-style with tabs)
 export function openQuestLogModal(scene) {
     if (!scene) return;
     const char = scene.char = scene.char || {};
     if (!char.activeQuests) char.activeQuests = [];
     if (!char.completedQuests) char.completedQuests = [];
     if (scene._questLogModal) return;
+    
     const modal = document.createElement('div');
     modal.id = 'quest-log-modal';
-    modal.style.position = 'fixed'; modal.style.left = '50%'; modal.style.top = '50%'; modal.style.transform = 'translate(-50%,-50%)'; modal.style.zIndex = '240';
-    modal.style.background = 'linear-gradient(135deg,#1a1a1f, #0f0f12)'; modal.style.color = '#fff'; modal.style.padding = '14px'; modal.style.borderRadius = '12px'; modal.style.minWidth = '400px'; modal.style.maxWidth = '600px'; modal.style.maxHeight = '80vh'; modal.style.overflowY = 'auto';
-    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Quest Log</strong><button id='quest-log-close' style='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;'>Close</button></div><div id='quest-log-body'></div>`;
+    modal.style.cssText = `
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 240;
+        background: linear-gradient(135deg, #1a1a20, #0f0f14);
+        color: #e8d8c8;
+        padding: 0;
+        border-radius: 12px;
+        min-width: 500px;
+        max-width: 700px;
+        max-height: 85vh;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 0 2px rgba(255,210,120,0.3);
+        overflow: hidden;
+        font-family: 'Share Tech Mono', monospace;
+    `;
+    
+    modal.innerHTML = `
+        <div style="
+            background: linear-gradient(90deg, rgba(40,30,20,0.9), rgba(30,20,10,0.8));
+            padding: 16px 20px;
+            border-bottom: 2px solid rgba(255,210,120,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.8em;">📜</span>
+                <strong style="
+                    font-family: 'Metal Mania', cursive;
+                    font-size: 1.4em;
+                    color: #ffd27a;
+                    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+                ">Quest Log</strong>
+            </div>
+            <button id='quest-log-close' style="
+                background: rgba(60,30,30,0.6);
+                color: #fff;
+                border: 1px solid rgba(255,100,100,0.4);
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 1.2em;
+                font-weight: bold;
+                transition: all 0.2s;
+                font-family: inherit;
+            " onmouseover="this.style.background='rgba(80,40,40,0.8)'; this.style.borderColor='rgba(255,100,100,0.6)';" onmouseout="this.style.background='rgba(60,30,30,0.6)'; this.style.borderColor='rgba(255,100,100,0.4)';">×</button>
+        </div>
+        <div style="
+            display: flex;
+            gap: 0;
+            background: rgba(20,20,24,0.5);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 0 20px;
+        ">
+            <button id="quest-tab-active" class="quest-tab" style="
+                flex: 1;
+                padding: 12px 16px;
+                background: rgba(40,35,30,0.7);
+                border: none;
+                border-bottom: 3px solid #fbbf24;
+                color: #ffd27a;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 0.95em;
+                font-weight: 600;
+                transition: all 0.2s;
+            ">
+                <span style="margin-right: 6px;">📋</span>
+                Active Quests
+            </button>
+            <button id="quest-tab-completed" class="quest-tab" style="
+                flex: 1;
+                padding: 12px 16px;
+                background: transparent;
+                border: none;
+                border-bottom: 3px solid transparent;
+                color: #888;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 0.95em;
+                font-weight: 600;
+                transition: all 0.2s;
+            " onmouseover="if(this.style.borderBottomColor === 'transparent') this.style.color='#aaa';" onmouseout="if(this.style.borderBottomColor === 'transparent') this.style.color='#888';">
+                <span style="margin-right: 6px;">✓</span>
+                Completed
+            </button>
+        </div>
+        <div id='quest-log-body' style="
+            padding: 20px;
+            max-height: calc(85vh - 140px);
+            overflow-y: auto;
+            overflow-x: hidden;
+        "></div>
+    `;
+    
     document.body.appendChild(modal);
     scene._questLogModal = modal;
+    scene._questLogCurrentTab = 'active';
+    
+    // Close button
     modal.querySelector('#quest-log-close').onclick = () => closeQuestLogModal(scene);
+    
+    // Tab switching
+    const activeTab = modal.querySelector('#quest-tab-active');
+    const completedTab = modal.querySelector('#quest-tab-completed');
+    
+    const switchTab = (tabName) => {
+        scene._questLogCurrentTab = tabName;
+        if (tabName === 'active') {
+            activeTab.style.background = 'rgba(40,35,30,0.7)';
+            activeTab.style.borderBottomColor = '#fbbf24';
+            activeTab.style.color = '#ffd27a';
+            completedTab.style.background = 'transparent';
+            completedTab.style.borderBottomColor = 'transparent';
+            completedTab.style.color = '#888';
+        } else {
+            completedTab.style.background = 'rgba(40,35,30,0.7)';
+            completedTab.style.borderBottomColor = '#4ade80';
+            completedTab.style.color = '#4ade80';
+            activeTab.style.background = 'transparent';
+            activeTab.style.borderBottomColor = 'transparent';
+            activeTab.style.color = '#888';
+        }
+        refreshQuestLogModal(scene);
+    };
+    
+    activeTab.onclick = () => switchTab('active');
+    completedTab.onclick = () => switchTab('completed');
+    
     // Auto-clean on scene shutdown
     try { scene.events && scene.events.once && scene.events.once('shutdown', () => { try { closeQuestLogModal(scene); } catch (e) {} }); } catch (e) {}
     refreshQuestLogModal(scene);
@@ -1691,67 +1817,201 @@ export function refreshQuestLogModal(scene) {
     const completed = char.completedQuests || [];
     const quests = (window && window.QUEST_DEFS) ? window.QUEST_DEFS : {};
     const objectiveStateFn = (window && window.getQuestObjectiveState) ? window.getQuestObjectiveState : null;
+    const currentTab = scene._questLogCurrentTab || 'active';
 
-    if (active.length > 0) {
-        body.innerHTML += '<h4 style="margin:0 0 8px 0; color:#ffd27a;">Active Quests</h4>';
-        for (const q of active) {
-            const questId = (q && q.id) ? q.id : q;
-            const def = quests[questId];
-            const div = document.createElement('div');
-            div.style.cssText = 'margin-bottom:12px; padding:8px; background:rgba(255,255,255,0.02); border-radius:8px;';
-            let inner = `<strong>${(def && def.name) || questId}</strong>`;
-            const description = def && def.description ? def.description : '';
-            if (description) inner += `<br><small>${description}</small>`;
-            const progressStates = objectiveStateFn ? objectiveStateFn(scene.char, questId) : null;
-            const rawProgress = Array.isArray(q && q.progress) ? q.progress : [];
-            const objectives = Array.isArray(def && def.objectives) ? def.objectives : [];
-            if (objectives.length > 0) {
-                for (const obj of objectives) {
-                    const targetId = obj.target || obj.id || obj.type;
-                    let current = 0;
-                    let required = obj.required || 1;
-                    if (Array.isArray(progressStates)) {
-                        const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
-                        if (state) {
-                            required = state.required || required;
-                            current = Math.min(state.current || 0, required);
+    if (currentTab === 'active') {
+        if (active.length > 0) {
+            for (const q of active) {
+                const questId = (q && q.id) ? q.id : q;
+                const def = quests[questId];
+                if (!def) continue;
+                
+                const progressStates = objectiveStateFn ? objectiveStateFn(scene.char, questId) : null;
+                const allComplete = progressStates && progressStates.length > 0 && progressStates.every(s => (s.current || 0) >= (s.required || 1));
+                const questLevel = def.level || '?';
+                const questType = def.type || 'Main';
+                const typeIcon = questType === 'Main' ? '⭐' : questType === 'Side' ? '📌' : '💼';
+                
+                const div = document.createElement('div');
+                div.style.cssText = `
+                    margin-bottom: 16px;
+                    padding: 14px;
+                    background: linear-gradient(135deg, rgba(30,25,20,0.7), rgba(20,15,10,0.5));
+                    border-left: 5px solid ${allComplete ? '#4ade80' : '#fbbf24'};
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                    transition: all 0.2s;
+                `;
+                div.onmouseover = function() { this.style.background = 'linear-gradient(135deg, rgba(40,35,30,0.8), rgba(30,25,20,0.6))'; this.style.boxShadow = '0 6px 16px rgba(0,0,0,0.7)'; };
+                div.onmouseout = function() { this.style.background = 'linear-gradient(135deg, rgba(30,25,20,0.7), rgba(20,15,10,0.5))'; this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)'; };
+                
+                let inner = `
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                <span style="font-size: 1.3em;">${typeIcon}</span>
+                                <strong style="font-size: 1.1em; color: ${allComplete ? '#4ade80' : '#ffd27a'}; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${def.name || questId}</strong>
+                                ${allComplete ? '<span style="color: #4ade80; font-size: 1.2em; margin-left: 8px;">✓</span>' : ''}
+                            </div>
+                            <div style="font-size: 0.8em; color: #888; font-weight: 600; letter-spacing: 0.5px; margin-left: 32px;">[Level ${questLevel}] ${questType} Quest</div>
+                        </div>
+                    </div>
+                `;
+                
+                const description = def && def.description ? def.description : '';
+                if (description) inner += `<div style="margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.3); border-left: 3px solid rgba(255,210,120,0.2); border-radius: 4px; font-size: 0.9em; color: #d4c5b9; line-height: 1.5;">${description}</div>`;
+                
+                // Objectives section
+                const rawProgress = Array.isArray(q && q.progress) ? q.progress : [];
+                const objectives = Array.isArray(def && def.objectives) ? def.objectives : [];
+                
+                if (objectives.length > 0) {
+                    inner += '<div style="margin-top: 12px;"><div style="font-size: 0.85em; color: #fbbf24; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">OBJECTIVES:</div>';
+                    
+                    for (const obj of objectives) {
+                        const targetId = obj.target || obj.id || obj.type;
+                        let current = 0;
+                        let required = obj.required || 1;
+                        
+                        if (Array.isArray(progressStates)) {
+                            const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
+                            if (state) {
+                                required = state.required || required;
+                                current = Math.min(state.current || 0, required);
+                            }
+                        } else {
+                            const progressEntry = rawProgress.find(p => p && p.type === obj.type && (!targetId || p.target === targetId));
+                            current = progressEntry && typeof progressEntry.current === 'number' ? progressEntry.current : 0;
+                            required = progressEntry && typeof progressEntry.required === 'number' ? progressEntry.required : required;
                         }
-                    } else {
-                        const progressEntry = rawProgress.find(p => p && p.type === obj.type && (!targetId || p.target === targetId));
-                        current = progressEntry && typeof progressEntry.current === 'number' ? progressEntry.current : 0;
-                        required = progressEntry && typeof progressEntry.required === 'number' ? progressEntry.required : required;
+                        
+                        const isComplete = current >= required;
+                        const percent = Math.min(100, Math.floor((current / required) * 100));
+                        
+                        inner += `
+                            <div style="margin-bottom: 8px; padding-left: 8px;">
+                                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                    <span style="color: ${isComplete ? '#4ade80' : '#fbbf24'}; font-weight: bold;">${isComplete ? '✓' : '○'}</span>
+                                    <span style="font-size: 0.9em; color: ${isComplete ? '#4ade80' : '#d4c5b9'};">${obj.description || obj.type}</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; padding-left: 24px;">
+                                    <div style="
+                                        flex: 1;
+                                        height: 16px;
+                                        background: rgba(0,0,0,0.5);
+                                        border: 1px solid rgba(255,255,255,0.1);
+                                        border-radius: 4px;
+                                        overflow: hidden;
+                                        box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+                                    ">
+                                        <div style="
+                                            height: 100%;
+                                            width: ${percent}%;
+                                            background: ${isComplete ? 'linear-gradient(90deg, #4ade80, #22c55e)' : 'linear-gradient(90deg, #fbbf24, #f59e0b)'};
+                                            box-shadow: 0 0 8px ${isComplete ? 'rgba(74,222,128,0.5)' : 'rgba(251,191,36,0.5)'};
+                                            transition: width 0.3s ease;
+                                        "></div>
+                                    </div>
+                                    <span style="
+                                        font-size: 0.85em;
+                                        font-weight: 700;
+                                        color: ${isComplete ? '#4ade80' : '#fff'};
+                                        min-width: 60px;
+                                        text-align: right;
+                                    ">${current} / ${required}</span>
+                                </div>
+                            </div>
+                        `;
                     }
-                    inner += `<br><small>- ${obj.description || obj.type}: ${current} / ${required}</small>`;
+                    inner += '</div>';
                 }
-            } else if (rawProgress.length > 0) {
-                for (const prog of rawProgress) {
-                    const label = prog && (prog.target || prog.type) ? (prog.target || prog.type) : 'Objective';
-                    const current = prog && typeof prog.current === 'number' ? prog.current : 0;
-                    const required = prog && typeof prog.required === 'number' ? prog.required : 1;
-                    inner += `<br><small>- ${label}: ${current} / ${required}</small>`;
+                
+                // Rewards section
+                if (def.rewards) {
+                    inner += '<div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05);"><div style="font-size: 0.85em; color: #fbbf24; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px;">REWARDS:</div><div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.85em;">';
+                    
+                    if (def.rewards.exp) inner += `<span style="padding: 4px 10px; background: rgba(238,238,68,0.15); border: 1px solid rgba(238,238,68,0.3); border-radius: 4px; color: #eee;">💫 ${def.rewards.exp} EXP</span>`;
+                    if (def.rewards.gold) inner += `<span style="padding: 4px 10px; background: rgba(255,215,0,0.15); border: 1px solid rgba(255,215,0,0.3); border-radius: 4px; color: #ffd700;">💰 ${def.rewards.gold} Gold</span>`;
+                    if (def.rewards.items && def.rewards.items.length > 0) {
+                        for (const item of def.rewards.items) {
+                            const itemName = typeof item === 'string' ? item : item.id || 'Item';
+                            inner += `<span style="padding: 4px 10px; background: rgba(147,51,234,0.15); border: 1px solid rgba(147,51,234,0.3); border-radius: 4px; color: #c084fc;">🎁 ${itemName}</span>`;
+                        }
+                    }
+                    
+                    inner += '</div></div>';
                 }
+                
+                // Turn-in info
+                if (allComplete && def.handInNpc) {
+                    inner += `
+                        <div style="
+                            margin-top: 12px;
+                            padding: 10px;
+                            background: linear-gradient(90deg, rgba(74,222,128,0.2), rgba(34,197,94,0.15));
+                            border: 1px solid rgba(74,222,128,0.4);
+                            border-radius: 6px;
+                            text-align: center;
+                            color: #4ade80;
+                            font-weight: 600;
+                            font-size: 0.9em;
+                        ">
+                            <span style="font-size: 1.2em; margin-right: 6px;">✨</span>
+                            Quest Complete! Return to ${def.handInNpc.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </div>
+                    `;
+                }
+                
+                div.innerHTML = inner;
+                body.appendChild(div);
             }
-            div.innerHTML = inner;
-            body.appendChild(div);
+        } else {
+            body.innerHTML = '<div style="text-align: center; padding: 40px 20px; color: #888;"><div style="font-size: 3em; margin-bottom: 12px; opacity: 0.3;">📋</div><div style="font-size: 1.1em;">No active quests</div><div style="font-size: 0.9em; margin-top: 8px; font-style: italic;">Visit NPCs with <span style="color: #fbbf24;">❓</span> above their heads to begin your adventures!</div></div>';
         }
     } else {
-        body.innerHTML += '<p style="color:#ccc;">No active quests.</p>';
-    }
-
-    if (completed.length > 0) {
-        body.innerHTML += '<h4 style="margin:16px 0 8px 0; color:#8ef58a;">Completed Quests</h4>';
-        for (const entry of completed) {
-            const questId = (entry && entry.id) ? entry.id : entry;
-            const def = quests[questId];
-            const div = document.createElement('div');
-            div.style.cssText = 'margin-bottom:8px; padding:6px; background:rgba(255,255,255,0.01); border-radius:6px;';
-            div.innerHTML = `<strong style="color:#8ef58a;">${def ? def.name || questId : questId}</strong>`;
-            body.appendChild(div);
+        // Completed tab
+        if (completed.length > 0) {
+            for (const entry of completed) {
+                const questId = (entry && entry.id) ? entry.id : entry;
+                const def = quests[questId];
+                const div = document.createElement('div');
+                div.style.cssText = `
+                    margin-bottom: 12px;
+                    padding: 12px;
+                    background: linear-gradient(135deg, rgba(20,30,20,0.5), rgba(10,20,10,0.3));
+                    border-left: 4px solid #4ade80;
+                    border-radius: 6px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                    transition: all 0.2s;
+                `;
+                div.onmouseover = function() { this.style.background = 'linear-gradient(135deg, rgba(30,40,30,0.6), rgba(20,30,20,0.4))'; };
+                div.onmouseout = function() { this.style.background = 'linear-gradient(135deg, rgba(20,30,20,0.5), rgba(10,20,10,0.3))'; };
+                
+                const questLevel = def && def.level ? def.level : '?';
+                const questType = def && def.type ? def.type : 'Main';
+                const typeIcon = questType === 'Main' ? '⭐' : questType === 'Side' ? '📌' : '💼';
+                
+                div.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5em; color: #4ade80;">✓</span>
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 1.1em;">${typeIcon}</span>
+                                <strong style="color: #4ade80; font-size: 1.05em;">${def ? def.name || questId : questId}</strong>
+                            </div>
+                            <div style="font-size: 0.75em; color: #666; margin-top: 2px; margin-left: 28px;">[Level ${questLevel}] ${questType} Quest</div>
+                        </div>
+                    </div>
+                `;
+                body.appendChild(div);
+            }
+        } else {
+            body.innerHTML = '<div style="text-align: center; padding: 40px 20px; color: #888;"><div style="font-size: 3em; margin-bottom: 12px; opacity: 0.3;">📜</div><div style="font-size: 1.1em;">No completed quests yet</div><div style="font-size: 0.9em; margin-top: 8px; font-style: italic;">Complete quests to fill your legacy!</div></div>';
         }
     }
 }
 
-// Active Quest Tracker - shows on-screen quest progress
+// Active Quest Tracker - shows on-screen quest progress (MMO-style)
 export function createQuestTracker(scene) {
     if (!scene) return;
     if (scene._questTracker) return scene._questTracker;
@@ -1762,28 +2022,58 @@ export function createQuestTracker(scene) {
         position: fixed;
         top: 20px;
         right: 20px;
-        width: 280px;
-        max-height: 400px;
+        width: 320px;
+        max-height: 500px;
         overflow-y: auto;
+        overflow-x: hidden;
         z-index: 90;
-        background: linear-gradient(180deg, rgba(12,12,14,0.95), rgba(18,18,20,0.93));
-        border: 3px solid #111;
-        border-left: 6px solid rgba(120,20,20,0.9);
-        border-radius: 6px;
-        padding: 10px;
-        color: #f0c9b0;
+        background: linear-gradient(135deg, rgba(20,20,24,0.97), rgba(10,10,14,0.95));
+        border: 2px solid rgba(255,210,120,0.3);
+        border-radius: 8px;
+        padding: 0;
+        color: #e8d8c8;
         font-family: 'Share Tech Mono', monospace;
-        font-size: 0.85em;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+        font-size: 0.9em;
+        box-shadow: 0 12px 36px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05);
         pointer-events: auto;
+        backdrop-filter: blur(8px);
+        transition: all 0.3s ease;
     `;
 
     tracker.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:6px;">
-            <span style="font-family:'Metal Mania', cursive; font-size:1.1em; color:#ffd27a;">Active Quests</span>
-            <button id="quest-tracker-toggle" style="background:transparent; color:#bbb; border:1px solid rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; cursor:pointer; font-size:0.9em;" title="Collapse/Expand">−</button>
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            background: linear-gradient(90deg, rgba(40,25,10,0.6), rgba(20,15,5,0.4));
+            border-bottom: 2px solid rgba(255,210,120,0.2);
+            border-radius: 6px 6px 0 0;
+        ">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3em;">📜</span>
+                <span style="
+                    font-family: 'Metal Mania', cursive;
+                    font-size: 1.15em;
+                    color: #ffd27a;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+                    letter-spacing: 0.5px;
+                ">Quest Log</span>
+            </div>
+            <button id="quest-tracker-toggle" style="
+                background: rgba(40,40,50,0.6);
+                color: #ffd27a;
+                border: 1px solid rgba(255,210,120,0.3);
+                padding: 4px 10px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.95em;
+                font-weight: bold;
+                transition: all 0.2s;
+                font-family: inherit;
+            " title="Collapse/Expand" onmouseover="this.style.background='rgba(60,60,70,0.8)'; this.style.borderColor='rgba(255,210,120,0.5)';" onmouseout="this.style.background='rgba(40,40,50,0.6)'; this.style.borderColor='rgba(255,210,120,0.3)';">−</button>
         </div>
-        <div id="quest-tracker-content"></div>
+        <div id="quest-tracker-content" style="padding: 10px;"></div>
     `;
 
     document.body.appendChild(tracker);
@@ -1798,9 +2088,11 @@ export function createQuestTracker(scene) {
         if (scene._questTrackerCollapsed) {
             content.style.display = 'none';
             toggleBtn.textContent = '+';
+            tracker.style.maxHeight = 'auto';
         } else {
             content.style.display = 'block';
             toggleBtn.textContent = '−';
+            tracker.style.maxHeight = '500px';
         }
     };
 
@@ -1824,7 +2116,18 @@ export function updateQuestTracker(scene) {
     const activeQuests = char.activeQuests || [];
     
     if (activeQuests.length === 0) {
-        content.innerHTML = '<div style="color:#888; font-size:0.9em; text-align:center; padding:12px 0;">No active quests</div>';
+        content.innerHTML = `
+            <div style="
+                color: #888;
+                font-size: 0.9em;
+                text-align: center;
+                padding: 20px 10px;
+                font-style: italic;
+            ">
+                <div style="font-size: 2em; margin-bottom: 8px; opacity: 0.3;">📋</div>
+                No active quests
+            </div>
+        `;
         return;
     }
 
@@ -1844,10 +2147,53 @@ export function updateQuestTracker(scene) {
 
         const states = getObjectiveState ? getObjectiveState(char, quest.id) : [];
         const allComplete = states.length > 0 && states.every(s => (s.current || 0) >= (s.required || 1));
+        const questLevel = def.level || '?';
+        const questType = def.type || 'Main';
+
+        // Quest type icon
+        const typeIcon = questType === 'Main' ? '⭐' : questType === 'Side' ? '📌' : '💼';
+        const borderColor = allComplete ? '#4ade80' : questType === 'Main' ? '#fbbf24' : '#60a5fa';
 
         html += `
-            <div style="margin-bottom:10px; padding:8px; background:rgba(255,255,255,0.02); border-radius:4px; border-left:3px solid ${allComplete ? '#8ef58a' : '#ffd27a'};">
-                <div style="font-weight:700; color:${allComplete ? '#8ef58a' : '#ffd27a'}; margin-bottom:4px; font-size:0.95em;">${def.name || quest.id}</div>
+            <div style="
+                margin-bottom: 12px;
+                background: linear-gradient(135deg, rgba(30,25,20,0.5), rgba(20,15,10,0.3));
+                border-left: 4px solid ${borderColor};
+                border-radius: 6px;
+                padding: 10px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                transition: all 0.2s;
+            " onmouseover="this.style.background='linear-gradient(135deg, rgba(40,35,30,0.6), rgba(30,25,20,0.4))'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.6)';" onmouseout="this.style.background='linear-gradient(135deg, rgba(30,25,20,0.5), rgba(20,15,10,0.3))'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.4)';">
+                <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 6px;
+                ">
+                    <div style="flex: 1;">
+                        <div style="
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            margin-bottom: 2px;
+                        ">
+                            <span style="font-size: 1.1em;">${typeIcon}</span>
+                            <span style="
+                                font-weight: 700;
+                                color: ${allComplete ? '#4ade80' : '#ffd27a'};
+                                font-size: 0.95em;
+                                text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+                            ">${def.name || quest.id}</span>
+                        </div>
+                        <div style="
+                            font-size: 0.75em;
+                            color: #888;
+                            font-weight: 600;
+                            letter-spacing: 0.5px;
+                        ">[Lv ${questLevel}] ${questType} Quest</div>
+                    </div>
+                    ${allComplete ? '<div style="font-size: 1.5em; color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.6);">✓</div>' : ''}
+                </div>
         `;
 
         if (states.length > 0) {
@@ -1858,13 +2204,51 @@ export function updateQuestTracker(scene) {
                 const isComplete = current >= required;
                 
                 html += `
-                    <div style="margin-bottom:3px; font-size:0.85em;">
-                        <div style="color:#ccc; margin-bottom:2px;">${obj.description || obj.type}</div>
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            <div style="flex:1; height:12px; background:#222; border-radius:3px; overflow:hidden; position:relative;">
-                                <div style="height:100%; width:${percent}%; background:${isComplete ? '#8ef58a' : '#ffd27a'}; border-radius:3px;"></div>
+                    <div style="margin-bottom: 6px; padding-left: 4px;">
+                        <div style="
+                            color: ${isComplete ? '#4ade80' : '#d4c5b9'};
+                            margin-bottom: 3px;
+                            font-size: 0.85em;
+                            display: flex;
+                            align-items: center;
+                            gap: 4px;
+                        ">
+                            <span style="color: ${isComplete ? '#4ade80' : '#ffd27a'};">${isComplete ? '✓' : '○'}</span>
+                            <span>${obj.description || obj.type}</span>
+                        </div>
+                        <div style="
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding-left: 18px;
+                        ">
+                            <div style="
+                                flex: 1;
+                                height: 14px;
+                                background: rgba(0,0,0,0.5);
+                                border: 1px solid rgba(255,255,255,0.1);
+                                border-radius: 4px;
+                                overflow: hidden;
+                                position: relative;
+                                box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+                            ">
+                                <div style="
+                                    height: 100%;
+                                    width: ${percent}%;
+                                    background: ${isComplete ? 'linear-gradient(90deg, #4ade80, #22c55e)' : 'linear-gradient(90deg, #fbbf24, #f59e0b)'};
+                                    border-radius: 3px;
+                                    box-shadow: 0 0 8px ${isComplete ? 'rgba(74,222,128,0.4)' : 'rgba(251,191,36,0.4)'};
+                                    transition: width 0.3s ease;
+                                "></div>
                             </div>
-                            <span style="color:${isComplete ? '#8ef58a' : '#fff'}; font-size:0.9em; min-width:45px; text-align:right;">${current}/${required}</span>
+                            <span style="
+                                color: ${isComplete ? '#4ade80' : '#fff'};
+                                font-size: 0.85em;
+                                font-weight: 600;
+                                min-width: 50px;
+                                text-align: right;
+                                text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+                            ">${current}/${required}</span>
                         </div>
                     </div>
                 `;
@@ -1872,13 +2256,43 @@ export function updateQuestTracker(scene) {
         }
 
         if (allComplete && def.handInNpc) {
-            html += `<div style="margin-top:6px; font-size:0.8em; color:#8ef58a;">✓ Ready to turn in!</div>`;
+            html += `
+                <div style="
+                    margin-top: 8px;
+                    padding: 6px 8px;
+                    background: linear-gradient(90deg, rgba(74,222,128,0.15), rgba(34,197,94,0.1));
+                    border: 1px solid rgba(74,222,128,0.3);
+                    border-radius: 4px;
+                    font-size: 0.8em;
+                    color: #4ade80;
+                    font-weight: 600;
+                    text-align: center;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+                    animation: pulse 2s ease-in-out infinite;
+                ">
+                    <span style="margin-right: 4px;">✨</span>
+                    Return to ${def.handInNpc.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </div>
+            `;
         }
 
         html += '</div>';
     }
 
     content.innerHTML = html;
+
+    // Add pulse animation if not already present
+    if (!document.getElementById('quest-tracker-animation-styles')) {
+        const style = document.createElement('style');
+        style.id = 'quest-tracker-animation-styles';
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 export function destroyQuestTracker(scene) {
