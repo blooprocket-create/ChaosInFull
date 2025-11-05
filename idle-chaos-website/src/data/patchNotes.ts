@@ -129,7 +129,7 @@ export const patchNotes: PatchNote[] = [
     version: "0.0.12",
     title: "Neon nights, bug stomps, and quest triage",
     highlights: [
-      "Sunset the old Prisma connection in favor of Neon; lighter, faster, deploy-friendly database wiring",
+  "Sunset the old database connection in favor of Neon; lighter, faster, deploy-friendly database wiring",
       "Players can now smack the new “Report Bug” button to capture a screenshot, add context, and send it straight to the team",
       "Admin dashboard gains a Bug Reports view with screenshots, reporter metadata, and a single-click complete flow",
       "Rebuilt the Grimsley quest flow (again) so acceptance, progress, and completion survive real traffic instead of imploding combat",
@@ -167,7 +167,7 @@ export const patchNotes: PatchNote[] = [
   "DB schema migrated: ItemDef.buy/sell are numeric to prevent overflow",
       "APIs serialize BigInt safely when returning JSON",
       "Seed endpoint now sources items from src/data/items to keep prices consistent",
-  "Serverless Postgres via Neon; remove Prisma runtime",
+  "Serverless Postgres via Neon; removed legacy ORM runtime",
       "Added vercel.json and deployment docs; .env.example updated for Postgres",
       "General cleanup: removed any types in routes, corrected Next.js route params typing"
     ]
