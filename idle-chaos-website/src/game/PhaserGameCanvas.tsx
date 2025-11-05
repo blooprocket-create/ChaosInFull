@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import createPhaserGame, { CharacterHUD } from "./createPhaserGame";
-import * as Phaser from "phaser";
+import type * as PhaserTypes from "phaser";
 
 export default function PhaserGameCanvas({ 
   character, 
@@ -11,7 +11,7 @@ export default function PhaserGameCanvas({
   initialScene?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const gameRef = useRef<Phaser.Game | null>(null);
+  const gameRef = useRef<PhaserTypes.Game | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;

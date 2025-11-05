@@ -1,4 +1,4 @@
-import * as Phaser from "phaser";
+import type * as PhaserTypes from "phaser";
 
 // Import scenes from the phaser folder (JavaScript files)
 // These will be dynamically imported to handle the .js extension
@@ -36,6 +36,8 @@ export async function createPhaserGame(opts: {
   initialScene?: string; 
 }) {
   const { parent, character, initialScene } = opts;
+  // Dynamically import Phaser on the client to avoid SSR "window is not defined"
+  const Phaser = (await import("phaser")) as unknown as typeof PhaserTypes;
   
   // Dynamically import the scenes from the phaser folder
   const [

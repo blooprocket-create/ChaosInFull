@@ -3633,7 +3633,7 @@ export function equipItemFromInventory(scene, itemId) {
     
     // Update quest progress for equip objectives
     try {
-        const questModule = window.__questModule || (typeof require !== 'undefined' ? require('../data/quests.js') : null);
+    const questModule = window.__questModule || null;
         if (questModule && questModule.updateQuestProgress) {
             const progressMade = questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
             console.log('[Quest] Equipment quest progress update:', { itemId, progressMade });
