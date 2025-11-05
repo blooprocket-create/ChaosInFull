@@ -5,6 +5,7 @@ import { updateSmoothPlayerMovement, playDirectionalAnimation, updateDepthForTop
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { attach as attachCleanup } from '../shared/cleanupManager.js';
+import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 
 export class GloamwaySwamp extends Phaser.Scene {
     constructor() { super('GloamwaySwamp'); }
@@ -180,7 +181,7 @@ export class GloamwaySwamp extends Phaser.Scene {
         if (!spawn || spawn.active) return;
         const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 80 };
         const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
-        const tex = this.textures.exists(spawn.type) ? spawn.type : 'goblin_slicer';
+    const tex = ensureEnemyTexture(this, spawn.type) || (this.textures.exists(spawn.type) ? spawn.type : 'goblin_slicer');
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.9);
         enemy.body.setCollideWorldBounds(true);
         try { enemy.body.setCircle(Math.max(12, (enemy.width || 20) / 2)); } catch (e) {}

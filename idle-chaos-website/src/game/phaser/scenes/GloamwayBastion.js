@@ -8,6 +8,7 @@ import { getQuestById, getQuestObjectiveState, startQuest, checkQuestCompletion,
 import { CLASS_DEFS } from '../data/classes.js';
 import { RACE_DEFS } from '../data/races.js';
 import { attach as attachCleanup, addTimeEvent, registerDisposer } from '../shared/cleanupManager.js';
+import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 
 const QUEST_CHAIN = [
     'mother_lumen_slime_cull',
@@ -139,7 +140,7 @@ export class GloamwayBastion extends Phaser.Scene {
         this.damageLayer.setDepth(6);
 
         this.enemies = this.physics.add.group();
-        this._ensureEnemyTextures();
+    // Use shared fallback textures on-demand; no pre-generation needed
 
         this._decorations = [];
         this._seedDecorations();
@@ -313,7 +314,7 @@ export class GloamwayBastion extends Phaser.Scene {
         if (!spawn || spawn.active) return;
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 86 };
     const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
-        const tex = this.textures.exists(spawn.type) ? spawn.type : 'goblin_slicer';
+    const tex = ensureEnemyTexture(this, spawn.type) || (this.textures.exists(spawn.type) ? spawn.type : 'goblin_slicer');
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.9);
         enemy.body.setCollideWorldBounds(true);
         try { enemy.body.setCircle(Math.max(12, (enemy.width || 20) / 2)); } catch (e) {}
