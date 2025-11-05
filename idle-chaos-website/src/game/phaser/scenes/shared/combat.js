@@ -823,8 +823,97 @@ function sharedHandleEnemyDeath(enemy) {
     const defId = safeGetData(enemy, 'defId');
     const def = (defId && this.enemyDefs) ? this.enemyDefs[defId] : null;
     safeSetData(enemy, 'alive', false);
+    // guard against double-processing
+    if (enemy._dying) return; // already handled
+    enemy._dying = true;
     if (this._detachEnemyBars) this._detachEnemyBars(enemy);
-    if (enemy.disableBody) enemy.disableBody(true, true);
+    // Disable physics immediately but keep the sprite visible so we can play a death animation
+    try {
+        if (enemy.body && enemy.body.setVelocity) enemy.body.setVelocity(0, 0);
+    } catch (e) {}
+    if (enemy.disableBody) {
+        try { enemy.disableBody(true, false); } catch (e) { try { enemy.disableBody(true, true); } catch (ee) {} }
+    } else {
+        try { enemy.setActive && enemy.setActive(false); } catch (e) {}
+    }
+    // Play a short non-blocking death animation (fade + shrink + burst) before fully removing the sprite
+    try {
+        const scene = this;
+        const ex = enemy.x || 0;
+        const ey = enemy.y || 0;
+        const depth = (enemy.depth || 7) + 0.15;
+        // Category-based tint/color selection from defId
+        const id = (defId || '').toLowerCase();
+        let burstColor = 0xffddaa; // default warm burst
+        if (/goblin|orc/.test(id)) burstColor = 0x88ff88;
+        else if (/skeleton|bone/.test(id)) burstColor = 0xe6e6e6;
+        else if (/slime/.test(id)) burstColor = 0x88ffcc;
+        else if (/zombie/.test(id)) burstColor = 0x99ff66;
+        else if (/ghost|wraith|spirit/.test(id)) burstColor = 0xbb99ff;
+        else if (/devil|imp|fire|lava|flame/.test(id)) burstColor = 0xff9966;
+
+        // Soft ring pop
+        try {
+            const ring = scene.add.circle(ex, ey, Math.max(12, Math.min(28, (enemy.displayWidth || enemy.width || 28) * 0.6)), burstColor, 0.28).setDepth(depth);
+            if (ring.setBlendMode) try { ring.setBlendMode(Phaser.BlendModes.ADD); } catch (e) {}
+            if (scene.tweens && scene.tweens.add) {
+                scene.tweens.add({ targets: ring, alpha: 0, scale: { from: 0.9, to: 1.9 }, duration: 280, ease: 'Cubic.easeOut', onComplete: () => { try { ring.destroy(); } catch (e) {} } });
+            } else {
+                scene.time && scene.time.delayedCall && scene.time.delayedCall(300, () => { try { ring.destroy(); } catch (e) {} });
+            }
+        } catch (e) {}
+
+        // Debris burst as a fallback effect (no particles required)
+        try { spawnDustBursts && spawnDustBursts(scene, ex, ey, Math.max(18, (enemy.displayWidth || enemy.width || 28) * 0.6)); } catch (e) {}
+
+        // Optional particle explosion if supported
+        try {
+            if (_supportsLegacyParticles(scene)) {
+                // Reuse a tiny spark texture if available, otherwise ensure a void spark
+                try { ensureVoidOrbAssets && ensureVoidOrbAssets(scene); } catch (e) {}
+                const sparkKey = (scene.textures && scene.textures.exists('fx_void_spark')) ? 'fx_void_spark' : null;
+                if (sparkKey && scene.add && scene.add.particles) {
+                    const pm = scene.add.particles(sparkKey);
+                    pm.setDepth(depth + 0.01);
+                    const emitter = pm.createEmitter({
+                        x: ex, y: ey,
+                        lifespan: { min: 240, max: 520 },
+                        speed: { min: 30, max: 140 },
+                        scale: { start: 1.0, end: 0 },
+                        alpha: { start: 0.95, end: 0 },
+                        quantity: 12,
+                        blendMode: Phaser.BlendModes.ADD,
+                        angle: { min: 0, max: 360 }
+                    });
+                    // Use explode once and then destroy
+                    try { emitter.explode(16, ex, ey); } catch (e) {}
+                    scene.time && scene.time.delayedCall && scene.time.delayedCall(360, () => { try { pm.destroy(); } catch (e) {} });
+                }
+            }
+        } catch (e) {}
+
+        // Tween enemy sprite itself
+        try {
+            const rot = Phaser.Math.Between(-16, 16);
+            if (scene.tweens && scene.tweens.add) {
+                scene.tweens.add({
+                    targets: enemy,
+                    angle: `+=${rot}`,
+                    alpha: 0,
+                    scaleX: 0.3,
+                    scaleY: 0.3,
+                    duration: 360,
+                    ease: 'Quad.easeIn',
+                    onComplete: () => { try { enemy.setVisible(false); enemy.destroy && enemy.destroy(); } catch (e) {} }
+                });
+            } else {
+                scene.time && scene.time.delayedCall && scene.time.delayedCall(380, () => { try { enemy.setVisible(false); enemy.destroy && enemy.destroy(); } catch (e) {} });
+            }
+        } catch (e) { try { enemy.setVisible(false); enemy.destroy && enemy.destroy(); } catch (ee) {} }
+    } catch (e) {
+        // If animation fails for any reason, ensure the sprite is removed
+        try { enemy.setVisible(false); enemy.destroy && enemy.destroy(); } catch (ee) {}
+    }
     const spawn = safeGetData(enemy, 'spawn');
     if (spawn) spawn.active = null;
     this._rollDrops(def);

@@ -6,7 +6,8 @@ function pickCategory(id) {
   if (/goblin/.test(s)) return 'goblin';
   if (/skeleton|bone/.test(s)) return 'skeleton';
   if (/zombie|undead/.test(s)) return 'zombie';
-  if (/slime|flame|lava|ember|flaming/.test(s)) return 'slime';
+  // Only match plain slimes here; flame/lava variants are handled via theme
+  if (/slime/.test(s)) return 'slime';
   if (/devil|demon|imp|hell/.test(s)) return 'devil';
   if (/lurker|void|abyss|shadow/.test(s)) return 'lurker';
   if (/ghost/.test(s)) return 'ghost';
@@ -70,17 +71,25 @@ function drawZombie(g, w, h) {
   g.strokeLineShape(new Phaser.Geom.Line(cx + Math.round(w * 0.06), cy - Math.round(h * 0.12), cx + Math.round(w * 0.22), cy + Math.round(h * 0.02)));
 }
 
-function drawSlime(g, w, h) {
+function drawSlime(g, w, h, theme = 'green') {
   const cx = Math.round(w / 2), cy = Math.round(h / 2);
-  // outer dark blob
-  g.fillStyle(0x5b1414, 1);
-  g.fillEllipse(cx, cy, Math.round(w * 0.86), Math.round(h * 0.66));
-  // mid glow
-  g.fillStyle(0xd44d2a, 0.95);
-  g.fillEllipse(cx, cy, Math.round(w * 0.7), Math.round(h * 0.5));
-  // inner highlight
-  g.fillStyle(0xffb36b, 0.9);
-  g.fillEllipse(cx - Math.round(w * 0.08), cy - Math.round(h * 0.1), Math.round(w * 0.34), Math.round(h * 0.2));
+  if (theme === 'flame') {
+    // Flame/lava palette
+    g.fillStyle(0x5b1414, 1);
+    g.fillEllipse(cx, cy, Math.round(w * 0.86), Math.round(h * 0.66));
+    g.fillStyle(0xd44d2a, 0.95);
+    g.fillEllipse(cx, cy, Math.round(w * 0.7), Math.round(h * 0.5));
+    g.fillStyle(0xffb36b, 0.9);
+    g.fillEllipse(cx - Math.round(w * 0.08), cy - Math.round(h * 0.1), Math.round(w * 0.34), Math.round(h * 0.2));
+  } else {
+    // Default green slime
+    g.fillStyle(0x1d4f20, 1);
+    g.fillEllipse(cx, cy, Math.round(w * 0.86), Math.round(h * 0.66));
+    g.fillStyle(0x2f8a37, 0.95);
+    g.fillEllipse(cx, cy, Math.round(w * 0.72), Math.round(h * 0.52));
+    g.fillStyle(0x9bff9b, 0.85);
+    g.fillEllipse(cx - Math.round(w * 0.08), cy - Math.round(h * 0.1), Math.round(w * 0.34), Math.round(h * 0.2));
+  }
 }
 
 function drawDevil(g, w, h) {
@@ -211,6 +220,9 @@ export function ensureEnemyTexture(scene, enemyId) {
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
   try {
     const kind = pickCategory(enemyId);
+    // Theme: treat flame/lava/ember/flaming/fire variants as flame theme for slimes
+    const s = (enemyId || '').toLowerCase();
+    const slimeTheme = (/flame|lava|ember|flaming|fire/.test(s)) ? 'flame' : 'green';
     // subtle shadow backdrop
     g.fillStyle(0x000000, 0.25);
     g.fillEllipse(Math.round(size / 2), Math.round(size / 2) + 8, Math.round(size * 0.6), Math.round(size * 0.22));
@@ -218,7 +230,7 @@ export function ensureEnemyTexture(scene, enemyId) {
       case 'goblin': drawGoblin(g, size, size); break;
       case 'skeleton': drawSkeleton(g, size, size); break;
       case 'zombie': drawZombie(g, size, size); break;
-      case 'slime': drawSlime(g, size, size); break;
+      case 'slime': drawSlime(g, size, size, slimeTheme); break;
       case 'devil': drawDevil(g, size, size); break;
       case 'lurker': drawLurker(g, size, size); break;
       case 'ghost': drawGhost(g, size, size); break;
