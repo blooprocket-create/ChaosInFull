@@ -47,48 +47,48 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
   };
   // No direct hand-in from panel; hand-in is via Grimsley in town.
 
+  // Only show quests that are in-progress or ready to hand in; hide panel if none
+  const visibleQuests = quests.filter(q => (q.status === "ACTIVE" || q.status === "COMPLETED"));
+  if (visibleQuests.length === 0) return null;
+
   return (
-    <div className="mt-4 rounded-lg border border-white/10 bg-black/60 p-4 text-gray-200">
+    <div className="mt-4 rounded-lg border border-white/10 bg-black/60 p-4 text-gray-200" aria-label="Quest log">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white">Quests</h3>
         <button className="btn px-2 py-0.5 text-xs" onClick={load} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
       </div>
-      {quests.length === 0 ? (
-        <div className="text-sm text-gray-400">No quests yet. Talk to Grimsley in town.</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3">
-          {quests.map((q) => (
-            <div key={q.questId} className="rounded border border-white/10 bg-black/40 p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-white/90 font-medium text-sm">{q.quest?.name || q.questId}</div>
-                  <div className="text-xs text-gray-300">{q.quest?.description}</div>
-                </div>
-                <span className="text-[10px] uppercase tracking-wide text-gray-400">{q.status}</span>
+      <div className="grid grid-cols-1 gap-3">
+        {visibleQuests.map((q) => (
+          <div key={q.questId} className="rounded border border-white/10 bg-black/40 p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white/90 font-medium text-sm">{q.quest?.name || q.questId}</div>
+                <div className="text-xs text-gray-300">{q.quest?.description}</div>
               </div>
-              {typeof q.progress === "number" && typeof q.quest?.objectiveCount === "number" && (
-                <div className="mt-2">
-                  <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
-                    <span>Progress</span>
-                    <span>{q.progress} / {q.quest.objectiveCount}</span>
-                  </div>
-                  <div className="h-2 w-full rounded bg-white/10">
-                    <div className="h-2 rounded bg-emerald-500" style={{ width: `${Math.min(100, (q.progress / Math.max(1, q.quest.objectiveCount)) * 100)}%` }} />
-                  </div>
-                </div>
-              )}
-              <div className="mt-2 flex gap-2">
-                {q.status === "ACTIVE" && (
-                  <button className="btn px-2 py-1 text-xs" onClick={() => abandon(q.questId)}>Abandon</button>
-                )}
-                {q.status === "COMPLETED" && (
-                  <span className="text-[11px] text-gray-400">Visit Grimsley to hand in</span>
-                )}
-              </div>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">{q.status}</span>
             </div>
-          ))}
-        </div>
-      )}
+            {typeof q.progress === "number" && typeof q.quest?.objectiveCount === "number" && (
+              <div className="mt-2">
+                <div className="mb-1 flex items-center justify-between text-[10px] text-gray-300">
+                  <span>Progress</span>
+                  <span>{q.progress} / {q.quest.objectiveCount}</span>
+                </div>
+                <div className="h-2 w-full rounded bg-white/10">
+                  <div className="h-2 rounded bg-emerald-500" style={{ width: `${Math.min(100, (q.progress / Math.max(1, q.quest.objectiveCount)) * 100)}%` }} />
+                </div>
+              </div>
+            )}
+            <div className="mt-2 flex gap-2">
+              {q.status === "ACTIVE" && (
+                <button className="btn px-2 py-1 text-xs" onClick={() => abandon(q.questId)}>Abandon</button>
+              )}
+              {q.status === "COMPLETED" && (
+                <span className="text-[11px] text-gray-400">Visit Grimsley to hand in</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
