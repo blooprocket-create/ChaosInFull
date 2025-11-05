@@ -1686,7 +1686,15 @@ function sharedGetEnemyInRange(range) {
                     } catch (e) {}
                 }
             } catch (e) {}
-            if (this.char.hp <= 0 && this._onPlayerDown) this._onPlayerDown();
+            if (this.char.hp <= 0) {
+                try {
+                    if (this._onPlayerDown && typeof this._onPlayerDown === 'function') {
+                        this._onPlayerDown();
+                    } else if (this.__defaultOnPlayerDown && typeof this.__defaultOnPlayerDown === 'function') {
+                        this.__defaultOnPlayerDown();
+                    }
+                } catch (e) { /* swallow */ }
+            }
         } catch (e) { /* swallow */ }
     }
 
@@ -1971,6 +1979,60 @@ function sharedClearAutoTarget() {
     this.autoTargetIndicator = null;
 }
 
+// Default player death handler: standardizes respawn behavior for scenes that don't override _onPlayerDown
+function defaultOnPlayerDown() {
+    try {
+        // brief message + disable player
+        try { if (this._showToast) this._showToast('You fall... dragged back to safety', 1600); } catch (e) {}
+        try { if (this.player && this.player.disableBody) this.player.disableBody(true, true); } catch (e) {}
+
+        const cfg = this._deathRespawn || {};
+        // Resolve target scene and spawn
+        let targetScene = cfg.targetScene;
+        let spawnX = cfg.spawnX;
+        let spawnY = cfg.spawnY;
+        if (!targetScene) {
+            // heuristic fallback: FlameRoad -> GloamwaySwamp, otherwise -> GloamwayBastion
+            const key = (this && this.scene && this.scene.key) || '';
+            if (/flameroad/i.test(key)) {
+                targetScene = 'GloamwaySwamp';
+                spawnX = Math.round((this.scale && this.scale.width ? this.scale.width : 800) / 2);
+                spawnY = Math.round((this.scale && this.scale.height ? this.scale.height : 600) * 0.82);
+            } else {
+                targetScene = 'GloamwayBastion';
+                spawnX = Math.round((this.scale && this.scale.width ? this.scale.width : 800) * 0.82);
+                spawnY = Math.round((this.scale && this.scale.height ? this.scale.height : 600) * 0.82);
+            }
+        }
+
+        const delayMs = 1200;
+        if (this.time && typeof this.time.addEvent === 'function') {
+            this.time.addEvent({ delay: delayMs, callback: () => {
+                try {
+                    // restore vitals and persist
+                    try { this.char.hp = this.char.maxhp; } catch (e) {}
+                    try { this.char.mana = this.char.maxmana; } catch (e) {}
+                    try { if (this._persistCharacter) this._persistCharacter(this.username); } catch (e) {}
+                    // transition
+                    if (this.scene && typeof this.scene.start === 'function') {
+                        this.scene.start(targetScene, {
+                            character: this.char,
+                            username: this.username,
+                            spawnX,
+                            spawnY
+                        });
+                    }
+                } catch (e) { /* ignore */ }
+            }});
+        } else {
+            // fallback immediate
+            try { this.char.hp = this.char.maxhp; this.char.mana = this.char.maxmana; } catch (e) {}
+            try { if (this._persistCharacter) this._persistCharacter(this.username); } catch (e) {}
+            try { if (this.scene && this.scene.start) this.scene.start(targetScene, { character: this.char, username: this.username, spawnX, spawnY }); } catch (e) {}
+        }
+    } catch (e) { /* swallow */ }
+}
+
 export const combatMixin = {
     _tryAttack: sharedTryAttack,
     _handleEnemyDeath: sharedHandleEnemyDeath,
@@ -1998,7 +2060,8 @@ export const combatMixin = {
     ,
     // New enemy AI FSM integration (shared, opt-in by scenes via existing _updateEnemiesAI wrapper)
     onAttack: sharedEnemyOnAttack,
-    _updateEnemiesAI_shared: sharedUpdateEnemiesAI
+    _updateEnemiesAI_shared: sharedUpdateEnemiesAI,
+    __defaultOnPlayerDown: defaultOnPlayerDown
 };
 
 export function applyCombatMixin(target) {

@@ -43,6 +43,13 @@ export class GloamwaySwamp extends Phaser.Scene {
         this._recalculateVitals();
         if (!this.char.hp || this.char.hp > this.char.maxhp) this.char.hp = this.char.maxhp;
 
+        // Standard respawn target: on death, send player back to Bastion (safe hub)
+        this._deathRespawn = {
+            targetScene: 'GloamwayBastion',
+            spawnX: Math.round(this.scale.width * 0.82),
+            spawnY: Math.round(this.scale.height * 0.82)
+        };
+
         const W = this.scale.width;
         const H = this.scale.height;
         const centerX = W / 2;

@@ -96,6 +96,34 @@ const FLOOR_THEMES = {
         noise: { color: 0x0b1624, density: 0.00028, alpha: [0.08, 0.22], radius: [1, 3] },
         speckle: { color: 0x2b4a73, density: 0.00016, alpha: [0.14, 0.3], size: [2, 4] },
         veins: { color: 0x142337, alpha: 0.2, min: 52, max: 112 }
+    },
+    // New: Swamp ground — murky greens and browns with puddle speckles
+    swamp: {
+        baseColor: 0x0f1b12,
+        accentColor: 0x1d3322,
+        accentRange: [-18, 16],
+        tileSize: 48,
+        tilePadding: 1,
+        tileLineColor: 0x09130d,
+        tileLineAlpha: 0.06,
+        highlight: { width: 0.4, height: 0.26, offsetY: 12, alpha: 0.2, color: 0x0b120d },
+        noise: { color: 0x08120c, density: 0.00034, alpha: [0.06, 0.2], radius: [1, 3] },
+        speckle: { color: 0x1f3a2a, density: 0.00022, alpha: [0.12, 0.32], size: [2, 4] },
+        veins: { color: 0x0a1a11, alpha: 0.22, min: 42, max: 96 }
+    },
+    // New: Lava/Hell ground — dark reds with ember speckles
+    lava: {
+        baseColor: 0x1b0b0b,
+        accentColor: 0x2a1010,
+        accentRange: [-16, 20],
+        tileSize: 44,
+        tilePadding: 1,
+        tileLineColor: 0x1a0707,
+        tileLineAlpha: 0.08,
+        highlight: { width: 0.36, height: 0.22, offsetY: 14, alpha: 0.18, color: 0x160606 },
+        noise: { color: 0x2a0b0b, density: 0.00026, alpha: [0.08, 0.22], radius: [1, 3] },
+        speckle: { color: 0x7a2a18, density: 0.00018, alpha: [0.14, 0.34], size: [2, 4] },
+        veins: { color: 0x3a0f0f, alpha: 0.24, min: 48, max: 104 }
     }
 };
 
@@ -171,6 +199,33 @@ const AMBIENT_THEMES = {
         particleSpeed: 14,
         particleLife: [5400, 9400],
         particleQuantity: 2
+    },
+    // New: Swamp — greenish overlay with sporadic spores
+    swamp: {
+        overlayTop: 0x1b2e22,
+        overlayBottom: 0x0a1510,
+        overlayAlpha: 0.26,
+        overlayBlend: Phaser.BlendModes.MULTIPLY,
+        particleColor: 0x66ffaa,
+        particleAlpha: [0.22, 0],
+        particleScale: [0.5, 0.12],
+        particleSpeed: 10,
+        particleLife: [5200, 9200],
+        particleQuantity: 3
+    },
+    // New: Lava/Hell — red tint and ember-like particles
+    lava: {
+        overlayTop: 0x3a1212,
+        overlayBottom: 0x0a0303,
+        overlayAlpha: 0.3,
+        overlayBlend: Phaser.BlendModes.MULTIPLY,
+        particleColor: 0xff7a3c,
+        particleAlpha: [0.28, 0],
+        particleScale: [0.6, 0.18],
+        particleSpeed: 18,
+        particleLife: [4800, 8800],
+        particleQuantity: 4,
+        particleBlend: Phaser.BlendModes.ADD
     }
 };
 

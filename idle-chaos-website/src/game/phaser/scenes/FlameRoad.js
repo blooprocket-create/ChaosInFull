@@ -42,6 +42,13 @@ export class FlameRoad extends Phaser.Scene {
         this._recalculateVitals();
         if (!this.char.hp || this.char.hp > this.char.maxhp) this.char.hp = this.char.maxhp;
 
+        // Standard respawn target: on death here, return player to Swamp entry
+        this._deathRespawn = {
+            targetScene: 'GloamwaySwamp',
+            spawnX: Math.round(this.scale.width / 2),
+            spawnY: Math.round(this.scale.height * 0.82)
+        };
+
         const W = this.scale.width;
         const H = this.scale.height;
         const centerX = W / 2;
@@ -97,9 +104,9 @@ export class FlameRoad extends Phaser.Scene {
         // Portals
         try {
             const portalHelper = (window && window.__portal_shared) ? window.__portal_shared : require('./shared/portal.js');
-            // Middle top back to Swamp
+            // Top edge back to Swamp (moved closer to top boundary)
             const swampX = Math.round(W / 2);
-            const swampY = Math.max(this._bounds.y1 + 48, Math.round(H * 0.18));
+            const swampY = Math.round(this._bounds.y1 + 24);
             const swampObj = portalHelper.createPortal(this, swampX, swampY, {
                 depth: 1.6,
                 targetScene: 'GloamwaySwamp',
@@ -109,11 +116,12 @@ export class FlameRoad extends Phaser.Scene {
             });
             this._swampPortal = swampObj.display;
 
-            // Dormant portals (no targetScene) with labels
+            // Dormant portals (no targetScene) with labels, moved closer to left/bottom/right edges
+            const midY = Math.round((this._bounds.y1 + this._bounds.y2) / 2);
             const dormantCoords = [
-                { x: Math.round(W * 0.18), y: Math.round(H * 0.5) }, // middle left
-                { x: Math.round(W * 0.5), y: Math.round(H * 0.86) }, // middle bottom
-                { x: Math.round(W * 0.82), y: Math.round(H * 0.5) }, // middle right
+                { x: Math.round(this._bounds.x1 + 24), y: midY },                     // near left edge, vertically centered
+                { x: Math.round(W / 2), y: Math.round(this._bounds.y2 - 24) },         // near bottom edge, horizontally centered
+                { x: Math.round(this._bounds.x2 - 24), y: midY },                      // near right edge, vertically centered
             ];
             dormantCoords.forEach(coord => {
                 const obj = portalHelper.createPortal(this, coord.x, coord.y, { depth: 1.3 });
