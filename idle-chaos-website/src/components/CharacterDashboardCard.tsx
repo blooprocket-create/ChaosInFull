@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { pick, afkPhrases } from "@/src/data/flavor";
 import { formatDuration } from "@/src/lib/time";
 import DeleteCharacterButton from "@/src/components/DeleteCharacterButton";
+import { getZone } from "@/src/data/zones";
 
 export type CharacterSummary = {
   id: string;
@@ -33,6 +34,10 @@ export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
   useEffect(() => {
     setAfkFlavor(pick(afkPhrases));
   }, []);
+  // Map lastScene key to a friendly zone name when possible
+  const zone = typeof c.lastScene === "string" ? getZone(c.lastScene) : undefined;
+  const lastZoneLabel = zone?.name ?? c.lastScene ?? "Unknown";
+
   return (
     <div className="rounded border border-white/10 bg-black/40 p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
@@ -41,7 +46,8 @@ export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
           <div className="text-sm text-gray-400">{c.class} • Lv {c.level}</div>
         </div>
         <div className="flex gap-2">
-          <a href={`/play?ch=${c.id}`} className="btn inline-flex items-center px-3 py-1">Play</a>
+          {/* Go directly to /phaser and preserve the character id so the game loads the right save */}
+          <a href={`/phaser?ch=${c.id}`} className="btn inline-flex items-center px-3 py-1">Play</a>
           <DeleteCharacterButton id={c.id} name={c.name} />
         </div>
       </div>
@@ -55,7 +61,7 @@ export default function CharacterDashboardCard({ c }: { c: CharacterSummary }) {
         </div>
         <div className="rounded bg-black/30 p-2 flex flex-col gap-1">
           <div className="font-semibold text-white/80">Activity</div>
-          <div className="text-gray-300">Last Zone: {c.lastScene}</div>
+          <div className="text-gray-300">Last Zone: {lastZoneLabel}</div>
           <div className="text-gray-300">AFK: {afkDisplay}</div>
           <div className="text-[10px] text-gray-500 italic">{afkFlavor}</div>
         </div>

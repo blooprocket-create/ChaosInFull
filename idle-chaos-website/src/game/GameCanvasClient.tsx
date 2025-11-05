@@ -8,8 +8,20 @@ type CharacterHUD = {
   level: number;
 };
 
-const DynamicCanvas = dynamic(() => import("./GameCanvas"), { ssr: false });
+// Use the new Phaser-based canvas implementation
+const DynamicCanvas = dynamic(() => import("./PhaserGameCanvas"), { ssr: false });
 
-export default function GameCanvasClient(props: { character?: CharacterHUD; initialSeenWelcome?: boolean; initialScene?: string; offlineSince?: string; initialExp?: number; initialMiningExp?: number; initialMiningLevel?: number }) {
-  return <DynamicCanvas {...props} />;
+type LegacyProps = {
+  character?: CharacterHUD;
+  initialSeenWelcome?: boolean;
+  initialScene?: string;
+  offlineSince?: string;
+  initialExp?: number;
+  initialMiningExp?: number;
+  initialMiningLevel?: number;
+};
+
+export default function GameCanvasClient(props: LegacyProps) {
+  // Adapt legacy props to the new PhaserGameCanvas signature
+  return <DynamicCanvas character={props.character} initialScene={props.initialScene} />;
 }
