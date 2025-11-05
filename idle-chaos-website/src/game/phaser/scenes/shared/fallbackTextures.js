@@ -9,6 +9,8 @@ function pickCategory(id) {
   if (/slime|flame|lava|ember|flaming/.test(s)) return 'slime';
   if (/devil|demon|imp|hell/.test(s)) return 'devil';
   if (/lurker|void|abyss|shadow/.test(s)) return 'lurker';
+  if (/ghost/.test(s)) return 'ghost';
+  if (/rat/.test(s)) return 'rat';
   return 'generic';
 }
 
@@ -122,6 +124,81 @@ function drawGeneric(g, w, h) {
   g.fillTriangle(cx, Math.round(h * 0.28), cx - Math.round(w * 0.08), Math.round(h * 0.44), cx + Math.round(w * 0.08), Math.round(h * 0.44));
 }
 
+function drawGhost(g, w, h) {
+  const cx = Math.round(w / 2), cy = Math.round(h / 2);
+  g.fillStyle(0xced7ff, 0.95);
+  g.fillEllipse(cx, cy, Math.round(w * 0.8), Math.round(h * 0.66));
+  // tail wisps
+  g.fillStyle(0xaec2ff, 0.9);
+  g.fillTriangle(cx - Math.round(w * 0.2), cy + Math.round(h * 0.04), cx - Math.round(w * 0.08), cy + Math.round(h * 0.28), cx + Math.round(w * 0.02), cy + Math.round(h * 0.08));
+  g.fillTriangle(cx + Math.round(w * 0.2), cy + Math.round(h * 0.04), cx + Math.round(w * 0.08), cy + Math.round(h * 0.28), cx - Math.round(w * 0.02), cy + Math.round(h * 0.08));
+  // eyes
+  g.fillStyle(0x2a3048, 1);
+  g.fillCircle(cx - Math.round(w * 0.12), cy - Math.round(h * 0.04), Math.round(w * 0.05));
+  g.fillCircle(cx + Math.round(w * 0.12), cy - Math.round(h * 0.04), Math.round(w * 0.05));
+}
+
+function drawRat(g, w, h) {
+  const cx = Math.round(w / 2), cy = Math.round(h / 2);
+  // body
+  g.fillStyle(0x7b5f47, 1);
+  g.fillEllipse(cx, cy, Math.round(w * 0.86), Math.round(h * 0.6));
+  // ears
+  g.fillStyle(0x9b7f67, 1);
+  g.fillCircle(cx - Math.round(w * 0.24), cy - Math.round(h * 0.16), Math.round(w * 0.08));
+  g.fillCircle(cx + Math.round(w * 0.24), cy - Math.round(h * 0.16), Math.round(w * 0.08));
+  // eye
+  g.fillStyle(0x222222, 1);
+  g.fillCircle(cx + Math.round(w * 0.12), cy - Math.round(h * 0.04), Math.round(w * 0.04));
+  // tail
+  g.lineStyle(4, 0xc57a7a, 1);
+  g.strokeLineShape(new Phaser.Geom.Line(cx + Math.round(w * 0.28), cy + Math.round(h * 0.06), cx + Math.round(w * 0.46), cy + Math.round(h * 0.22)));
+}
+
+function drawVariantOverlay(g, w, h, id) {
+  const s = (id || '').toLowerCase();
+  const cx = Math.round(w / 2), cy = Math.round(h / 2);
+  // crowns for rarity
+  if (/boss/.test(s)) {
+    g.fillStyle(0xff5544, 0.95);
+    g.fillTriangle(cx, cy - Math.round(h * 0.38), cx - Math.round(w * 0.12), cy - Math.round(h * 0.18), cx + Math.round(w * 0.12), cy - Math.round(h * 0.18));
+  } else if (/epic/.test(s)) {
+    g.fillStyle(0xffd27a, 0.95);
+    g.fillTriangle(cx, cy - Math.round(h * 0.36), cx - Math.round(w * 0.1), cy - Math.round(h * 0.2), cx + Math.round(w * 0.1), cy - Math.round(h * 0.2));
+  }
+  // role markers
+  if (/slicer|blade/.test(s)) {
+    g.lineStyle(3, 0xe8e8e8, 1);
+    g.strokeLineShape(new Phaser.Geom.Line(cx - 10, cy + 8, cx + 10, cy - 8));
+    g.strokeLineShape(new Phaser.Geom.Line(cx - 10, cy - 8, cx + 10, cy + 8));
+  }
+  if (/flame|flaming|binder/.test(s)) {
+    g.fillStyle(0xff8844, 0.9);
+    // flame tear
+    g.fillEllipse(cx + 12, cy - 6, 10, 14);
+    g.fillStyle(0xffcc66, 0.9);
+    g.fillEllipse(cx + 12, cy - 8, 6, 8);
+  }
+  if (/iron|vanguard|guard/.test(s)) {
+    g.lineStyle(3, 0xcfd8ff, 0.9);
+    g.strokeCircle(cx, cy + 10, 12);
+  }
+  if (/girl/.test(s)) {
+    // small ribbon
+    g.fillStyle(0xcc66cc, 0.95);
+    g.fillRect(cx - 6, cy - 2, 12, 4);
+    g.fillTriangle(cx + 6, cy, cx + 12, cy + 3, cx + 6, cy + 6);
+  }
+  if (/zombie/.test(s)) {
+    g.lineStyle(2, 0x9b2c2c, 1);
+    g.strokeLineShape(new Phaser.Geom.Line(cx - 6, cy + 6, cx + 6, cy + 16));
+  }
+  if (/ghost/.test(s)) {
+    g.lineStyle(2, 0xaec2ff, 0.9);
+    g.strokeCircle(cx, cy, Math.round(w * 0.38));
+  }
+}
+
 export function ensureEnemyTexture(scene, enemyId) {
   if (!scene || !enemyId) return null;
   // If a real texture exists, use it as-is
@@ -144,8 +221,12 @@ export function ensureEnemyTexture(scene, enemyId) {
       case 'slime': drawSlime(g, size, size); break;
       case 'devil': drawDevil(g, size, size); break;
       case 'lurker': drawLurker(g, size, size); break;
+      case 'ghost': drawGhost(g, size, size); break;
+      case 'rat': drawRat(g, size, size); break;
       default: drawGeneric(g, size, size); break;
     }
+    // variant overlays for roles/rarity/subtype cues
+    drawVariantOverlay(g, size, size, enemyId);
     g.generateTexture(key, size, size);
   } catch (e) {
     // emergency: simple circle fallback

@@ -6,6 +6,7 @@ import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { setCircleCentered } from '../shared/physicsHelpers.js';
 import { attach } from '../shared/cleanupManager.js';
+import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 
 export class OuterField extends Phaser.Scene {
     constructor() { super('OuterField'); }
@@ -100,14 +101,7 @@ export class OuterField extends Phaser.Scene {
         }
         swayDecorations(this, this._decorations);
 
-        // generate simple rat textures to prototype (avoid new assets)
-        try {
-            const rg = this.make.graphics({ x: 0, y: 0, add: false });
-            rg.clear(); rg.fillStyle(0x8b6b4a, 1); rg.fillCircle(14, 14, 12); rg.generateTexture('rat_common', 28, 28);
-            rg.clear(); rg.fillStyle(0x557744, 1); rg.fillCircle(16, 16, 14); rg.generateTexture('zombie_rat', 32, 32);
-            rg.clear(); rg.fillStyle(0x99aadd, 1); rg.fillCircle(18, 18, 16); rg.generateTexture('ghost_rat', 36, 36);
-            rg.destroy();
-        } catch (e) { /* ignore */ }
+        // rat placeholders now generated on-demand by ensureEnemyTexture
 
             // generate simple obstacle textures and obstacles group
             try {
@@ -229,8 +223,7 @@ export class OuterField extends Phaser.Scene {
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 60 };
     const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
         // choose generated texture when possible
-        const texMap = { rat: 'rat_common', zombie_rat: 'zombie_rat', ghost_rat: 'ghost_rat' };
-        const tex = texMap[spawn.type] || 'rat_common';
+    const tex = ensureEnemyTexture(this, spawn.type) || spawn.type || 'rat';
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.8);
         enemy.body.setCollideWorldBounds(true);
         // approximate circular body for rats

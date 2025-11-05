@@ -6,6 +6,7 @@ import { setCircleCentered } from '../shared/physicsHelpers.js';
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { attach } from '../shared/cleanupManager.js';
+import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 
 export class InnerField extends Phaser.Scene {
     constructor() {
@@ -105,17 +106,7 @@ export class InnerField extends Phaser.Scene {
         }
         swayDecorations(this, this._decorations);
 
-        // generate simple slime textures (graphics-based) so we don't need external assets
-        try {
-            const sg = this.make.graphics({ x: 0, y: 0, add: false });
-            // common
-            sg.clear(); sg.fillStyle(0x4edd66, 1); sg.fillCircle(16, 16, 14); sg.generateTexture('slime_common', 32, 32);
-            // epic
-            sg.clear(); sg.fillStyle(0x66ddff, 1); sg.fillCircle(18, 18, 16); sg.generateTexture('slime_epic', 36, 36);
-            // boss
-            sg.clear(); sg.fillStyle(0xff66aa, 1); sg.fillCircle(22, 22, 20); sg.generateTexture('slime_boss', 44, 44);
-            sg.destroy();
-        } catch (e) { /* ignore texture gen errors */ }
+        // slime placeholders now generated via ensureEnemyTexture on demand
 
             // generate simple obstacle textures (rocks/fences/walls)
             try {
@@ -332,7 +323,7 @@ export class InnerField extends Phaser.Scene {
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 60 };
     const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
         // choose generated texture when possible
-        const tex = spawn.type || 'slime_common';
+    const tex = ensureEnemyTexture(this, spawn.type) || spawn.type || 'slime_common';
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.8);
         enemy.body.setCollideWorldBounds(true);
     try { setCircleCentered(enemy, Math.max(12, (enemy.width||16)/2)); } catch (e) {}

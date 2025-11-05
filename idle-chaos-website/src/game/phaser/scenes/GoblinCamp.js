@@ -5,6 +5,7 @@ import { updateSmoothPlayerMovement, playDirectionalAnimation, updateDepthForTop
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { setCircleCentered } from '../shared/physicsHelpers.js';
+import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { attach } from '../shared/cleanupManager.js';
 
 export class GoblinCamp extends Phaser.Scene {
@@ -187,14 +188,7 @@ export class GoblinCamp extends Phaser.Scene {
         }
         swayDecorations(this, this._decorations);
 
-        try {
-            const gg = this.make.graphics({ x: 0, y: 0, add: false });
-            gg.clear(); gg.fillStyle(0x4e8b3d, 1); gg.fillCircle(16, 16, 14); gg.generateTexture('goblin_common', 32, 32);
-            gg.clear(); gg.fillStyle(0x7bbf5b, 1); gg.fillCircle(16, 16, 14); gg.generateTexture('goblin_girl', 32, 32);
-            gg.clear(); gg.fillStyle(0xcc9933, 1); gg.fillCircle(18, 18, 16); gg.generateTexture('goblin_epic', 36, 36);
-            gg.clear(); gg.fillStyle(0xff6644, 1); gg.fillCircle(20, 20, 18); gg.generateTexture('goblin_boss', 40, 40);
-            gg.destroy();
-        } catch (e) {}
+        // goblin placeholders are now generated on-demand by ensureEnemyTexture
 
         try {
             const og = this.make.graphics({ x: 0, y: 0, add: false });
@@ -297,8 +291,7 @@ export class GoblinCamp extends Phaser.Scene {
         if (!spawn || spawn.active) return;
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 70 };
     const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
-        const texMap = { goblin_common: 'goblin_common', goblin_girl: 'goblin_girl', goblin_epic: 'goblin_epic', goblin_boss: 'goblin_boss' };
-        const tex = texMap[spawn.type] || 'goblin_common';
+    const tex = ensureEnemyTexture(this, spawn.type) || spawn.type || 'goblin_common';
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.8);
         enemy.body.setCollideWorldBounds(true);
         try { setCircleCentered(enemy, Math.max(10, (enemy.width || 16) / 2)); } catch (e) {}
