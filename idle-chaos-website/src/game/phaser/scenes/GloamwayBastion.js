@@ -176,6 +176,18 @@ export class GloamwayBastion extends Phaser.Scene {
                 promptLabel: 'Return to Goblin Camp'
             });
             this._returnPortal = portalObj.display;
+            // New portal: Bottom-right to Gloamway Swamp
+            const swampX = Math.min(this._bounds.x2 - 48, Math.round(W * 0.86));
+            const swampY = Math.min(this._bounds.y2 - 48, Math.round(H * 0.86));
+            const swampObj = portalHelper.createPortal(this, swampX, swampY, {
+                depth: 1.6,
+                targetScene: 'GloamwaySwamp',
+                // Spawn near the top-left portal in Swamp; will auto-align when returning
+                spawnX: Math.max(80, Math.round(this.scale.width * 0.14)),
+                spawnY: Math.max(120, Math.round(this.scale.height * 0.22)),
+                promptLabel: 'Enter Gloamway Swamp'
+            });
+            this._swampPortal = swampObj.display;
         } catch (e) { /* ignore portal errors */ }
 
         this.events.once('shutdown', () => this.shutdown());
@@ -513,19 +525,26 @@ export class GloamwayBastion extends Phaser.Scene {
         const card = this._ensureDialogueOverlay();
         if (!card) return;
 
-    const completed = this.char.completedQuests || [];
-    const active = this.char.activeQuests || [];
-    // Track chain quests and the post-class special separately
-    const activeChainQuest = active.find(q => q && QUEST_CHAIN.includes(q.id));
-    const activeSpecialQuest = active.find(q => q && q.id === 'mother_lumen_request');
-    const readyChain = activeChainQuest && checkQuestCompletion(this.char, activeChainQuest.id);
-    const readySpecial = activeSpecialQuest && checkQuestCompletion(this.char, 'mother_lumen_request');
-    const readyQuestId = readyChain ? activeChainQuest.id : (readySpecial ? 'mother_lumen_request' : null);
-    const activeQuest = activeChainQuest || activeSpecialQuest || null;
-    const nextQuestId = !activeChainQuest ? QUEST_CHAIN.find(id => !completed.includes(id)) : null;
+        // Align Mother Lumen quest flow with other NPCs by using centralized availability logic
+        const completed = this.char.completedQuests || [];
+        const allActive = Array.isArray(this.char.activeQuests) ? (this.char.activeQuests || []) : [];
         const hasChosenClass = this.char.class && this.char.class !== 'beginner';
         const hasCompletedGoblinCull = completed.includes('mother_lumen_goblin_cull');
-        
+
+        // Compute availability and active quests using shared quest module
+        const available = (getAvailableQuests(this.char, 'GloamwayBastion') || []).filter(q => q && q.giver === 'mother_lumen');
+        const activeFromMother = allActive.filter(entry => {
+            const def = getQuestById(entry.id);
+            return !!(def && def.giver === 'mother_lumen');
+        });
+        const activeHandInAtMother = allActive.filter(entry => {
+            const def = getQuestById(entry.id);
+            return !!(def && def.handInNpc === 'mother_lumen');
+        });
+        const ready = activeHandInAtMother.find(entry => checkQuestCompletion(this.char, entry.id));
+        const nextAvailable = available[0] || null;
+        const activeQuest = activeFromMother.find(entry => !checkQuestCompletion(this.char, entry.id)) || null;
+
         // Check if this is the first time meeting Mother Lumen
         const hasMetMotherLumen = this.char.hasMetMotherLumen || false;
         
@@ -541,43 +560,43 @@ export class GloamwayBastion extends Phaser.Scene {
         const optionConfigs = [];
         const ui = window.__shared_ui;
 
-        if (readyQuestId) {
-            const questDef = getQuestById(readyQuestId);
+        if (ready) {
+            const questDef = getQuestById(ready.id);
             bodyNodes.push(ui.createDialogueParagraph('The pathstones warm. Your deeds have rippled back to me.'));
-            const states = getQuestObjectiveState(this.char, readyQuestId);
+            const states = getQuestObjectiveState(this.char, ready.id);
             const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: 'Offer the completed tally',
                 onClick: () => {
-                    this._completeMotherLumenQuest(readyQuestId);
+                    this._completeMotherLumenQuest(ready.id);
                     addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
                 },
                 variant: 'success'
             });
             optionConfigs.push({ label: 'Not yet', onClick: () => {} });
-        } else if (activeQuest) {
-            const questDef = getQuestById(activeQuest.id);
-            const ui = window.__shared_ui;
-            bodyNodes.push(ui.createDialogueParagraph('My lantern tracks your steps. Keep pressing the shadows aside.'));
-            const states = getQuestObjectiveState(this.char, activeQuest.id);
-            const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
-            if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'I will return soon.', onClick: () => {} });
-        } else if (nextQuestId) {
-            const questDef = getQuestById(nextQuestId);
-            const ui = window.__shared_ui;
+        } else if (nextAvailable) {
+            const questDef = getQuestById(nextAvailable.id);
             bodyNodes.push(ui.createDialogueParagraph('Traveler, a fracture widens near the camp. Will you mend it for me?'));
             if (questDef && questDef.description) bodyNodes.push(ui.createDialogueParagraph(questDef.description));
+            const list = ui.buildObjectiveList(questDef, null, '#5c86ff');
+            if (list) bodyNodes.push(list);
             optionConfigs.push({
-                label: 'I will take this task.',
+                label: `I will take this task.`,
                 onClick: () => {
-                    this._acceptMotherLumenQuest(nextQuestId);
+                    this._acceptMotherLumenQuest(nextAvailable.id);
                     addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
                 },
                 variant: 'success'
             });
             optionConfigs.push({ label: 'Another time.', onClick: () => {} });
+        } else if (activeQuest) {
+            const questDef = getQuestById(activeQuest.id);
+            bodyNodes.push(ui.createDialogueParagraph('My lantern tracks your steps. Keep pressing the shadows aside.'));
+            const states = getQuestObjectiveState(this.char, activeQuest.id);
+            const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
+            if (list) bodyNodes.push(list);
+            optionConfigs.push({ label: 'I will return soon.', onClick: () => {} });
         } else if (hasCompletedGoblinCull && !hasChosenClass) {
             // Player finished goblin cull but hasn't chosen a class yet
             bodyNodes.push(ui.createDialogueParagraph('You have proven your resolve. Now you must choose the path that calls to you.'));
@@ -590,30 +609,6 @@ export class GloamwayBastion extends Phaser.Scene {
             });
             optionConfigs.push({ label: 'I need more time.', onClick: () => {} });
         } else {
-            // Check for special post-class-selection request (chieftain)
-            let offeredSpecial = false;
-            try {
-                const ui = window.__shared_ui;
-                if (canStartQuest && canStartQuest(this.char, 'mother_lumen_request')) {
-                    const qd = getQuestById('mother_lumen_request');
-                    bodyNodes.push(ui.createDialogueParagraph('A heavier presence treads the dark. Will you bring down their chieftain?'));
-                    if (qd && qd.description) bodyNodes.push(ui.createDialogueParagraph(qd.description));
-                    optionConfigs.push({
-                        label: 'I will face the chieftain.',
-                        onClick: () => {
-                            this._acceptMotherLumenQuest('mother_lumen_request');
-                            addTimeEvent(this, { delay: 50, callback: () => this._openMotherLumenDialogue() });
-                        },
-                        variant: 'success'
-                    });
-                    optionConfigs.push({ label: 'Not yet.', onClick: () => {} });
-                    offeredSpecial = true;
-                }
-            } catch (e) {}
-            if (offeredSpecial) {
-                window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
-                return;
-            }
             const ui = window.__shared_ui;
             bodyNodes.push(ui.createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
             optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => {} });

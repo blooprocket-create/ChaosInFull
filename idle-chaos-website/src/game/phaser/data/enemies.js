@@ -270,6 +270,154 @@ export const ENEMY_DEFS = {
         ]
         ,
         gold: { min: 6, max: 15, chance: 0.9, luckBonus: 0.0016 }
+    },
+
+    // post-gloamway bastion enemies can be added here
+    skeleton: {
+        id: 'skeleton',
+        name: 'Skeleton Warrior',
+        tier: 'common',
+        dynamicStats: true,
+        level: 12,
+        maxhp: 400,
+        moveSpeed: 85,
+        attackRange: 50,
+        attackCooldown: 1200,
+        damage: [28, 44],
+        exp: 320,
+        drops: [
+            { itemId: 'bone', minQty: 1, maxQty: 3, baseChance: 0.85, luckBonus: 0.0015 },
+            { itemId: 'minor_health_potion', minQty: 1, maxQty: 1, baseChance: 0.1, luckBonus: 0.01 }
+        ],
+        gold: { min: 20, max: 40, chance: 0.9, luckBonus: 0.002 }
+    },
+    zombie: {
+        id: 'zombie',
+        name: 'Zombie',
+        tier: 'common',
+        dynamicStats: true,
+        level: 14,
+        maxhp: 480,
+        moveSpeed: 75,
+        attackRange: 45,
+        attackCooldown: 1300,
+        damage: [32, 48],
+        exp: 360,
+        drops: [
+            { itemId: 'rotting_flesh', minQty: 1, maxQty: 3, baseChance: 0.85, luckBonus: 0.0015 },
+            { itemId: 'minor_health_potion', minQty: 1, maxQty: 1, baseChance: 0.1, luckBonus: 0.01 }
+        ],
+        gold: { min: 25, max: 50, chance: 0.9, luckBonus: 0.002 }
+    },
+    goblin_skeleton: {
+        id: 'goblin_skeleton',
+        name: 'Goblin Skeleton',
+        tier: 'rare',
+        dynamicStats: true,
+        level: 16,
+        maxhp: 600,
+        moveSpeed: 90,
+        attackRange: 55,
+        attackCooldown: 1100,
+        damage: [40, 60],
+        exp: 480,
+        drops: [
+            { itemId: 'bone', minQty: 2, maxQty: 5, baseChance: 0.9, luckBonus: 0.002 },
+            { itemId: 'minor_health_potion', minQty: 1, maxQty: 2, baseChance: 0.15, luckBonus: 0.015 }
+        ],
+        gold: { min: 30, max: 60, chance: 0.95, luckBonus: 0.003 }
+    },
+    flaming_slime: {
+        id: 'flaming_slime',
+        name: 'Flaming Slime',
+        tier: 'rare',
+        dynamicStats: true,
+        level: 15,
+        maxhp: 520,
+        moveSpeed: 85,
+        attackRange: 50,
+        attackCooldown: 1250,
+        damage: [38, 55],
+        exp: 460,
+        drops: [
+            { itemId: 'flame_essence', minQty: 1, maxQty: 3, baseChance: 0.85, luckBonus: 0.002 },
+            { itemId: 'minor_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.1, luckBonus: 0.01 }
+        ],
+        gold: { min: 25, max: 55, chance: 0.9, luckBonus: 0.0025 }
+    },
+    brute_skeleton: {
+        id: 'brute_skeleton',
+        name: 'Brute Skeleton',
+        tier: 'epic',
+        dynamicStats: true,
+        level: 18,
+        maxhp: 800,
+        moveSpeed: 70,
+        attackRange: 60,
+        attackCooldown: 1000,
+        damage: [50, 80],
+        exp: 600,
+        drops: [
+            { itemId: 'bone', minQty: 3, maxQty: 6, baseChance: 0.95, luckBonus: 0.0025 },
+            { itemId: 'major_health_potion', minQty: 1, maxQty: 1, baseChance: 0.15, luckBonus: 0.015 }
+        ],
+        gold: { min: 40, max: 80, chance: 0.95, luckBonus: 0.003 }
+    },
+    big_flaming_slime: {
+        id: 'big_flaming_slime',
+        name: 'Big Flaming Slime',
+        tier: 'epic',
+        dynamicStats: true,
+        level: 20,
+        maxhp: 900,
+        moveSpeed: 80,
+        attackRange: 65,
+        attackCooldown: 900,
+        damage: [55, 85],
+        exp: 700,
+        drops: [
+            { itemId: 'flame_essence', minQty: 2, maxQty: 5, baseChance: 0.9, luckBonus: 0.003 },
+            { itemId: 'major_mana_potion', minQty: 1, maxQty: 2, baseChance: 0.2, luckBonus: 0.02 }
+        ],
+        gold: { min: 50, max: 100, chance: 0.95, luckBonus: 0.004 }
+    },
+    devil_spawn: {
+        id: 'devil_spawn',
+        name: 'Devil Spawn',
+        tier: 'legendary',
+        dynamicStats: true,
+        level: 25,
+        maxhp: 1200,
+        moveSpeed: 75,
+        attackRange: 70,
+        attackCooldown: 800,
+        damage: [70, 110],
+        exp: 1000,
+        drops: [
+            { itemId: 'demonic_essence', minQty: 3, maxQty: 7, baseChance: 0.95, luckBonus: 0.004 },
+            { itemId: 'major_mana_potion', minQty: 1, maxQty: 3, baseChance: 0.25, luckBonus: 0.025 },
+            { itemId: 'major_health_potion', minQty: 1, maxQty: 2, baseChance: 0.2, luckBonus: 0.02 },
+            { itemId: 'devil_horn', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.001 }
+        ],
+        gold: { min: 70, max: 140, chance: 0.95, luckBonus: 0.005 }
+    },
+    the_lurker: {
+        id: 'the_lurker',
+        name: 'The Lurker',
+        tier: 'boss',
+        dynamicStats: true,
+        level: 30,
+        maxhp: 5000,
+        moveSpeed: 60,
+        attackRange: 80,
+        attackCooldown: 1500,
+        damage: [100, 150],
+        exp: 5000,
+        drops: [
+            { itemId: 'lurker_eye', minQty: 1, maxQty: 2, baseChance: 0.75, luckBonus: 0.005 },
+            { itemId: 'major_health_potion', minQty: 2, maxQty: 4, baseChance: 0.5, luckBonus: 0.01 }
+        ],
+        gold: { min: 200, max: 400, chance: 1.0, luckBonus: 0.01 }
     }
 };
 

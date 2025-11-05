@@ -8,6 +8,27 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-11-05",
+    version: "0.0.17",
+    title: "New Zones: Gloamway Swamp → Flame Road, portal network, and Mother Lumen parity",
+    highlights: [
+      "New zone: Gloamway Swamp — undead and bone-goblins stalk the marsh",
+      "New zone: Flame Road — fire-aspected threats and a lurking apex",
+      "Portals: Bastion bottom-right → Swamp, Swamp mid-bottom → Flame Road, return portals wired",
+      "Flame Road shows three dormant portals (left/bottom/right) as non-interactive placeholders",
+      "Mother Lumen’s dialogue now uses the centralized quest availability flow (markers and offers match)",
+    ],
+    notes: [
+      "Swamp enemies: skeleton, zombie, goblin_skeleton (also accepts goblin_skeleteon), brute_skeleton. Fallback enemy visuals included until art lands.",
+      "Flame Road enemies: flaming_slime, big_flaming_slime, devil_spawn, and the_lurker. Expect tighter detection and faster engagements.",
+      "Portals: In Gloamway Bastion, a new bottom-right portal leads to Swamp. In Swamp, the top-left portal returns to Bastion and the middle-bottom portal enters Flame Road. In Flame Road, the middle-top portal returns to Swamp.",
+      "Dormant portals on Flame Road (mid-left, mid-bottom, mid-right) are rendered semi-faint with a 'Dormant' label—no prompt or interaction yet.",
+      "Mother Lumen parity: her dialogue in Bastion now uses getAvailableQuests like Town/Cave/Grave Forest. Indicators (❓/❗) and her offers/turn-ins are consistent. Intro/class-gate flows remain intact, including the class requirement for the special chieftain request.",
+      "World metadata updated so the World page and tools can reflect the new Swamp and Flame Road scenes.",
+      "Tech notes: scenes registered in the Phaser bootstrap; typecheck/lint/build pass.",
+    ],
+  },
+  {
     date: "2025-11-04",
     version: "0.0.16b",
     title: "Quest Indicator Polish & Tracker Reliability",

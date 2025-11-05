@@ -2586,6 +2586,62 @@ const ITEM_DEFS = {
             "skill": 2,
             "speedReductionMs": 100
         }
+    },
+
+    // post gloamway items can go here
+    "bone": {
+        "id": "bone",
+        "name": "Bone",
+        "rarity": "common",
+        "stackable": true,
+        "maxStack": 999,
+        "value": 2,
+        "description": "A sturdy bone, useful for crafting various items."
+    },
+    "rotting_flesh": {
+        "id": "rotting_flesh",
+        "name": "Rotting Flesh",
+        "rarity": "common",
+        "stackable": true,
+        "maxStack": 999,
+        "value": 1,
+        "description": "Decayed flesh, often found on the remains of fallen creatures."
+    },
+    "flame_essence": {
+        "id": "flame_essence",
+        "name": "Flame Essence",
+        "rarity": "rare",
+        "stackable": true,
+        "maxStack": 100,
+        "value": 15,
+        "description": "A mystical essence imbued with the power of fire."
+    },
+    "demonic_essence": {
+        "id": "demonic_essence",
+        "name": "Demonic Essence",
+        "rarity": "legendary",
+        "stackable": true,
+        "maxStack": 50,
+        "value": 50,
+        "description": "A dark essence radiating with malevolent power."
+    },
+    "devil_horn": {
+        "id": "devil_horn",
+        "name": "Devil Horn",
+        "rarity": "legendary",
+        "stackable": true,
+        "maxStack": 50,
+        "value": 45,
+        "description": "A sharp horn from a devil, pulsating with dark energy."
+    },
+    "lurker_eye": {
+        "id": "lurker_eye",
+        "name": "Lurker Eye",
+        "rarity": "legendary",
+        "stackable": true,
+        "maxStack": 50,
+        "value": 60,
+        "description": "An eerie eye from the Lurker, said to hold mysterious powers."
     }
 };
 

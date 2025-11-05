@@ -52,6 +52,8 @@ export async function createPhaserGame(opts: {
     { OuterField },
     { GoblinCamp },
     { GloamwayBastion },
+    { GloamwaySwamp },
+    { FlameRoad },
     { GraveForest },
     { BrokenDock },
   ] = await Promise.all([
@@ -66,6 +68,8 @@ export async function createPhaserGame(opts: {
     import('./phaser/scenes/OuterField.js'),
     import('./phaser/scenes/GoblinCamp.js'),
     import('./phaser/scenes/GloamwayBastion.js'),
+    import('./phaser/scenes/GloamwaySwamp.js'),
+    import('./phaser/scenes/FlameRoad.js'),
     import('./phaser/scenes/GraveForest.js'),
     import('./phaser/scenes/BrokenDock.js'),
   ]);
@@ -179,6 +183,8 @@ export async function createPhaserGame(opts: {
       OuterField,
       GoblinCamp,
       GloamwayBastion,
+      GloamwaySwamp,
+      FlameRoad,
       GraveForest,
       BrokenDock,
     ],

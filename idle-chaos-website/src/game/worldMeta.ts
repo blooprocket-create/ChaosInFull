@@ -20,6 +20,8 @@ export const SCENE_META: SceneMeta[] = [
   { key: 'OuterField', label: 'Outer Field', kind: 'world', description: 'Wider hunting grounds with increased pacing and density.' },
   { key: 'GoblinCamp', label: 'Goblin Camp', kind: 'world', description: 'Hostile pocket with coordinated enemies and burst checks.' },
   { key: 'GloamwayBastion', label: 'Gloamway Bastion', kind: 'world', description: 'Defensive layouts with vision pressure. Talent synergy matters.' },
+  { key: 'GloamwaySwamp', label: 'Gloamway Swamp', kind: 'world', description: 'Rotting marsh paths with undead pressure and attrition pacing.' },
+  { key: 'FlameRoad', label: 'Flame Road', kind: 'world', description: 'Ash winds and burst checks. Fire-aspected foes with mobility tests.' },
   { key: 'GraveForest', label: 'Grave Forest', kind: 'world', description: 'Damage-over-time threats and pathing discipline checks.' },
   { key: 'BrokenDock', label: 'Broken Dock', kind: 'world', description: 'Edge-of-world pocket. Expect environmental hazards and tight windows.' },
 ];
