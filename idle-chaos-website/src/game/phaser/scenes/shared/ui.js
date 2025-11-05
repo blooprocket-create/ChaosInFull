@@ -3193,20 +3193,17 @@ export function assignActiveToNextSlot(scene, talentId) {
         const char = scene.char;
         // ensure talent is learned (present in learnedActives)
         if (!Array.isArray(char.learnedActives) || !char.learnedActives.find(x => x && x.id === talentId)) {
-            try { if (scene._showToast) scene._showToast('You must learn this active first.'); } catch (e) {}
             return;
         }
         if (!char.talents) char.talents = { skillBar: new Array(9).fill(null) };
         for (let i = 0; i < 9; i++) {
             if (!char.talents.skillBar[i]) {
                 char.talents.skillBar[i] = talentId;
-                try { if (scene._showToast) scene._showToast(`Assigned ${talentId} to slot ${i+1}`); } catch (e) {}
                 if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
                 try { refreshSkillBarHUD(scene); } catch (e) {}
                 return;
             }
         }
-        try { if (scene._showToast) scene._showToast('Skill bar is full. Remove a skill first.'); } catch (e) {}
     } catch (e) {}
 }
 
@@ -3217,9 +3214,7 @@ export function unassignSkillBarSlot(scene, slotIndex) {
         const char = scene.char;
         if (!char.talents || !Array.isArray(char.talents.skillBar)) return;
         if (slotIndex < 0 || slotIndex >= char.talents.skillBar.length) return;
-        const prev = char.talents.skillBar[slotIndex];
         char.talents.skillBar[slotIndex] = null;
-        try { if (scene._showToast) scene._showToast(prev ? `Unassigned slot ${slotIndex+1}` : `Cleared slot ${slotIndex+1}`); } catch (e) {}
         if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
         try { refreshSkillBarHUD(scene); } catch (e) {}
     } catch (e) {}
@@ -3593,7 +3588,7 @@ try {
 export function equipItemFromInventory(scene, itemId) {
     if (!scene || !scene.char) return;
     const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-    const def = defs[itemId]; if (!def) { scene._showToast && scene._showToast('Unknown item'); return; }
+    const def = defs[itemId]; if (!def) { return; }
     // Determine equipment slot. Prefer explicit `def.slot` when provided.
     let slot = null;
     if (def.slot) {
@@ -3617,11 +3612,11 @@ export function equipItemFromInventory(scene, itemId) {
         else if (id.includes('ring') || name.includes('ring')) slot = 'ring1';
         else if (id.includes('amulet') || name.includes('amulet')) slot = 'amulet';
         else slot = 'armor';
-    } else { scene._showToast && scene._showToast('Cannot equip this item'); return; }
+    } else { return; }
     // ensure slot array and remove one item
     scene.char.inventory = initSlots(scene.char.inventory);
     const removed = removeItemFromSlots(scene.char.inventory, itemId, 1);
-    if (!removed) { scene._showToast && scene._showToast('Item not in inventory'); return; }
+    if (!removed) { return; }
     if (!scene.char.equipment) scene.char.equipment = { head:null, armor:null, legs:null, boots:null, ring1:null, ring2:null, amulet:null, weapon:null, fishing:null, mining:null, woodcutting:null };
     // handle ring auto-slotting: if item slot is 'ring', prefer ring1 then ring2
     if (slot === 'ring') {
@@ -3635,12 +3630,9 @@ export function equipItemFromInventory(scene, itemId) {
     try {
     const questModule = window.__questModule || null;
         if (questModule && questModule.updateQuestProgress) {
-            const progressMade = questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
-            console.log('[Quest] Equipment quest progress update:', { itemId, progressMade });
+            questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
         }
-    } catch (e) {
-        console.warn('[Quest] Failed to update quest progress for equip:', e);
-    }
+    } catch (e) {}
     
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
