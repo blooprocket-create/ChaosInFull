@@ -43,11 +43,12 @@ export class GloamwaySwamp extends Phaser.Scene {
         this._recalculateVitals();
         if (!this.char.hp || this.char.hp > this.char.maxhp) this.char.hp = this.char.maxhp;
 
-        // Standard respawn target: on death, send player back to Bastion (safe hub)
+        // Standard respawn target: on death, send player back to Bastion next to Mother Lumen
         this._deathRespawn = {
             targetScene: 'GloamwayBastion',
-            spawnX: Math.round(this.scale.width * 0.82),
-            spawnY: Math.round(this.scale.height * 0.82)
+            // Bastion safe-center approx (Mother Lumen stands at ~0.74W, ~0.38H)
+            spawnX: Math.round(this.scale.width * 0.74),
+            spawnY: Math.round(this.scale.height * 0.38)
         };
 
         const W = this.scale.width;
