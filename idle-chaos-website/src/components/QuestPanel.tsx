@@ -5,7 +5,15 @@ import { useEffect, useState, useCallback } from "react";
 let lastQuestDirty: number | undefined;
 
 export default function QuestPanel({ characterId }: { characterId: string }) {
-  type QuestRow = { questId: string; status: "AVAILABLE" | "ACTIVE" | "COMPLETED"; progress: number; claimedRewards?: boolean; quest?: { id: string; name: string; description: string; objectiveCount: number } };
+  // Support broader quest status vocabulary from API
+  type QuestStatus =
+    | "UNAVAILABLE" | "UNAVAILABLE"
+    | "AVAILABLE" | "AVAILABLE"
+    | "ACCEPTED"
+    | "IN_PROGRESS" | "IN-PROGRESS" | "INPROGRESS" | "ACTIVE" // legacy ACTIVE
+    | "COMPLETE" | "COMPLETED"
+    | "HANDED_IN" | "HANDED-IN" | "HANDEDIN";
+  type QuestRow = { questId: string; status: QuestStatus | string; progress: number; claimedRewards?: boolean; quest?: { id: string; name: string; description: string; objectiveCount: number } };
   const [quests, setQuests] = useState<QuestRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -47,8 +55,31 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
   };
   // No direct hand-in from panel; hand-in is via Grimsley in town.
 
-  // Only show quests that are in-progress or ready to hand in; hide panel if none
-  const visibleQuests = quests.filter(q => (q.status === "ACTIVE" || q.status === "COMPLETED"));
+  // Determine which statuses should be shown in the quest log
+  const isVisibleStatus = (status: string | undefined): boolean => {
+    if (!status) return false;
+    const s = String(status).toUpperCase();
+    // Show: ACCEPTED, IN_PROGRESS (and variants/legacy ACTIVE), COMPLETE/COMPLETED
+    if (s === "ACCEPTED") return true;
+    if (s === "ACTIVE" || s === "IN_PROGRESS" || s === "IN-PROGRESS" || s === "INPROGRESS") return true;
+    if (s === "COMPLETE" || s === "COMPLETED") return true;
+    return false; // Hide AVAILABLE/UNAVAILABLE/HANDED_IN and unknowns
+  };
+
+  const formatStatus = (status: string | undefined, progress?: number): string => {
+    if (!status) return "";
+    const s = String(status).toUpperCase();
+    // ACTIVE covers both accepted (0 progress) and in-progress (>0)
+    if (s === "ACTIVE" || s === "IN_PROGRESS" || s === "IN-PROGRESS" || s === "INPROGRESS") {
+      return (typeof progress === 'number' && progress > 0) ? "In-Progress" : "Accepted";
+    }
+    if (s === "COMPLETE" || s === "COMPLETED") return "Complete";
+    if (s === "ACCEPTED") return "Accepted";
+    return status; // fallback
+  };
+
+  // Only show quests we want to display; hide panel entirely if none
+  const visibleQuests = quests.filter(q => isVisibleStatus(q.status as string));
   if (visibleQuests.length === 0) return null;
 
   return (
@@ -65,7 +96,7 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
                 <div className="text-white/90 font-medium text-sm">{q.quest?.name || q.questId}</div>
                 <div className="text-xs text-gray-300">{q.quest?.description}</div>
               </div>
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">{q.status}</span>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">{formatStatus(q.status as string, q.progress)}</span>
             </div>
             {typeof q.progress === "number" && typeof q.quest?.objectiveCount === "number" && (
               <div className="mt-2">
