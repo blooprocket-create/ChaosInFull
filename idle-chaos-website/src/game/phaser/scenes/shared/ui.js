@@ -1435,30 +1435,7 @@ function collectActiveBuffs(scene) {
     return list;
 }
 
-export function refreshSkillBarHUD(scene) {
-    const bar = ensureSkillBar(); if (!bar) return;
-    // Only populate buffs for now (slots are handled elsewhere/not required for this task)
-    const buffsHost = bar.querySelector('#skill-buffs');
-    if (!buffsHost) return;
-    // Rebuild chips
-    while (buffsHost.firstChild) buffsHost.removeChild(buffsHost.firstChild);
-    const buffs = collectActiveBuffs(scene);
-    for (const b of buffs) {
-        try {
-            const chip = document.createElement('div'); chip.className = 'buff-chip ' + (b.temporary ? 'temporary' : 'permanent');
-            const name = document.createElement('div'); name.className = 'buff-name'; name.textContent = b.label;
-            const eta = document.createElement('div'); eta.className = 'buff-eta'; eta.textContent = (b.eta != null) ? `${b.eta}s` : '';
-            chip.appendChild(name); chip.appendChild(eta);
-            buffsHost.appendChild(chip);
-        } catch (e) {}
-    }
-    // Hide panel if empty
-    try { buffsHost.style.display = (buffs.length > 0) ? 'flex' : 'none'; } catch (e) {}
-}
-
-// Minimal key binding shims (scene-level input handlers already exist in combat)
-export function bindSkillBarKeys(_scene) { /* intentionally minimal for this task */ }
-export function unbindSkillBarKeys(_scene) { /* intentionally minimal for this task */ }
+// (removed duplicate minimal refreshSkillBarHUD/bind/unbind in favor of the full implementation below)
 
 
 export function openInventoryModal(scene) {
@@ -3349,6 +3326,11 @@ export function refreshSkillBarHUD(scene) {
         const char = scene.char;
         const defs = (char.learnedActives || []).reduce((m, a) => { if (a && a.id) m[a.id] = a; return m; }, {});
         const now = Date.now();
+        // Slots wrapper to allow a buffs panel to sit beside it
+        const slotsWrap = document.createElement('div');
+        slotsWrap.style.display = 'flex';
+        slotsWrap.style.gap = '8px';
+        el.appendChild(slotsWrap);
         for (let i = 0; i < 9; i++) {
             const slot = document.createElement('div'); slot.className = 'skill-slot';
             // base visuals are handled via CSS; keep minimal inline fallbacks
@@ -3405,8 +3387,50 @@ export function refreshSkillBarHUD(scene) {
                         if (exp && now2 < exp) { try { if (scene._showToast) scene._showToast('Ability on cooldown'); } catch (e) {} return; }
                         unassignSkillBarSlot(scene, idx);
                     } else { /* no-op */ } } catch (e) {} }; })(i, assigned, cooldownExpiry);
-            el.appendChild(slot);
+            slotsWrap.appendChild(slot);
         }
+
+        // Buffs panel on the right side
+        const buffsHost = document.createElement('div');
+        buffsHost.id = 'skill-buffs';
+        buffsHost.style.display = 'flex';
+        buffsHost.style.alignItems = 'stretch';
+        buffsHost.style.gap = '6px';
+        buffsHost.style.marginLeft = '6px';
+        buffsHost.style.paddingLeft = '8px';
+        buffsHost.style.borderLeft = '1px solid rgba(255,255,255,0.06)';
+
+        const buffs = collectActiveBuffs(scene);
+        for (const b of buffs) {
+            try {
+                const chip = document.createElement('div');
+                chip.className = 'buff-chip ' + (b.temporary ? 'temporary' : 'permanent');
+                chip.style.display = 'flex';
+                chip.style.alignItems = 'center';
+                chip.style.gap = '6px';
+                chip.style.padding = '4px 8px';
+                chip.style.borderRadius = '8px';
+                chip.style.border = '1px solid rgba(255,255,255,0.08)';
+                chip.style.background = b.temporary ? 'rgba(255,210,120,0.06)' : 'rgba(140,200,255,0.06)';
+                chip.style.color = '#ddd';
+                const name = document.createElement('div');
+                name.className = 'buff-name';
+                name.textContent = b.label;
+                name.style.fontSize = '12px';
+                name.style.fontWeight = '700';
+                const eta = document.createElement('div');
+                eta.className = 'buff-eta';
+                eta.textContent = (b.eta != null) ? `${b.eta}s` : '';
+                eta.style.fontSize = '11px';
+                eta.style.opacity = '0.8';
+                chip.appendChild(name);
+                chip.appendChild(eta);
+                buffsHost.appendChild(chip);
+            } catch (e) {}
+        }
+        // Hide panel if empty
+        try { buffsHost.style.display = (buffs.length > 0) ? 'flex' : 'none'; } catch (e) {}
+        el.appendChild(buffsHost);
     } catch (e) { /* ignore DOM errors */ }
 }
 

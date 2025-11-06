@@ -1,79 +1,107 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Dev (Next.js)",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run dev"
-      ],
-      "isBackground": true,
-      "group": "build"
-    },
-    {
-      "label": "Build (Next.js)",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
-      ],
-      "group": "build"
-    },
-    {
-      "label": "Typecheck (tsc)",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
-      ],
-      "problemMatcher": ["$tsc"],
-      "group": "build"
-    },
-    {
-      "label": "Lint (eslint)",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
-      ],
-      "problemMatcher": ["$eslint-stylish"],
-      "group": "build"
-    },
-    {
-      "label": "Typecheck+Lint",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
-      ],
-      "group": "build"
-    },
-    {
-      "label": "Install deps",
-      "type": "shell",
-      "command": "pwsh",
-      "args": [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm install --no-audit --no-fund"
-      ]
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Dev (Next.js)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run dev"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Build (Next.js)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck (tsc)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }"
+			],
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Lint (eslint)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Typecheck+Lint",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Install deps",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm install --no-audit --no-fund"
+			]
+		},
+		{
+			"label": "Build (Next.js) - on demand",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build (Next.js) - on demand",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; npm run build"
+			],
+			"group": "build"
+		}
+	]
 }

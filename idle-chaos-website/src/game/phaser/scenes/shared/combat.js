@@ -1304,92 +1304,12 @@ function sharedClearToasts() {
     this._toastContainer = null;
 }
 
-// Buff HUD: persistent top-center display showing active short-term buffs
-function sharedCreateBuffHUD(scene) {
-    if (!scene || typeof document === 'undefined') return null;
-    try {
-        if (!scene._buffContainer) {
-            const c = document.createElement('div');
-            c.style.position = 'fixed';
-            c.style.top = '56px';
-            c.style.left = '50%';
-            c.style.transform = 'translateX(-50%)';
-            c.style.zIndex = '211';
-            c.style.pointerEvents = 'none';
-            c.style.display = 'flex';
-            c.style.gap = '8px';
-            document.body.appendChild(c);
-            scene._buffContainer = c;
-        }
-        return scene._buffContainer;
-    } catch (e) { return null; }
-}
+// Legacy Buff HUD removed: top-center display is deprecated in favor of the skill bar buffs panel
+function sharedCreateBuffHUD(scene) { return null; }
 
-function sharedDestroyBuffHUD(scene) {
-    if (!scene) return;
-    try {
-        if (scene._buffContainer && scene._buffContainer.parentNode) scene._buffContainer.parentNode.removeChild(scene._buffContainer);
-    } catch (e) {}
-    scene._buffContainer = null;
-}
+function sharedDestroyBuffHUD(scene) { /* no-op */ }
 
-function sharedUpdateBuffHUD(scene) {
-    if (!scene || typeof document === 'undefined') return;
-    try {
-        const container = sharedCreateBuffHUD(scene);
-        if (!container) return;
-        // collect active buffs from scene.char
-        const char = scene.char || {};
-        const now = Date.now();
-        const buffs = [];
-        try {
-            if (char._postStealthDodge && char._postStealthDodge.expiresAt && char._postStealthDodge.expiresAt > now) {
-                const rem = Math.ceil((char._postStealthDodge.expiresAt - now) / 1000);
-                buffs.push({ key: 'Dodge', text: `${Math.round(char._postStealthDodge.percent || 0)}% Dodge`, secs: rem });
-            }
-            if (char._postStealthHaste && char._postStealthHaste.expiresAt && char._postStealthHaste.expiresAt > now) {
-                const rem = Math.ceil((char._postStealthHaste.expiresAt - now) / 1000);
-                buffs.push({ key: 'Haste', text: `${Math.round(char._postStealthHaste.percent || 0)}% Haste`, secs: rem });
-            }
-            if (char._postStealthCritDmgBuff && char._postStealthCritDmgBuff.expiresAt && char._postStealthCritDmgBuff.expiresAt > now) {
-                const rem = Math.ceil((char._postStealthCritDmgBuff.expiresAt - now) / 1000);
-                buffs.push({ key: 'Crit+', text: `+${Math.round(char._postStealthCritDmgBuff.percent || 0)}% Crit Dmg`, secs: rem });
-            }
-            if (typeof char._stealthPoints === 'number' && char._stealthPoints > 0) {
-                buffs.push({ key: 'StealthPts', text: `${Math.floor(char._stealthPoints)} SP`, secs: null });
-            }
-        } catch (e) {}
-
-        // rebuild container children
-        while (container.firstChild) container.removeChild(container.firstChild);
-        buffs.forEach(b => {
-            try {
-                const el = document.createElement('div');
-                el.style.background = 'rgba(8,8,10,0.86)';
-                el.style.color = '#fff';
-                el.style.padding = '6px 10px';
-                el.style.borderRadius = '8px';
-                el.style.fontFamily = 'UnifrakturCook, cursive';
-                el.style.fontSize = '13px';
-                el.style.pointerEvents = 'none';
-                el.style.display = 'flex';
-                el.style.flexDirection = 'column';
-                el.style.alignItems = 'center';
-                const label = document.createElement('div');
-                label.textContent = b.text;
-                const sub = document.createElement('div');
-                sub.style.fontSize = '11px';
-                sub.style.opacity = '0.85';
-                sub.textContent = (b.secs != null) ? `${b.secs}s` : '';
-                el.appendChild(label);
-                el.appendChild(sub);
-                container.appendChild(el);
-            } catch (e) {}
-        });
-        // hide container if no buffs
-        try { container.style.display = (buffs.length > 0) ? 'flex' : 'none'; } catch (e) {}
-    } catch (e) {}
-}
+function sharedUpdateBuffHUD(scene) { /* no-op */ }
 
 function sharedShowDamageNumber(x, y, text, color = '#fff') {
     if (!this || !this.add) return;
@@ -4120,16 +4040,7 @@ export function registerTalentHandlers(scene) {
             } });
         }
     } catch (e) {}
-    // Buff HUD updater: refresh the persistent buff display
-    try {
-        if (!scene._buffMonitorEvent && scene.time && typeof scene.time.addEvent === 'function') {
-            // create HUD immediately
-            try { sharedCreateBuffHUD(scene); } catch (e) {}
-            scene._buffMonitorEvent = scene.time.addEvent({ delay: 300, loop: true, callback: function() {
-                try { sharedUpdateBuffHUD(scene); } catch (e) {}
-            } });
-        }
-    } catch (e) {}
+    // Legacy Buff HUD updater removed; the skill bar HUD now handles buff displays
     // Aura monitor: create/destroy icy aura emitter around player when terror_aura is present
     try {
         if (!scene._auraMonitorEvent && scene.time && typeof scene.time.addEvent === 'function') {
