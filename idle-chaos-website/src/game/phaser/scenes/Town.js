@@ -345,7 +345,7 @@ export class Town extends Phaser.Scene {
     const stewardY = Math.max(bounds.y1 + 80, centerY - 30);
     this.steward = this.add.sprite(stewardX, stewardY, 'grimsley_idle').setOrigin(0.5, 0.9).setDepth(1.5);
     try { this.steward.setTint(0x88b4ff); } catch (e) {}
-    this._playMayorAnimation('idle', 'left');
+    this._playNpcAnimation(this.steward, 'idle', 'left');
     this.stewardState = {
         home: { x: stewardX, y: stewardY },
         radius: 90,
@@ -1048,7 +1048,11 @@ export class Town extends Phaser.Scene {
     }
 
     _playMayorAnimation(mode, facing) {
-        const sprite = this.mayor;
+        // Backward-compatible helper targeting the mayor sprite
+        this._playNpcAnimation(this.mayor, mode, facing);
+    }
+
+    _playNpcAnimation(sprite, mode, facing) {
         if (!sprite || !this.anims) return;
         const key = `grimsley_${mode}_${facing}`;
         if (!this.anims.exists(key)) return;
@@ -1066,7 +1070,7 @@ export class Town extends Phaser.Scene {
         if (this._activeDialogueNpc === 'mayor') {
             state.target = null;
             state.idleUntil = now + 200;
-            this._playMayorAnimation('idle', state.facing || 'down');
+            this._playNpcAnimation(sprite, 'idle', state.facing || 'down');
             return;
         }
 
@@ -1089,7 +1093,7 @@ export class Town extends Phaser.Scene {
                 if (Math.abs(dx) > Math.abs(dy)) facing = dx < 0 ? 'left' : 'right';
                 else facing = dy < 0 ? 'up' : 'down';
                 state.facing = facing;
-                this._playMayorAnimation('walk', facing);
+                this._playNpcAnimation(sprite, 'walk', facing);
             }
         } else {
             if (!state.idleUntil || now >= state.idleUntil) {
@@ -1103,7 +1107,7 @@ export class Town extends Phaser.Scene {
                 state.speed = Phaser.Math.FloatBetween(24, 38);
                 state.target = { x: tx, y: ty };
             } else {
-                this._playMayorAnimation('idle', state.facing || 'down');
+                this._playNpcAnimation(sprite, 'idle', state.facing || 'down');
             }
         }
 
@@ -1129,7 +1133,7 @@ export class Town extends Phaser.Scene {
         if (this._activeDialogueNpc === 'steward') {
             state.target = null;
             state.idleUntil = now + 200;
-            this._playMayorAnimation('idle', state.facing || 'down');
+            this._playNpcAnimation(sprite, 'idle', state.facing || 'down');
             return;
         }
 
@@ -1152,7 +1156,7 @@ export class Town extends Phaser.Scene {
                 if (Math.abs(dx) > Math.abs(dy)) facing = dx < 0 ? 'left' : 'right';
                 else facing = dy < 0 ? 'up' : 'down';
                 state.facing = facing;
-                this._playMayorAnimation('walk', facing);
+                this._playNpcAnimation(sprite, 'walk', facing);
             }
         } else {
             if (!state.idleUntil || now >= state.idleUntil) {
@@ -1166,7 +1170,7 @@ export class Town extends Phaser.Scene {
                 state.speed = Phaser.Math.FloatBetween(22, 34);
                 state.target = { x: tx, y: ty };
             } else {
-                this._playMayorAnimation('idle', state.facing || 'left');
+                this._playNpcAnimation(sprite, 'idle', state.facing || 'left');
             }
         }
 
@@ -1394,7 +1398,8 @@ export class Town extends Phaser.Scene {
             });
             optionConfigs.push({
                 label: 'Maybe later',
-                onClick: () => {}
+                onClick: () => {},
+                closeOnClick: true
             });
         } else if (nextAvailable) {
             const ui = window.__shared_ui;
@@ -1410,7 +1415,8 @@ export class Town extends Phaser.Scene {
             });
             optionConfigs.push({
                 label: 'Maybe later',
-                onClick: () => {}
+                onClick: () => {},
+                closeOnClick: true
             });
         } else if (activeQuest) {
             const def = questDefs[activeQuest.id] || {};
@@ -1420,14 +1426,16 @@ export class Town extends Phaser.Scene {
             if (list) bodyNodes.push(list);
             optionConfigs.push({
                 label: 'I\'ll get back to it',
-                onClick: () => {}
+                onClick: () => {},
+                closeOnClick: true
             });
         } else {
             const ui = window.__shared_ui;
             bodyNodes.push(ui.createDialogueParagraph('Greetings! Stay vigilant out there, and let me know when you are ready for more responsibility.'));
             optionConfigs.push({
                 label: 'Leave',
-                onClick: () => {}
+                onClick: () => {},
+                closeOnClick: true
             });
         }
 
@@ -1439,13 +1447,13 @@ export class Town extends Phaser.Scene {
         const ui = window.__shared_ui;
         if (!quest) {
             ui.renderDialogue('Mayor Grimsley', '👔', [ui.createDialogueParagraph('Hmm, I seem to have misplaced that contract.')], [
-                { label: 'Leave', onClick: () => {} }
+                { label: 'Leave', onClick: () => {}, closeOnClick: true }
             ], '#ffd27a');
             return;
         }
         if (!startQuest(this.char, questId)) {
             ui.renderDialogue('Mayor Grimsley', '👔', [ui.createDialogueParagraph('Looks like you cannot take that on right now.')], [
-                { label: 'Understood', onClick: () => {} }
+                { label: 'Understood', onClick: () => {}, closeOnClick: true }
             ], '#ffd27a');
             return;
         }
@@ -1458,7 +1466,7 @@ export class Town extends Phaser.Scene {
         ui.renderDialogue('Mayor Grimsley', '👔', [
             ui.createDialogueParagraph(`Excellent. Bring me what I asked for and we'll speak again.`)
         ], [
-            { label: 'I\'m on it', onClick: () => {}, variant: 'success' }
+            { label: 'I\'m on it', onClick: () => {}, variant: 'success', closeOnClick: true }
         ], '#ffd27a');
     }
 
@@ -1470,7 +1478,7 @@ export class Town extends Phaser.Scene {
                 ui.createDialogueParagraph(`You still have work to finish for ${def ? def.name : questId}.`),
                 ui.buildObjectiveList(def, getQuestObjectiveState(this.char, questId), '#ffd27a')
             ].filter(Boolean), [
-                { label: 'I\'ll finish it', onClick: () => {} }
+                { label: 'I\'ll finish it', onClick: () => {}, closeOnClick: true }
             ], '#ffd27a');
             return;
         }
@@ -1494,7 +1502,7 @@ export class Town extends Phaser.Scene {
             ui.createDialogueParagraph('Let me know if you want to take on another duty.')
         ], [
             { label: 'Any more work?', onClick: () => this._openMayorDialogue(), variant: 'primary' },
-            { label: 'Thanks', onClick: () => {}, variant: 'success' }
+            { label: 'Thanks', onClick: () => {}, variant: 'success', closeOnClick: true }
         ], '#ffd27a');
     }
 
@@ -1518,7 +1526,7 @@ export class Town extends Phaser.Scene {
             optionConfigs.push({ label: 'Who are you, really?', onClick: () => this._openStewardDialogue('bio') });
             optionConfigs.push({ label: 'Any advice for a newcomer?', onClick: () => this._openStewardDialogue('advice'), variant: 'primary' });
             optionConfigs.push({ label: 'Where can I find work?', onClick: () => this._openStewardDialogue('work') });
-            optionConfigs.push({ label: 'Leave', onClick: () => {} });
+            optionConfigs.push({ label: 'Leave', onClick: () => {}, closeOnClick: true });
             return render();
         }
 
@@ -1533,9 +1541,9 @@ export class Town extends Phaser.Scene {
             bodyNodes.push(ui.createDialogueParagraph("Three habits keep adventurers alive: keep stocked, keep sorted, and keep moving."));
             bodyNodes.push(ui.createDialogueParagraph("Shop’s over there—look for the awning. Storage chest holds what you can’t carry. The workbench turns scraps into something sharper."));
             bodyNodes.push(ui.createDialogueParagraph("When you’re ready to roam, portals flank the plaza. They’re picky about where you stand—so are undertakers."));
-            optionConfigs.push({ label: 'Open Shop', onClick: () => { try { this._openShopModal(); } catch(e){} } });
-            optionConfigs.push({ label: 'Open Storage', onClick: () => { try { this._openStorageModal(); } catch(e){} } });
-            optionConfigs.push({ label: 'Use Workbench', onClick: () => { try { this._openWorkbenchModal(); } catch(e){} } });
+            optionConfigs.push({ label: 'Open Shop', onClick: () => { try { this._openShopModal(); } catch(e){} }, closeOnClick: true });
+            optionConfigs.push({ label: 'Open Storage', onClick: () => { try { this._openStorageModal(); } catch(e){} }, closeOnClick: true });
+            optionConfigs.push({ label: 'Use Workbench', onClick: () => { try { this._openWorkbenchModal(); } catch(e){} }, closeOnClick: true });
             optionConfigs.push({ label: 'Back', onClick: () => this._openStewardDialogue('root') });
             return render();
         }

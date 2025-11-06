@@ -15,14 +15,18 @@ export const patchNotes: PatchNote[] = [
       "Steward Fenric arrives — the Mayor’s cooler, tidier shadow with wandering feet and actual manners",
       "Workbench, Storage, and Shop had a glow‑up: less ‘grey rectangle,’ more ‘I belong in a town’",
       "Newcomer perks: from Fenric’s Advice, pop open Shop/Storage/Workbench without walking a single tile",
-      "Pacing problem solved: NPCs stop roaming while you’re mid‑conversation; bushes stop photobombing the furniture"
+      "Pacing problem solved: NPCs stop roaming while you’re mid‑conversation; bushes stop photobombing the furniture",
+      "New: Buffs panel lives in the skill bar — see active effects with timers at a glance"
     ],
     notes: [
       "Fenric reuses Grimsley’s rig with a tasteful blue tint (0x88b4ff) and a smaller wander radius — tidy steward, tidy orbits.",
       "He’s chatty at ~56px: press E to be judged politely. ‘Advice’ includes quick‑open buttons for Shop, Storage, and the Workbench.",
       "Visuals: Workbench sports a highlighted plank and visible bolts; Chest has a band + lock; Shop gets counter trim, a stripey awning, and a proper sign.",
       "Depth sorting cleaned so foliage sits behind fixtures; prompts track NPC heads like loyal birds; roaming pauses during dialogue so no one moonwalks off‑screen mid‑sentence.",
-      "Town shutdown tidies after itself — modals, prompts, and indicators don’t linger like a dragon’s hoard of UI."
+      "Town shutdown tidies after itself — modals, prompts, and indicators don’t linger like a dragon’s hoard of UI.",
+      "Bug fixes: Fenric now actually animates (idle/walk in four directions) instead of striking a single dramatic pose.",
+      "Bug fixes: Dialogue options no longer auto‑dismiss the conversation. Only explicit ‘Leave’/‘Thanks’ buttons close the window; in‑dialog choices keep it open.",
+      "Buffs panel: integrated into the global skill bar. Pulls from your character’s active buffs and skill effects (e.g., stealth dodge, mana shield) and shows countdowns."
     ]
   },
   {

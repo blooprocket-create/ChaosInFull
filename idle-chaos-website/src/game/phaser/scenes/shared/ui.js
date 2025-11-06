@@ -215,6 +215,15 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
     .mana-badge{position:absolute;right:8px;top:6px;background:rgba(120,20,20,0.9);color:#fff;padding:4px 6px;border-radius:6px;font-size:11px;font-weight:800}
     .cooldown-overlay{position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.6));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;border-radius:6px}
     .cooldown-active{filter:grayscale(30%);opacity:0.95}
+    /* Buffs panel inside the global skill bar */
+    #global-skill-bar .skillbar-inner { display:flex; align-items:center; gap:12px; }
+    #global-skill-bar .skill-slots { display:flex; align-items:center; gap:8px; }
+    #global-skill-bar .buffs-panel { display:flex; align-items:center; gap:8px; margin-left:6px; padding-left:10px; border-left: 2px dashed rgba(255,255,255,0.08); }
+    #global-skill-bar .buff-chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:58px; height:58px; padding:6px 8px; border-radius:6px; background:linear-gradient(180deg,rgba(20,20,22,0.96),rgba(12,12,14,0.96)); border:1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 18px rgba(0,0,0,0.45) inset; color:#eee; font-size:12px; }
+    #global-skill-bar .buff-chip .buff-name { font-weight:800; color:#ffd27a; text-shadow:0 1px 0 rgba(0,0,0,0.5); max-width:80px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #global-skill-bar .buff-chip .buff-eta { font-size:11px; color:#cfd; opacity:0.9; }
+    #global-skill-bar .buff-chip.temporary { border-color: rgba(255,210,122,0.35); }
+    #global-skill-bar .buff-chip.permanent { border-color: rgba(120,220,160,0.28); }
     `;
     document.head.appendChild(s);
 }
@@ -676,6 +685,8 @@ try {
         // tooltip helpers
         window.__shared_ui.showItemTooltip = showItemTooltip;
         window.__shared_ui.hideItemTooltip = hideItemTooltip;
+        // expose prune for other modules (HUD)
+        window.__shared_ui.pruneExpiredBuffs = pruneExpiredBuffs;
         // low-level slot/inventory helpers
         window.__shared_ui.initSlots = initSlots;
         window.__shared_ui.getQtyInSlots = getQtyInSlots;
@@ -707,6 +718,10 @@ try {
         // indicator helpers
         window.__shared_ui.registerQuestIndicators = registerQuestIndicators;
         window.__shared_ui.reconcileEquipmentBonuses = reconcileEquipmentBonuses;
+        // skill bar helpers (buffs panel lives here)
+        window.__shared_ui.refreshSkillBarHUD = refreshSkillBarHUD;
+        window.__shared_ui.bindSkillBarKeys = bindSkillBarKeys;
+        window.__shared_ui.unbindSkillBarKeys = unbindSkillBarKeys;
     }
 } catch (e) {}
 
@@ -1349,6 +1364,101 @@ function useItemFromSlot(scene, slotIndex) {
 
 // export low-level helpers for legacy scenes that reference them
 export { initSlots, addItemToSlots, removeItemFromSlots, getQtyInSlots };
+
+// ===============================
+// Skill Bar + Buffs Panel (HUD)
+// ===============================
+
+function ensureSkillBar() {
+    if (typeof document === 'undefined') return null;
+    let bar = document.getElementById('global-skill-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'global-skill-bar';
+        const inner = document.createElement('div'); inner.className = 'skillbar-inner';
+        const slots = document.createElement('div'); slots.className = 'skill-slots'; slots.id = 'skill-slots';
+        const buffs = document.createElement('div'); buffs.className = 'buffs-panel'; buffs.id = 'skill-buffs';
+        inner.appendChild(slots); inner.appendChild(buffs);
+        bar.appendChild(inner);
+        document.body.appendChild(bar);
+    }
+    return bar;
+}
+
+function collectActiveBuffs(scene) {
+    const list = [];
+    if (!scene || !scene.char) return list;
+    const now = Date.now();
+    try { if (typeof pruneExpiredBuffs === 'function') pruneExpiredBuffs(scene); } catch (e) {}
+    // 1) Generic temporary buffs from items/skills stored in char._buffs
+    try {
+        const arr = Array.isArray(scene.char._buffs) ? scene.char._buffs : (Array.isArray(scene.char.buffs) ? scene.char.buffs : null);
+        if (Array.isArray(arr)) {
+            for (const b of arr) {
+                if (!b) continue;
+                const name = b.name || (b.source ? String(b.source).replace(/_/g,' ') : 'Buff');
+                const remainingMs = (typeof b.expiresAt === 'number') ? (b.expiresAt - now) : null;
+                if (remainingMs != null && remainingMs <= 0) continue;
+                const eta = remainingMs != null ? Math.ceil(Math.max(0, remainingMs) / 1000) : null;
+                list.push({ key: 'generic_' + (b.id || name), label: name, eta, temporary: remainingMs != null });
+            }
+        }
+    } catch (e) {}
+    // 2) Skill-based ephemeral buffs (from combat.js conventions)
+    try {
+        const c = scene.char;
+        if (c._postStealthDodge && c._postStealthDodge.expiresAt > now) {
+            list.push({ key: 'stealth_dodge', label: `Dodge ${Math.round(c._postStealthDodge.percent||0)}%`, eta: Math.ceil((c._postStealthDodge.expiresAt-now)/1000), temporary: true });
+        }
+        if (c._postStealthHaste && c._postStealthHaste.expiresAt > now) {
+            list.push({ key: 'stealth_haste', label: `Haste ${Math.round(c._postStealthHaste.percent||0)}%`, eta: Math.ceil((c._postStealthHaste.expiresAt-now)/1000), temporary: true });
+        }
+        if (c._postStealthCritDmgBuff && c._postStealthCritDmgBuff.expiresAt > now) {
+            list.push({ key: 'stealth_crit', label: `Crit Dmg +${Math.round(c._postStealthCritDmgBuff.percent||0)}%`, eta: Math.ceil((c._postStealthCritDmgBuff.expiresAt-now)/1000), temporary: true });
+        }
+        if (typeof c._stealthPoints === 'number' && c._stealthPoints > 0) {
+            list.push({ key: 'stealth_points', label: `${Math.floor(c._stealthPoints)} SP`, eta: null, temporary: false });
+        }
+        if (c._manaShield && c._manaShield.max > 0) {
+            const cur = Math.floor(c._manaShield.current || 0); const mx = Math.floor(c._manaShield.max || 0);
+            list.push({ key: 'mana_shield', label: `Shield ${cur}/${mx}`, eta: null, temporary: false });
+        }
+        if (c._terrorAuraEnabled) {
+            list.push({ key: 'terror_aura', label: 'Terror Aura', eta: null, temporary: false });
+        }
+        if (c._marksmanFocusBonuses) {
+            const cc = Math.round(c._marksmanFocusBonuses.critChance || 0);
+            const cd = Math.round(c._marksmanFocusBonuses.critDmg || 0);
+            list.push({ key: 'marksman_focus', label: `Focus +${cc}%/${cd}%`, eta: null, temporary: false });
+        }
+    } catch (e) {}
+    return list;
+}
+
+export function refreshSkillBarHUD(scene) {
+    const bar = ensureSkillBar(); if (!bar) return;
+    // Only populate buffs for now (slots are handled elsewhere/not required for this task)
+    const buffsHost = bar.querySelector('#skill-buffs');
+    if (!buffsHost) return;
+    // Rebuild chips
+    while (buffsHost.firstChild) buffsHost.removeChild(buffsHost.firstChild);
+    const buffs = collectActiveBuffs(scene);
+    for (const b of buffs) {
+        try {
+            const chip = document.createElement('div'); chip.className = 'buff-chip ' + (b.temporary ? 'temporary' : 'permanent');
+            const name = document.createElement('div'); name.className = 'buff-name'; name.textContent = b.label;
+            const eta = document.createElement('div'); eta.className = 'buff-eta'; eta.textContent = (b.eta != null) ? `${b.eta}s` : '';
+            chip.appendChild(name); chip.appendChild(eta);
+            buffsHost.appendChild(chip);
+        } catch (e) {}
+    }
+    // Hide panel if empty
+    try { buffsHost.style.display = (buffs.length > 0) ? 'flex' : 'none'; } catch (e) {}
+}
+
+// Minimal key binding shims (scene-level input handlers already exist in combat)
+export function bindSkillBarKeys(_scene) { /* intentionally minimal for this task */ }
+export function unbindSkillBarKeys(_scene) { /* intentionally minimal for this task */ }
 
 
 export function openInventoryModal(scene) {
@@ -3878,8 +3988,10 @@ export function renderDialogue(npcName, npcPortrait, bodyNodes, optionConfigs = 
             
             if (opt.onClick) {
                 btn.onclick = () => {
-                    opt.onClick();
-                    closeDialogue();
+                    try { opt.onClick(); } catch (e) {}
+                    // Only close if explicitly requested. Default behavior keeps the dialogue open
+                    // so options like "Back" or in-dialog navigation don't immediately dismiss it.
+                    if (opt.closeOnClick === true) closeDialogue();
                 };
             }
             
