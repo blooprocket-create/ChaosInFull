@@ -446,13 +446,13 @@ export class GraveForest extends Phaser.Scene {
                 },
                 variant: 'success'
             });
-            optionConfigs.push({ label: 'Give me a moment.', onClick: () => {} });
+            optionConfigs.push({ label: 'Give me a moment.', onClick: () => {}, closeOnClick: true });
         } else if (activeWoodQuest) {
             bodyNodes.push(ui.createDialogueParagraph('Keep splitting those trunks. The village needs the timber and the calm it brings.'));
             const woodStates = objectiveStateFn ? objectiveStateFn(this.char, woodQuestId) : getQuestObjectiveState(this.char, woodQuestId);
             const list = ui.buildObjectiveList(woodQuestDef, woodStates, '#8b7355');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'Back to chopping.', onClick: () => {} });
+            optionConfigs.push({ label: 'Back to chopping.', onClick: () => {}, closeOnClick: true });
         } else if (justCompleted || nowCompleted) {
             bodyNodes.push(ui.createDialogueParagraph('You made it through the forest. Good-Mayor Grimsley can rest easier knowing you\'re here.'));
             bodyNodes.push(ui.createDialogueParagraph('Keep your eyes sharp. The Grave Forest hides more than restless spirits.'));
@@ -467,19 +467,19 @@ export class GraveForest extends Phaser.Scene {
                     },
                     variant: 'success'
                 });
-                optionConfigs.push({ label: 'Another time.', onClick: () => {} });
+                optionConfigs.push({ label: 'Another time.', onClick: () => {}, closeOnClick: true });
             } else {
-                optionConfigs.push({ label: 'I\'ll be ready.', onClick: () => {} });
+                optionConfigs.push({ label: 'I\'ll be ready.', onClick: () => {}, closeOnClick: true });
             }
         } else if (activeRowan) {
             bodyNodes.push(ui.createDialogueParagraph('Rowan Boneaxe at your service. The mayor must think highly of you if he sent you here.'));
             const states = objectiveStateFn ? objectiveStateFn(this.char, questId) : null;
             const list = ui.buildObjectiveList(questDef, states, '#8b7355');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'I\'ll hold the line.', onClick: () => {} });
+            optionConfigs.push({ label: 'I\'ll hold the line.', onClick: () => {}, closeOnClick: true });
         } else {
             bodyNodes.push(ui.createDialogueParagraph('Another traveler braving the graves? Stay close to the lantern light and you may survive.'));
-            optionConfigs.push({ label: 'Understood.', onClick: () => {} });
+            optionConfigs.push({ label: 'Understood.', onClick: () => {}, closeOnClick: true });
         }
 
         ui.renderDialogue('Rowan Boneaxe', '🪓', bodyNodes, optionConfigs, '#8b7355');
@@ -501,43 +501,76 @@ export class GraveForest extends Phaser.Scene {
     _acceptRowanWoodQuest() {
         const questId = 'tutorial_chop_wood';
         const questDef = getQuestById ? getQuestById(questId) : null;
-        if (!startQuest) { this._closeDialogueOverlay(); return; }
-        if ((this.char.activeQuests || []).some(q => q.id === questId)) {
-            this._closeDialogueOverlay();
+        const ui = window.__shared_ui;
+        if (!startQuest) {
+            if (ui && ui.closeDialogue) ui.closeDialogue();
             return;
         }
-        const started = startQuest(this.char, questId);
-        if (started) {
-            const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-            if (this._persistCharacter) this._persistCharacter(username);
-            try {
-                if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this);
-            } catch (e) {}
-            this._showToast('Quest started: ' + ((questDef && questDef.name) || questId), 2200);
+        if ((this.char.activeQuests || []).some(q => q.id === questId)) {
+            if (ui && ui.closeDialogue) ui.closeDialogue();
+            return;
         }
-        this._closeDialogueOverlay();
+        if (!startQuest(this.char, questId)) {
+            if (ui && ui.renderDialogue) {
+                ui.renderDialogue('Rowan Boneaxe', '🪓', [ui.createDialogueParagraph('You cannot take that on right now.')], [
+                    { label: 'Understood', onClick: () => {}, closeOnClick: true }
+                ], '#8b7355');
+            }
+            return;
+        }
+        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+        if (this._persistCharacter) this._persistCharacter(username);
+        try {
+            if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this);
+        } catch (e) {}
+        this._showToast('Quest started: ' + ((questDef && questDef.name) || questId), 2200);
+        if (ui && ui.renderDialogue) {
+            ui.renderDialogue('Rowan Boneaxe', '🪓', [
+                ui.createDialogueParagraph('Good. Gather the timber and return when you have what I need.')
+            ], [
+                { label: 'On my way', onClick: () => {}, variant: 'success', closeOnClick: true }
+            ], '#8b7355');
+        }
     }
 
     _completeRowanWoodQuest() {
         const questId = 'tutorial_chop_wood';
         const questDef = getQuestById ? getQuestById(questId) : null;
-        const completed = completeQuest(this.char, questId);
-        if (completed) {
-            const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-            if (this._persistCharacter) this._persistCharacter(username);
-            try {
-                if (window && window.__shared_ui) {
-                    if (window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this);
-                    if (window.__shared_ui.refreshInventoryModal) window.__shared_ui.refreshInventoryModal(this);
-                    if (window.__shared_ui.refreshEquipmentModal) window.__shared_ui.refreshEquipmentModal(this);
-                }
-            } catch (e) {}
-            this._showToast('Quest completed: ' + ((questDef && questDef.name) || questId), 2400);
-            if (this._updateHUD) {
-                try { this._updateHUD(); } catch (e) {}
+        const ui = window.__shared_ui;
+        if (!checkQuestCompletion(this.char, questId)) {
+            const def = getQuestById(questId);
+            if (ui && ui.renderDialogue) {
+                ui.renderDialogue('Rowan Boneaxe', '🪓', [
+                    ui.createDialogueParagraph(`You still have work to finish for ${def ? def.name : questId}.`),
+                    ui.buildObjectiveList(def, getQuestObjectiveState(this.char, questId), '#8b7355')
+                ].filter(Boolean), [
+                    { label: 'I\'ll finish it', onClick: () => {}, closeOnClick: true }
+                ], '#8b7355');
             }
+            return;
         }
-        this._closeDialogueOverlay();
+        completeQuest(this.char, questId);
+        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+        if (this._persistCharacter) this._persistCharacter(username);
+        try {
+            if (window && window.__shared_ui) {
+                if (window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this);
+                if (window.__shared_ui.refreshInventoryModal) window.__shared_ui.refreshInventoryModal(this);
+                if (window.__shared_ui.refreshEquipmentModal) window.__shared_ui.refreshEquipmentModal(this);
+            }
+        } catch (e) {}
+        this._showToast('Quest completed: ' + ((questDef && questDef.name) || questId), 2400);
+        if (this._updateHUD) {
+            try { this._updateHUD(); } catch (e) {}
+        }
+        if (ui && ui.renderDialogue) {
+            ui.renderDialogue('Rowan Boneaxe', '🪓', [
+                ui.createDialogueParagraph(`Well done. The timber will serve the watch well.`),
+                ui.createDialogueParagraph('There may be more work ahead, but for now, rest easy.')
+            ], [
+                { label: 'Glad to help', onClick: () => {}, variant: 'success', closeOnClick: true }
+            ], '#8b7355');
+        }
     }
 
     _ensureDialogueOverlay() {

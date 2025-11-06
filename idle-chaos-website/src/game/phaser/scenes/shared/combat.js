@@ -1380,6 +1380,33 @@ function sharedDestroyPlayerHealthBar() {
     this.playerHpBarBg = null;
 }
 
+// Determine an enemy's rarity from its def or id string
+function _inferEnemyRarity(defId, def) {
+    try {
+        const tier = (def && (def.rarity || def.tier)) ? String(def.rarity || def.tier).toLowerCase() : null;
+        const s = String(defId || '').toLowerCase();
+        const src = tier || s;
+        if (/boss/.test(src)) return 'boss';
+        if (/legendary/.test(src)) return 'legendary';
+        if (/epic/.test(src)) return 'epic';
+        if (/rare/.test(src)) return 'rare';
+        if (/uncommon/.test(src)) return 'uncommon';
+        return 'common';
+    } catch (e) { return 'common'; }
+}
+
+// Map rarity to a readable text color (hex string for Phaser Text)
+function _rarityToColor(rarity) {
+    switch ((rarity || 'common').toLowerCase()) {
+        case 'uncommon': return '#34d399';     // emerald-400
+        case 'rare': return '#60a5fa';          // blue-400
+        case 'epic': return '#a78bfa';          // violet-400
+        case 'legendary': return '#f59e0b';     // amber-500
+        case 'boss': return '#ef4444';          // red-500
+        default: return '#d1d5db';              // gray-300
+    }
+}
+
 function sharedAttachEnemyBars(enemy) {
     if (!enemy || !this || !this.add) return;
     const cfg = this._enemyBarConfig || {};
@@ -1405,7 +1432,20 @@ function sharedAttachEnemyBars(enemy) {
                 else if (def && def.tier === 'epic') level = 5;
                 else if (def && def.tier === 'boss') level = 10;
                 const labelOffset = (cfg.nameOffset != null) ? cfg.nameOffset : (offsetY + 14);
-                enemy.nameLabel = this.add.text(enemy.x, enemy.y - labelOffset, `${name} | ${level}`, { fontSize: '14px', color: '#ffffff', fontFamily: 'UnifrakturCook, cursive' }).setOrigin(0.5).setDepth(depth);
+                const rarity = _inferEnemyRarity(defId, def);
+                const nameColor = _rarityToColor(rarity);
+                enemy.nameLabel = this.add.text(
+                    enemy.x,
+                    enemy.y - labelOffset,
+                    `${name} | ${level}`,
+                    { 
+                        fontSize: '14px', 
+                        color: nameColor, 
+                        fontFamily: 'UnifrakturCook, cursive',
+                        stroke: '#000000',
+                        strokeThickness: 3
+                    }
+                ).setOrigin(0.5).setDepth(depth);
             } catch (e) {
                 enemy.nameLabel = null;
             }
