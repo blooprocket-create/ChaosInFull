@@ -3375,6 +3375,39 @@ export function refreshSkillBarHUD(scene) {
         const now = Date.now();
         // Buffs row ABOVE the skill bar (compact 32x32 icons)
         const buffs = collectActiveBuffs(scene);
+        // Ensure a single tooltip element for buffs exists
+        let tip = document.getElementById('skill-buffs-tooltip');
+        if (!tip) {
+            tip = document.createElement('div');
+            tip.id = 'skill-buffs-tooltip';
+            tip.style.position = 'fixed';
+            tip.style.left = '0';
+            tip.style.top = '0';
+            tip.style.transform = 'translate(-9999px, -9999px)';
+            tip.style.zIndex = '10000';
+            tip.style.pointerEvents = 'none';
+            tip.style.background = 'rgba(10,10,12,0.92)';
+            tip.style.border = '1px solid rgba(255,255,255,0.12)';
+            tip.style.boxShadow = '0 6px 18px rgba(0,0,0,0.5)';
+            tip.style.borderRadius = '8px';
+            tip.style.padding = '6px 8px';
+            tip.style.color = '#f3f4f6';
+            tip.style.fontSize = '12px';
+            tip.style.fontWeight = '700';
+            tip.style.fontFamily = "'Share Tech Mono', monospace";
+            document.body.appendChild(tip);
+        }
+        const hideTip = () => { try { tip.style.transform = 'translate(-9999px, -9999px)'; tip.innerHTML = ''; } catch (e) {} };
+        const moveTip = (ev) => {
+            try {
+                const x = (ev && typeof ev.clientX === 'number') ? ev.clientX : 0;
+                const y = (ev && typeof ev.clientY === 'number') ? ev.clientY : 0;
+                tip.style.transform = `translate(${x + 14}px, ${y + 14}px)`;
+            } catch (e) {}
+        };
+        const showTip = (html, ev) => {
+            try { tip.innerHTML = html || ''; moveTip(ev); } catch (e) {}
+        };
         const buffsRow = document.createElement('div');
         buffsRow.id = 'skill-buffs';
         buffsRow.style.display = (buffs.length > 0) ? 'flex' : 'none';
@@ -3422,7 +3455,42 @@ export function refreshSkillBarHUD(scene) {
                     eta.style.pointerEvents = 'none';
                     icon.appendChild(eta);
                 }
+                // Basic native tooltip fallback
                 icon.title = b.label + (b.eta != null ? ` (${b.eta}s)` : '');
+                // Rich tooltip (hover) — compute a small description block
+                const mkTipHtml = () => {
+                    try {
+                        const parts = [];
+                        const header = `<div style="font-weight:800;color:#ffd27a;margin-bottom:2px;">${(b.label || 'Buff')}</div>`;
+                        parts.push(header);
+                        if (b.eta != null) parts.push(`<div style="opacity:0.9;">Remaining: ${Math.max(0, b.eta)}s</div>`);
+                        // Add a contextual line for known keys
+                        const c = scene.char || {};
+                        if (b.key === 'mana_shield' && c._manaShield) {
+                            const cur = Math.floor(c._manaShield.current || 0); const mx = Math.floor(c._manaShield.max || 0);
+                            parts.push(`<div style="opacity:0.9;">Absorb: ${cur}/${mx}</div>`);
+                        } else if (b.key === 'dark_shield' && c._darkShield) {
+                            const rem = Math.floor(c._darkShield.remaining || 0);
+                            parts.push(`<div style="opacity:0.9;">Absorb: ${rem}</div>`);
+                        } else if (b.key === 'marksman_focus' && c._marksmanFocusBonuses) {
+                            const cc = Math.round(c._marksmanFocusBonuses.critChance || 0);
+                            const cd = Math.round(c._marksmanFocusBonuses.critDmg || 0);
+                            parts.push(`<div style="opacity:0.9;">Crit: +${cc}% | Crit Dmg: +${cd}%</div>`);
+                        } else if (b.key === 'stealth_active') {
+                            parts.push(`<div style="opacity:0.9;">You are hidden from enemies.</div>`);
+                        } else if (b.key === 'unholy_frenzy') {
+                            parts.push(`<div style="opacity:0.9;">Increased attack speed.</div>`);
+                        } else if (b.key === 'standing_dr' && typeof c._standingDRPercent === 'number') {
+                            parts.push(`<div style="opacity:0.9;">Damage Reduction: +${Math.round(c._standingDRPercent)}%</div>`);
+                        } else if (b.key === 'blood_ritual') {
+                            parts.push(`<div style="opacity:0.9;">Channeling: converts mana to health over time.</div>`);
+                        }
+                        return parts.join('');
+                    } catch (e) { return (b && b.label) ? b.label : 'Buff'; }
+                };
+                icon.addEventListener('mouseenter', (ev) => { try { showTip(mkTipHtml(), ev); } catch (e) {} });
+                icon.addEventListener('mousemove', (ev) => { try { moveTip(ev); } catch (e) {} });
+                icon.addEventListener('mouseleave', () => { try { hideTip(); } catch (e) {} });
                 buffsRow.appendChild(icon);
             } catch (e) {}
         }

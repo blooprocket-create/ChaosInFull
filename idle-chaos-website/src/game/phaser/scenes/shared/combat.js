@@ -1445,8 +1445,9 @@ function sharedUpdatePlayerHealthBar() {
             const maxhp = Math.max(1, Number(c.maxhp || 1));
             const hp = Math.max(0, Number(c.hp || 0));
             const manaShield = (c._manaShield && typeof c._manaShield.current === 'number') ? Math.max(0, c._manaShield.current) : 0;
+            const manaWard = (c._manaWard && typeof c._manaWard.remaining === 'number') ? Math.max(0, c._manaWard.remaining) : 0;
             const darkShield = (c._darkShield && typeof c._darkShield.remaining === 'number') ? Math.max(0, c._darkShield.remaining) : 0;
-            const totalShield = Math.max(0, manaShield + darkShield);
+            const totalShield = Math.max(0, manaShield + manaWard + darkShield);
             const combined = Math.min(maxhp, hp + totalShield);
             const shieldRatio = Math.max(0, Math.min(1, combined / maxhp));
             if (this.playerShieldBar) {
@@ -1752,6 +1753,20 @@ function sharedGetEnemyInRange(range) {
                             const used = Math.min(ms.current, incoming);
                             ms.current = Math.max(0, ms.current - used);
                             incoming = Math.max(0, incoming - used);
+                        }
+                    } catch (e) {}
+                    // Mana Ward (temporary absorb): consumes next
+                    try {
+                        const mw = (this.char && this.char._manaWard) ? this.char._manaWard : null;
+                        if (mw && typeof mw.remaining === 'number' && mw.remaining > 0) {
+                            const used = Math.min(mw.remaining, incoming);
+                            mw.remaining = Math.max(0, mw.remaining - used);
+                            incoming = Math.max(0, incoming - used);
+                            if (mw.remaining <= 0) {
+                                try { this.char._manaWard = null; } catch (e) {}
+                                try { if (this._manaWardFx && this._manaWardFx.destroy) this._manaWardFx.destroy(); } catch (e) {}
+                                try { this._manaWardFx = null; } catch (e) {}
+                            }
                         }
                     } catch (e) {}
                     // Dark Shield (burst-on-low-hp): consumes next
@@ -3333,11 +3348,12 @@ function _talentActivatedHandler(payload) {
                     const absorb = Math.round(maxhp * (strength / 100));
                     scene.char._manaWard = { remaining: absorb, expiresAt: Date.now() + durationMs };
                     try { if (scene._showToast) scene._showToast('Mana Ward active', 900); } catch (e) {}
-                    let shieldFx = null;
-                    try { shieldFx = spawnArcaneShield(scene, scene.player.x, scene.player.y, 34, 0x66bbff); } catch (e) {}
-                    if (shieldFx && shieldFx.destroy && scene.time && scene.time.addEvent) {
-                        scene.time.addEvent({ delay: durationMs, callback: () => { try { shieldFx.destroy(); } catch (e) {} } });
-                    }
+                    // track following FX so we can clean up early if fully consumed
+                    try {
+                        if (scene._manaWardFx && scene._manaWardFx.destroy) { try { scene._manaWardFx.destroy(); } catch (ee) {} }
+                        scene._manaWardFx = spawnArcaneShield(scene, scene.player.x, scene.player.y, 34, 0x66bbff, { attachToPlayer: true, duration: durationMs });
+                    } catch (e) {}
+                    try { if (scene._updatePlayerHealthBar) scene._updatePlayerHealthBar(); } catch (e) {}
                     markActivationSuccess(scene, tid);
                 } catch (e) {}
                 break;
