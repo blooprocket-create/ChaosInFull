@@ -164,8 +164,9 @@ export class Cave extends Phaser.Scene {
     this._smeltingEvent = null;
     this.smeltingInterval = 2800;
 
-    // Procedural mining node generation: walls + nodes placed along cave edges
-    // plus 1-2 clusters near the center. Prefer reading ore definitions from `src/data/ores.js` if available
+    // Procedural mining node generation: open cave (no blocking walls),
+    // with balanced clusters near the center and blue-noise scatter elsewhere.
+    // Prefer reading ore definitions from `src/data/ores.js` if available
     // (window.ORE_DEFS or import)
     let oreConfigs = [];
     try {
@@ -186,101 +187,8 @@ export class Cave extends Phaser.Scene {
     // logical bounds where nodes and decorations may be placed
     const bounds = { x1: margin, x2: this.scale.width - margin, y1: 120, y2: this.scale.height - 120 };
 
-    // Create solid cave walls that extend to (and slightly past) the screen edges.
-    // Walls are dark brown and fully opaque so the cave feels enclosed.
-    this._caveWalls = this._caveWalls || [];
-    try {
-        const worldW = this.scale.width;
-        const worldH = this.scale.height;
-        const extra = 48; // extend past edges for safety
-        const wallColor = 0x3b2a14; // dark brown
-
-        // Create organic walls using overlapping circular/oval segments.
-        // Each edge is approximated by a chain of overlapping circles with varied radii
-        // so the visual boundary reads as ovals while each circle also gets a static collider.
-        const makeEdgeCircles = (points) => {
-            for (const p of points) {
-                try {
-                    const c = this.add.circle(p.x, p.y, p.r, wallColor, 1).setDepth(1.0);
-                    try { this.physics.add.existing(c, true); } catch (e) {}
-                    try { if (typeof setCircleCentered === 'function') setCircleCentered(c, Math.max(6, Math.round(p.r))); } catch (e) {}
-                    try { if (this.player && this.player.body) this.physics.add.collider(this.player, c); } catch (e) {}
-                    this._caveWalls.push(c);
-                } catch (e) { /* ignore individual circle failures */ }
-            }
-        };
-
-    // Top / bottom chains (denser; increased to better match left-side visuals)
-    const segCountX = Math.max(80, Math.round(worldW / 12));
-        const topPoints = [];
-        const bottomPoints = [];
-        for (let i = 0; i < segCountX; i++) {
-            const t = i / Math.max(1, segCountX - 1);
-            const x = -extra + t * (worldW + extra * 2);
-            const jitter = Phaser.Math.Between(-14, 14);
-            // use smaller radii so many overlapping circles form a smooth organic edge
-            // then scale top/bottom radii up to better match the left-side visuals
-            let rTop = Phaser.Math.Between(Math.max(14, Math.round(worldW / 160)), Math.max(32, Math.round(worldW / 80)));
-            let rBottom = Phaser.Math.Between(Math.max(14, Math.round(worldW / 160)), Math.max(32, Math.round(worldW / 80)));
-            // enlarge top/bottom to approximately 3x to match the left cluster size
-            rTop = Math.max(12, Math.round(rTop * 3));
-            rBottom = Math.max(12, Math.round(rBottom * 3));
-            // align to the screen edge (top should be near y=0)
-            topPoints.push({ x: x, y: Math.round(-rTop / 2) + Phaser.Math.Between(-10, 10), r: rTop });
-            // bottom aligned beyond the bottom edge (y ~= worldH + r/2)
-            bottomPoints.push({ x: x, y: Math.round(worldH + rBottom / 2) + Phaser.Math.Between(-10, 10), r: rBottom });
-        }
-        makeEdgeCircles(topPoints);
-        makeEdgeCircles(bottomPoints);
-
-        // Add extra top/bottom clusters to match the left-side density and scale
-        const extraTopCount = Math.max(20, Math.round(segCountX * 0.8));
-        const extraBottomCount = Math.max(20, Math.round(segCountX * 0.8));
-        const topExtra = [];
-        const bottomExtra = [];
-        for (let i = 0; i < extraTopCount; i++) {
-            const x = Phaser.Math.Between(-extra, worldW + extra);
-            const r = Phaser.Math.Between(12, 64);
-            topExtra.push({ x: x, y: Math.round(-r / 2) + Phaser.Math.Between(-12, 12), r: r });
-        }
-        for (let i = 0; i < extraBottomCount; i++) {
-            const x = Phaser.Math.Between(-extra, worldW + extra);
-            const r = Phaser.Math.Between(12, 64);
-            bottomExtra.push({ x: x, y: Math.round(worldH + r / 2) + Phaser.Math.Between(-12, 12), r: r });
-        }
-        makeEdgeCircles(topExtra);
-        makeEdgeCircles(bottomExtra);
-
-        // Left / right chains (much denser on Y and with extra left-side cluster)
-        const segCountY = Math.max(50, Math.round(worldH / 22));
-        const leftPoints = [];
-        const rightPoints = [];
-        for (let i = 0; i < segCountY; i++) {
-            const t = i / Math.max(1, segCountY - 1);
-            const y = -extra + t * (worldH + extra * 2);
-            const jitter = Phaser.Math.Between(-18, 18);
-            const rLeft = Phaser.Math.Between(Math.max(14, Math.round(worldH / 160)), Math.max(32, Math.round(worldH / 80)));
-            // compute rRight similarly then enlarge to match left-side visual scale
-            let rRight = Phaser.Math.Between(Math.max(14, Math.round(worldH / 160)), Math.max(32, Math.round(worldH / 80)));
-            rRight = Math.max(12, Math.round(rRight * 3));
-            // left aligned beyond left edge (x ~= -r/2)
-            leftPoints.push({ x: Math.round(-rLeft / 2) + Phaser.Math.Between(-10, 10), y: y, r: rLeft });
-            // right aligned beyond right edge (x ~= worldW + r/2)
-            rightPoints.push({ x: Math.round(worldW + rRight / 2) + Phaser.Math.Between(-10, 10), y: y, r: rRight });
-        }
-
-        // Add a much larger left-side cluster of circles to guarantee dense coverage
-        const extraLeftCount = Math.max(30, Math.round(segCountY * 4.5));
-        for (let i = 0; i < extraLeftCount; i++) {
-            const y = Phaser.Math.Between(bounds.y1 - extra, bounds.y2 + extra);
-            const x = bounds.x1 - Phaser.Math.Between(24, 140) - Phaser.Math.Between(0, 40);
-            const r = Phaser.Math.Between(12, 56);
-            leftPoints.push({ x: x, y: y, r: r });
-        }
-
-        makeEdgeCircles(leftPoints);
-        makeEdgeCircles(rightPoints);
-    } catch (e) { /* ignore physics failures */ }
+    // Note: We intentionally removed blocking cave walls for a more open look.
+    // Players can traverse the whole area; node placement simply respects margins.
 
     const isTooClose = (x, y) => {
         // avoid furnace and portal
@@ -288,208 +196,60 @@ export class Cave extends Phaser.Scene {
         try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
         // avoid player spawn
         try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
-        // avoid cave walls (keep nodes a bit away from wall rects)
-        try {
-            if (this._caveWalls && this._caveWalls.length) {
-                for (const w of this._caveWalls) {
-                    if (!w || !w.body) continue;
-                    // approximate by checking distance to visual bounds
-                    const wr = w.getBounds ? w.getBounds() : null;
-                    if (wr && Phaser.Geom.Rectangle.Contains(wr, x, y)) return true;
-                }
-            }
-        } catch (e) {}
         for (const p of placedNodes) if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < minSeparation) return true;
         return false;
     };
-
-    // Place nodes along cave edges first (top/bottom/left/right near walls)
+    
+    // Balanced distribution: per-ore clusters near center + blue-noise scatter
     // Limit total nodes to avoid overcrowding on smaller screens. Distribute the cap
     // across ores so each ore gets at least one chance to spawn.
-    // increase node density: smaller denominator -> more nodes on typical viewports
     const MAX_NODES = Math.max(16, Math.round((this.scale.width * this.scale.height) / 45000));
-    // use ceil so distribution doesn't underallocate when MAX_NODES is not divisible
     const perOreCap = Math.max(1, Math.ceil(MAX_NODES / Math.max(1, oreConfigs.length)));
+
+    const placeNode = (tx, ty, oreType) => {
+        tx = Phaser.Math.Clamp(tx, bounds.x1, bounds.x2);
+        ty = Phaser.Math.Clamp(ty, bounds.y1, bounds.y2);
+        if (isTooClose(tx, ty)) return false;
+        this._createMiningNode(tx, ty, oreType);
+        placedNodes.push({ x: tx, y: ty, type: oreType });
+        return true;
+    };
+
+    // 1) Per-ore clusters near center
+    const centerArea = { x1: bounds.x1 + 140, x2: bounds.x2 - 140, y1: bounds.y1 + 100, y2: bounds.y2 - 100 };
     for (const cfg of oreConfigs) {
         let remainingForThisOre = perOreCap;
-        const edgeCount = cfg.edgeCount || Math.max(4, (cfg.perCluster || 2) * 2);
-        for (let i = 0; i < edgeCount; i++) {
-            if (placedNodes.length >= MAX_NODES) break;
-            if (remainingForThisOre <= 0) break;
-            let side = Phaser.Math.Between(0, 3); // 0=top,1=right,2=bottom,3=left
-            let nx = 0, ny = 0;
-            // prefer to attach nodes to the inner edge of the nearest wall circle so they
-            // appear on the accessible side (toward the scene center) instead of outside
-            // the visible cave. If no wall circle found, fall back to inset placement.
-            const nodeRadius = 28;
-            const innerGap = 8;
-            const findWallCircleForSide = (side, targetX, targetY) => {
-                if (!this._caveWalls || !this._caveWalls.length) return null;
-                let best = null; let bestDist = 1e9;
-                for (const w of this._caveWalls) {
-                    if (!w) continue;
-                    const wr = (w.getBounds && typeof w.getBounds === 'function') ? w.getBounds() : null;
-                    if (!wr) continue;
-                    const cx = wr.x + wr.width / 2;
-                    const cy = wr.y + wr.height / 2;
-                    // filter by side approximate position
-                    if (side === 0 && cy > bounds.y1 + 40) continue; // top circles should be above
-                    if (side === 2 && cy < bounds.y2 - 40) continue; // bottom circles should be below
-                    if (side === 3 && cx > bounds.x1 + 40) continue; // left circles should be left
-                    if (side === 1 && cx < bounds.x2 - 40) continue; // right circles should be right
-                    // measure distance to desired target to pick the closest wall segment
-                    const d = Phaser.Math.Distance.Between(targetX || cx, targetY || cy, cx, cy);
-                    if (d < bestDist) { bestDist = d; best = { w, cx, cy, wr }; }
-                }
-                return best;
-            };
-            const edgeInset = 24; // distance from the inner edge where nodes sit
-            if (side === 0) { // top
-                const tx = Phaser.Math.Between(bounds.x1 + 20, bounds.x2 - 20);
-                const hit = findWallCircleForSide(0, tx, bounds.y1);
-                if (hit) {
-                    const radius = Math.round(hit.w.displayWidth ? hit.w.displayWidth / 2 : (hit.w.width || hit.w.radius || 32));
-                    nx = Phaser.Math.Clamp(Math.round(hit.cx + Phaser.Math.Between(-Math.round(radius/2), Math.round(radius/2))), bounds.x1, bounds.x2);
-                    ny = Math.round(hit.cy + radius + nodeRadius + innerGap);
-                } else {
-                    nx = Phaser.Math.Between(bounds.x1 + 20, bounds.x2 - 20);
-                    ny = bounds.y1 + edgeInset + Phaser.Math.Between(-8, 8);
-                }
-            } else if (side === 2) { // bottom
-                const tx = Phaser.Math.Between(bounds.x1 + 20, bounds.x2 - 20);
-                const hit = findWallCircleForSide(2, tx, bounds.y2);
-                if (hit) {
-                    const radius = Math.round(hit.w.displayWidth ? hit.w.displayWidth / 2 : (hit.w.width || hit.w.radius || 32));
-                    nx = Phaser.Math.Clamp(Math.round(hit.cx + Phaser.Math.Between(-Math.round(radius/2), Math.round(radius/2))), bounds.x1, bounds.x2);
-                    ny = Math.round(hit.cy - radius - nodeRadius - innerGap);
-                } else {
-                    nx = Phaser.Math.Between(bounds.x1 + 20, bounds.x2 - 20);
-                    ny = bounds.y2 - edgeInset + Phaser.Math.Between(-8, 8);
-                }
-            } else if (side === 3) { // left
-                const ty = Phaser.Math.Between(bounds.y1 + 20, bounds.y2 - 20);
-                const hit = findWallCircleForSide(3, bounds.x1, ty);
-                if (hit) {
-                    const radius = Math.round(hit.w.displayWidth ? hit.w.displayWidth / 2 : (hit.w.width || hit.w.radius || 32));
-                    nx = Math.round(hit.cx + radius + nodeRadius + innerGap);
-                    ny = Phaser.Math.Clamp(Math.round(hit.cy + Phaser.Math.Between(-Math.round(radius/2), Math.round(radius/2))), bounds.y1, bounds.y2);
-                } else {
-                    nx = bounds.x1 + edgeInset + Phaser.Math.Between(-8, 8);
-                    ny = Phaser.Math.Between(bounds.y1 + 20, bounds.y2 - 20);
-                }
-            } else { // right
-                const ty = Phaser.Math.Between(bounds.y1 + 20, bounds.y2 - 20);
-                const hit = findWallCircleForSide(1, bounds.x2, ty);
-                if (hit) {
-                    const radius = Math.round(hit.w.displayWidth ? hit.w.displayWidth / 2 : (hit.w.width || hit.w.radius || 32));
-                    nx = Math.round(hit.cx - radius - nodeRadius - innerGap);
-                    ny = Phaser.Math.Clamp(Math.round(hit.cy + Phaser.Math.Between(-Math.round(radius/2), Math.round(radius/2))), bounds.y1, bounds.y2);
-                } else {
-                    nx = bounds.x2 - edgeInset + Phaser.Math.Between(-8, 8);
-                    ny = Phaser.Math.Between(bounds.y1 + 20, bounds.y2 - 20);
-                }
-            }
-            nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-            ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-            let tries = 0;
-            while (isTooClose(nx, ny) && tries < 25) {
-                side = Phaser.Math.Between(0, 3);
-                if (side === 0) { nx = Phaser.Math.Between(bounds.x1 + 20, bounds.x2 - 20); ny = bounds.y1 + edgeInset + Phaser.Math.Between(-12, 12); }
-                else if (side === 2) { nx = Phaser.Math.Between(bounds.x1 + 20, bounds.x2 - 20); ny = bounds.y2 - edgeInset + Phaser.Math.Between(-12, 12); }
-                else if (side === 3) { nx = bounds.x1 + edgeInset + Phaser.Math.Between(-12, 12); ny = Phaser.Math.Between(bounds.y1 + 20, bounds.y2 - 20); }
-                else { nx = bounds.x2 - edgeInset + Phaser.Math.Between(-12, 12); ny = Phaser.Math.Between(bounds.y1 + 20, bounds.y2 - 20); }
-                nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                tries++;
-            }
-            if (!isTooClose(nx, ny)) {
-                this._createMiningNode(nx, ny, cfg.type);
-                placedNodes.push({ x: nx, y: ny, type: cfg.type });
-                remainingForThisOre--;
-            }
-        }
-
-        // Now create 1-2 center clusters (avoid overlapping other objects)
-        const centerClusters = Math.min(2, Math.max(1, cfg.centerClusters || Math.max(1, Math.floor((cfg.clusters || 1)))));
-        const centerArea = { x1: bounds.x1 + 120, x2: bounds.x2 - 120, y1: bounds.y1 + 80, y2: bounds.y2 - 80 };
-        for (let c = 0; c < centerClusters; c++) {
-            if (placedNodes.length >= MAX_NODES) break;
-            if (remainingForThisOre <= 0) break;
+        const clusterCount = Math.min(2, Math.max(1, cfg.centerClusters || Math.floor((cfg.clusters || 2) / 1)));
+        const perCluster = Math.max(2, Math.round((cfg.perCluster || 3)));
+        for (let c = 0; c < clusterCount; c++) {
+            if (placedNodes.length >= MAX_NODES || remainingForThisOre <= 0) break;
             let cx = Phaser.Math.Between(centerArea.x1, centerArea.x2);
             let cy = Phaser.Math.Between(centerArea.y1, centerArea.y2);
             let attempts = 0;
-            while (isTooClose(cx, cy) && attempts < 40) {
-                cx = Phaser.Math.Between(centerArea.x1, centerArea.x2);
-                cy = Phaser.Math.Between(centerArea.y1, centerArea.y2);
-                attempts++;
-            }
+            while (isTooClose(cx, cy) && attempts < 40) { cx = Phaser.Math.Between(centerArea.x1, centerArea.x2); cy = Phaser.Math.Between(centerArea.y1, centerArea.y2); attempts++; }
             if (isTooClose(cx, cy)) continue;
-            for (let i = 0; i < (cfg.perCluster || 3); i++) {
-                if (placedNodes.length >= MAX_NODES) break;
-                if (remainingForThisOre <= 0) break;
-                let angle = Math.random() * Math.PI * 2;
-                let rad = Math.random() * (cfg.clusterRadius || 80);
-                let nx = Math.round(cx + Math.cos(angle) * rad);
-                let ny = Math.round(cy + Math.sin(angle) * rad);
-                nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                let innerAttempts = 0;
-                while (isTooClose(nx, ny) && innerAttempts < 20) {
-                    angle = Math.random() * Math.PI * 2; rad = Math.random() * (cfg.clusterRadius || 80);
-                    nx = Math.round(cx + Math.cos(angle) * rad);
-                    ny = Math.round(cy + Math.sin(angle) * rad);
-                    nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                    ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                    innerAttempts++;
-                }
-                if (!isTooClose(nx, ny)) {
-                    this._createMiningNode(nx, ny, cfg.type);
-                    placedNodes.push({ x: nx, y: ny, type: cfg.type });
-                    remainingForThisOre--;
-                }
+            for (let i = 0; i < perCluster; i++) {
+                if (placedNodes.length >= MAX_NODES || remainingForThisOre <= 0) break;
+                const angle = Math.random() * Math.PI * 2;
+                const rad = Math.random() * (cfg.clusterRadius || 80);
+                const nx = Math.round(cx + Math.cos(angle) * rad);
+                const ny = Math.round(cy + Math.sin(angle) * rad);
+                if (placeNode(nx, ny, cfg.type)) remainingForThisOre--;
             }
         }
-        // Optional mid-cluster between edge and center to create a gradation
-        const midClusters = Math.max(0, (cfg.midClusters != null) ? cfg.midClusters : 1);
-        const midArea = { x1: bounds.x1 + 60, x2: bounds.x2 - 60, y1: bounds.y1 + 40, y2: bounds.y2 - 40 };
-        for (let m = 0; m < midClusters; m++) {
-            if (placedNodes.length >= MAX_NODES) break;
-            if (remainingForThisOre <= 0) break;
-            let mx = Phaser.Math.Between(midArea.x1, midArea.x2);
-            let my = Phaser.Math.Between(midArea.y1, midArea.y2);
-            let mattempts = 0;
-            while (isTooClose(mx, my) && mattempts < 30) {
-                mx = Phaser.Math.Between(midArea.x1, midArea.x2);
-                my = Phaser.Math.Between(midArea.y1, midArea.y2);
-                mattempts++;
-            }
-            if (isTooClose(mx, my)) continue;
-            const midCount = Math.max(1, Math.round((cfg.perCluster || 3) / 2));
-            for (let i = 0; i < midCount; i++) {
-                if (placedNodes.length >= MAX_NODES) break;
-                if (remainingForThisOre <= 0) break;
-                const angle = Math.random() * Math.PI * 2;
-                const rad = Math.random() * ((cfg.clusterRadius || 80) * 0.7);
-                let nx = Math.round(mx + Math.cos(angle) * rad);
-                let ny = Math.round(my + Math.sin(angle) * rad);
-                nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                let innerAttempts = 0;
-                while (isTooClose(nx, ny) && innerAttempts < 12) {
-                    const angle2 = Math.random() * Math.PI * 2;
-                    const rad2 = Math.random() * ((cfg.clusterRadius || 80) * 0.7);
-                    nx = Math.round(mx + Math.cos(angle2) * rad2);
-                    ny = Math.round(my + Math.sin(angle2) * rad2);
-                    nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                    ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                    innerAttempts++;
-                }
-                if (!isTooClose(nx, ny)) {
-                    this._createMiningNode(nx, ny, cfg.type);
-                    placedNodes.push({ x: nx, y: ny, type: cfg.type });
-                    remainingForThisOre--;
-                }
-            }
+        cfg._remaining = remainingForThisOre; // carry into scatter phase for balance
+    }
+
+    // 2) Blue-noise scatter: dart throwing with min separation until cap
+    let scatterAttempts = 0;
+    while (placedNodes.length < MAX_NODES && scatterAttempts < MAX_NODES * 20) {
+        scatterAttempts++;
+        const sx = Phaser.Math.Between(bounds.x1, bounds.x2);
+        const sy = Phaser.Math.Between(bounds.y1, bounds.y2);
+        // cycle ore types to keep variety; prefer ones with remaining quota
+        const preferred = oreConfigs.find(c => (c._remaining || 0) > 0) || oreConfigs[placedNodes.length % oreConfigs.length];
+        if (placeNode(sx, sy, preferred.type)) {
+            if (preferred._remaining && preferred._remaining > 0) preferred._remaining--;
         }
     }
     // Add several scattered filler nodes (proportional to MAX_NODES) and ensure they're tracked
