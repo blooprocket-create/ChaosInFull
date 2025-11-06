@@ -11,7 +11,9 @@ function resolveTalentIcon(scene, talentLike) {
         if (!scene || !scene.char || !talentLike) return null;
         const cls = (scene.char.class || '').trim();
         if (!cls) return null;
-        const folder = cls.charAt(0).toUpperCase() + cls.slice(1).toLowerCase(); // e.g. Horror, Occultist, Stalker, Beginner
+        // Normalize class folder; handle historical naming mismatch ("Occultis" class uses assets folder "Occultist")
+        let folder = cls.charAt(0).toUpperCase() + cls.slice(1).toLowerCase(); // e.g. Horror, Occultist, Stalker, Beginner
+        if (folder === 'Occultis') folder = 'Occultist';
         const override = {
             plus1str: 'Plus1Str', plus1int: 'Plus1Int', plus1agi: 'Plus1Agi',
             bonecrusher_training: 'BoneCrusher', bloodstaked_guard: 'Bloodstaked', wood_lover: 'StaffMastery', mining_exp_gain: 'MiningExpertise',
@@ -264,12 +266,13 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
     .talent-badge{font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,0.25);display:inline-block;margin-top:6px}
     /* Themed skill bar to match login/character-select: blocky cards, red accent, Metal Mania heading feel */
     #global-skill-bar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 9999; display:flex; gap:10px; padding:8px; background: linear-gradient(180deg, rgba(12,12,14,0.96), rgba(18,18,20,0.96)); border-left:8px solid rgba(120,20,20,0.95); border:3px solid #111; border-radius:6px; box-shadow: 0 30px 80px rgba(0,0,0,0.9); font-family: 'Share Tech Mono', monospace; }
-    .skill-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;width:72px;height:72px;gap:6px;padding:8px;border-radius:6px;background:linear-gradient(180deg,rgba(14,14,16,0.96),rgba(8,8,10,0.96));border:2px solid rgba(30,30,30,0.7);cursor:pointer;transition:background-color 140ms ease,border-color 120ms ease,color 120ms ease;text-align:center;color:#e6d7cf}
+    .skill-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;width:72px;height:72px;gap:6px;padding:8px;border-radius:6px;background:linear-gradient(180deg,rgba(14,14,16,0.96),rgba(8,8,10,0.96));border:2px solid rgba(30,30,30,0.7);cursor:pointer;transition:background-color 140ms ease,border-color 120ms ease,color 120ms ease;text-align:center;color:#e6d7cf;position:relative;}
     /* Hover: gentle tint only (no translate/box-shadow) to avoid visual glitches */
     .skill-slot:hover{ background: linear-gradient(180deg, rgba(20,12,12,0.98), rgba(26,14,14,0.98)); border-color: rgba(140,30,30,0.95); }
     .skill-slot.selected{ border-color: rgba(255,180,120,0.95); }
-    .skill-icon{width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(255,255,255,0.02);color:#ffd27a}
-    .skill-label{font-family:'Metal Mania',cursive;font-size:0.85rem;color:#f0c9b0;letter-spacing:0.5px}
+    .skill-icon{width:40px;height:40px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#ffd27a;overflow:hidden;}
+    .skill-icon img{width:100%;height:100%;object-fit:cover;border-radius:6px;}
+    .skill-label{font-family:'Metal Mania',cursive;font-size:0.75rem;color:#f0c9b0;letter-spacing:0.5px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .mana-badge{position:absolute;right:8px;top:6px;background:rgba(120,20,20,0.9);color:#fff;padding:4px 6px;border-radius:6px;font-size:11px;font-weight:800}
     .cooldown-overlay{position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.6));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;border-radius:6px}
     .cooldown-active{filter:grayscale(30%);opacity:0.95}
@@ -3600,20 +3603,22 @@ export function refreshSkillBarHUD(scene) {
             const iconDiv = document.createElement('div'); iconDiv.className = 'skill-icon';
             // Prefer actual icon image from TalentIcons; fallback to emoji
             try {
-                iconDiv.style.position = 'relative';
-                iconDiv.style.overflow = 'hidden';
                 const src = (assignedDef ? resolveTalentIcon(scene, { id: assigned, name: assignedDef.name }) : null);
                 if (src) {
                     const img = document.createElement('img');
-                    img.src = src; img.alt = assignedDef ? (assignedDef.name || assigned) : assigned || '';
-                    img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+                    img.src = src; 
+                    img.alt = assignedDef ? (assignedDef.name || assigned) : assigned || '';
                     img.referrerPolicy = 'no-referrer';
-                    img.onerror = () => { try { iconDiv.textContent = assigned ? '•' : ''; iconDiv.style.background = 'rgba(255,255,255,0.04)'; } catch(e){} };
+                    img.onerror = () => { 
+                        try { 
+                            iconDiv.innerHTML = ''; 
+                            iconDiv.textContent = assigned ? '•' : ''; 
+                        } catch(e){} 
+                    };
                     iconDiv.appendChild(img);
                 } else {
                     // fallback glyph
                     iconDiv.textContent = assigned ? '•' : '';
-                    iconDiv.style.background = 'rgba(255,255,255,0.04)';
                 }
             } catch (e) { iconDiv.textContent = assigned ? '•' : ''; }
 
