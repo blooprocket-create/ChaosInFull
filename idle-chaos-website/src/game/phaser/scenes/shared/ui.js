@@ -3335,8 +3335,17 @@ export function refreshTalentModal(scene) {
         const desc = document.createElement('div'); desc.className='desc';
         try {
             const s = t.scaling; const s2 = t.secondScaling; let txt = t.description || '';
-            if (s) { const curVal = s.base + s.perRank * Math.max(0, alloc-1); const showCur = (alloc>0)? formatDisplay(curVal): formatDisplay(s.base); txt = txt.replace(/\{value\}/g, showCur); }
-            if (s2){ const cur2 = s2.base + s2.perRank * Math.max(0, alloc-1); const showCur2 = (alloc>0)? formatDisplay(cur2): formatDisplay(s2.base); txt = txt.replace(/\{secondValue\}/g, showCur2); }
+            if (s) {
+                // current effective value at this rank (if 0, show base)
+                const curVal = s.base + s.perRank * Math.max(0, alloc - 1);
+                const showCur = (alloc > 0) ? formatDisplay(curVal) : formatDisplay(s.base);
+                txt = txt.replace(/\{value\}/g, showCur);
+            }
+            if (s2){
+                const cur2 = s2.base + s2.perRank * Math.max(0, alloc - 1);
+                const showCur2 = (alloc > 0) ? formatDisplay(cur2) : formatDisplay(s2.base);
+                txt = txt.replace(/\{secondValue\}/g, showCur2);
+            }
             desc.textContent = txt;
         } catch(e){ desc.textContent = t.description || ''; }
         node.appendChild(desc);
@@ -3346,8 +3355,17 @@ export function refreshTalentModal(scene) {
             try {
                 const preview = document.createElement('div'); preview.className='next-rank';
                 let parts = [];
-                if (t.scaling) { const nextVal = t.scaling.base + t.scaling.perRank * Math.max(0, (alloc === 0? 0: alloc)) ; parts.push(`Next: {value} → ${formatDisplay(nextVal)}`); }
-                if (t.secondScaling) { const next2 = t.secondScaling.base + t.secondScaling.perRank * Math.max(0,(alloc === 0? 0: alloc)); parts.push(`+${formatDisplay(next2)} ${t.secondScaling.label||''}`); }
+                if (t.scaling) {
+                    // current value at this rank (if alloc>0 use alloc-1 progression, else base)
+                    const curVal = t.scaling.base + t.scaling.perRank * Math.max(0, alloc - 1);
+                    const nextVal = t.scaling.base + t.scaling.perRank * Math.max(0, alloc);
+                    parts.push(`Current: ${formatDisplay(curVal)}  →  Next: ${formatDisplay(nextVal)}`);
+                }
+                if (t.secondScaling) {
+                    const cur2 = t.secondScaling.base + t.secondScaling.perRank * Math.max(0, alloc - 1);
+                    const next2 = t.secondScaling.base + t.secondScaling.perRank * Math.max(0, alloc);
+                    parts.push(`${t.secondScaling.label||'Extra'}: ${formatDisplay(cur2)} → ${formatDisplay(next2)}`);
+                }
                 preview.textContent = parts.join('  |  ');
                 node.appendChild(preview);
             } catch(e){}
