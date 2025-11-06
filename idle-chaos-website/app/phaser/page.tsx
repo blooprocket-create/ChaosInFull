@@ -1,5 +1,6 @@
 import { getSession } from "@/src/lib/auth";
 import PhaserGameCanvas from "@/src/game/PhaserGameCanvas";
+import HideFooter from "@/src/components/HideFooter";
 import JsonLd from "@/src/components/JsonLd";
 
 export const metadata = { 
@@ -21,13 +22,15 @@ export default async function PhaserGamePage({ searchParams }: { searchParams?: 
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12">
+      {/* Hide global footer on the Play (Phaser) page to maximize canvas area */}
+      <HideFooter />
       <JsonLd data={[{
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
   name: "Veil Keeper",
   applicationCategory: "Game",
         operatingSystem: "Web",
-        offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+        offers: { "@type": "Offer", price: 5000, priceCurrency: "USD" },
         url: "https://chaos-in-full.vercel.app/phaser"
       },{
         "@context": "https://schema.org",

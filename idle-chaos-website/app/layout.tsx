@@ -74,7 +74,7 @@ export default async function RootLayout({
           </nav>
         </header>
   <main className="min-h-[calc(100vh-64px)]">{children}</main>
-        <footer className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
+  <footer id="site-footer" className="border-t border-white/10 py-8 text-center text-xs text-gray-400">
           <div className="mx-auto max-w-6xl px-4 flex items-center justify-between gap-3">
             <div title="v0.0.11">© {new Date().getFullYear()} Veil Keeper</div>
             <StatusChip />
