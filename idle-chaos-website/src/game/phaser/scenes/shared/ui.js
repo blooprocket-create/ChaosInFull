@@ -3576,74 +3576,7 @@ export function refreshSkillBarHUD(scene) {
         }
         el.appendChild(buffsRow);
 
-        // Insert vitals (HP + Shield) row between buffs and slots
-        try {
-            const vitals = document.createElement('div');
-            vitals.id = 'skillbar-vitals';
-            vitals.style.position = 'relative';
-            vitals.style.width = '100%';
-            vitals.style.height = '12px';
-            vitals.style.marginTop = buffs.length ? '2px' : '0';
-            vitals.style.borderRadius = '6px';
-            vitals.style.overflow = 'hidden';
-            vitals.style.background = '#2a0a16';
-            vitals.style.border = '1px solid rgba(255,255,255,0.06)';
-            vitals.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.04)';
-            const hpFill = document.createElement('div'); hpFill.id = 'skillbar-hp';
-            hpFill.style.position = 'absolute'; hpFill.style.left = '0'; hpFill.style.top = '0';
-            hpFill.style.height = '100%'; hpFill.style.width = '0%'; hpFill.style.background = '#e44';
-            const shieldFill = document.createElement('div'); shieldFill.id = 'skillbar-shield';
-            shieldFill.style.position = 'absolute'; shieldFill.style.left = '0'; shieldFill.style.top = '0';
-            shieldFill.style.height = '100%'; shieldFill.style.width = '0%';
-            shieldFill.style.background = 'linear-gradient(90deg, rgba(90,150,255,0.55) 0%, rgba(40,100,200,0.55) 100%)';
-            shieldFill.style.mixBlendMode = 'screen';
-            shieldFill.style.opacity = '0';
-            shieldFill.style.transition = 'width 0.15s linear, opacity 0.2s ease';
-            shieldFill.style.boxShadow = 'inset 0 0 6px rgba(120,180,255,0.6), 0 0 4px rgba(100,160,255,0.35)';
-            const vitalsText = document.createElement('div'); vitalsText.id = 'skillbar-vitals-text';
-            vitalsText.style.position = 'absolute'; vitalsText.style.left = '50%'; vitalsText.style.top = '50%';
-            vitalsText.style.transform = 'translate(-50%, -50%)';
-            vitalsText.style.color = '#fff'; vitalsText.style.fontSize = '10px'; vitalsText.style.fontWeight = '800';
-            vitalsText.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
-            vitals.appendChild(hpFill); vitals.appendChild(shieldFill); vitals.appendChild(vitalsText);
-            // derive hp
-            let maxhp = 1; let hp = 1;
-            try {
-                if (typeof char.maxhp === 'number' && char.maxhp > 0) maxhp = Math.floor(char.maxhp);
-                else if (window.__shared_ui && window.__shared_ui.stats && typeof window.__shared_ui.stats.effectiveStats === 'function') {
-                    const eff = window.__shared_ui.stats.effectiveStats(char); maxhp = Math.max(1, Math.floor((eff && eff.maxhp) || 1));
-                } else maxhp = Math.max(1, Math.floor(100 + ((char.level||1)*10)));
-                hp = (typeof char.hp === 'number') ? Math.max(0, Math.min(maxhp, Math.floor(char.hp))) : maxhp;
-            } catch (e) { maxhp = 1; hp = 1; }
-            const manaShield = (char._manaShield && typeof char._manaShield.current === 'number') ? Math.max(0, char._manaShield.current) : 0;
-            const manaWard = (char._manaWard && typeof char._manaWard.remaining === 'number') ? Math.max(0, char._manaWard.remaining) : 0;
-            const darkShield = (char._darkShield && typeof char._darkShield.remaining === 'number') ? Math.max(0, char._darkShield.remaining) : 0;
-            const totalShield = manaShield + manaWard + darkShield;
-            const hpPct = maxhp > 0 ? Math.max(0, Math.min(100, (hp / maxhp) * 100)) : 0;
-            const shieldPct = maxhp > 0 ? Math.max(0, Math.min(100, (totalShield / maxhp) * 100)) : 0;
-            hpFill.style.width = hpPct + '%';
-            shieldFill.style.width = shieldPct + '%';
-            shieldFill.style.opacity = totalShield > 0 ? '1' : '0';
-            vitalsText.textContent = `${hp}/${maxhp}`;
-            if (totalShield > 0 && totalShield < Math.max(20, maxhp * 0.15)) {
-                if (!shieldFill.dataset.pulsing) { shieldFill.dataset.pulsing = '1'; shieldFill.style.animation = 'shieldPulse 0.8s ease-in-out infinite'; }
-            } else if (shieldFill.dataset.pulsing) { delete shieldFill.dataset.pulsing; shieldFill.style.animation = 'none'; }
-            // Tooltip on vitals for shield breakdown
-            const mkVitalsTip = () => {
-                const segs = [];
-                if (manaShield > 0) segs.push(`<div style='color:#9cf;'>Mana Shield: ${Math.floor(manaShield)}</div>`);
-                if (manaWard > 0) segs.push(`<div style='color:#7dd;'>Mana Ward: ${Math.floor(manaWard)}</div>`);
-                if (darkShield > 0) segs.push(`<div style='color:#c9f;'>Dark Shield: ${Math.floor(darkShield)}</div>`);
-                if (!segs.length) segs.push('<div style="opacity:0.7;">No shield active</div>');
-                return `<div style='font-weight:800;color:#ffd27a;margin-bottom:2px;'>Shield</div>${segs.join('')}`;
-            };
-            vitals.addEventListener('mouseenter', (ev) => { try { showTip(mkVitalsTip(), ev); } catch(e){} });
-            vitals.addEventListener('mousemove', (ev) => { try { moveTip(ev); } catch(e){} });
-            vitals.addEventListener('mouseleave', () => { try { hideTip(); } catch(e){} });
-            el.appendChild(vitals);
-        } catch (e) {}
-
-        // Slots wrapper (nine slots) BELOW the vitals row
+        // Slots wrapper (nine slots) BELOW the buffs row
         const slotsWrap = document.createElement('div');
         slotsWrap.style.display = 'flex';
         slotsWrap.style.gap = '8px';
