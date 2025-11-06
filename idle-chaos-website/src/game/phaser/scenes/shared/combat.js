@@ -355,9 +355,35 @@ function spawnArcaneShield(scene, x, y, radius, color, opts = {}) {
             scene.tweens.add({ targets: base, alpha: { from: 0.28, to: 0.12 }, yoyo: true, repeat: -1, duration: 420 });
         }
 
-        return {
-            destroy: () => { try { container.destroy(); } catch (e) {} }
+        // Follow the player (or provided target) by default so the shield surrounds the character
+        const attachToPlayer = (opts.attachToPlayer === undefined) ? true : !!opts.attachToPlayer;
+        const target = opts.target || (attachToPlayer ? scene.player : null);
+        let destroyed = false;
+        const updateFn = () => {
+            if (destroyed) return;
+            try {
+                if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+                    container.x = target.x;
+                    container.y = target.y;
+                }
+            } catch (e) {}
         };
+        if (target && scene.events && scene.events.on) scene.events.on('update', updateFn);
+
+        const api = {
+            destroy: () => {
+                try { destroyed = true; } catch (e) {}
+                try { if (scene.events && scene.events.off) scene.events.off('update', updateFn); } catch (e) {}
+                try { container.destroy(); } catch (e) {}
+            }
+        };
+
+        // Optional lifetime
+        if (opts.duration && scene.time && scene.time.addEvent) {
+            scene.time.addEvent({ delay: Math.max(0, opts.duration), callback: () => { try { api.destroy(); } catch (e) {} } });
+        }
+
+        return api;
     } catch (e) { return null; }
 }
 
@@ -1735,6 +1761,12 @@ function sharedGetEnemyInRange(range) {
                             const used = Math.min(ds.remaining, incoming);
                             ds.remaining = Math.max(0, ds.remaining - used);
                             incoming = Math.max(0, incoming - used);
+                            // If shield is fully consumed, clear state and visuals immediately
+                            if (ds.remaining <= 0) {
+                                try { this.char._darkShield = null; } catch (e) {}
+                                try { if (this._darkShieldFx && this._darkShieldFx.destroy) this._darkShieldFx.destroy(); } catch (e) {}
+                                try { this._darkShieldFx = null; } catch (e) {}
+                            }
                         }
                     } catch (e) {}
                     this.char.hp = Math.max(0, (this.char.hp || this.char.maxhp) - incoming);
@@ -1755,9 +1787,27 @@ function sharedGetEnemyInRange(range) {
                         try {
                             if (!this.char._darkShield || !(this.char._darkShield && this.char._darkShield.remaining > 0)) {
                                 const shieldAmount = Math.max(1, Math.round((Number(this.char.maxmana || 0) * (magicShieldPct / 100))));
-                                this.char._darkShield = { remaining: shieldAmount, expiresAt: Date.now() + 6000 };
+                                const expiresAt = Date.now() + 6000;
+                                this.char._darkShield = { remaining: shieldAmount, expiresAt };
                                 try { if (this._showToast) this._showToast('Dark Shield activated!', 900); } catch (e) {}
-                                try { const _pc = getPlayerCenter(this); spawnArcaneShield && spawnArcaneShield(this, _pc.x, _pc.y, 28, 0x552266); } catch (e) {}
+                                // Spawn a following shield visual and keep a handle for cleanup
+                                try {
+                                    const _pc = getPlayerCenter(this);
+                                    if (this._darkShieldFx && this._darkShieldFx.destroy) { try { this._darkShieldFx.destroy(); } catch (ee) {} }
+                                    this._darkShieldFx = spawnArcaneShield && spawnArcaneShield(this, _pc.x, _pc.y, 28, 0x552266, { attachToPlayer: true });
+                                } catch (e) {}
+                                // Schedule expiry cleanup
+                                try {
+                                    const delay = Math.max(0, (this.char._darkShield && this.char._darkShield.expiresAt) ? (this.char._darkShield.expiresAt - Date.now()) : 0);
+                                    if (delay > 0 && this.time && this.time.addEvent) {
+                                        if (this._darkShieldTimer && typeof this._darkShieldTimer.remove === 'function') { try { this._darkShieldTimer.remove(false); } catch (ee) {} }
+                                        this._darkShieldTimer = this.time.addEvent({ delay, callback: () => {
+                                            try { this.char._darkShield = null; } catch (e) {}
+                                            try { if (this._darkShieldFx && this._darkShieldFx.destroy) this._darkShieldFx.destroy(); } catch (e) {}
+                                            try { this._darkShieldFx = null; } catch (e) {}
+                                        } });
+                                    }
+                                } catch (e) {}
                                 // immediate HUD update so shield overlay appears right away
                                 try { if (this._updatePlayerHealthBar) this._updatePlayerHealthBar(); } catch (e) {}
                             }
