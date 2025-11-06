@@ -523,9 +523,6 @@ export class GloamwayBastion extends Phaser.Scene {
     }
 
     _openMotherLumenDialogue() {
-        const card = this._ensureDialogueOverlay();
-        if (!card) return;
-
         // Align Mother Lumen quest flow with other NPCs by using centralized availability logic
         const completed = this.char.completedQuests || [];
         const allActive = Array.isArray(this.char.activeQuests) ? (this.char.activeQuests || []) : [];
@@ -575,7 +572,7 @@ export class GloamwayBastion extends Phaser.Scene {
                 },
                 variant: 'success'
             });
-            optionConfigs.push({ label: 'Not yet', onClick: () => {} });
+            optionConfigs.push({ label: 'Not yet', onClick: () => {}, closeOnClick: true });
         } else if (nextAvailable) {
             const questDef = getQuestById(nextAvailable.id);
             bodyNodes.push(ui.createDialogueParagraph('Traveler, a fracture widens near the camp. Will you mend it for me?'));
@@ -590,14 +587,14 @@ export class GloamwayBastion extends Phaser.Scene {
                 },
                 variant: 'success'
             });
-            optionConfigs.push({ label: 'Another time.', onClick: () => {} });
+            optionConfigs.push({ label: 'Another time.', onClick: () => {}, closeOnClick: true });
         } else if (activeQuest) {
             const questDef = getQuestById(activeQuest.id);
             bodyNodes.push(ui.createDialogueParagraph('My lantern tracks your steps. Keep pressing the shadows aside.'));
             const states = getQuestObjectiveState(this.char, activeQuest.id);
             const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'I will return soon.', onClick: () => {} });
+            optionConfigs.push({ label: 'I will return soon.', onClick: () => {}, closeOnClick: true });
         } else if (hasCompletedGoblinCull && !hasChosenClass) {
             // Player finished goblin cull but hasn't chosen a class yet
             bodyNodes.push(ui.createDialogueParagraph('You have proven your resolve. Now you must choose the path that calls to you.'));
@@ -608,11 +605,11 @@ export class GloamwayBastion extends Phaser.Scene {
                 },
                 variant: 'success'
             });
-            optionConfigs.push({ label: 'I need more time.', onClick: () => {} });
+            optionConfigs.push({ label: 'I need more time.', onClick: () => {}, closeOnClick: true });
         } else {
             const ui = window.__shared_ui;
             bodyNodes.push(ui.createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
-            optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => {} });
+            optionConfigs.push({ label: 'Thank you, Mother Lumen.', onClick: () => {}, closeOnClick: true });
         }
 
         window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
@@ -824,7 +821,7 @@ export class GloamwayBastion extends Phaser.Scene {
         } catch (e) {}
     }
 
-    _ensureDialogueOverlay() {
+    _onPlayerDown() {
         if (this._dialogueOverlay && this._dialogueCard) {
             this._dialogueOpen = true;
             return this._dialogueCard;
