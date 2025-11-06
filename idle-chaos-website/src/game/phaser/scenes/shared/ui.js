@@ -1407,6 +1407,13 @@ function collectActiveBuffs(scene) {
     // 2) Skill-based ephemeral buffs (from combat.js conventions)
     try {
         const c = scene.char;
+        // Shadowstep: show active stealth window while it lasts
+        try {
+            if (c._shadowstep && c._shadowstep.stealth && typeof c._shadowstep.expiresAt === 'number' && c._shadowstep.expiresAt > now) {
+                const eta = Math.ceil((c._shadowstep.expiresAt - now) / 1000);
+                list.push({ key: 'stealth_active', label: 'Stealth', eta: eta, temporary: true });
+            }
+        } catch (ee) {}
         if (c._postStealthDodge && c._postStealthDodge.expiresAt > now) {
             list.push({ key: 'stealth_dodge', label: `Dodge ${Math.round(c._postStealthDodge.percent||0)}%`, eta: Math.ceil((c._postStealthDodge.expiresAt-now)/1000), temporary: true });
         }
@@ -1423,6 +1430,13 @@ function collectActiveBuffs(scene) {
             const cur = Math.floor(c._manaShield.current || 0); const mx = Math.floor(c._manaShield.max || 0);
             list.push({ key: 'mana_shield', label: `Shield ${cur}/${mx}`, eta: null, temporary: false });
         }
+        // Dark Shield (burst-on-low-hp) — show remaining absorb and its expiry if present
+        try {
+            if (c._darkShield && typeof c._darkShield.remaining === 'number' && c._darkShield.remaining > 0) {
+                const eta = (typeof c._darkShield.expiresAt === 'number') ? Math.ceil((c._darkShield.expiresAt - now) / 1000) : null;
+                if (eta == null || eta > 0) list.push({ key: 'dark_shield', label: `Dark Shield ${Math.floor(c._darkShield.remaining)}`, eta: eta, temporary: true });
+            }
+        } catch (ee) {}
         if (c._terrorAuraEnabled) {
             list.push({ key: 'terror_aura', label: 'Terror Aura', eta: null, temporary: false });
         }
@@ -1431,6 +1445,27 @@ function collectActiveBuffs(scene) {
             const cd = Math.round(c._marksmanFocusBonuses.critDmg || 0);
             list.push({ key: 'marksman_focus', label: `Focus +${cc}%/${cd}%`, eta: null, temporary: false });
         }
+        // Standing DR (glyphic_anchor): while standing, show DR percent
+        try {
+            if (c._isStanding && typeof c._standingDRPercent === 'number' && c._standingDRPercent > 0) {
+                list.push({ key: 'standing_dr', label: `Standing DR +${Math.round(c._standingDRPercent)}%`, eta: null, temporary: false });
+            }
+        } catch (ee) {}
+        // Blood Ritual Reserve: channeling state
+        try {
+            if (c._bloodRitualReserve && c._bloodRitualReserve.active) {
+                list.push({ key: 'blood_ritual', label: 'Blood Ritual', eta: null, temporary: true });
+            }
+        } catch (ee) {}
+        // Unholy Frenzy (scene-level flag/expiry managed in combat.js)
+        try {
+            if (scene._frenzyActive) {
+                const eta = (typeof scene._frenzyExpiresAt === 'number') ? Math.ceil((scene._frenzyExpiresAt - now) / 1000) : null;
+                if (eta == null || eta > 0) {
+                    list.push({ key: 'unholy_frenzy', label: 'Unholy Frenzy', eta: eta, temporary: true });
+                }
+            }
+        } catch (ee) {}
     } catch (e) {}
     return list;
 }

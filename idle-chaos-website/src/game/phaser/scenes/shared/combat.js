@@ -743,6 +743,25 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                 }
             } catch (e) {}
             hitSomething = true;
+            
+            // Calculate animation duration to delay damage application (~70% through animation)
+            let animDelayMs = 0;
+            try {
+                const mineKey = (this.char && this.char._terrorFormEnabled) ? 'dude_mine_terror' : 'dude_mine';
+                const tex = this.textures.get(mineKey);
+                let frameNames = [];
+                if (tex && typeof tex.getFrameNames === 'function') frameNames = tex.getFrameNames();
+                const totalFrames = (frameNames && frameNames.length) ? frameNames.length : 0;
+                const rows = 4;
+                const framesPerRow = (totalFrames > 0) ? Math.floor(totalFrames / rows) : 6; // default 6 frames if unknown
+                const durationMs = Math.max(120, cooldown);
+                const fps = (framesPerRow > 0) ? Math.max(1, Math.round(framesPerRow / (durationMs / 1000))) : 8;
+                const animDurationMs = (framesPerRow / fps) * 1000;
+                animDelayMs = Math.floor(animDurationMs * 0.7); // 70% through the animation
+            } catch (e) {
+                animDelayMs = 80; // fallback delay if calculation fails
+            }
+            
             // route player damage through the centralized handler so crits/lifesteal apply
             try {
                 if (isStaff && this.add && this.tweens) {
@@ -771,7 +790,15 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                         try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: true }); } catch (ee) {}
                     }
                 } else {
-                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: isStaff }); } catch (e) {}
+                    // Melee attack: delay damage until ~70% through attack animation
+                    const applyMeleeDamage = () => {
+                        try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: isStaff }); } catch (e) {}
+                    };
+                    if (animDelayMs > 0 && this.time && this.time.delayedCall) {
+                        this.time.delayedCall(animDelayMs, applyMeleeDamage);
+                    } else {
+                        applyMeleeDamage(); // fallback to immediate if timing unavailable
+                    }
                 }
             } catch (e) {}
 
@@ -794,18 +821,28 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                         return da - db;
                     });
                     let taken = 0;
-                    for (let i = 0; i < others.length && taken < extraTargets; i++) {
-                        try {
-                            const e = others[i];
-                            const d = pdist(this, e.x, e.y);
-                            if (d <= cleaveRadius) {
-                                const cleaveDmg = Math.max(1, (baseDamage * (cleavePct / 100)));
-                                _dealPlayerDamage(this, e, cleaveDmg, '#ffd4b3');
-                                // small visual
-                                try { highlightEnemy(this, e, { color: 0xffcc88, duration: 220 }); } catch (ee) {}
-                                taken++;
-                            }
-                        } catch (ee) {}
+                    
+                    // Apply cleave damage with same timing as primary attack
+                    const applyCleave = () => {
+                        for (let i = 0; i < others.length && taken < extraTargets; i++) {
+                            try {
+                                const e = others[i];
+                                const d = pdist(this, e.x, e.y);
+                                if (d <= cleaveRadius) {
+                                    const cleaveDmg = Math.max(1, (baseDamage * (cleavePct / 100)));
+                                    _dealPlayerDamage(this, e, cleaveDmg, '#ffd4b3');
+                                    // small visual
+                                    try { highlightEnemy(this, e, { color: 0xffcc88, duration: 220 }); } catch (ee) {}
+                                    taken++;
+                                }
+                            } catch (ee) {}
+                        }
+                    };
+                    
+                    if (animDelayMs > 0 && this.time && this.time.delayedCall) {
+                        this.time.delayedCall(animDelayMs, applyCleave);
+                    } else {
+                        applyCleave();
                     }
                 }
             } catch (e) {}
@@ -1342,21 +1379,27 @@ function sharedCreatePlayerHealthBar() {
     const width = (cfg.width != null) ? cfg.width : 70;
     const height = (cfg.height != null) ? cfg.height : 8;
     const color = (cfg.color != null) ? cfg.color : 0xff4444;
+    const shieldColor = (cfg.shieldColor != null) ? cfg.shieldColor : 0x66bbff;
     const bgColor = (cfg.bgColor != null) ? cfg.bgColor : 0x000000;
     const bgAlpha = (cfg.bgAlpha != null) ? cfg.bgAlpha : 0.55;
     const depth = (cfg.depth != null) ? cfg.depth : 4;
     const offset = (cfg.offsetY != null) ? cfg.offsetY : 60;
     try {
         this.playerHpBarBg = this.add.rectangle(0, 0, width, height, bgColor, bgAlpha).setDepth(depth);
+    // Shield bar sits between BG and HP (created after BG, before HP) and grows to represent HP+Shield (clamped to max)
+    this.playerShieldBar = this.add.rectangle(0, 0, width, height, shieldColor, 1).setDepth(depth);
         this.playerHpBar = this.add.rectangle(0, 0, width, height, color).setDepth(depth);
         this.playerHpBar.fullWidth = width;
+        this.playerShieldBar.fullWidth = width;
         this.playerHpBarOffset = offset;
         if (this.playerHpBarBg.setOrigin) this.playerHpBarBg.setOrigin(0.5);
+        if (this.playerShieldBar.setOrigin) this.playerShieldBar.setOrigin(0.5);
         if (this.playerHpBar.setOrigin) this.playerHpBar.setOrigin(0.5);
         this._updatePlayerHealthBar();
     } catch (e) {
         this.playerHpBarBg = null;
         this.playerHpBar = null;
+        this.playerShieldBar = null;
     }
 }
 
@@ -1370,14 +1413,34 @@ function sharedUpdatePlayerHealthBar() {
         const barY = this.player.y - offset;
         this.playerHpBarBg.setPosition(this.player.x, barY);
         this.playerHpBar.setPosition(this.player.x, barY);
+        // Shield overlay: compute total shield and render a bar behind HP up to (HP+Shield)
+        try {
+            const c = this.char || {};
+            const maxhp = Math.max(1, Number(c.maxhp || 1));
+            const hp = Math.max(0, Number(c.hp || 0));
+            const manaShield = (c._manaShield && typeof c._manaShield.current === 'number') ? Math.max(0, c._manaShield.current) : 0;
+            const darkShield = (c._darkShield && typeof c._darkShield.remaining === 'number') ? Math.max(0, c._darkShield.remaining) : 0;
+            const totalShield = Math.max(0, manaShield + darkShield);
+            const combined = Math.min(maxhp, hp + totalShield);
+            const shieldRatio = Math.max(0, Math.min(1, combined / maxhp));
+            if (this.playerShieldBar) {
+                this.playerShieldBar.displayWidth = (this.playerShieldBar.fullWidth || width) * shieldRatio;
+                this.playerShieldBar.setPosition(this.player.x, barY);
+                // Only show if there is an actual shield beyond HP
+                const show = (totalShield > 0) && (shieldRatio > ratio + 0.001);
+                try { this.playerShieldBar.setVisible(!!show); } catch (e) { this.playerShieldBar.visible = !!show; }
+            }
+        } catch (e) { /* ignore shield calc */ }
     } catch (e) { /* ignore */ }
 }
 
 function sharedDestroyPlayerHealthBar() {
     try { if (this.playerHpBar) this.playerHpBar.destroy(); } catch (e) {}
     try { if (this.playerHpBarBg) this.playerHpBarBg.destroy(); } catch (e) {}
+    try { if (this.playerShieldBar) this.playerShieldBar.destroy(); } catch (e) {}
     this.playerHpBar = null;
     this.playerHpBarBg = null;
+    this.playerShieldBar = null;
 }
 
 // Determine an enemy's rarity from its def or id string
@@ -1695,6 +1758,8 @@ function sharedGetEnemyInRange(range) {
                                 this.char._darkShield = { remaining: shieldAmount, expiresAt: Date.now() + 6000 };
                                 try { if (this._showToast) this._showToast('Dark Shield activated!', 900); } catch (e) {}
                                 try { const _pc = getPlayerCenter(this); spawnArcaneShield && spawnArcaneShield(this, _pc.x, _pc.y, 28, 0x552266); } catch (e) {}
+                                // immediate HUD update so shield overlay appears right away
+                                try { if (this._updatePlayerHealthBar) this._updatePlayerHealthBar(); } catch (e) {}
                             }
                         } catch (e) {}
                     }
@@ -4313,6 +4378,8 @@ export function registerTalentHandlers(scene) {
                             scene._frenzyExpiresAt = now + 8000;
                             try { if (scene._showToast) scene._showToast('Unholy Frenzy!', 900); } catch (e) {}
                             try { scene._frenzyFx = spawnArcaneSigil(scene, scene.player.x, scene.player.y, 28, { depth: 9, fillColor: 0x662222 }); } catch (e) {}
+                            // Immediately refresh HUD so Unholy Frenzy appears in buffs row
+                            try { if (typeof refreshSkillBarHUD === 'function') refreshSkillBarHUD(scene); } catch (e) {}
                         }
                         scene._frenzyNextTime = now + Math.max(1000, Math.round(cooldownSec * 1000));
                     }
@@ -4324,6 +4391,8 @@ export function registerTalentHandlers(scene) {
                         scene._frenzyExpiresAt = null;
                         try { if (scene._frenzyFx && typeof scene._frenzyFx.destroy === 'function') scene._frenzyFx.destroy(); } catch (e) {}
                         try { if (scene._showToast) scene._showToast('Frenzy ended', 700); } catch (e) {}
+                        // Refresh HUD to remove frenzy buff icon
+                        try { if (typeof refreshSkillBarHUD === 'function') refreshSkillBarHUD(scene); } catch (e) {}
                     }
                 } catch (e) {}
             } });
