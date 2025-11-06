@@ -174,6 +174,26 @@ function drawVariantOverlay(g, w, h, id) {
   } else if (/epic/.test(s)) {
     g.fillStyle(0xffd27a, 0.95);
     g.fillTriangle(cx, cy - Math.round(h * 0.36), cx - Math.round(w * 0.1), cy - Math.round(h * 0.2), cx + Math.round(w * 0.1), cy - Math.round(h * 0.2));
+  } else if (/legendary/.test(s)) {
+    // Legendary: radiant halo + starbursts
+    // outer soft halo
+    g.fillStyle(0xfff2a8, 0.18);
+    g.fillCircle(cx, cy, Math.round(Math.min(w, h) * 0.52));
+    // bright ring
+    g.lineStyle(4, 0xffea75, 1);
+    g.strokeCircle(cx, cy, Math.round(Math.min(w, h) * 0.46));
+    // starbursts (small diamonds at cardinal points)
+    g.fillStyle(0xfff6c0, 0.95);
+    const r = Math.round(Math.min(w, h) * 0.46);
+    const d = Math.max(3, Math.round(Math.min(w, h) * 0.06));
+    // top
+    g.fillTriangle(cx, cy - r, cx - d, cy - r + d, cx + d, cy - r + d);
+    // right
+    g.fillTriangle(cx + r, cy, cx + r - d, cy - d, cx + r - d, cy + d);
+    // bottom
+    g.fillTriangle(cx, cy + r, cx - d, cy + r - d, cx + d, cy + r - d);
+    // left
+    g.fillTriangle(cx - r, cy, cx - r + d, cy - d, cx - r + d, cy + d);
   }
   // role markers
   if (/slicer|blade/.test(s)) {

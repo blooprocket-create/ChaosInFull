@@ -163,16 +163,22 @@ export class GloamwaySwamp extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(10, 14);
+        const count = Phaser.Math.Between(12, 16);
         for (let i = 0; i < count; i++) {
             const x = Phaser.Math.Between(x1, x2);
             const y = Phaser.Math.Between(y1, y2);
             const roll = Math.random();
+            // Weighted ladder for skeleton family with some themed guests
             let type = 'skeleton';
-            if (roll > 0.7) type = 'zombie';
-            if (roll > 0.85) type = 'goblin_skeleton';
-            if (roll > 0.95) type = 'brute_skeleton';
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(7000, 14000), active: null });
+            if (roll > 0.98) type = 'skeleton_legendary';
+            else if (roll > 0.92) type = 'skeleton_epic';
+            else if (roll > 0.78) type = 'skeleton_rare';
+            else if (roll > 0.62) type = 'skeleton_uncommon';
+            // sprinkle in themed variants
+            if (roll > 0.84 && roll <= 0.88) type = 'goblin_skeleton';
+            if (roll > 0.88 && roll <= 0.92) type = 'brute_skeleton';
+            if (roll > 0.56 && roll <= 0.62) type = 'zombie';
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(8000, 15000), active: null });
         }
         return pts;
     }

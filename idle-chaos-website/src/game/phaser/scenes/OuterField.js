@@ -267,7 +267,17 @@ export class OuterField extends Phaser.Scene {
     _buildSpawnPoints() {
         // randomized spawn points for outer field rats/zombies/ghosts
         const pts = [];
-        const defs = [ { type: 'rat', count: 6, respawn: 4000 }, { type: 'zombie_rat', count: 3, respawn: 5200 }, { type: 'ghost_rat', count: 2, respawn: 6400 } ];
+        // Include full rat rarity ladder with a few themed variants
+        const defs = [
+            { type: 'rat', count: 6, respawn: 4200 },
+            { type: 'rat_uncommon', count: 4, respawn: 5200 },
+            { type: 'rat_rare', count: 3, respawn: 6800 },
+            { type: 'rat_epic', count: 2, respawn: 8800 },
+            { type: 'rat_legendary', count: 1, respawn: 13000 },
+            { type: 'rat_boss', count: 1, respawn: 17000 },
+            { type: 'zombie_rat', count: 2, respawn: 9000 },
+            { type: 'ghost_rat', count: 2, respawn: 9800 }
+        ];
         for (const d of defs) {
             for (let i = 0; i < d.count; i++) {
                 let tries = 0;

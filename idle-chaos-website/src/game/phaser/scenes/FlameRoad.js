@@ -160,16 +160,22 @@ export class FlameRoad extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(8, 12);
+        const count = Phaser.Math.Between(10, 14);
         for (let i = 0; i < count; i++) {
             const x = Phaser.Math.Between(x1, x2);
             const y = Phaser.Math.Between(y1, y2);
             const roll = Math.random();
+            // Lava zone: flaming slimes and demon spawn ladder, with rare devil and a boss
             let type = 'flaming_slime';
-            if (roll > 0.7) type = 'big_flaming_slime';
-            if (roll > 0.88) type = 'devil_spawn';
-            if (roll > 0.97) type = 'the_lurker';
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(9000, 16000), active: null });
+            if (roll > 0.85 && roll <= 0.9) type = 'big_flaming_slime';
+            else if (roll > 0.3 && roll <= 0.5) type = 'demon_spawn_common';
+            else if (roll > 0.5 && roll <= 0.65) type = 'demon_spawn_uncommon';
+            else if (roll > 0.65 && roll <= 0.78) type = 'demon_spawn_rare';
+            else if (roll > 0.78 && roll <= 0.85) type = 'demon_spawn_epic';
+            else if (roll > 0.9 && roll <= 0.965) type = 'demon_spawn_legendary';
+            else if (roll > 0.965 && roll <= 0.985) type = 'devil_spawn';
+            else if (roll > 0.985) type = 'the_lurker';
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(9000, 17000), active: null });
         }
         return pts;
     }

@@ -166,7 +166,15 @@ export class InnerField extends Phaser.Scene {
     _buildSpawnPoints(groundY) {
         // Create a spread of randomized spawn points within bounds. Avoid clustering too close to center spawn.
         const pts = [];
-        const defs = [ { type: 'slime_common', count: 6, respawn: 4000 }, { type: 'slime_epic', count: 2, respawn: 9000 }, { type: 'slime_boss', count: 1, respawn: 16000 } ];
+        // Include full slime rarity ladder with weighted counts
+        const defs = [
+            { type: 'slime_common', count: 6, respawn: 4200 },
+            { type: 'slime_uncommon', count: 4, respawn: 5200 },
+            { type: 'slime_rare', count: 2, respawn: 7800 },
+            { type: 'slime_epic', count: 1, respawn: 9800 },
+            { type: 'slime_legendary', count: 1, respawn: 14000 },
+            { type: 'slime_boss', count: 1, respawn: 18000 }
+        ];
         for (const d of defs) {
             for (let i = 0; i < d.count; i++) {
                 let tries = 0;

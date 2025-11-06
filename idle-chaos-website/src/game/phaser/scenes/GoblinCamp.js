@@ -21,17 +21,19 @@ export class GoblinCamp extends Phaser.Scene {
     _buildSpawnPoints() {
         const pts = [];
         const count = Phaser.Math.Between(6, 12);
-        const types = ['goblin_common', 'goblin_girl', 'goblin_epic', 'goblin_boss'];
         for (let i = 0; i < count; i++) {
             const x = Phaser.Math.Between(this._bounds.x1 + 12, this._bounds.x2 - 12);
             const y = Phaser.Math.Between(this._bounds.y1 + 12, this._bounds.y2 - 12);
-            // prefer commons, rarer epics/boss
+            // Weighted distribution across goblin rarity ladder
             const roll = Math.random();
             let type = 'goblin_common';
-            if (roll > 0.95) type = 'goblin_boss';
-            else if (roll > 0.8) type = 'goblin_epic';
-            else if (roll > 0.5) type = 'goblin_girl';
-            pts.push({ x, y, type, active: null, respawn: Phaser.Math.Between(5000, 14000) });
+            if (roll > 0.985) type = 'goblin_boss';
+            else if (roll > 0.97) type = 'goblin_legendary';
+            else if (roll > 0.9) type = 'goblin_epic';
+            else if (roll > 0.75) type = 'goblin_rare';
+            else if (roll > 0.55) type = 'goblin_uncommon';
+            else if (roll > 0.45) type = 'goblin_girl'; // occasional stylistic variant
+            pts.push({ x, y, type, active: null, respawn: Phaser.Math.Between(6000, 15000) });
         }
         return pts;
     }

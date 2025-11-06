@@ -28,10 +28,12 @@ export function computeEnemyStats(def: EnemyDef): ScaledEnemy {
   const tier = String(def.tier ?? 'common').toLowerCase();
   const mult = RARITY_MULTIPLIERS[tier] ?? 1.0;
 
-  const baseHp = 18; // baseline per-level constant
-  const hp = clampInt((baseHp * Math.pow(level, 1.18)) * mult, 1);
+  // Slightly tougher enemies: nudge base HP and scaling exponent
+  const baseHp = 20; // was 18
+  const hp = clampInt((baseHp * Math.pow(level, 1.20)) * mult, 1);
 
-  const dmgBase = Math.max(1, (Math.pow(level, 1.02) * 1.4) * mult);
+  // Increase enemy damage modestly across levels
+  const dmgBase = Math.max(1, (Math.pow(level, 1.04) * 1.5) * mult); // was pow^1.02 * 1.4
   const dmgVariance = Math.max(1, Math.round(dmgBase * 0.45));
   const dmgMin = Math.max(1, Math.round(dmgBase - dmgVariance));
   const dmgMax = Math.max(dmgMin + 1, Math.round(dmgBase + dmgVariance));
