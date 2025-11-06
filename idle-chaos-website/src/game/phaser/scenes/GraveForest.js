@@ -393,9 +393,9 @@ export class GraveForest extends Phaser.Scene {
                     if (this._keyHandlers.q) this.input.keyboard.off('keydown-Q', this._keyHandlers.q);
                     if (this._keyHandlers.t) this.input.keyboard.off('keydown-T', this._keyHandlers.t);
                 } catch (e) { /* ignore key cleanup errors */ }
-    }
             }
         });
+    } // end create()
 
     _openRowanDialogue() {
         this._activeDialogueNpc = 'rowan';
@@ -1109,7 +1109,6 @@ export class GraveForest extends Phaser.Scene {
         this._dialogueOverlay = null;
         this._dialogueCard = null;
         this._activeDialogueNpc = null;
-    }
     }
 }
 
