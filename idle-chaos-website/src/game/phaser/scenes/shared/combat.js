@@ -2031,9 +2031,26 @@ function sharedClearAutoTarget() {
 // Default player death handler: standardizes respawn behavior for scenes that don't override _onPlayerDown
 function defaultOnPlayerDown() {
     try {
-        // brief message + disable player
+        // Play death/hurt animation if available
+        try {
+            if (this.player && this.anims && this.anims.exists && this.anims.exists('hurt')) {
+                this.player.play('hurt', true);
+            }
+        } catch (e) { /* ignore animation errors */ }
+        
+        // brief message
         try { if (this._showToast) this._showToast('You fall... dragged back to safety', 1600); } catch (e) {}
-        try { if (this.player && this.player.disableBody) this.player.disableBody(true, true); } catch (e) {}
+        
+        // Wait for animation to complete before disabling (hurt animation is ~8 frames at 8fps = ~1000ms)
+        const animDelay = 1000;
+        if (this.time && typeof this.time.addEvent === 'function') {
+            this.time.addEvent({ delay: animDelay, callback: () => {
+                try { if (this.player && this.player.disableBody) this.player.disableBody(true, true); } catch (e) {}
+            }});
+        } else {
+            // fallback: disable immediately
+            try { if (this.player && this.player.disableBody) this.player.disableBody(true, true); } catch (e) {}
+        }
 
         const cfg = this._deathRespawn || {};
         // Resolve target scene and spawn
@@ -2054,7 +2071,7 @@ function defaultOnPlayerDown() {
             }
         }
 
-        const delayMs = 1200;
+        const delayMs = 1800; // increased to allow hurt animation to complete (1000ms) + brief pause
         if (this.time && typeof this.time.addEvent === 'function') {
             this.time.addEvent({ delay: delayMs, callback: () => {
                 try {

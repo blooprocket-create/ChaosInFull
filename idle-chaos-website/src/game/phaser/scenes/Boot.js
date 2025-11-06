@@ -10,6 +10,7 @@ export class Boot extends Phaser.Scene {
         try { this.load.spritesheet('dude_run', 'assets/dude/run.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
         try { this.load.spritesheet('dude_mine', 'assets/dude/slash.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
         try { this.load.spritesheet('dude_idle', 'assets/dude/idle.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
+        try { this.load.spritesheet('dude_hurt', 'assets/dude/hurt.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
         // Terror Form variants: preloaded so we can swap animations at runtime
         try { this.load.spritesheet('dude_walk_terror', 'assets/dude/terrorForm/walk.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
         try { this.load.spritesheet('dude_run_terror', 'assets/dude/terrorForm/run.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
@@ -85,6 +86,15 @@ export class Boot extends Phaser.Scene {
             makeDirectional('dude_run', 'run', 12, -1, false);
             // For idle prefer a single-frame per-direction (first column)
             makeDirectional('dude_idle', 'idle', 4, -1, true);
+            // Create death/hurt animation (non-directional, plays once)
+            try {
+                if (!this.anims.exists('hurt')) {
+                    const frames = this.anims.generateFrameNumbers('dude_hurt');
+                    if (frames && frames.length) {
+                        this.anims.create({ key: 'hurt', frames: frames, frameRate: 8, repeat: 0 });
+                    }
+                }
+            } catch (e) { /* ignore hurt animation creation error */ }
             // create directional mining animation placeholders (up/left/down/right).
             // The actual animations will be recreated in-scene to match swing duration, but create keys so scenes can reference them safely.
             const dirKeys = ['up', 'left', 'down', 'right'];
