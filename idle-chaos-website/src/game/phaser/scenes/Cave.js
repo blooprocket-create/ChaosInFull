@@ -298,6 +298,8 @@ export class Cave extends Phaser.Scene {
                             try { this.physics.add.existing(dz, true); } catch (e) {}
                             try { if (typeof setCircleCentered === 'function') setCircleCentered(dz, Math.max(6, Math.round(r))); } catch (e) {}
                             try { if (this.player && this.player.body) this.physics.add.collider(this.player, dz); } catch (e) {}
+                            // store geometric center + radius for simple collision checks
+                            try { dz._cx = rx; dz._cy = ry; dz._cr = Math.max(6, Math.round(r)); } catch (e) {}
                             base._decorZone = dz;
                             shade._decorZone = dz;
                             this._decorColliders = this._decorColliders || [];
@@ -330,6 +332,7 @@ export class Cave extends Phaser.Scene {
                             try { this.physics.add.existing(sz, true); } catch (e) {}
                             try { if (typeof setCircleCentered === 'function') setCircleCentered(sz, Math.max(6, rsz)); } catch (e) {}
                             try { if (this.player && this.player.body) this.physics.add.collider(this.player, sz); } catch (e) {}
+                            try { sz._cx = sx; sz._cy = tipY; sz._cr = Math.max(6, rsz); } catch (e) {}
                             g._decorZone = sz;
                             this._decorColliders = this._decorColliders || [];
                             this._decorColliders.push(sz);
@@ -1001,14 +1004,17 @@ export class Cave extends Phaser.Scene {
                 // simple collision test against decoration colliders to avoid walking through them
                 let blocked = false;
                 try {
-                    const rowanRadius = Math.max(12, (sprite.displayWidth || 48) / 2);
+                    const npcRadius = Math.max(12, (sprite.displayWidth || 48) / 2);
                     const colliders = this._decorColliders || [];
                     for (const cz of colliders) {
                         if (!cz) continue;
-                        const cx = cz.x || 0; const cy = cz.y || 0;
-                        const czRadius = (typeof cz.radius === 'number') ? cz.radius : ((cz.width && cz.width > 0) ? cz.width / 2 : 28);
+                        // prefer stored center (_cx/_cy) else fallback to cz.x/cz.y (top-left origin circles need adjustment)
+                        const cx = (cz._cx != null) ? cz._cx : (cz.x || 0);
+                        const cy = (cz._cy != null) ? cz._cy : (cz.y || 0);
+                        // prefer stored radius _cr, else infer from width/2
+                        const czRadius = (cz._cr != null) ? cz._cr : ((typeof cz.radius === 'number') ? cz.radius : ((cz.width && cz.width > 0) ? cz.width / 2 : 28));
                         const d = Phaser.Math.Distance.Between(proposedX, proposedY, cx, cy);
-                        if (d < (rowanRadius + czRadius - 2)) { blocked = true; break; }
+                        if (d < (npcRadius + czRadius + 4)) { blocked = true; break; }
                     }
                 } catch (e) { blocked = false; }
                 if (!blocked) {
