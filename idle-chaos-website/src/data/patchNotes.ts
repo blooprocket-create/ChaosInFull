@@ -9,6 +9,24 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-11-05",
+    version: "0.0.19",
+    title: "Town Gossip: Steward Fenric, bench glow‑ups, and shortcut buttons",
+    highlights: [
+      "Steward Fenric arrives — the Mayor’s cooler, tidier shadow with wandering feet and actual manners",
+      "Workbench, Storage, and Shop had a glow‑up: less ‘grey rectangle,’ more ‘I belong in a town’",
+      "Newcomer perks: from Fenric’s Advice, pop open Shop/Storage/Workbench without walking a single tile",
+      "Pacing problem solved: NPCs stop roaming while you’re mid‑conversation; bushes stop photobombing the furniture"
+    ],
+    notes: [
+      "Fenric reuses Grimsley’s rig with a tasteful blue tint (0x88b4ff) and a smaller wander radius — tidy steward, tidy orbits.",
+      "He’s chatty at ~56px: press E to be judged politely. ‘Advice’ includes quick‑open buttons for Shop, Storage, and the Workbench.",
+      "Visuals: Workbench sports a highlighted plank and visible bolts; Chest has a band + lock; Shop gets counter trim, a stripey awning, and a proper sign.",
+      "Depth sorting cleaned so foliage sits behind fixtures; prompts track NPC heads like loyal birds; roaming pauses during dialogue so no one moonwalks off‑screen mid‑sentence.",
+      "Town shutdown tidies after itself — modals, prompts, and indicators don’t linger like a dragon’s hoard of UI."
+    ]
+  },
+  {
+    date: "2025-11-05",
     version: "0.0.18",
     title: "Rarity ladders, legendary glow, and spawn refresh",
     highlights: [
