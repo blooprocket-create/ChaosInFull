@@ -339,7 +339,6 @@ export class GraveForest extends Phaser.Scene {
                 try { disp = this.add.circle(dx, dy, 5, 0x3a7a2a, 1).setDepth(0.6); } catch (e) { disp = null; }
             }
         if (disp) this._decorations.push({ x: dx, y: dy, type: type, display: disp });
-    }
         swayDecorations(this, this._decorations);
 
         // continuous woodcutting state
@@ -571,134 +570,6 @@ export class GraveForest extends Phaser.Scene {
                 { label: 'Glad to help', onClick: () => {}, variant: 'success', closeOnClick: true }
             ], '#8b7355');
         }
-    }
-
-    _ensureDialogueOverlay() {
-        if (this._dialogueOverlay) {
-            return this._dialogueCard;
-        }
-        if (typeof document === 'undefined') return null;
-        const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
-        overlay.style.left = '0';
-        overlay.style.top = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.background = 'rgba(0,0,0,0.65)';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.style.zIndex = '245';
-
-        const card = document.createElement('div');
-        card.style.background = 'linear-gradient(135deg,#1f2b2f,#0f1619)';
-        card.style.borderRadius = '12px';
-        card.style.padding = '18px';
-        card.style.color = '#fff';
-        card.style.minWidth = '340px';
-        card.style.maxWidth = '480px';
-        card.style.boxShadow = '0 18px 32px rgba(0,0,0,0.55)';
-
-        overlay.appendChild(card);
-        document.body.appendChild(overlay);
-        this._dialogueOverlay = overlay;
-        this._dialogueCard = card;
-        return card;
-    }
-
-    _renderDialogue(title, bodyNodes, optionConfigs) {
-        const card = this._ensureDialogueOverlay();
-        if (!card) return;
-        card.innerHTML = '';
-
-        const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        const heading = document.createElement('strong');
-        heading.textContent = title;
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '×';
-        closeBtn.style.background = 'transparent';
-        closeBtn.style.border = 'none';
-        closeBtn.style.color = '#fff';
-        closeBtn.style.fontSize = '20px';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.onclick = () => this._closeDialogueOverlay();
-        header.appendChild(heading);
-        header.appendChild(closeBtn);
-        card.appendChild(header);
-
-        const body = document.createElement('div');
-        body.style.marginTop = '12px';
-        body.style.marginBottom = '16px';
-        for (const node of bodyNodes) {
-            if (node) body.appendChild(node);
-        }
-        card.appendChild(body);
-
-        const buttons = document.createElement('div');
-        buttons.style.display = 'flex';
-        buttons.style.flexDirection = 'column';
-        buttons.style.gap = '8px';
-        for (const opt of optionConfigs) {
-            const btn = document.createElement('button');
-            btn.textContent = opt.label;
-            btn.style.padding = '8px 12px';
-            btn.style.border = 'none';
-            btn.style.borderRadius = '8px';
-            btn.style.cursor = 'pointer';
-            btn.style.background = '#2f6b46';
-            btn.style.color = '#fff';
-            btn.onclick = () => {
-                if (typeof opt.onClick === 'function') opt.onClick();
-            };
-            buttons.appendChild(btn);
-        }
-        card.appendChild(buttons);
-    }
-
-    _createDialogueParagraph(text) {
-        if (typeof document === 'undefined') return null;
-        const p = document.createElement('p');
-        p.style.margin = '0 0 10px 0';
-        p.textContent = text;
-        return p;
-    }
-
-    _buildObjectiveList(questDef, progressStates) {
-        if (typeof document === 'undefined') return null;
-        if (!questDef || !Array.isArray(questDef.objectives) || questDef.objectives.length === 0) return null;
-        const list = document.createElement('ul');
-        list.style.margin = '8px 0 16px 16px';
-        list.style.padding = '0';
-        for (const obj of questDef.objectives) {
-            const li = document.createElement('li');
-            li.style.marginBottom = '4px';
-            const required = obj.required || 1;
-            const label = obj.description || obj.type;
-            if (progressStates) {
-                const targetId = obj.target || null;
-                const state = progressStates.find(s => s && s.type === obj.type && (targetId ? s.target === targetId : true));
-                const current = state ? Math.min(state.current || 0, required) : 0;
-                li.textContent = `${label}: ${current} / ${required}`;
-            } else {
-                li.textContent = `${label}: ${required}`;
-            }
-            list.appendChild(li);
-        }
-        return list;
-    }
-
-    _closeDialogueOverlay() {
-        if (this._dialogueOverlay) {
-            try {
-                if (this._dialogueOverlay.parentNode) this._dialogueOverlay.parentNode.removeChild(this._dialogueOverlay);
-            } catch (e) {}
-        }
-        this._dialogueOverlay = null;
-        this._dialogueCard = null;
-        this._activeDialogueNpc = null;
     }
 
     _startSafeZoneRegen() {
@@ -1229,7 +1100,18 @@ export class GraveForest extends Phaser.Scene {
         clearActivity(this, { source: 'woodcutting-stop' });
         try { this._updateHUD(); } catch(e) { try { this._destroyHUD(); this._createHUD(); } catch(_) {} }
     }
+
+    _closeDialogueOverlay() {
+        if (this._dialogueOverlay && this._dialogueOverlay.parentNode) {
+            this._dialogueOverlay.parentNode.removeChild(this._dialogueOverlay);
+        }
+        this._dialogueOverlay = null;
+        this._dialogueCard = null;
+        this._activeDialogueNpc = null;
+    }
+    }
 }
 
 applyCombatMixin(GraveForest.prototype);
 export default GraveForest;
+
