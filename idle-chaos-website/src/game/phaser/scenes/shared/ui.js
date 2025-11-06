@@ -3318,15 +3318,82 @@ export function refreshSkillBarHUD(scene) {
         let el = document.getElementById(containerId);
         if (!el) {
             el = document.createElement('div'); el.id = containerId;
-            el.style.position = 'fixed'; el.style.left = '50%'; el.style.bottom = '12px'; el.style.transform = 'translateX(-50%)'; el.style.zIndex = '9999'; el.style.display = 'flex'; el.style.gap = '8px'; el.style.padding = '6px';
-            el.style.background = 'rgba(0,0,0,0.35)'; el.style.border = '1px solid rgba(255,255,255,0.06)'; el.style.borderRadius = '10px'; el.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
+            el.style.position = 'fixed';
+            el.style.left = '50%';
+            el.style.bottom = '12px';
+            el.style.transform = 'translateX(-50%)';
+            el.style.zIndex = '9999';
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.alignItems = 'center';
+            el.style.gap = '6px';
+            el.style.padding = '6px 8px';
+            el.style.background = 'rgba(0,0,0,0.35)';
+            el.style.border = '1px solid rgba(255,255,255,0.06)';
+            el.style.borderRadius = '10px';
+            el.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
             document.body.appendChild(el);
         }
         el.innerHTML = ''; // rebuild
         const char = scene.char;
         const defs = (char.learnedActives || []).reduce((m, a) => { if (a && a.id) m[a.id] = a; return m; }, {});
         const now = Date.now();
-        // Slots wrapper to allow a buffs panel to sit beside it
+        // Buffs row ABOVE the skill bar (compact 32x32 icons)
+        const buffs = collectActiveBuffs(scene);
+        const buffsRow = document.createElement('div');
+        buffsRow.id = 'skill-buffs';
+        buffsRow.style.display = (buffs.length > 0) ? 'flex' : 'none';
+        buffsRow.style.alignItems = 'center';
+        buffsRow.style.justifyContent = 'center';
+        buffsRow.style.gap = '6px';
+        buffsRow.style.width = '100%';
+        // Render buff icons (32x32) with small ETA overlay
+        for (const b of buffs) {
+            try {
+                const icon = document.createElement('div');
+                icon.className = 'buff-icon ' + (b.temporary ? 'temporary' : 'permanent');
+                icon.style.position = 'relative';
+                icon.style.width = '32px';
+                icon.style.height = '32px';
+                icon.style.borderRadius = '6px';
+                icon.style.border = '1px solid rgba(255,255,255,0.08)';
+                icon.style.boxShadow = '0 2px 8px rgba(0,0,0,0.35)';
+                icon.style.display = 'flex';
+                icon.style.alignItems = 'center';
+                icon.style.justifyContent = 'center';
+                // subtle background color by type
+                icon.style.background = b.temporary ? 'rgba(255,210,120,0.10)' : 'rgba(140,200,255,0.10)';
+                // simple glyph: first letter of label
+                const glyph = document.createElement('div');
+                glyph.textContent = (b.label || 'B').slice(0,1).toUpperCase();
+                glyph.style.fontSize = '14px';
+                glyph.style.fontWeight = '800';
+                glyph.style.color = '#eee';
+                glyph.style.textShadow = '0 1px 0 rgba(0,0,0,0.6)';
+                icon.appendChild(glyph);
+                // ETA overlay (bottom-right)
+                if (b.eta != null) {
+                    const eta = document.createElement('div');
+                    eta.textContent = `${b.eta}`;
+                    eta.style.position = 'absolute';
+                    eta.style.right = '2px';
+                    eta.style.bottom = '1px';
+                    eta.style.fontSize = '10px';
+                    eta.style.fontWeight = '800';
+                    eta.style.padding = '0 2px';
+                    eta.style.borderRadius = '3px';
+                    eta.style.color = '#fff';
+                    eta.style.background = 'rgba(0,0,0,0.35)';
+                    eta.style.pointerEvents = 'none';
+                    icon.appendChild(eta);
+                }
+                icon.title = b.label + (b.eta != null ? ` (${b.eta}s)` : '');
+                buffsRow.appendChild(icon);
+            } catch (e) {}
+        }
+        el.appendChild(buffsRow);
+
+        // Slots wrapper (nine slots) BELOW the buffs row
         const slotsWrap = document.createElement('div');
         slotsWrap.style.display = 'flex';
         slotsWrap.style.gap = '8px';
@@ -3390,47 +3457,7 @@ export function refreshSkillBarHUD(scene) {
             slotsWrap.appendChild(slot);
         }
 
-        // Buffs panel on the right side
-        const buffsHost = document.createElement('div');
-        buffsHost.id = 'skill-buffs';
-        buffsHost.style.display = 'flex';
-        buffsHost.style.alignItems = 'stretch';
-        buffsHost.style.gap = '6px';
-        buffsHost.style.marginLeft = '6px';
-        buffsHost.style.paddingLeft = '8px';
-        buffsHost.style.borderLeft = '1px solid rgba(255,255,255,0.06)';
-
-        const buffs = collectActiveBuffs(scene);
-        for (const b of buffs) {
-            try {
-                const chip = document.createElement('div');
-                chip.className = 'buff-chip ' + (b.temporary ? 'temporary' : 'permanent');
-                chip.style.display = 'flex';
-                chip.style.alignItems = 'center';
-                chip.style.gap = '6px';
-                chip.style.padding = '4px 8px';
-                chip.style.borderRadius = '8px';
-                chip.style.border = '1px solid rgba(255,255,255,0.08)';
-                chip.style.background = b.temporary ? 'rgba(255,210,120,0.06)' : 'rgba(140,200,255,0.06)';
-                chip.style.color = '#ddd';
-                const name = document.createElement('div');
-                name.className = 'buff-name';
-                name.textContent = b.label;
-                name.style.fontSize = '12px';
-                name.style.fontWeight = '700';
-                const eta = document.createElement('div');
-                eta.className = 'buff-eta';
-                eta.textContent = (b.eta != null) ? `${b.eta}s` : '';
-                eta.style.fontSize = '11px';
-                eta.style.opacity = '0.8';
-                chip.appendChild(name);
-                chip.appendChild(eta);
-                buffsHost.appendChild(chip);
-            } catch (e) {}
-        }
-        // Hide panel if empty
-        try { buffsHost.style.display = (buffs.length > 0) ? 'flex' : 'none'; } catch (e) {}
-        el.appendChild(buffsHost);
+        // no right-side buffs host anymore (buffs are rendered above)
     } catch (e) { /* ignore DOM errors */ }
 }
 
