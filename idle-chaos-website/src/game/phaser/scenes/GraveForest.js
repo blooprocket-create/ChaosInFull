@@ -339,6 +339,7 @@ export class GraveForest extends Phaser.Scene {
                 try { disp = this.add.circle(dx, dy, 5, 0x3a7a2a, 1).setDepth(0.6); } catch (e) { disp = null; }
             }
         if (disp) this._decorations.push({ x: dx, y: dy, type: type, display: disp });
+    }
         swayDecorations(this, this._decorations);
 
         // continuous woodcutting state
@@ -394,7 +395,6 @@ export class GraveForest extends Phaser.Scene {
                 } catch (e) { /* ignore key cleanup errors */ }
             }
         });
-    }
 
     _openRowanDialogue() {
         this._activeDialogueNpc = 'rowan';
