@@ -131,7 +131,7 @@ const PRIMARY_STAT_BY_CLASS = {
     horror: 'str',
     ravager: 'str',
     sanguine: 'str',
-    occultis: 'int',
+    occultist: 'int',
     hexweaver: 'int',
     astral_scribe: 'int',
     stalker: 'agi',
@@ -639,7 +639,7 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
         weaponMax = Number(weaponDef.damage[1]) || weaponMax;
     }
 
-    // Class-based primary stat: beginner->luk, horror->str, occultis->int, stalker->agi
+    // Class-based primary stat: beginner->luk, horror->str, occultist->int, stalker->agi
     const cls = (this.char && this.char.class) ? this.char.class : 'beginner';
     const primaryStatKey = getPrimaryStatKeyForClass(cls);
     const primaryStat = (effStats && typeof effStats[primaryStatKey] === 'number') ? effStats[primaryStatKey] : ((effStats && effStats.str) || 0);
@@ -4508,3 +4508,4 @@ export default {
     initAutoCombat,
     teardownAutoCombat
 };
+

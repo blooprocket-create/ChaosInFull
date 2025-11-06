@@ -11,9 +11,8 @@ function resolveTalentIcon(scene, talentLike) {
         if (!scene || !scene.char || !talentLike) return null;
         const cls = (scene.char.class || '').trim();
         if (!cls) return null;
-        // Normalize class folder; handle historical naming mismatch ("Occultis" class uses assets folder "Occultist")
+        // Assets folder is 'Occultist' for all variations
         let folder = cls.charAt(0).toUpperCase() + cls.slice(1).toLowerCase(); // e.g. Horror, Occultist, Stalker, Beginner
-        if (folder === 'Occultis') folder = 'Occultist';
         const override = {
             plus1str: 'Plus1Str', plus1int: 'Plus1Int', plus1agi: 'Plus1Agi',
             bonecrusher_training: 'BoneCrusher', bloodstaked_guard: 'Bloodstaked', wood_lover: 'StaffMastery', mining_exp_gain: 'MiningExpertise',
@@ -4474,7 +4473,7 @@ export function createClassSelectionModal(scene, onClassSelected) {
 
     // Get class definitions from global registry (Next exposes window.CLASS_DEFS)
     const CLASS_DEFS = (typeof window !== 'undefined' && window.CLASS_DEFS) ? window.CLASS_DEFS : (window.__classData?.CLASS_DEFINITIONS || {});
-    const TIER_1_CLASSES = ['horror', 'occultis', 'stalker'];
+    const TIER_1_CLASSES = ['horror', 'occultist', 'stalker'];
 
     // Create modal overlay
     const overlay = document.createElement('div');
@@ -4718,5 +4717,6 @@ try {
 
 // expose stats helpers to the shared UI export so callers can compute effective stats
 export const stats = { effectiveStats, makeStatPill, formatSkillLine, checkClassLevelUps };
+
 
 

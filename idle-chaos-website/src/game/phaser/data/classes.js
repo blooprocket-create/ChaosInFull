@@ -17,9 +17,9 @@ export const CLASS_DEFS = {
         tier: 1,
         requiredClass: 'beginner'
     },
-    occultis: {
-        id: 'occultis',
-        name: 'Occultis',
+    occultist: {
+        id: 'occultist',
+        name: 'Occultist',
         description: 'Refuses normal spell schools. Trades stability for layered hex engines.',
         base: { str: 0, int: 3, agi: 0, luk: 0 },
         perLevel: { str: 0.05, int: 0.7, agi: 0.05, luk: 0.1 },
@@ -51,7 +51,7 @@ export const CLASS_DEFS = {
         base: { str: 1, int: 5, agi: 1, luk: 2 },
         perLevel: { str: 0.1, int: 0.9, agi: 0.3, luk: 0.6 },
         tier: 2,
-        requiredClass: 'occultis'
+        requiredClass: 'occultist'
     },
     nightblade: {
         id: 'nightblade',
@@ -78,7 +78,7 @@ export const CLASS_DEFS = {
         base: { str: 1, int: 4, agi: 2, luk: 2 },
         perLevel: { str: 0.2, int: 0.8, agi: 0.5, luk: 0.5 },
         tier: 2,
-        requiredClass: 'occultis'
+        requiredClass: 'occultist'
     },
     shade_dancer: {
         id: 'shade_dancer',

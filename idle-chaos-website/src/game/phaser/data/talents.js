@@ -196,11 +196,11 @@ const horrorTalents = [
     })
 ];
 
-const occultisTalents = [
+const occultistTalents = [
     makeTalent('sigilcraft', 'Sigilcraft', {//works
         description: 'Draw forbidden symbols that explode in faces. Sigil damage +{value}%.',
         scaling: { type: 'percent', target: 'sigilDamage', base: 80, perRank: 8.75 },
-        tags: ['combat', 'occultis'],
+        tags: ['combat', 'occultist'],
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 10,
@@ -210,14 +210,14 @@ const occultisTalents = [
         description: 'A passive mana shield: a portion of your max mana becomes a regenerative shield that restores slowly when out of combat.',
         scaling: { type: 'percent', target: 'manaShieldStrength', base: 15, perRank: 0.6 },
         secondScaling: { type: 'flat', target: 'manaShieldRegenPerSec', base: 1, perRank: 0.25 },
-        tags: ['mana', 'defensive', 'occultis', 'passive'],
+        tags: ['mana', 'defensive', 'occultist', 'passive'],
         kind: 'passive'
     }),
     makeTalent('hex_engine', 'Hex Engine', {//works
         description: 'Teleport through curses, because walking is for mortals. Blink cooldown -{value}s.',
         // Scoped target so the talent only affects its own cooldown value
         scaling: { type: 'flat', target: 'hex_engine.cooldownSeconds', base: 12, perRank: -0.07 },
-        tags: ['mobility', 'occultis'],
+        tags: ['mobility', 'occultist'],
         kind: 'active',
         activeType: 'buff',
         // base cooldown in seconds (UI consumers use cooldownMs / cooldownSeconds)
@@ -228,7 +228,7 @@ const occultisTalents = [
         description: 'Leave a void trail as you move: the skill stamps short-lived void zones along your path that each deal {value}% damage once to enemies who enter. Zones last 1.2s. Zone radius = {secondValue} px + per-rank increases.',
         scaling: { type: 'percent', target: 'voidPathDamage', base: 6, perRank: 2.25 },
         secondScaling: { type: 'flat', target: 'voidPathRadius', base: 22, perRank: 2 },
-        tags: ['movement', 'aoe', 'occultis'],
+        tags: ['movement', 'aoe', 'occultist'],
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 14,
@@ -238,30 +238,30 @@ const occultisTalents = [
     makeTalent('dark_shield', 'Dark Shield', {
         description: 'Gain a shield when health drops below a threshold. Shield strength scales with your max mana.',
         scaling: { type: 'percent', target: 'magicShield', base: 5, perRank: 0.45 },
-        tags: ['survivability', 'occultis'],
+        tags: ['survivability', 'occultist'],
         kind: 'passive'
     }),
     makeTalent('rune_overflow', 'Rune Overflow', {
         description: 'Crits that refill your dark well. Crit mana refund +{value}%.',
         scaling: { type: 'percent', target: 'critManaRefund', base: 15, perRank: 1.5 },
-        tags: ['mana', 'crit', 'occultis']
+        tags: ['mana', 'crit', 'occultist']
     }),
     makeTalent('astral_acuity', 'Astral Acuity', {
         description: 'Spells that pierce the veil of reality. Spell crit chance +{value}%.',
         scaling: { type: 'percent', target: 'spellCritChance', base: 2.5, perRank: 0.5 },
-        tags: ['combat', 'occultis']
+        tags: ['combat', 'occultist']
     }),
     makeTalent('abyssal_conjurer', 'Abyssal Conjurer', {//added
         description: 'When you slay foes there is a chance to conjure a minor abyssal ally for a short time.',
         scaling: { type: 'percent', target: 'abyssalSummonChance', base: 6, perRank: 1.1 },
-        tags: ['summon', 'occultis'],
+        tags: ['summon', 'occultist'],
         kind: 'passive'
     }),
     makeTalent('blood_ritual_reserve', 'Blood Ritual Reserve', {//works
         description: 'Channel to sacrifice a portion of your maximum mana each second to restore health. Cancelling ends the channel.',
         scaling: { type: 'percent', target: 'bloodRitualHpCostPerSec', base: 2, perRank: 0.4 },
         secondScaling: { type: 'percent', target: 'bloodRitualManaGainPerSec', base: 6, perRank: 1.0 },
-        tags: ['mana', 'channel', 'occultis'],
+        tags: ['mana', 'channel', 'occultist'],
         kind: 'active',
         activeType: 'utility',
         cooldownSeconds: 10,
@@ -270,19 +270,19 @@ const occultisTalents = [
     makeTalent('planar_echo', 'Planar Echo', {
         description: 'Spells that echo from the void. Spell duplicate chance +{value}%.',
         scaling: { type: 'percent', target: 'spellDuplicate', base: 3, perRank: 0.6 },
-        tags: ['combat', 'occultis']
+        tags: ['combat', 'occultist']
     }),
     makeTalent('glyphic_anchor', 'Glyphic Anchor', {
         description: 'Stand still, embrace the void. Standing damage reduction +{value}% (stacks to 3).',
         scaling: { type: 'percent', target: 'standingDR', base: 3, perRank: 0.7 },
-        tags: ['survivability', 'occultis'],
+        tags: ['survivability', 'occultist'],
         kind: 'passive'
     }),
     makeTalent('forbidden_balls', 'Forbidden Balls', {//works
         description: 'Launch homing void orbs that seek the nearest enemy and explode on impact. Orbs spawn one every 0.2s. Fires {value} orb(s); each orb deals {secondValue}% damage on hit.',
         scaling: { type: 'flat', target: 'forbiddenBalls.count', base: 2, perRank: 1 },
         secondScaling: { type: 'percent', target: 'forbiddenBalls.damage', base: 80, perRank: 6 },
-        tags: ['aoe', 'offensive', 'occultis'],
+        tags: ['aoe', 'offensive', 'occultist'],
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 14,
@@ -292,17 +292,17 @@ const occultisTalents = [
     makeTalent('shadow_mosaic', 'Shadow Mosaic', {
         description: 'Damage from the shadows between worlds. Some attacks have a chance to hit an additional time.',
         scaling: { type: 'percent', target: 'shadowDamage', base: 7, perRank: 0.7 },
-        tags: ['damage', 'occultis']
+        tags: ['damage', 'occultist']
     }),
     makeTalent('wood_lover', 'Staff Mastery', {
         description: 'Increase staff damage and handling. Staff damage +{value}%.',
         scaling: { type: 'percent', target: 'staffDamage', base: 8, perRank: 1.2 },
-        tags: ['combat', 'occultis']
+        tags: ['combat', 'occultist']
     }),
     makeTalent('occult_resurgence', 'Occult Resurgence', {
         description: 'Spells that cheat death itself. Cooldown reset chance +{value}%.',
         scaling: { type: 'percent', target: 'cooldownResetChance', base: 1.5, perRank: 0.25 },
-        tags: ['utility', 'occultis']
+        tags: ['utility', 'occultist']
     })
 ];
 
@@ -978,14 +978,14 @@ export const TALENT_TABS = {
         classIds: ['horror', 'ravager', 'sanguine'],
         talents: horrorTalents
     },
-    tab_occultis_core: {
-        id: 'tab_occultis_core',
+    tab_occultist_core: {
+        id: 'tab_occultist_core',
         slot: 2,
-        label: 'Occultis Tenets',
-        description: 'Spellcraft and curse manipulation for Occultis casters.',
+        label: 'Occultist Tenets',
+        description: 'Spellcraft and curse manipulation for Occultist casters.',
         type: 'class',
-        classIds: ['occultis', 'hexweaver', 'astral_scribe'],
-        talents: occultisTalents
+        classIds: ['occultist', 'hexweaver', 'astral_scribe'],
+        talents: occultistTalents
     },
     tab_stalker_core: {
         id: 'tab_stalker_core',
@@ -1065,9 +1065,9 @@ export const CLASS_PATH_MAP = {
     horror: 'horror',
     ravager: 'horror',
     sanguine: 'horror',
-    occultis: 'occultis',
-    hexweaver: 'occultis',
-    astral_scribe: 'occultis',
+    occultist: 'occultist',
+    hexweaver: 'occultist',
+    astral_scribe: 'occultist',
     stalker: 'stalker',
     nightblade: 'stalker',
     shade_dancer: 'stalker'
@@ -1075,7 +1075,7 @@ export const CLASS_PATH_MAP = {
 
 const SLOT2_TAB_BY_PATH = {
     horror: 'tab_horror_core',
-    occultis: 'tab_occultis_core',
+    occultist: 'tab_occultist_core',
     stalker: 'tab_stalker_core'
 };
 
@@ -1121,7 +1121,7 @@ export function getTabIdForSlot(classId, slot) {
 export const TALENT_TAB_ORDER = [
     'tab_beginner',
     'tab_horror_core',
-    'tab_occultis_core',
+    'tab_occultist_core',
     'tab_stalker_core',
     'tab_ravager_special',
     'tab_sanguine_special',

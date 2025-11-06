@@ -16,7 +16,7 @@ const QUEST_CHAIN = [
     'mother_lumen_goblin_cull'
 ];
 
-const CLASS_UPGRADE_CHOICES = ['horror', 'occultis', 'stalker'];
+const CLASS_UPGRADE_CHOICES = ['horror', 'occultist', 'stalker'];
 
 export class GloamwayBastion extends Phaser.Scene {
     constructor() {
@@ -629,7 +629,7 @@ export class GloamwayBastion extends Phaser.Scene {
                 bodyNodes: [
                     ui.createDialogueParagraph('There are three paths beyond the beginner\'s gate. Each reshapes the body, the mind, the very hunger that drives you forward.'),
                     ui.createDialogueParagraph('The Horror - a guilt-powered wrecking suit. They monetize collision, turning violence into momentum. Strength and endurance are their currency.'),
-                    ui.createDialogueParagraph('The Occultis - one who refuses normal spell schools. They trade stability for layered hex engines, weaving curses that compound and corrupt. Intelligence and cunning guide their craft.')
+                    ui.createDialogueParagraph('The Occultist - one who refuses normal spell schools. They trade stability for layered hex engines, weaving curses that compound and corrupt. Intelligence and cunning guide their craft.')
                 ]
             },
             {
@@ -668,7 +668,7 @@ export class GloamwayBastion extends Phaser.Scene {
                                     },
                                     {
                                         bodyNodes: [
-                                            ui.createDialogueParagraph('The Occultis - one who refuses normal spell schools. They trade stability for layered hex engines, weaving curses that compound and corrupt. Intelligence and cunning guide their craft.'),
+                                            ui.createDialogueParagraph('The Occultist - one who refuses normal spell schools. They trade stability for layered hex engines, weaving curses that compound and corrupt. Intelligence and cunning guide their craft.'),
                                             ui.createDialogueParagraph('Base: +3 INT | Per Level: +0.7 INT, +0.1 LUK'),
                                             ui.createDialogueParagraph('Masters of manipulation and control, they debilitate enemies before striking. Their path leads to mastery over cosmic and blood magics.')
                                         ]
@@ -1253,3 +1253,4 @@ export class GloamwayBastion extends Phaser.Scene {
 applyCombatMixin(GloamwayBastion.prototype);
 
 export default GloamwayBastion;
+
