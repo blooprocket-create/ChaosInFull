@@ -258,21 +258,42 @@ export class Town extends Phaser.Scene {
     // separate workbench indicator
     const workbenchX = centerX + 120;
     const workbenchY = furnaceY + 6;
-    this._workbenchIndicator = this.add.text(workbenchX, workbenchY - 28, '⚒️', { fontSize: '18px' }).setOrigin(0.5).setDepth(2);
+    this._workbenchIndicator = this.add.text(workbenchX, workbenchY - 34, '⚒️', { fontSize: '18px' }).setOrigin(0.5).setDepth(2);
     this._workbenchIndicator.setVisible(false);
-    // create and place workbench slightly left of the furnace
+    // create and place workbench slightly left of the furnace with improved visuals
     this._createWorkbench(workbenchX, workbenchY);
-    // storage chest (shared across account)
+    // storage chest (shared across account) — improved visual container
     const chestX = workbenchX - 200;
     const chestY = workbenchY;
-    this.storageChest = this.add.rectangle(chestX, chestY, 48, 40, 0x443366, 1).setDepth(1.5);
-    this.storageChestPrompt = this.add.text(chestX, chestY - 48, '[E] Open Storage', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+    {
+        const chest = this.add.container(chestX, chestY).setDepth(1.5);
+        const base = this.add.rectangle(0, 8, 58, 30, 0x5a4630, 1);
+        const lid = this.add.rectangle(0, -4, 62, 16, 0x7a5a3a, 1);
+        const band = this.add.rectangle(0, 8, 10, 30, 0x3a2a1a, 0.9);
+        const lock = this.add.circle(0, 6, 4, 0xd4b36a, 1);
+        chest.add([base, lid, band, lock]);
+        this.storageChest = chest;
+    }
+    this.storageChestPrompt = this.add.text(chestX, chestY - 54, '[E] Open Storage', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
     this.storageChestPrompt.setVisible(false);
-    // shop (near storage chest)
+    // shop (near storage chest) — improved stall visual
     const shopX = chestX - 120;
     const shopY = chestY;
-    this.shop = this.add.rectangle(shopX, shopY, 48, 40, 0x8B4513, 1).setDepth(1.5);
-    this.shopPrompt = this.add.text(shopX, shopY - 48, '[E] Visit Shop', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+    {
+        const stall = this.add.container(shopX, shopY).setDepth(1.5);
+        const counter = this.add.rectangle(0, 10, 64, 24, 0x6f3a1a, 1);
+        const counterEdge = this.add.rectangle(0, -2, 68, 8, 0x8b4a22, 1);
+        const awning = this.add.rectangle(0, -32, 70, 12, 0xaa2b2b, 1);
+        // stripes on awning
+        for (let i = -24; i <= 24; i += 12) {
+            const stripe = this.add.rectangle(i, -32, 6, 12, 0xffe0e0, 0.85);
+            stall.add(stripe);
+        }
+        const sign = this.add.text(0, -50, '🛒', { fontSize: '16px' }).setOrigin(0.5);
+        stall.add([counter, counterEdge, awning, sign]);
+        this.shop = stall;
+    }
+    this.shopPrompt = this.add.text(shopX, shopY - 54, '[E] Visit Shop', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
     this.shopPrompt.setVisible(false);
     // shop inventory (pulling from ITEM_DEFS)
     this.shopInventory = [
@@ -319,6 +340,22 @@ export class Town extends Phaser.Scene {
     };
     this.mayorPrompt = this.add.text(mayorX, mayorY - 68, '[E] Talk to Mayor Grimsley', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 }, align: 'center' }).setOrigin(0.5).setDepth(2);
     this.mayorPrompt.setVisible(false);
+    // Steward NPC (new): duplicate mayor behaviors with a tint and unique dialogue
+    const stewardX = Math.min(bounds.x2 - 140, centerX + 180);
+    const stewardY = Math.max(bounds.y1 + 80, centerY - 30);
+    this.steward = this.add.sprite(stewardX, stewardY, 'grimsley_idle').setOrigin(0.5, 0.9).setDepth(1.5);
+    try { this.steward.setTint(0x88b4ff); } catch (e) {}
+    this._playMayorAnimation('idle', 'left');
+    this.stewardState = {
+        home: { x: stewardX, y: stewardY },
+        radius: 90,
+        speed: 28,
+        facing: 'left',
+        target: null,
+        idleUntil: this.time.now + Phaser.Math.Between(1600, 3200)
+    };
+    this.stewardPrompt = this.add.text(stewardX, stewardY - 68, '[E] Talk to Steward Fenric', { fontSize: '14px', color: '#e8f0ff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 }, align: 'center' }).setOrigin(0.5).setDepth(2);
+    this.stewardPrompt.setVisible(false);
         // cleanup on shutdown
         this.events.once('shutdown', () => {
             clearActivity(this, { silent: true });
@@ -341,6 +378,9 @@ export class Town extends Phaser.Scene {
             this.mayor = null;
             this.mayorState = null;
             if (this.mayorPrompt && this.mayorPrompt.destroy) { this.mayorPrompt.destroy(); this.mayorPrompt = null; }
+            if (this.steward && this.steward.destroy) { this.steward.destroy(); this.steward = null; }
+            if (this.stewardPrompt && this.stewardPrompt.destroy) { this.stewardPrompt.destroy(); this.stewardPrompt = null; }
+            this.stewardState = null;
     this._stopSafeZoneRegen();
 
     // Remove key handlers
@@ -356,8 +396,15 @@ export class Town extends Phaser.Scene {
     // --- Workbench (crafting) ---
     // Place a workbench in the town near the furnace
     _createWorkbench(x, y) {
-        this.workbench = this.add.rectangle(x, y, 64, 40, 0x4b6b2f, 1).setDepth(1.5);
-        this.workbenchPrompt = this.add.text(x, y - 48, '[E] Use Workbench', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+        const bench = this.add.container(x, y).setDepth(1.5);
+        const top = this.add.rectangle(0, 0, 72, 16, 0x354f2b, 1);
+        const topHighlight = this.add.rectangle(0, -6, 76, 4, 0x5c8b4a, 0.9);
+        const legL = this.add.rectangle(-28, 14, 10, 22, 0x2b3f24, 1);
+        const legR = this.add.rectangle(28, 14, 10, 22, 0x2b3f24, 1);
+        const bolts = [this.add.circle(-18, -2, 2, 0xbacfa2, 0.9), this.add.circle(18, -2, 2, 0xbacfa2, 0.9)];
+        bench.add([top, topHighlight, legL, legR, ...bolts]);
+        this.workbench = bench;
+        this.workbenchPrompt = this.add.text(x, y - 54, '[E] Use Workbench', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
         this.workbenchPrompt.setVisible(false);
     }
     _openWorkbenchModal() {
@@ -1072,6 +1119,64 @@ export class Town extends Phaser.Scene {
         }
     }
 
+    _updateStewardAI(time, delta) {
+        if (!this.steward || !this.stewardState) return;
+        const sprite = this.steward;
+        const state = this.stewardState;
+        const now = (typeof time === 'number') ? time : (this.time ? this.time.now : 0);
+        const dt = (typeof delta === 'number') ? delta : 16.6;
+
+        if (this._activeDialogueNpc === 'steward') {
+            state.target = null;
+            state.idleUntil = now + 200;
+            this._playMayorAnimation('idle', state.facing || 'down');
+            return;
+        }
+
+        if (state.target) {
+            const dx = state.target.x - sprite.x;
+            const dy = state.target.y - sprite.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const step = state.speed * (dt / 1000);
+            if (dist <= step) {
+                sprite.setPosition(state.target.x, state.target.y);
+                state.target = null;
+                state.idleUntil = now + Phaser.Math.Between(1400, 3200);
+                this._playMayorAnimation('idle', state.facing || 'down');
+            } else {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                sprite.x += nx * step;
+                sprite.y += ny * step;
+                let facing;
+                if (Math.abs(dx) > Math.abs(dy)) facing = dx < 0 ? 'left' : 'right';
+                else facing = dy < 0 ? 'up' : 'down';
+                state.facing = facing;
+                this._playMayorAnimation('walk', facing);
+            }
+        } else {
+            if (!state.idleUntil || now >= state.idleUntil) {
+                const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+                const distance = Phaser.Math.FloatBetween(18, state.radius || 90);
+                let tx = state.home.x + Math.cos(angle) * distance;
+                let ty = state.home.y + Math.sin(angle) * distance;
+                const padding = 48;
+                tx = Phaser.Math.Clamp(tx, padding, this.scale.width - padding);
+                ty = Phaser.Math.Clamp(ty, padding, this.scale.height - padding);
+                state.speed = Phaser.Math.FloatBetween(22, 34);
+                state.target = { x: tx, y: ty };
+            } else {
+                this._playMayorAnimation('idle', state.facing || 'left');
+            }
+        }
+
+        if (this.stewardPrompt) this.stewardPrompt.setPosition(sprite.x, sprite.y - 68);
+        if (sprite.setDepth) {
+            const depth = 1 + (sprite.y / Math.max(1, this.scale.height)) * 1.2;
+            sprite.setDepth(depth);
+        }
+    }
+
     update(time, delta) {
         if (typeof delta !== 'number') delta = (this.game && this.game.loop && this.game.loop.delta) ? this.game.loop.delta : 16.6;
         if (typeof time !== 'number') time = this.time ? this.time.now : 0;
@@ -1097,7 +1202,8 @@ export class Town extends Phaser.Scene {
                 updateDepthForTopDown(this, { min: 0.9, max: 2.4 });
             } catch (e) { /* ignore */ }
         } catch (e) { /* ignore depth ordering errors */ }
-        this._updateMayorAI(time, delta);
+    this._updateMayorAI(time, delta);
+    this._updateStewardAI(time, delta);
         // Portal interactions (cave, inner field) are handled by the shared portal helper
         // Furnace interaction: proximity + E to open smelting UI
         if (this.furnace) {
@@ -1175,6 +1281,22 @@ export class Town extends Phaser.Scene {
             } else {
                 this.mayorPrompt.setVisible(false);
                 if (this._activeDialogueNpc === 'mayor') this._closeDialogueOverlay();
+            }
+        }
+
+        // Steward interaction
+        if (this.steward) {
+            const _px = (this.player && this.player.body) ? (this.player.body.x + ((this.player.body.width||0) / 2)) : this.player.x;
+            const _py = (this.player && this.player.body) ? (this.player.body.y + ((this.player.body.height||0) / 2)) : this.player.y;
+            const mdist = Phaser.Math.Distance.Between(_px, _py, this.steward.x, this.steward.y);
+            if (mdist <= 56) {
+                this.stewardPrompt.setVisible(true);
+                if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                    this._openStewardDialogue();
+                }
+            } else {
+                this.stewardPrompt.setVisible(false);
+                if (this._activeDialogueNpc === 'steward') this._closeDialogueOverlay();
             }
         }
     }
@@ -1374,6 +1496,60 @@ export class Town extends Phaser.Scene {
             { label: 'Any more work?', onClick: () => this._openMayorDialogue(), variant: 'primary' },
             { label: 'Thanks', onClick: () => {}, variant: 'success' }
         ], '#ffd27a');
+    }
+
+    // --- Steward Fenric dialogue (personality + town tips) ---
+    _openStewardDialogue(page = 'root') {
+        this._activeDialogueNpc = 'steward';
+        try { updateQuestProgress && updateQuestProgress(this.char, 'talk', 'steward_fenric', 1); } catch (e) {}
+        this._renderStewardDialoguePage(page);
+    }
+
+    _renderStewardDialoguePage(page) {
+        const ui = window.__shared_ui;
+        const bodyNodes = [];
+        const optionConfigs = [];
+
+        const render = () => ui.renderDialogue('Steward Fenric', '📜', bodyNodes, optionConfigs, '#a8c7ff');
+
+        if (page === 'root') {
+            bodyNodes.push(ui.createDialogueParagraph("Ah, the newcomer. I'm Steward Fenric—keeper of ledgers, knower of shortcuts, and sworn enemy of disarray."));
+            bodyNodes.push(ui.createDialogueParagraph("The Mayor blusters. I smooth the gears. If you're looking to get settled, I can point the way."));
+            optionConfigs.push({ label: 'Who are you, really?', onClick: () => this._openStewardDialogue('bio') });
+            optionConfigs.push({ label: 'Any advice for a newcomer?', onClick: () => this._openStewardDialogue('advice'), variant: 'primary' });
+            optionConfigs.push({ label: 'Where can I find work?', onClick: () => this._openStewardDialogue('work') });
+            optionConfigs.push({ label: 'Leave', onClick: () => {} });
+            return render();
+        }
+
+        if (page === 'bio') {
+            bodyNodes.push(ui.createDialogueParagraph("Steward is the old title. Means I keep things running—records straight, coffers balanced, citizens un-panicked."));
+            bodyNodes.push(ui.createDialogueParagraph("If you make a mess, try to make it the profitable kind. If not, at least make it entertaining."));
+            optionConfigs.push({ label: 'Back', onClick: () => this._openStewardDialogue('root') });
+            return render();
+        }
+
+        if (page === 'advice') {
+            bodyNodes.push(ui.createDialogueParagraph("Three habits keep adventurers alive: keep stocked, keep sorted, and keep moving."));
+            bodyNodes.push(ui.createDialogueParagraph("Shop’s over there—look for the awning. Storage chest holds what you can’t carry. The workbench turns scraps into something sharper."));
+            bodyNodes.push(ui.createDialogueParagraph("When you’re ready to roam, portals flank the plaza. They’re picky about where you stand—so are undertakers."));
+            optionConfigs.push({ label: 'Open Shop', onClick: () => { try { this._openShopModal(); } catch(e){} } });
+            optionConfigs.push({ label: 'Open Storage', onClick: () => { try { this._openStorageModal(); } catch(e){} } });
+            optionConfigs.push({ label: 'Use Workbench', onClick: () => { try { this._openWorkbenchModal(); } catch(e){} } });
+            optionConfigs.push({ label: 'Back', onClick: () => this._openStewardDialogue('root') });
+            return render();
+        }
+
+        if (page === 'work') {
+            bodyNodes.push(ui.createDialogueParagraph("If you want coin, the Mayor’s your man—he hands out contracts and collects favors."));
+            bodyNodes.push(ui.createDialogueParagraph("If you want trouble, the fields will oblige. Start in the Inner Field. If you come back in pieces, I’ll fetch a broom."));
+            optionConfigs.push({ label: 'Talk to the Mayor', onClick: () => this._openMayorDialogue(), variant: 'success' });
+            optionConfigs.push({ label: 'Back', onClick: () => this._openStewardDialogue('root') });
+            return render();
+        }
+
+        // Fallback
+        this._openStewardDialogue('root');
     }
 
     _ensureDialogueOverlay() {
