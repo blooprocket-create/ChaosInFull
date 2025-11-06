@@ -3133,37 +3133,93 @@ export function openTalentModal(scene) {
     const char = scene.char = scene.char || {};
     try { ensureCharTalents && ensureCharTalents(char); } catch (e) {}
     if (scene._talentModal) return;
-    const modal = document.createElement('div');
-    modal.id = 'talent-modal';
-    modal.className = 'modal-overlay show';
-    modal.style.zIndex = '250';
-    modal.innerHTML = `
-        <div class='modal-card'>
-            <div class='modal-head'>
-                <div>
-                    <div class='modal-title'>Talent Tree</div>
-                    <div class='modal-subtitle'>Allocate talent points across tabs. Star points are separate.</div>
+
+    // Inject one-off stylesheet for revamped talent UI if not already present
+    if (!document.getElementById('talent-modal-styles')) {
+        const style = document.createElement('style');
+        style.id = 'talent-modal-styles';
+        style.textContent = `
+            #talent-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:250; }
+            #talent-modal .talent-shell { background:linear-gradient(135deg,#1b1b21,#101014); border:3px solid #111; border-left:8px solid rgba(120,20,20,0.9); border-radius:14px; min-width:960px; max-width:1180px; max-height:82vh; display:flex; flex-direction:column; box-shadow:0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.04); font-family:'Share Tech Mono', monospace; color:#f0c9b0; overflow:hidden; }
+            #talent-modal .talent-head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding:16px 20px 14px; background:linear-gradient(90deg,rgba(50,40,34,0.8),rgba(32,24,20,0.7)); border-bottom:2px solid rgba(255,210,122,0.25); }
+            #talent-modal .talent-head h1 { font-family:'Metal Mania',cursive; font-size:1.85rem; margin:0; letter-spacing:1px; color:#ffd8a0; text-shadow:0 3px 10px rgba(0,0,0,0.8); }
+            #talent-modal .talent-head .meta { display:flex; flex-wrap:wrap; gap:12px; font-size:0.75rem; letter-spacing:0.08em; color:#caa78e; }
+            #talent-modal .talent-body { flex:1 1 auto; display:flex; min-height:0; }
+            #talent-tabs { background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.55)); border-right:1px solid rgba(255,255,255,0.05); padding:14px 12px; display:flex; flex-direction:column; gap:8px; }
+            #talent-tabs button { text-align:left; font-weight:700; font-size:0.8rem; background:rgba(255,255,255,0.04); color:#f8e1cc; border:1px solid rgba(255,255,255,0.07); padding:10px 12px; border-radius:8px; cursor:pointer; position:relative; transition:background .18s,border-color .18s, transform .18s; }
+            #talent-tabs button.active { background:linear-gradient(90deg,rgba(255,210,122,0.2),rgba(255,210,122,0.05)); border:1px solid rgba(255,210,122,0.6); color:#ffd8a0; box-shadow:0 0 0 1px rgba(255,210,122,0.25),0 6px 18px -6px rgba(0,0,0,0.6); }
+            #talent-tabs button:not(.active):hover { background:rgba(255,255,255,0.08); }
+            #talent-grid-panel { flex:1 1 auto; display:flex; flex-direction:column; padding:14px 16px; gap:10px; overflow:auto; }
+            #talent-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; align-content:start; }
+            .talent-node { background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.08); border-left:4px solid rgba(90,90,90,0.4); padding:10px 10px 12px; border-radius:12px; display:flex; flex-direction:column; gap:6px; position:relative; min-height:142px; transition:box-shadow .2s,border-color .2s, transform .15s, filter .2s, background .25s; }
+            .talent-node.locked { filter:grayscale(80%) brightness(0.6); opacity:0.55; }
+            .talent-node.available:not(.maxed) { border-left-color:#ffd27a; box-shadow:0 0 0 1px rgba(255,210,122,0.25),0 0 14px -4px rgba(255,210,122,0.4); }
+            .talent-node.available:not(.maxed):hover { background:linear-gradient(145deg,rgba(255,210,122,0.15),rgba(255,210,122,0.05)); }
+            .talent-node.maxed { border-left-color:#4ade80; box-shadow:0 0 0 1px rgba(74,222,128,0.3),0 0 18px -4px rgba(74,222,128,0.45); }
+            .talent-node header { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+            .talent-node header h2 { font-size:0.9rem; line-height:1.1; margin:0; color:#fce7d6; flex:1; font-weight:800; letter-spacing:0.5px; }
+            .talent-node .badge { font-size:10px; padding:3px 6px; border-radius:6px; font-weight:700; letter-spacing:.08em; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); color:#c9b8ff; }
+            .talent-node.passive .badge { color:#ffd27a; }
+            .talent-node .desc { font-size:11px; line-height:1.35; color:#d6c2b2; flex:1; }
+            .talent-node footer { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+            .talent-node footer .rank { font-size:11px; font-weight:700; letter-spacing:.06em; color:#fff; }
+            .talent-node footer .controls { display:flex; gap:4px; }
+            .talent-node footer button { font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:#f3f3f3; transition:background .15s,border-color .15s; }
+            .talent-node footer button:hover { background:rgba(255,255,255,0.12); }
+            .talent-node .next-rank { font-size:10px; color:#a7f3d0; font-weight:600; letter-spacing:.05em; margin-top:2px; }
+            #talent-info { width:290px; flex:0 0 290px; border-left:1px solid rgba(255,255,255,0.05); background:linear-gradient(180deg,rgba(0,0,0,0.4),rgba(0,0,0,0.65)); padding:14px 16px; display:flex; flex-direction:column; gap:12px; overflow:auto; }
+            #talent-info .panel { background:linear-gradient(140deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:10px 12px; font-size:12px; line-height:1.4; }
+            #talent-info .panel h3 { margin:0 0 4px; font-size:0.85rem; font-weight:800; letter-spacing:.06em; color:#ffd8a0; }
+            #talent-info .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
+            #talent-info .summary .stat { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:6px 8px; font-size:11px; display:flex; flex-direction:column; gap:2px; }
+            #talent-info .summary .stat span.value { font-size:13px; font-weight:800; color:#ffd27a; }
+            #talent-modal .close-btn { background:rgba(80,40,40,0.55); border:1px solid rgba(255,110,110,0.4); color:#fff; font-weight:700; padding:8px 14px; font-size:0.85rem; border-radius:8px; cursor:pointer; letter-spacing:.08em; }
+            #talent-modal .close-btn:hover { background:rgba(110,50,50,0.7); }
+            #talent-modal .respec-btn { background:rgba(40,60,90,0.4); border:1px solid rgba(120,170,255,0.4); color:#cfe4ff; font-weight:700; padding:8px 14px; font-size:0.72rem; border-radius:8px; cursor:pointer; letter-spacing:.1em; }
+            #talent-modal .respec-btn:hover { background:rgba(60,90,130,0.55); }
+            #talent-modal .points-pill { background:linear-gradient(90deg,rgba(255,210,122,0.15),rgba(255,210,122,0.04)); border:1px solid rgba(255,210,122,0.35); padding:6px 10px; border-radius:999px; font-size:0.7rem; font-weight:700; letter-spacing:.08em; color:#ffd8a0; display:inline-flex; gap:6px; align-items:center; }
+            #talent-modal .points-pill.star { background:linear-gradient(90deg,rgba(180,120,255,0.18),rgba(180,120,255,0.04)); border-color:rgba(180,120,255,0.45); color:#d8b3ff; }
+            @keyframes pulse-glow { 0%,100% { box-shadow:0 0 0 0 rgba(255,210,122,0.45);} 50% { box-shadow:0 0 0 4px rgba(255,210,122,0);} }
+            .talent-node.available:not(.maxed) { animation:pulse-glow 3.2s ease-in-out infinite; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.id = 'talent-modal';
+    wrap.innerHTML = `
+        <div class="talent-shell">
+            <div class="talent-head">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <h1>Talent Tree</h1>
+                    <div class="meta"><span>Allocate points to enhance your character. Shift+Click = Max / Ctrl+Click = -1.</span></div>
                 </div>
-                <div class='modal-close'><button id='talent-close' class='btn btn-ghost'>Close</button></div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;" id="talent-points-summary"></div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="respec-btn" id="talent-respec-tab" title="Refund all points in current tab">RESPEC TAB</button>
+                        <button class="close-btn" id="talent-close">CLOSE</button>
+                    </div>
+                </div>
             </div>
-            <div class='modal-body'>
-                <div id='talent-tabs' style='width:180px; flex:0 0 180px; overflow:auto;'></div>
-                <div id='talent-grid' style='flex:1 1 480px; overflow:auto; padding:6px; display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:8px;'></div>
-                <div id='talent-info' style='width:260px; flex:0 0 260px; overflow:auto; padding:6px;'></div>
+            <div class="talent-body">
+                <div id="talent-tabs" style="width:190px; flex:0 0 190px; overflow:auto;"></div>
+                <div id="talent-grid-panel">
+                    <div id="talent-grid"></div>
+                </div>
+                <div id="talent-info"></div>
             </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    scene._talentModal = modal;
-    document.getElementById('talent-close').onclick = () => closeTalentModal(scene);
-    // Auto-clean on scene shutdown
-    try { scene.events && scene.events.once && scene.events.once('shutdown', () => { try { closeTalentModal(scene); } catch (e) {} }); } catch (e) {}
-    // attach data and state
+        </div>`;
+    document.body.appendChild(wrap);
+    scene._talentModal = wrap;
+    const closeBtn = wrap.querySelector('#talent-close'); if (closeBtn) closeBtn.onclick = () => closeTalentModal(scene);
+    // attach data/state
     scene._talentState = scene._talentState || { activeTab: null };
-    // default active tab: first available for class
     const availableTabs = getTabsForClass(char.class);
     scene._talentState.availableTabs = availableTabs;
     scene._talentState.activeTab = scene._talentState.activeTab || (availableTabs && availableTabs[0]) || 'tab_beginner';
+    // Respec button wired later inside refresh to ensure activeTab context
+    try { scene.events?.once?.('shutdown', () => { try { closeTalentModal(scene); } catch(e){} }); } catch(e){}
     refreshTalentModal(scene);
 }
 
@@ -3184,197 +3240,161 @@ export function refreshTalentModal(scene) {
     const tabsEl = scene._talentModal.querySelector('#talent-tabs');
     const gridEl = scene._talentModal.querySelector('#talent-grid');
     const infoEl = scene._talentModal.querySelector('#talent-info');
+    const pointsSummary = scene._talentModal.querySelector('#talent-points-summary');
     if (!tabsEl || !gridEl || !infoEl) return;
-    tabsEl.innerHTML = '';
-    gridEl.innerHTML = '';
-    infoEl.innerHTML = '';
 
+    // Rebuild tabs
+    tabsEl.innerHTML = '';
     const tabs = state.availableTabs || getTabsForClass(char.class);
     for (const tid of tabs) {
         const tDef = getTalentTab(tid) || {};
-        const btn = document.createElement('button'); btn.className = 'btn btn-secondary'; btn.style.display = 'block'; btn.style.width = '100%'; btn.style.marginBottom = '8px';
-        btn.textContent = `${tDef.label || tid} (${tDef.type === 'star' ? 'Star' : 'Tab'})`;
-        if (state.activeTab === tid) btn.style.border = '2px solid rgba(255,210,122,0.6)';
-        btn.onclick = () => { state.activeTab = tid; refreshTalentModal(scene); };
-        tabsEl.appendChild(btn);
+        const b = document.createElement('button');
+        b.textContent = (tDef.label || tid.replace(/^tab_/,'').replace(/_/g,' ')).toUpperCase();
+        if (state.activeTab === tid) b.classList.add('active');
+        b.onclick = () => { state.activeTab = tid; refreshTalentModal(scene); };
+        // small type badge
+        const type = document.createElement('span'); type.style.position='absolute'; type.style.top='4px'; type.style.right='8px'; type.style.fontSize='9px'; type.style.opacity='0.65'; type.style.letterSpacing='.12em'; type.textContent = (tDef.type === 'star')? '★':'TAB'; b.appendChild(type);
+        tabsEl.appendChild(b);
     }
 
+    // Active tab definition
     const activeTabId = state.activeTab || tabs[0];
     const activeTabDef = getTalentTab(activeTabId) || {};
-    // header info
-    const header = document.createElement('div'); header.style.marginBottom = '8px';
-    header.innerHTML = `<strong style='display:block;margin-bottom:6px;'>${activeTabDef.label || activeTabId}</strong><div style='font-size:12px;color:rgba(255,255,255,0.8)'>${activeTabDef.description || ''}</div>`;
-    infoEl.appendChild(header);
-    const unspent = (activeTabDef.type === 'star') ? (char.talents && char.talents.starPoints) || 0 : (char.talents && char.talents.unspentByTab && (char.talents.unspentByTab[activeTabId] || 0)) || 0;
-    const pts = document.createElement('div'); pts.style.margin = '8px 0'; pts.innerHTML = `<div style='font-weight:800'>Unspent: <span style='color:#ffd27a'>${unspent}</span></div>`;
-    infoEl.appendChild(pts);
 
-    // Respec button
-    const respecBtn = document.createElement('button'); respecBtn.className = 'btn btn-ghost'; respecBtn.textContent = 'Respec Tab';
-    respecBtn.onclick = () => {
+    // Points summary chips (global top-right)
+    if (pointsSummary) {
+        pointsSummary.innerHTML = '';
         try {
-            const allocs = (char.talents && char.talents.allocations && char.talents.allocations[activeTabId]) || {};
-            let refunded = 0;
-            for (const k of Object.keys(allocs)) { refunded += (allocs[k] || 0); }
-            if (activeTabDef.type === 'star') {
-                char.talents.starPoints = (char.talents.starPoints || 0) + refunded;
-            } else {
-                char.talents.unspentByTab = char.talents.unspentByTab || {};
-                char.talents.unspentByTab[activeTabId] = (char.talents.unspentByTab[activeTabId] || 0) + refunded;
+            const totalStar = char.talents?.starPoints || 0;
+            const star = document.createElement('div'); star.className = 'points-pill star'; star.innerHTML = `★ STAR: <strong style="font-size:0.9rem;">${totalStar}</strong>`; pointsSummary.appendChild(star);
+            for (const tid of tabs) {
+                const td = getTalentTab(tid) || {}; if (td.type === 'star') continue;
+                const un = (char.talents?.unspentByTab && (char.talents.unspentByTab[tid]||0)) || 0;
+                const pill = document.createElement('div'); pill.className='points-pill'; pill.textContent = `${(td.label||tid.replace(/^tab_/,'')).toUpperCase()}: ${un}`; pointsSummary.appendChild(pill);
             }
-            // clear allocations and run de-learn logic for active talents
-            try {
-                if (char.talents && char.talents.allocations && char.talents.allocations[activeTabId]) {
-                    const arr = char.talents.allocations[activeTabId];
-                    for (const k of Object.keys(arr)) {
-                        try { const prev = arr[k] || 0; if (prev > 0) processTalentAllocation(scene, char, activeTabId, k, prev, 0); } catch (e) {}
-                    }
-                }
-            } catch (e) {}
-            // clear allocations
-            if (char.talents && char.talents.allocations) char.talents.allocations[activeTabId] = {};
-            if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
-            refreshTalentModal(scene);
-        } catch (e) { console.warn('respec error', e); }
-    };
-    infoEl.appendChild(respecBtn);
+        } catch(e){}
+    }
 
-    // talent cards
+    // Info side panel content
+    infoEl.innerHTML = '';
+    const infoHeader = document.createElement('div'); infoHeader.className = 'panel';
+    infoHeader.innerHTML = `<h3>${(activeTabDef.label||activeTabId).toUpperCase()}</h3><div style="font-size:11px; color:#c7b9ab;">${activeTabDef.description||''}</div>`;
+    infoEl.appendChild(infoHeader);
+
+    // Current tab unspent points panel
+    const unspent = (activeTabDef.type === 'star') ? (char.talents?.starPoints || 0) : (char.talents?.unspentByTab && (char.talents.unspentByTab[activeTabId]||0)) || 0;
+    const ptsPanel = document.createElement('div'); ptsPanel.className='panel'; ptsPanel.innerHTML = `<h3>POINTS</h3><div style="font-size:12px;">Unspent: <span style="color:#ffd27a;font-weight:800;">${unspent}</span> ${(activeTabDef.type==='star')? '(STAR)':''}</div>`;
+    infoEl.appendChild(ptsPanel);
+
+    // Wire up respec button (in header)
+    const respecBtn = scene._talentModal.querySelector('#talent-respec-tab');
+    if (respecBtn) {
+        respecBtn.onclick = () => {
+            try {
+                const allocs = (char.talents && char.talents.allocations && char.talents.allocations[activeTabId]) || {};
+                let refunded = 0; for (const k of Object.keys(allocs)) refunded += (allocs[k]||0);
+                if (activeTabDef.type === 'star') char.talents.starPoints = (char.talents.starPoints||0) + refunded; else { char.talents.unspentByTab = char.talents.unspentByTab||{}; char.talents.unspentByTab[activeTabId] = (char.talents.unspentByTab[activeTabId]||0) + refunded; }
+                // process de-allocation
+                try { for (const k of Object.keys(allocs)) { const prev = allocs[k]||0; if (prev>0) processTalentAllocation(scene,char,activeTabId,k,prev,0); } } catch(e){}
+                if (char.talents && char.talents.allocations) char.talents.allocations[activeTabId] = {};
+                if (scene._persistCharacter) scene._persistCharacter((scene.sys?.settings?.data && scene.sys.settings.data.username)||null);
+                refreshTalentModal(scene);
+            } catch(e){ console.warn('respec error',e); }
+        };
+    }
+
+    // Build grid of talents
+    gridEl.innerHTML = '';
     const talents = Array.isArray(activeTabDef.talents) ? activeTabDef.talents : [];
+    const allocations = (char.talents?.allocations && char.talents.allocations[activeTabId]) || {};
+
+    const formatDisplay = (v) => {
+        const n = parseFloat(v||0); if (isNaN(n)) return String(v); if (Math.abs(n - Math.round(n)) < 0.0001) return String(Math.round(n)); return String(parseFloat(n.toFixed(2))); };
+
     for (const t of talents) {
-        const tid = t.id;
-        const card = document.createElement('div'); card.style.background = 'rgba(255,255,255,0.03)'; card.style.padding = '8px'; card.style.borderRadius = '10px'; card.style.display = 'flex'; card.style.flexDirection = 'column'; card.style.gap = '6px';
-    const name = document.createElement('div'); name.style.fontWeight = '800'; name.textContent = t.name || tid;
-        const desc = document.createElement('div'); desc.style.fontSize = '12px'; desc.style.color = 'rgba(255,255,255,0.85)';
-        // Determine current allocation before interpolation
-        const alloc = (char.talents && char.talents.allocations && char.talents.allocations[activeTabId] && char.talents.allocations[activeTabId][tid]) || 0;
-        // small formatter to produce clean numbers for display (trim unnecessary decimals)
-        const formatDisplay = (v, type) => {
-            const n = parseFloat(v || 0);
-            if (isNaN(n)) return String(v);
-            if (Math.abs(n - Math.round(n)) < 0.0001) return String(Math.round(n));
-            // show up to 2 decimals for fractional values
-            return String(parseFloat(n.toFixed(2)));
-        };
-        // Interpolate {value} in descriptions based on current allocation (show current applied bonus when allocated)
+        const tid = t.id; const alloc = allocations[tid] || 0; const maxRank = t.maxRank || 1;
+        const node = document.createElement('div'); node.className = 'talent-node'; node.tabIndex = 0; if (t.kind !== 'active') node.classList.add('passive');
+        if (alloc >= maxRank) node.classList.add('maxed');
+        // Determine availability: simple check = if unspent > 0 and not maxed
+        const available = (unspent > 0 || activeTabDef.type === 'star') && alloc < maxRank; if (available) node.classList.add('available'); else if (alloc === 0) node.classList.add('locked');
+
+        // Header
+        const h = document.createElement('header');
+        const h2 = document.createElement('h2'); h2.textContent = t.name || tid; h.appendChild(h2);
+        const badge = document.createElement('div'); badge.className='badge'; badge.textContent = t.kind === 'active' ? 'ACTIVE' : 'PASSIVE'; h.appendChild(badge);
+        // optional icon
+        try { const iconPath = resolveTalentIcon(scene,t); if (iconPath) { const img = document.createElement('img'); img.src=iconPath; img.alt=t.name||tid; img.width=20; img.height=20; img.style.width='20px'; img.style.height='20px'; img.style.objectFit='cover'; img.style.borderRadius='6px'; img.style.marginLeft='4px'; h.appendChild(img);} } catch(e){}
+        node.appendChild(h);
+
+        // Description with current interpolation
+        const desc = document.createElement('div'); desc.className='desc';
         try {
-            const s = (t && t.scaling) ? t.scaling : null;
-            let displayVal = null;
-            if (s) {
-                const base = Number(s.base || 0); const per = Number(s.perRank || 0);
-                const val = base + per * Math.max(0, alloc - 1);
-                displayVal = formatDisplay(val, s.type || 'flat');
-            }
-            // secondary scaling interpolation (if present), e.g., extra targets or extra projectiles
-            const s2 = (t && t.secondScaling) ? t.secondScaling : null;
-            let displaySecondVal = null;
-            if (s2) {
-                const base2 = Number(s2.base || 0); const per2 = Number(s2.perRank || 0);
-                const val2 = base2 + per2 * Math.max(0, alloc - 1);
-                displaySecondVal = formatDisplay(val2, s2.type || 'flat');
-            }
-            let txt = t.description || '';
-            if (displayVal !== null) txt = txt.replace(/\{value\}/g, '' + displayVal);
-            if (displaySecondVal !== null) txt = txt.replace(/\{secondValue\}/g, '' + displaySecondVal);
+            const s = t.scaling; const s2 = t.secondScaling; let txt = t.description || '';
+            if (s) { const curVal = s.base + s.perRank * Math.max(0, alloc-1); const showCur = (alloc>0)? formatDisplay(curVal): formatDisplay(s.base); txt = txt.replace(/\{value\}/g, showCur); }
+            if (s2){ const cur2 = s2.base + s2.perRank * Math.max(0, alloc-1); const showCur2 = (alloc>0)? formatDisplay(cur2): formatDisplay(s2.base); txt = txt.replace(/\{secondValue\}/g, showCur2); }
             desc.textContent = txt;
-        } catch (e) { desc.textContent = t.description || ''; }
-        const controls = document.createElement('div'); controls.style.display = 'flex'; controls.style.justifyContent = 'space-between'; controls.style.alignItems = 'center';
-        const rank = document.createElement('div'); rank.textContent = `Rank: ${alloc} / ${t.maxRank || 1}`; rank.style.fontWeight = '700';
-        const btns = document.createElement('div'); btns.style.display = 'flex'; btns.style.gap = '6px';
-        const dec = document.createElement('button'); dec.className = 'btn btn-ghost'; dec.textContent = '-'; dec.onclick = () => {
+        } catch(e){ desc.textContent = t.description || ''; }
+        node.appendChild(desc);
+
+        // Next rank preview
+        if (alloc < maxRank) {
             try {
-                if (alloc <= 0) return;
-                const prevAlloc = alloc;
-                const newAlloc = Math.max(0, (char.talents.allocations[activeTabId][tid]||0) - 1);
-                char.talents.allocations[activeTabId][tid] = newAlloc;
-                if (activeTabDef.type === 'star') { char.talents.starPoints = (char.talents.starPoints || 0) + 1; } else { char.talents.unspentByTab[activeTabId] = (char.talents.unspentByTab[activeTabId]||0) + 1; }
-                try { processTalentAllocation(scene, char, activeTabId, tid, prevAlloc, newAlloc); } catch (e) { }
-                if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
-                refreshTalentModal(scene);
-                try { refreshSkillBarHUD(scene); } catch (e) {}
-                // Immediately refresh HUD and stats modal so stat changes from talents appear
-                try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch (e) {}
-                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
-            } catch (e) {}
-        };
-        const inc = document.createElement('button'); inc.className = 'btn btn-primary'; inc.textContent = '+'; inc.onclick = () => {
-            try {
-                // determine available pool
-                const pool = (activeTabDef.type === 'star') ? (char.talents.starPoints || 0) : (char.talents.unspentByTab && (char.talents.unspentByTab[activeTabId] || 0)) || 0;
-                if (pool <= 0) return;
-                char.talents.allocations[activeTabId] = char.talents.allocations[activeTabId] || {};
-                const prevAlloc = alloc;
-                const newAlloc = (char.talents.allocations[activeTabId][tid] || 0) + 1;
-                char.talents.allocations[activeTabId][tid] = newAlloc;
-                if (activeTabDef.type === 'star') { char.talents.starPoints = Math.max(0, (char.talents.starPoints||0) - 1); } else { char.talents.unspentByTab[activeTabId] = Math.max(0, (char.talents.unspentByTab[activeTabId]||0) - 1); }
-                try { processTalentAllocation(scene, char, activeTabId, tid, prevAlloc, newAlloc); } catch (e) { }
-                if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
-                refreshTalentModal(scene);
-                try { refreshSkillBarHUD(scene); } catch (e) {}
-                // Immediately refresh HUD and stats modal so stat changes from talents appear
-                try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch (e) {}
-                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
-            } catch (e) {}
-        };
-        btns.appendChild(dec); btns.appendChild(inc);
-        controls.appendChild(rank); controls.appendChild(btns);
-        // show mana cost and active/passive badge
+                const preview = document.createElement('div'); preview.className='next-rank';
+                let parts = [];
+                if (t.scaling) { const nextVal = t.scaling.base + t.scaling.perRank * Math.max(0, (alloc === 0? 0: alloc)) ; parts.push(`Next: {value} → ${formatDisplay(nextVal)}`); }
+                if (t.secondScaling) { const next2 = t.secondScaling.base + t.secondScaling.perRank * Math.max(0,(alloc === 0? 0: alloc)); parts.push(`+${formatDisplay(next2)} ${t.secondScaling.label||''}`); }
+                preview.textContent = parts.join('  |  ');
+                node.appendChild(preview);
+            } catch(e){}
+        }
+
+        // Footer controls
+        const footer = document.createElement('footer');
+        const rank = document.createElement('div'); rank.className='rank'; rank.textContent = `RANK ${alloc} / ${maxRank}`; footer.appendChild(rank);
+        const controls = document.createElement('div'); controls.className='controls';
+        const dec = document.createElement('button'); dec.textContent='-'; dec.disabled = alloc <= 0; dec.onclick = (ev)=>{ ev.stopPropagation(); if (alloc<=0) return; adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc-1); };
+        const inc = document.createElement('button'); inc.textContent='+'; inc.disabled = !available; inc.onclick = (ev)=>{ ev.stopPropagation(); if (!available) return; adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc+1); };
+        controls.appendChild(dec); controls.appendChild(inc); footer.appendChild(controls); node.appendChild(footer);
+
+        // Shift-click to max / Ctrl-click to minus one direct
+        node.addEventListener('click', (ev)=>{ try { if (ev.shiftKey) { let cur=alloc; while (cur < maxRank) { if (!adjustTalent(scene,activeTabDef,activeTabId,tid,cur,cur+1,true)) break; cur++; } refreshTalentModal(scene); } else if (ev.ctrlKey) { if (alloc>0) adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc-1); } else if (available) { adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc+1); } } catch(e){} });
+
+        // Assign active ability button if learned
+        if (t.kind === 'active' && alloc > 0) {
+            const assignWrap = document.createElement('div'); assignWrap.style.marginTop='4px';
+            const assignBtn = document.createElement('button'); assignBtn.textContent='Assign to Bar'; assignBtn.style.fontSize='10px'; assignBtn.style.padding='4px 8px'; assignBtn.onclick=(ev)=>{ ev.stopPropagation(); try { assignActiveToNextSlot(scene,tid); if (scene._persistCharacter) scene._persistCharacter((scene.sys?.settings?.data && scene.sys.settings.data.username)||null); refreshTalentModal(scene); refreshSkillBarHUD(scene); } catch(e){} };
+            assignWrap.appendChild(assignBtn); node.appendChild(assignWrap);
+        }
+
+        // Visual states
+        if (alloc === 0 && !available) node.classList.add('locked'); else if (alloc >= maxRank) node.classList.add('maxed');
+
+        gridEl.appendChild(node);
+    }
+
+    // Helper inside refresh to allocate / refund
+    function adjustTalent(sceneRef, tabDef, tabId, talentId, prevAlloc, newAlloc, silent) {
         try {
-            const meta = document.createElement('div'); meta.style.display = 'flex'; meta.style.gap = '8px'; meta.style.alignItems = 'center'; meta.style.marginTop = '6px';
-            const tag = document.createElement('div'); tag.style.fontSize = '11px'; tag.style.padding = '4px 8px'; tag.style.borderRadius = '8px'; tag.style.background = t.kind === 'active' ? 'linear-gradient(90deg, rgba(180,120,255,0.06), rgba(180,120,255,0.02))' : 'linear-gradient(90deg, rgba(255,210,122,0.02), rgba(255,255,255,0.01))'; tag.style.color = t.kind === 'active' ? '#d8b3ff' : '#ffd27a'; tag.textContent = t.kind === 'active' ? 'Active' : 'Passive'; meta.appendChild(tag);
-            if (t && typeof t.manaCost === 'number' && t.manaCost > 0) {
-                const mc = document.createElement('div'); mc.style.fontSize = '12px'; mc.style.color = '#9fd6ff'; mc.textContent = `Mana: ${t.manaCost}`; meta.appendChild(mc);
+            if (!sceneRef || !sceneRef.char) return false; const c = sceneRef.char;
+            c.talents.allocations[tabId] = c.talents.allocations[tabId] || {};
+            const isStar = tabDef.type === 'star';
+            if (newAlloc > prevAlloc) { // allocate
+                const pool = isStar ? (c.talents.starPoints||0) : (c.talents.unspentByTab?.[tabId]||0);
+                if (pool <= 0) return false;
+                c.talents.allocations[tabId][talentId] = newAlloc;
+                if (isStar) c.talents.starPoints = Math.max(0,(c.talents.starPoints||0)-1); else { c.talents.unspentByTab = c.talents.unspentByTab||{}; c.talents.unspentByTab[tabId] = Math.max(0,(c.talents.unspentByTab[tabId]||0)-1); }
+            } else if (newAlloc < prevAlloc) { // refund
+                c.talents.allocations[tabId][talentId] = newAlloc;
+                if (isStar) c.talents.starPoints = (c.talents.starPoints||0)+1; else { c.talents.unspentByTab = c.talents.unspentByTab||{}; c.talents.unspentByTab[tabId] = (c.talents.unspentByTab[tabId]||0)+1; }
             }
-            card.appendChild(meta);
-        } catch (e) {}
-        // visual polish: learned vs unlearned style & small icon
-        try {
-            // ensure name acts as a header with flexible layout so we can append an icon image
-            name.style.display = 'flex'; name.style.alignItems = 'center'; name.style.justifyContent = 'space-between';
-            const titleSpan = document.createElement('span'); titleSpan.style.fontWeight = '800'; titleSpan.textContent = t.name || tid;
-            const rightWrap = document.createElement('span'); rightWrap.style.display = 'inline-flex'; rightWrap.style.alignItems = 'center'; rightWrap.style.gap = '6px';
-            // small badge for active/passive
-            const badge = document.createElement('div'); badge.style.width = '10px'; badge.style.height = '10px'; badge.style.borderRadius = '3px'; badge.style.flex = '0 0 auto'; badge.style.background = (t.kind === 'active') ? '#b388ff' : '#ffd27a';
-            // optional icon image
-            const iconPath = resolveTalentIcon(scene, t);
-            if (iconPath) {
-                const thumb = document.createElement('img');
-                thumb.src = iconPath; thumb.alt = t.name || tid; thumb.width = 18; thumb.height = 18;
-                thumb.style.width = '18px'; thumb.style.height = '18px'; thumb.style.borderRadius = '4px'; thumb.style.objectFit = 'cover';
-                thumb.referrerPolicy = 'no-referrer';
-                thumb.onerror = () => { try { rightWrap.removeChild(thumb); } catch(e){} };
-                rightWrap.appendChild(thumb);
-            }
-            rightWrap.appendChild(badge);
-            // clear previous children then append title + right group
-            name.innerHTML = '';
-            name.appendChild(titleSpan); name.appendChild(rightWrap);
-            // gray-out unallocated talents for visual clarity
-            if (!alloc || alloc <= 0) { card.style.filter = 'grayscale(56%)'; card.style.opacity = '0.78'; }
-            else { card.style.filter = ''; card.style.opacity = '1'; }
-        } catch (e) {}
-        card.appendChild(name); card.appendChild(desc); card.appendChild(controls);
-        // If this talent is active and allocated, show Assign button
-        try {
-            const isActive = (t && t.kind === 'active');
-            const allocNow = (char.talents && char.talents.allocations && char.talents.allocations[activeTabId] && char.talents.allocations[activeTabId][tid]) || 0;
-            if (isActive && allocNow > 0) {
-                const assignBtn = document.createElement('button'); assignBtn.className = 'btn btn-secondary'; assignBtn.textContent = 'Assign to Skill Bar';
-                assignBtn.style.marginTop = '6px';
-                assignBtn.onclick = () => {
-                    try {
-                        assignActiveToNextSlot(scene, tid);
-                        // persist and refresh UI
-                        if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
-                        refreshTalentModal(scene);
-                        try { refreshSkillBarHUD(scene); } catch (e) {}
-                        refreshSkillBarHUD(scene);
-                    } catch (e) {}
-                };
-                card.appendChild(assignBtn);
-            }
-        } catch (e) {}
-        gridEl.appendChild(card);
+            try { processTalentAllocation(sceneRef,c,tabId,talentId,prevAlloc,newAlloc); } catch(e){}
+            if (sceneRef._persistCharacter) sceneRef._persistCharacter((sceneRef.sys?.settings?.data && sceneRef.sys.settings.data.username)||null);
+            try { refreshSkillBarHUD(sceneRef); } catch(e){}
+            try { if (sceneRef._updateHUD) sceneRef._updateHUD(); else { if (sceneRef._destroyHUD) sceneRef._destroyHUD(); if (sceneRef._createHUD) sceneRef._createHUD(); } } catch(e){}
+            try { if (window && window.__shared_ui?.refreshStatsModal && sceneRef._statsModal) window.__shared_ui.refreshStatsModal(sceneRef); } catch(e){}
+            if (!silent) refreshTalentModal(sceneRef);
+            return true;
+        } catch(e){ return false; }
     }
 }
 
