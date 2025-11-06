@@ -9,6 +9,30 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-11-05",
+    version: "0.0.18",
+    title: "Rarity ladders, legendary glow, and spawn refresh",
+    highlights: [
+      "Full rarity ladders added: Slimes (common→boss), Rats (common→boss), Goblins (common→boss), Skeletons (common→legendary), Demon Spawn (common→legendary)",
+      "Legendaries now pop: radiant halo, gold ring, and starbursts on fallback textures",
+      "Scenes updated to spawn the new tiers: Inner Field (slimes), Outer Field (rats), Goblin Camp (goblins), Swamp (skeletons), Flame Road (demon spawn)",
+      "Shared enemy death animations added for clearer feedback",
+      "Slight difficulty bump: HP and damage scaling increased",
+      "Slime visuals fixed: regular slimes render green again; flame variants stay fiery"
+    ],
+    notes: [
+      "New enemy IDs (examples): slime_uncommon/rare/legendary, rat_uncommon/rare/epic/legendary/boss, goblin_uncommon/rare/legendary, skeleton_uncommon/rare/epic/legendary, demon_spawn_common/uncommon/rare/epic/legendary.",
+      "Inner Field now rolls across the full slime ladder with sensible respawn times; Outer Field mixes in rat tiers with occasional zombie/ghost rats.",
+      "Goblin Camp includes uncommon/rare/legendary goblins alongside the existing epics and boss; Gloamway Swamp favors skeleton tiers with a sprinkle of zombies, goblin skeletons, and a brute.",
+      "Flame Road blends flaming slimes with Demon Spawn from common to legendary; devil_spawn is rare and The Lurker is ultra-rare.",
+      "Legendary visual pass: fallback art overlays a soft halo, bright gold ring, and four-point starbursts — instantly noticeable in the crowd.",
+      "Enemy death animation: fade+shrink with an impact ring and debris burst; physics disabled post-kill to prevent jitter.",
+      "Balance: computeEnemyStats base curves nudged upward (HP and damage) for a tougher feel without spiking TTK too hard.",
+      "Bug fix: default slimes are green again; flame/lava variants only appear in fire-aspected scenes.",
+      "Tech notes: scenes use ensureEnemyTexture() for clean fallback art; drawVariantOverlay() now detects 'legendary' for the new glow."
+    ]
+  },
+  {
+    date: "2025-11-05",
     version: "0.0.17",
     title: "New Zones: Gloamway Swamp → Flame Road, portal network, and Mother Lumen parity",
     highlights: [
