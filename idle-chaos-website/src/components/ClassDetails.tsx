@@ -43,7 +43,7 @@ export default function ClassDetails({ archetype }: { archetype: ClassArchetype 
       }
     }
     return ids;
-  }, [a.talentsByTab, collapsedTabs, showActives, showPassives]);
+  }, [a.talentsByTab, collapsedTabs, showActives, showPassives, talentVisible]);
 
   const resetRanks = () => setRanks(prev => {
     const next = { ...prev };

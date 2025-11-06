@@ -218,7 +218,7 @@ export default function ClassesExplorer(props: ClassesExplorerProps = {}) {
       }
     }
     return ids;
-  }, [active.talentsByTab, collapsedTabs, showActives, showPassives, talentVisible]);
+  }, [active.talentsByTab, collapsedTabs, talentVisible]);
   const resetRanks = () => setRanks(prev => {
     const next = { ...prev };
     for (const id of currentVisibleTalentIds) next[id] = 0;

@@ -85,6 +85,7 @@ export function createHUD(scene) {
         <div style="display:flex; flex-direction:column; gap:3px; width:100%;">
             <div style="height:18px; background:#2a0a16; border-radius:6px; overflow:hidden; position:relative; display:flex; align-items:center;">
                 <div id="${hudId}-hp-bar" style="height:100%; width:100%; background:#e44; border-radius:6px; position:absolute; left:0; top:0;"></div>
+                <div id="${hudId}-shield-bar" style="height:100%; width:0%; background:linear-gradient(90deg, rgba(90,150,255,0.55) 0%, rgba(40,100,200,0.55) 100%); mix-blend-mode:screen; position:absolute; left:0; top:0; pointer-events:none; opacity:0; transition:width 0.15s linear, opacity 0.25s ease; box-shadow:inset 0 0 6px rgba(120,180,255,0.6), 0 0 4px rgba(100,160,255,0.35);"></div>
                 <span id="${hudId}-hp-text" style="position:relative; z-index:1; margin:0 auto; color:#fff; font-size:0.7em; text-shadow:0 1px 2px rgba(0,0,0,0.8);">0/0</span>
             </div>
             <div style="height:18px; background:#181a2a; border-radius:6px; overflow:hidden; position:relative; display:flex; align-items:center;">
@@ -100,6 +101,16 @@ export function createHUD(scene) {
 
     document.body.appendChild(hud);
     scene.hud = hud;
+
+    // Ensure keyframes for shield pulse animation are available
+    try {
+        if (typeof document !== 'undefined' && !document.getElementById('cif-hud-styles')) {
+            const style = document.createElement('style');
+            style.id = 'cif-hud-styles';
+            style.textContent = `@keyframes shieldPulse { 0% { filter: drop-shadow(0 0 0 rgba(120,180,255,0)); } 50% { filter: drop-shadow(0 0 8px rgba(120,180,255,0.9)); } 100% { filter: drop-shadow(0 0 0 rgba(120,180,255,0)); } }`;
+            document.head && document.head.appendChild(style);
+        }
+    } catch (e) { /* ignore */ }
 
     // Defensive: on scene shutdown, tear down this HUD so UI never persists across scenes
     try {
@@ -366,6 +377,30 @@ export function updateHUD(scene, options = {}) {
 
     if (hpBar) hpBar.style.width = `${maxhp > 0 ? Math.max(0, Math.min(100, (hp / maxhp) * 100)) : 0}%`;
     if (hpText) hpText.textContent = `${hp}/${maxhp}`;
+
+    // Aggregate shields for HUD overlay (initial combined segment; later can be split by source)
+    try {
+        const shieldBar = document.getElementById(`${hudId}-shield-bar`);
+        if (shieldBar) {
+            const manaShield = (char._manaShield && typeof char._manaShield.current === 'number') ? Math.max(0, char._manaShield.current) : 0;
+            const manaWard = (char._manaWard && typeof char._manaWard.remaining === 'number') ? Math.max(0, char._manaWard.remaining) : 0;
+            const darkShield = (char._darkShield && typeof char._darkShield.remaining === 'number') ? Math.max(0, char._darkShield.remaining) : 0;
+            const totalShield = manaShield + manaWard + darkShield;
+            const pct = (maxhp > 0) ? Math.min(100, (totalShield / maxhp) * 100) : 0;
+            shieldBar.style.width = pct + '%';
+            shieldBar.style.opacity = (totalShield > 0 ? '1' : '0');
+            // Low-shield pulse preparation (future enhancement): mark data attr if below threshold
+            if (totalShield > 0 && totalShield < Math.max(20, maxhp * 0.15)) {
+                if (!shieldBar.dataset.pulsing) {
+                    shieldBar.dataset.pulsing = '1';
+                    shieldBar.style.animation = 'shieldPulse 0.8s ease-in-out infinite';
+                }
+            } else if (shieldBar.dataset.pulsing) {
+                delete shieldBar.dataset.pulsing;
+                shieldBar.style.animation = 'none';
+            }
+        }
+    } catch (e) { /* ignore shield errors */ }
 
     if (manaBar) manaBar.style.width = `${maxmana > 0 ? Math.max(0, Math.min(100, (mana / maxmana) * 100)) : 0}%`;
     if (manaText) manaText.textContent = `${mana}/${maxmana}`;
