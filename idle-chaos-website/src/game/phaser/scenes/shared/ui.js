@@ -1,5 +1,63 @@
 import { effectiveStats, makeStatPill, formatSkillLine, checkClassLevelUps } from './stats.js';
 import { getTabsForClass, TALENT_TAB_ORDER, getTalentTab, ensureCharTalents, processTalentAllocation, getTalentDefById } from '../../data/talents.js';
+// Talent / Buff icon resolution helper
+// Attempts to derive an icon file path for a talent (or buff mapped to a talent) based on:
+// 1. Explicit talent.icon (if author later adds)
+// 2. Sanitized talent name PascalCase
+// 3. PascalCase from id segments
+// Override map handles irregular ids -> filenames.
+function resolveTalentIcon(scene, talentLike) {
+    try {
+        if (!scene || !scene.char || !talentLike) return null;
+        const cls = (scene.char.class || '').trim();
+        if (!cls) return null;
+        const folder = cls.charAt(0).toUpperCase() + cls.slice(1).toLowerCase(); // e.g. Horror, Occultist, Stalker, Beginner
+        const override = {
+            plus1str: 'Plus1Str', plus1int: 'Plus1Int', plus1agi: 'Plus1Agi',
+            bonecrusher_training: 'BoneCrusher', bloodstaked_guard: 'Bloodstaked', wood_lover: 'StaffMastery', mining_exp_gain: 'MiningExpertise',
+            hunter_s_formula: 'HuntersFormula', five_finger_discount: 'FiveFingerDiscount',
+            shadowstep: 'ShadowStep', mana_shield: 'ManaShield', dark_shield: 'DarkShield', blood_ritual_reserve: 'BloodRitualReserve', unholy_frenzy: 'UnholyFrenzy', terror_form: 'TerrorForm'
+        };
+        const explicit = talentLike.icon; if (explicit) return explicit;
+        const id = talentLike.id || talentLike.key || '';
+        const name = talentLike.name || '';
+        const candidates = [];
+        if (override[id]) candidates.push(override[id]);
+        // From name: remove non-alphanumerics and capitalize words
+        if (name) {
+            const nBase = name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+            if (nBase) candidates.push(nBase);
+        }
+        // From id segments
+        if (id) {
+            const segBase = id.split(/[_\-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+            if (segBase) candidates.push(segBase);
+        }
+        // Deduplicate preserving order
+        const uniq = []; for (const c of candidates) { if (uniq.indexOf(c) === -1) uniq.push(c); }
+        for (const base of uniq) {
+            // public asset path
+            const path = `/phaser-game/assets/TalentIcons/${folder}/${base}.png`;
+            return path; // Optimistic: browser onerror will fallback if missing
+        }
+        return null;
+    } catch (e) { return null; }
+}
+
+// Resolve buff key -> talent-like stub to reuse talent icon logic
+function resolveBuffIcon(scene, buff) {
+    try {
+        if (!buff) return null;
+        const key = buff.key || buff.id || '';
+        if (!key) return null;
+        // Map buff keys that differ from talent ids
+        const map = {
+            mana_shield: 'mana_shield', dark_shield: 'dark_shield', unholy_frenzy: 'unholy_frenzy', blood_ritual: 'blood_ritual_reserve', marksman_focus: 'marksman_focus', standing_dr: 'glyphic_anchor', stealth_active: 'shadowstep'
+        };
+        const tid = map[key] || key;
+        return resolveTalentIcon(scene, { id: tid, name: buff.label });
+    } catch (e) { return null; }
+}
 // Shared UI utilities: Inventory, Equipment, and Stats modals.
 // Each function accepts a Phaser.Scene instance as the first arg and operates on scene.char.
 
@@ -3184,7 +3242,7 @@ export function refreshTalentModal(scene) {
     for (const t of talents) {
         const tid = t.id;
         const card = document.createElement('div'); card.style.background = 'rgba(255,255,255,0.03)'; card.style.padding = '8px'; card.style.borderRadius = '10px'; card.style.display = 'flex'; card.style.flexDirection = 'column'; card.style.gap = '6px';
-        const name = document.createElement('div'); name.style.fontWeight = '800'; name.textContent = t.name || tid;
+    const name = document.createElement('div'); name.style.fontWeight = '800'; name.textContent = t.name || tid;
         const desc = document.createElement('div'); desc.style.fontSize = '12px'; desc.style.color = 'rgba(255,255,255,0.85)';
         // Determine current allocation before interpolation
         const alloc = (char.talents && char.talents.allocations && char.talents.allocations[activeTabId] && char.talents.allocations[activeTabId][tid]) || 0;
@@ -3269,15 +3327,26 @@ export function refreshTalentModal(scene) {
         } catch (e) {}
         // visual polish: learned vs unlearned style & small icon
         try {
-            // ensure name acts as a header with flexible layout so we can append an icon
+            // ensure name acts as a header with flexible layout so we can append an icon image
             name.style.display = 'flex'; name.style.alignItems = 'center'; name.style.justifyContent = 'space-between';
             const titleSpan = document.createElement('span'); titleSpan.style.fontWeight = '800'; titleSpan.textContent = t.name || tid;
-            // small icon indicating active/passive (colored)
-            const icon = document.createElement('div'); icon.style.width = '14px'; icon.style.height = '14px'; icon.style.borderRadius = '4px'; icon.style.marginLeft = '8px'; icon.style.flex = '0 0 auto';
-            icon.style.background = (t.kind === 'active') ? '#b388ff' : '#ffd27a';
-            // clear previous children then append title + icon
+            const rightWrap = document.createElement('span'); rightWrap.style.display = 'inline-flex'; rightWrap.style.alignItems = 'center'; rightWrap.style.gap = '6px';
+            // small badge for active/passive
+            const badge = document.createElement('div'); badge.style.width = '10px'; badge.style.height = '10px'; badge.style.borderRadius = '3px'; badge.style.flex = '0 0 auto'; badge.style.background = (t.kind === 'active') ? '#b388ff' : '#ffd27a';
+            // optional icon image
+            const iconPath = resolveTalentIcon(scene, t);
+            if (iconPath) {
+                const thumb = document.createElement('img');
+                thumb.src = iconPath; thumb.alt = t.name || tid; thumb.width = 18; thumb.height = 18;
+                thumb.style.width = '18px'; thumb.style.height = '18px'; thumb.style.borderRadius = '4px'; thumb.style.objectFit = 'cover';
+                thumb.referrerPolicy = 'no-referrer';
+                thumb.onerror = () => { try { rightWrap.removeChild(thumb); } catch(e){} };
+                rightWrap.appendChild(thumb);
+            }
+            rightWrap.appendChild(badge);
+            // clear previous children then append title + right group
             name.innerHTML = '';
-            name.appendChild(titleSpan); name.appendChild(icon);
+            name.appendChild(titleSpan); name.appendChild(rightWrap);
             // gray-out unallocated talents for visual clarity
             if (!alloc || alloc <= 0) { card.style.filter = 'grayscale(56%)'; card.style.opacity = '0.78'; }
             else { card.style.filter = ''; card.style.opacity = '1'; }
@@ -3429,16 +3498,27 @@ export function refreshSkillBarHUD(scene) {
                 icon.style.display = 'flex';
                 icon.style.alignItems = 'center';
                 icon.style.justifyContent = 'center';
-                // subtle background color by type
-                icon.style.background = b.temporary ? 'rgba(255,210,120,0.10)' : 'rgba(140,200,255,0.10)';
-                // simple glyph: first letter of label
-                const glyph = document.createElement('div');
-                glyph.textContent = (b.label || 'B').slice(0,1).toUpperCase();
-                glyph.style.fontSize = '14px';
-                glyph.style.fontWeight = '800';
-                glyph.style.color = '#eee';
-                glyph.style.textShadow = '0 1px 0 rgba(0,0,0,0.6)';
-                icon.appendChild(glyph);
+                icon.style.overflow = 'hidden';
+                // try to use a proper icon image
+                const src = resolveBuffIcon(scene, b);
+                if (src) {
+                    const img = document.createElement('img');
+                    img.src = src; img.alt = b.label || b.key || 'buff';
+                    img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+                    img.referrerPolicy = 'no-referrer';
+                    img.onerror = () => { try { icon.textContent = (b.label || 'B').slice(0,1).toUpperCase(); icon.style.background = b.temporary ? 'rgba(255,210,120,0.10)' : 'rgba(140,200,255,0.10)'; } catch(e){} };
+                    icon.appendChild(img);
+                } else {
+                    // fallback glyph with subtle background
+                    icon.style.background = b.temporary ? 'rgba(255,210,120,0.10)' : 'rgba(140,200,255,0.10)';
+                    const glyph = document.createElement('div');
+                    glyph.textContent = (b.label || 'B').slice(0,1).toUpperCase();
+                    glyph.style.fontSize = '14px';
+                    glyph.style.fontWeight = '800';
+                    glyph.style.color = '#eee';
+                    glyph.style.textShadow = '0 1px 0 rgba(0,0,0,0.6)';
+                    icon.appendChild(glyph);
+                }
                 // ETA overlay (bottom-right)
                 if (b.eta != null) {
                     const eta = document.createElement('div');
@@ -3585,14 +3665,22 @@ export function refreshSkillBarHUD(scene) {
 
             // icon
             const iconDiv = document.createElement('div'); iconDiv.className = 'skill-icon';
-            // placeholder icon: prefer a small emoji or letter based on activeType
+            // Prefer actual icon image from TalentIcons; fallback to emoji
             try {
-                if (assignedDef && assignedDef.kind === 'active') {
-                    if (assignedDef.activeType === 'offensive') iconDiv.textContent = '⚔️';
-                    else if (assignedDef.activeType === 'defensive') iconDiv.textContent = '🛡️';
-                    else iconDiv.textContent = '✨';
+                iconDiv.style.position = 'relative';
+                iconDiv.style.overflow = 'hidden';
+                const src = (assignedDef ? resolveTalentIcon(scene, { id: assigned, name: assignedDef.name }) : null);
+                if (src) {
+                    const img = document.createElement('img');
+                    img.src = src; img.alt = assignedDef ? (assignedDef.name || assigned) : assigned || '';
+                    img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+                    img.referrerPolicy = 'no-referrer';
+                    img.onerror = () => { try { iconDiv.textContent = assigned ? '•' : ''; iconDiv.style.background = 'rgba(255,255,255,0.04)'; } catch(e){} };
+                    iconDiv.appendChild(img);
                 } else {
+                    // fallback glyph
                     iconDiv.textContent = assigned ? '•' : '';
+                    iconDiv.style.background = 'rgba(255,255,255,0.04)';
                 }
             } catch (e) { iconDiv.textContent = assigned ? '•' : ''; }
 

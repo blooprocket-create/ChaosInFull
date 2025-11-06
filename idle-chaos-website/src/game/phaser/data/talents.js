@@ -133,7 +133,7 @@ const horrorTalents = [
         scaling: { type: 'flat', target: 'damageReduction', base: 1, perRank: 0.6 },
         tags: ['survivability']
     }),
-    makeTalent('terror_form', 'Terror Form', {//re-working
+    makeTalent('terror_form', 'Terror Form', {
     description: 'A Demononic Form overtakes you that chills the soul...with fire. Melee attackers take {value}% damage of their max hp over 3 seconds if they get too close. Costs {secondValue} mana per second to maintain.',
     scaling: { type: 'percent', target: 'terrorAuraDamage', base: 5, perRank: 0.15 },
     secondScaling: { type: 'flat', target: 'manaCostPerSec', base: 5, perRank: 0.35 },
