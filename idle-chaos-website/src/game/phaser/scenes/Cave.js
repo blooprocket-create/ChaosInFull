@@ -183,7 +183,10 @@ export class Cave extends Phaser.Scene {
     }
     const placedNodes = [];
     const margin = 96;
-    const minSeparation = 56; // min distance between nodes
+    // Node and walkway sizing
+    const NODE_RADIUS = 28; // matches node.r default
+    const WALKWAY_BUFFER = 24; // extra space so player can pass between nodes
+    const MIN_CENTER_SEPARATION = (NODE_RADIUS * 2) + WALKWAY_BUFFER; // 28*2 + 24 = 80
     // logical bounds where nodes and decorations may be placed
     const bounds = { x1: margin, x2: this.scale.width - margin, y1: 120, y2: this.scale.height - 120 };
 
@@ -196,7 +199,11 @@ export class Cave extends Phaser.Scene {
         try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
         // avoid player spawn
         try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
-        for (const p of placedNodes) if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < minSeparation) return true;
+        for (const p of placedNodes) {
+            const pr = (typeof p.r === 'number') ? p.r : NODE_RADIUS;
+            const req = pr + NODE_RADIUS + WALKWAY_BUFFER;
+            if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < req) return true;
+        }
         return false;
     };
     
@@ -211,7 +218,7 @@ export class Cave extends Phaser.Scene {
         ty = Phaser.Math.Clamp(ty, bounds.y1, bounds.y2);
         if (isTooClose(tx, ty)) return false;
         this._createMiningNode(tx, ty, oreType);
-        placedNodes.push({ x: tx, y: ty, type: oreType });
+        placedNodes.push({ x: tx, y: ty, r: NODE_RADIUS, type: oreType });
         return true;
     };
 
@@ -264,7 +271,7 @@ export class Cave extends Phaser.Scene {
         // pick an ore type cycling through available configs so distribution stays varied
         const oreType = (oreConfigs && oreConfigs.length) ? oreConfigs[i % oreConfigs.length].type : ((i % 2 === 0) ? 'tin' : 'copper');
         this._createMiningNode(sx, sy, oreType);
-        placedNodes.push({ x: sx, y: sy, type: oreType });
+        placedNodes.push({ x: sx, y: sy, r: NODE_RADIUS, type: oreType });
     }
 
     // Cave decorations: rocks and stalactites
