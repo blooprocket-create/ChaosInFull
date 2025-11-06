@@ -3145,13 +3145,13 @@ export function openTalentModal(scene) {
             #talent-modal .talent-head h1 { font-family:'Metal Mania',cursive; font-size:1.85rem; margin:0; letter-spacing:1px; color:#ffd8a0; text-shadow:0 3px 10px rgba(0,0,0,0.8); }
             #talent-modal .talent-head .meta { display:flex; flex-wrap:wrap; gap:12px; font-size:0.75rem; letter-spacing:0.08em; color:#caa78e; }
             #talent-modal .talent-body { flex:1 1 auto; display:flex; min-height:0; }
-            #talent-tabs { background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.55)); border-right:1px solid rgba(255,255,255,0.05); padding:14px 12px; display:flex; flex-direction:column; gap:8px; }
+            #talent-tabs { background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.55)); border-right:1px solid rgba(255,255,255,0.05); padding:14px 12px; display:flex; flex-direction:column; gap:8px; overflow:auto; }
             #talent-tabs button { text-align:left; font-weight:700; font-size:0.8rem; background:rgba(255,255,255,0.04); color:#f8e1cc; border:1px solid rgba(255,255,255,0.07); padding:10px 12px; border-radius:8px; cursor:pointer; position:relative; transition:background .18s,border-color .18s, transform .18s; }
             #talent-tabs button.active { background:linear-gradient(90deg,rgba(255,210,122,0.2),rgba(255,210,122,0.05)); border:1px solid rgba(255,210,122,0.6); color:#ffd8a0; box-shadow:0 0 0 1px rgba(255,210,122,0.25),0 6px 18px -6px rgba(0,0,0,0.6); }
             #talent-tabs button:not(.active):hover { background:rgba(255,255,255,0.08); }
             #talent-grid-panel { flex:1 1 auto; display:flex; flex-direction:column; padding:14px 16px; gap:10px; overflow:auto; }
             #talent-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; align-content:start; }
-            .talent-node { background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.08); border-left:4px solid rgba(90,90,90,0.4); padding:10px 10px 12px; border-radius:12px; display:flex; flex-direction:column; gap:6px; position:relative; min-height:142px; transition:box-shadow .2s,border-color .2s, transform .15s, filter .2s, background .25s; }
+            .talent-node { background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.08); border-left:4px solid rgba(90,90,90,0.4); padding:10px 10px 12px; border-radius:12px; display:flex; flex-direction:column; gap:6px; position:relative; min-height:142px; transition:box-shadow .2s,border-color .2s, transform .15s, filter .2s, background .25s; overflow:hidden; }
             .talent-node.locked { filter:grayscale(80%) brightness(0.6); opacity:0.55; }
             .talent-node.available:not(.maxed) { border-left-color:#ffd27a; box-shadow:0 0 0 1px rgba(255,210,122,0.25),0 0 14px -4px rgba(255,210,122,0.4); }
             .talent-node.available:not(.maxed):hover { background:linear-gradient(145deg,rgba(255,210,122,0.15),rgba(255,210,122,0.05)); }
@@ -3160,12 +3160,10 @@ export function openTalentModal(scene) {
             .talent-node header h2 { font-size:0.9rem; line-height:1.1; margin:0; color:#fce7d6; flex:1; font-weight:800; letter-spacing:0.5px; }
             .talent-node .badge { font-size:10px; padding:3px 6px; border-radius:6px; font-weight:700; letter-spacing:.08em; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); color:#c9b8ff; }
             .talent-node.passive .badge { color:#ffd27a; }
-            .talent-node .desc { font-size:11px; line-height:1.35; color:#d6c2b2; flex:1; }
+            .talent-node .desc { font-size:11px; line-height:1.35; color:#d6c2b2; flex:1; overflow-wrap:break-word; word-break:break-word; hyphens:auto; }
             .talent-node footer { display:flex; align-items:center; justify-content:space-between; gap:6px; }
             .talent-node footer .rank { font-size:11px; font-weight:700; letter-spacing:.06em; color:#fff; }
-            .talent-node footer .controls { display:flex; gap:4px; }
-            .talent-node footer button { font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); color:#f3f3f3; transition:background .15s,border-color .15s; }
-            .talent-node footer button:hover { background:rgba(255,255,255,0.12); }
+            .talent-node footer .controls { display:none; }
             .talent-node .next-rank { font-size:10px; color:#a7f3d0; font-weight:600; letter-spacing:.05em; margin-top:2px; }
             #talent-info { width:290px; flex:0 0 290px; border-left:1px solid rgba(255,255,255,0.05); background:linear-gradient(180deg,rgba(0,0,0,0.4),rgba(0,0,0,0.65)); padding:14px 16px; display:flex; flex-direction:column; gap:12px; overflow:auto; }
             #talent-info .panel { background:linear-gradient(140deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:10px 12px; font-size:12px; line-height:1.4; }
@@ -3181,6 +3179,13 @@ export function openTalentModal(scene) {
             #talent-modal .points-pill.star { background:linear-gradient(90deg,rgba(180,120,255,0.18),rgba(180,120,255,0.04)); border-color:rgba(180,120,255,0.45); color:#d8b3ff; }
             @keyframes pulse-glow { 0%,100% { box-shadow:0 0 0 0 rgba(255,210,122,0.45);} 50% { box-shadow:0 0 0 4px rgba(255,210,122,0);} }
             .talent-node.available:not(.maxed) { animation:pulse-glow 3.2s ease-in-out infinite; }
+            /* Scrollbar styling to match inventory */
+            #talent-tabs::-webkit-scrollbar, #talent-grid-panel::-webkit-scrollbar, #talent-info::-webkit-scrollbar { width: 10px; height:10px; }
+            #talent-tabs::-webkit-scrollbar-track, #talent-grid-panel::-webkit-scrollbar-track, #talent-info::-webkit-scrollbar-track { background: rgba(0,0,0,0.25); border-radius: 8px; }
+            #talent-tabs::-webkit-scrollbar-thumb, #talent-grid-panel::-webkit-scrollbar-thumb, #talent-info::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(255,210,122,0.3), rgba(255,210,122,0.08)); border: 1px solid rgba(255,210,122,0.35); border-radius: 8px; }
+            #talent-tabs { scrollbar-color: rgba(255,210,122,0.35) rgba(0,0,0,0.25); }
+            #talent-grid-panel { scrollbar-color: rgba(255,210,122,0.35) rgba(0,0,0,0.25); }
+            #talent-info { scrollbar-color: rgba(255,210,122,0.35) rgba(0,0,0,0.25); }
         `;
         document.head.appendChild(style);
     }
@@ -3349,12 +3354,10 @@ export function refreshTalentModal(scene) {
         }
 
         // Footer controls
-        const footer = document.createElement('footer');
-        const rank = document.createElement('div'); rank.className='rank'; rank.textContent = `RANK ${alloc} / ${maxRank}`; footer.appendChild(rank);
-        const controls = document.createElement('div'); controls.className='controls';
-        const dec = document.createElement('button'); dec.textContent='-'; dec.disabled = alloc <= 0; dec.onclick = (ev)=>{ ev.stopPropagation(); if (alloc<=0) return; adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc-1); };
-        const inc = document.createElement('button'); inc.textContent='+'; inc.disabled = !available; inc.onclick = (ev)=>{ ev.stopPropagation(); if (!available) return; adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc+1); };
-        controls.appendChild(dec); controls.appendChild(inc); footer.appendChild(controls); node.appendChild(footer);
+    const footer = document.createElement('footer');
+    const rank = document.createElement('div'); rank.className='rank'; rank.textContent = `RANK ${alloc} / ${maxRank}`; footer.appendChild(rank);
+    // remove explicit +/- controls; interactions are click / shift-click / ctrl-click directly on the card
+    node.appendChild(footer);
 
         // Shift-click to max / Ctrl-click to minus one direct
         node.addEventListener('click', (ev)=>{ try { if (ev.shiftKey) { let cur=alloc; while (cur < maxRank) { if (!adjustTalent(scene,activeTabDef,activeTabId,tid,cur,cur+1,true)) break; cur++; } refreshTalentModal(scene); } else if (ev.ctrlKey) { if (alloc>0) adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc-1); } else if (available) { adjustTalent(scene,activeTabDef,activeTabId,tid,alloc,alloc+1); } } catch(e){} });
