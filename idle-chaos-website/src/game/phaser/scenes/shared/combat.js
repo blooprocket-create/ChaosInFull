@@ -1412,8 +1412,8 @@ function sharedCreatePlayerHealthBar() {
     const offset = (cfg.offsetY != null) ? cfg.offsetY : 60;
     try {
         this.playerHpBarBg = this.add.rectangle(0, 0, width, height, bgColor, bgAlpha).setDepth(depth);
-    // Shield bar sits between BG and HP (created after BG, before HP) and grows to represent HP+Shield (clamped to max)
-    this.playerShieldBar = this.add.rectangle(0, 0, width, height, shieldColor, 1).setDepth(depth);
+    // Shield overlay sits ABOVE the HP bar and represents current shield amount (as a portion of max HP)
+    this.playerShieldBar = this.add.rectangle(0, 0, width, height, shieldColor, 1).setDepth(depth + 0.02);
         this.playerHpBar = this.add.rectangle(0, 0, width, height, color).setDepth(depth);
         this.playerHpBar.fullWidth = width;
         this.playerShieldBar.fullWidth = width;
@@ -1421,6 +1421,7 @@ function sharedCreatePlayerHealthBar() {
         if (this.playerHpBarBg.setOrigin) this.playerHpBarBg.setOrigin(0.5);
         if (this.playerShieldBar.setOrigin) this.playerShieldBar.setOrigin(0.5);
         if (this.playerHpBar.setOrigin) this.playerHpBar.setOrigin(0.5);
+    try { this.playerShieldBar.setAlpha(0.42); } catch (e) {}
         this._updatePlayerHealthBar();
     } catch (e) {
         this.playerHpBarBg = null;
@@ -1443,18 +1444,16 @@ function sharedUpdatePlayerHealthBar() {
         try {
             const c = this.char || {};
             const maxhp = Math.max(1, Number(c.maxhp || 1));
-            const hp = Math.max(0, Number(c.hp || 0));
             const manaShield = (c._manaShield && typeof c._manaShield.current === 'number') ? Math.max(0, c._manaShield.current) : 0;
             const manaWard = (c._manaWard && typeof c._manaWard.remaining === 'number') ? Math.max(0, c._manaWard.remaining) : 0;
             const darkShield = (c._darkShield && typeof c._darkShield.remaining === 'number') ? Math.max(0, c._darkShield.remaining) : 0;
             const totalShield = Math.max(0, manaShield + manaWard + darkShield);
-            const combined = Math.min(maxhp, hp + totalShield);
-            const shieldRatio = Math.max(0, Math.min(1, combined / maxhp));
+            // Show the shield as its own overlay fraction of max HP so it's visible even at full HP
+            const shieldOnlyRatio = Math.max(0, Math.min(1, totalShield / maxhp));
             if (this.playerShieldBar) {
-                this.playerShieldBar.displayWidth = (this.playerShieldBar.fullWidth || width) * shieldRatio;
+                this.playerShieldBar.displayWidth = (this.playerShieldBar.fullWidth || width) * shieldOnlyRatio;
                 this.playerShieldBar.setPosition(this.player.x, barY);
-                // Only show if there is an actual shield beyond HP
-                const show = (totalShield > 0) && (shieldRatio > ratio + 0.001);
+                const show = totalShield > 0;
                 try { this.playerShieldBar.setVisible(!!show); } catch (e) { this.playerShieldBar.visible = !!show; }
             }
         } catch (e) { /* ignore shield calc */ }
