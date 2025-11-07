@@ -783,4 +783,76 @@ export const RECIPE_DEFS = {
         reqLevel: 5,
         smithingXp: 1800 // Mythril + essence boots (36x from 50)
     },
+    'basic_bow': {
+        id: 'basic_bow',
+        name: 'Basic Bow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'normal_log', qty: 5 }, { id: 'string', qty: 2 } ],
+        reqLevel: 1,
+        smithingXp: 100 // Basic bow crafting experience
+    },
+    'oak_bow': {
+        id: 'oak_bow',
+        name: 'Oak Bow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'oak_log', qty: 5 }, { id: 'string', qty: 2 } ],
+        reqLevel: 5,
+        smithingXp: 500 // Oak bow crafting experience
+    },
+    'maple_bow': {
+        id: 'maple_bow',
+        name: 'Maple Bow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'maple_log', qty: 5 }, { id: 'string', qty: 2 } ],
+        reqLevel: 10,
+        smithingXp: 1000 // Maple bow crafting experience
+    },
+    'birch_bow': {
+        id: 'birch_bow',
+        name: 'Birch Bow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'birch_log', qty: 5 }, { id: 'string', qty: 2 } ],
+        reqLevel: 15,
+        smithingXp: 1500 // Birch bow crafting experience
+    },
+    'iron_crossbow': {
+        id: 'iron_crossbow',
+        name: 'Iron Crossbow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'iron_bar', qty: 5 }, { id: 'oak_log', qty: 2 }, { id: 'string', qty: 3 } ],
+        reqLevel: 20,
+        smithingXp: 2000 // Iron crossbow crafting experience
+    },
+    'mithril_crossbow': {
+        id: 'mithril_crossbow',
+        name: 'Mithril Crossbow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'mythril_bar', qty: 5 }, { id: 'maple_log', qty: 2 }, { id: 'string', qty: 3 } ],
+        reqLevel: 25,
+        smithingXp: 3000 // Mithril crossbow crafting experience
+    },
+    'bronze_polearm': {
+        id: 'bronze_polearm',
+        name: 'Bronze Polearm',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'bronze_bar', qty: 5 }, { id: 'oak_log', qty: 2 }, { id: 'string', qty: 3 } ],
+        reqLevel: 15,
+        smithingXp: 1500 // Bronze polearm crafting experience
+    },
+    'golden_polearm': {
+        id: 'golden_polearm',
+        name: 'Golden Polearm',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'gold_bar', qty: 5 }, { id: 'oak_log', qty: 2 }, { id: 'string', qty: 3 } ],
+        reqLevel: 20,
+        smithingXp: 2500 // Golden polearm crafting experience
+    },
 };

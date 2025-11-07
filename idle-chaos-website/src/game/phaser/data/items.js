@@ -2789,6 +2789,7 @@ const ITEM_DEFS = {
         "value": 600,
         "description": "A finely crafted golden polearm favored by elite warriors."
     }
+    
 };
 
 if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;

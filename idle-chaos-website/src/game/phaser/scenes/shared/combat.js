@@ -3800,9 +3800,7 @@ function _talentActivatedHandler(payload) {
             }
             case 'knife_swarm': {
                 try {
-                    if (scene._showToast) scene._showToast('[DEBUG] knife_swarm handler entered', 1500);
                     const baseKnives = 6;
-                    // Prefer talent modifiers for count; fallback to simple rank heuristic
                     const tmods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : (typeof computeTalentModifiers === 'function' ? computeTalentModifiers(scene.char) : {}) || {};
                     const knifeCountMod = tmods['knifeCount'] || null;
                     const extraFromMod = Number((knifeCountMod && (knifeCountMod.flat != null ? knifeCountMod.flat : knifeCountMod.percent)) || 0);
@@ -3811,34 +3809,49 @@ function _talentActivatedHandler(payload) {
                     const [projMin, projMax] = getWeaponDamageRange(scene);
                     const avgWeapon = (projMin + projMax) / 2;
                     const baseRanged = Math.max(6, avgWeapon + (((eff && eff.agi) || 0) * 1.1) + (((eff && eff.luk) || 0) * 0.35));
-                    // Damage percent comes from talent modifiers; fall back to scaledValue if missing
                     const knifeMods = tmods['knifeDamage'] || null;
-                    let dmgPercent = 0;
-                    if (knifeMods) {
-                        dmgPercent = Number(knifeMods.percent || 0) + Number(knifeMods.flat || 0);
-                    } else {
-                        dmgPercent = Number(scaledValue || 6);
-                    }
+                    const dmgPercent = knifeMods ? (Number(knifeMods.percent || 0) + Number(knifeMods.flat || 0)) : Number(scaledValue || 6);
                     const knifeDamage = Math.max(1, baseRanged * (dmgPercent / 100));
 
-                    const assetsReady = ensureKnifeSwarmAssets(scene);
-                    const spawnRadius = 26;
-                    const knifeDepth = (scene.player && typeof scene.player.depth === 'number') ? scene.player.depth + 0.2 : 9.2;
-                    const speed = 420;
-                    const lifetime = 900;
-                    const launchGap = 45;
+                    // Target bias (closest enemy) used to orient swirl
+                    const enemiesAlive = (scene.enemies && scene.enemies.getChildren) ? scene.enemies.getChildren().filter(e => e && safeGetData(e, 'alive')) : [];
+                    let primaryTarget = null; let closestDist = Infinity;
+                    for (let ei = 0; ei < enemiesAlive.length; ei++) {
+                        const e = enemiesAlive[ei];
+                        const d = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, e.x, e.y);
+                        if (d < closestDist) { closestDist = d; primaryTarget = e; }
+                    }
+
+                    const spawnRadius = 28;
+                    const knifeDepth = (scene.player && typeof scene.player.depth === 'number') ? scene.player.depth + 0.31 : 9.31;
+                    const baseSpeed = 460;
+                    const lifetime = 880;
+                    const launchGap = 38;
                     const step = total > 0 ? ((Math.PI * 2) / total) : 0;
+                    const swirlTurns = 1.35;
+                    const homingWindowMs = 220;
+                    const homingStrength = 0.18;
 
                     let baseAng = 0;
                     try {
                         if (scene.input && scene.input.activePointer && (scene.input.activePointer.worldX || scene.input.activePointer.worldY)) {
                             baseAng = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.input.activePointer.worldX, scene.input.activePointer.worldY);
+                        } else if (primaryTarget) {
+                            baseAng = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, primaryTarget.x, primaryTarget.y);
                         } else if (scene._facing) {
                             const fmap = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2 };
                             baseAng = fmap[scene._facing] || 0;
                         }
                     } catch (e) { baseAng = 0; }
 
+                    // Telegraph vortex
+                    try {
+                        const vortex = scene.add.circle(scene.player.x, scene.player.y, spawnRadius * 0.7, 0x7bd3ff, 0.08).setDepth(knifeDepth - 0.3);
+                        if (scene.tweens) scene.tweens.add({ targets: vortex, alpha: 0, scale: 1.4, angle: 180, duration: 420, ease: 'Cubic.easeOut', onComplete: () => { try { vortex.destroy(); } catch (e) {} } });
+                    } catch (e) {}
+
+                    const assetsReady = ensureKnifeSwarmAssets(scene);
+                    const knives = [];
                     for (let i = 0; i < total; i++) {
                         const ang = Phaser.Math.Angle.Wrap(baseAng + (step * i));
                         const spawnX = scene.player.x + Math.cos(ang) * spawnRadius;
@@ -3866,80 +3879,84 @@ function _talentActivatedHandler(payload) {
                         if (knife.setRotation) knife.setRotation(ang);
                         try { if (knife.setBlendMode) knife.setBlendMode(Phaser.BlendModes.ADD); } catch (e) {}
                         if (knife.setAlpha) knife.setAlpha(0);
-
                         if (knife.body) {
                             knife.body.allowGravity = false;
                             if (knife.body.setVelocity) knife.body.setVelocity(0, 0);
                             try { setBodySizeCentered(knife, 14, 6); } catch (e) {}
                         }
-
-                        const trail = createKnifeTrailEmitter(scene, knife, knifeDepth - 0.2);
-                        if (knife.once) {
-                            knife.once('destroy', () => {
-                                try { if (trail) trail.destroy(); } catch (e) {}
-                            });
+                        const trail = createKnifeTrailEmitter(scene, knife, knifeDepth - 0.15);
+                        if (trail && trail._emitter) {
+                            try { trail._emitter.frequency = 38; trail._emitter.lifespan = { min: 110, max: 190 }; } catch (e) {}
                         }
+                        if (knife.once) knife.once('destroy', () => { try { if (trail) trail.destroy(); } catch (e) {} });
 
                         if (scene.tweens && typeof scene.tweens.add === 'function') {
-                            scene.tweens.add({ targets: knife, alpha: { from: 0, to: 1 }, duration: 90, delay: i * launchGap, ease: 'Cubic.easeOut' });
-                            scene.tweens.add({ targets: knife, rotation: knife.rotation + Phaser.Math.DegToRad(360), duration: 520, ease: 'Linear', repeat: -1 });
+                            scene.tweens.add({ targets: knife, alpha: { from: 0, to: 1 }, scale: { from: 0.8, to: 1 }, duration: 120, delay: i * launchGap * 0.55, ease: 'Cubic.easeOut' });
+                            scene.tweens.add({ targets: knife, rotation: knife.rotation + Phaser.Math.DegToRad(360 * swirlTurns), duration: 640, ease: 'Linear', repeat: -1 });
                         } else if (knife.setAlpha) {
                             knife.setAlpha(1);
                         }
 
-                        const launchDelay = i * launchGap + 60;
-                        const applyVelocity = () => {
-                            if (!knife || !knife.active) return;
-                            const vx = Math.cos(ang) * speed;
-                            const vy = Math.sin(ang) * speed;
-                            if (knife.body && knife.body.setVelocity) {
-                                knife.body.setVelocity(vx, vy);
-                            } else if (scene.tweens && typeof scene.tweens.add === 'function') {
-                                scene.tweens.add({ targets: knife, x: knife.x + vx * (lifetime / 1000), y: knife.y + vy * (lifetime / 1000), duration: lifetime, ease: 'Linear' });
-                            } else {
-                                knife.x += vx * 0.016;
-                                knife.y += vy * 0.016;
-                            }
-                        };
+                        knife._baseAng = ang;
+                        knife._spawnAt = scene.time ? scene.time.now : performance.now();
+                        knife._target = primaryTarget;
+                        knife._speed = baseSpeed + Phaser.Math.Between(-40, 60);
+                        knife._homing = true;
+                        knives.push(knife);
+                    }
 
-                        if (scene.time && scene.time.addEvent) {
-                            scene.time.addEvent({ delay: launchDelay, callback: applyVelocity });
-                        } else {
-                            applyVelocity();
-                        }
-
-                        if (scene.physics && knife.body && scene.enemies && scene.enemies.getChildren && typeof scene.physics.add.overlap === 'function') {
-                            addPhysicsOverlap(scene, knife, scene.enemies, function(proj, enemy) {
-                                if (!enemy || !safeGetData(enemy, 'alive')) return;
-                                try {
-                                    _dealPlayerDamage(scene, enemy, knifeDamage, '#fffbcc');
-                                    if (scene.add) {
-                                        const slash = scene.add.rectangle(enemy.x, enemy.y, 24, 3, 0xfff0cc, 0.7).setDepth(enemy.depth ? enemy.depth + 0.1 : knifeDepth + 0.1);
-                                        slash.setRotation(ang);
-                                        if (scene.tweens && typeof scene.tweens.add === 'function') {
-                                            scene.tweens.add({ targets: slash, alpha: 0, scaleX: 0.2, duration: 170, ease: 'Cubic.easeIn', onComplete: () => { try { slash.destroy(); } catch (ee) {} } });
-                                        } else {
-                                            scene.time && scene.time.delayedCall && scene.time.delayedCall(170, () => { try { slash.destroy(); } catch (ee) {} });
-                                        }
+                    const updateKnives = () => {
+                        const nowTs = scene.time ? scene.time.now : performance.now();
+                        for (let k = 0; k < knives.length; k++) {
+                            const knife = knives[k];
+                            if (!knife || !knife.active) continue;
+                            const age = nowTs - (knife._spawnAt || nowTs);
+                            if (knife._homing && age < homingWindowMs) {
+                                if (!knife._target || !safeGetData(knife._target, 'alive')) {
+                                    let best = null; let bd = Infinity;
+                                    for (let ei = 0; ei < enemiesAlive.length; ei++) {
+                                        const e = enemiesAlive[ei];
+                                        if (!e || !safeGetData(e, 'alive')) continue;
+                                        const d = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, e.x, e.y);
+                                        if (d < bd && d < 420) { bd = d; best = e; }
                                     }
-                                } catch (ee) {}
+                                    if (best) knife._target = best;
+                                }
+                                if (knife._target && safeGetData(knife._target, 'alive')) {
+                                    const angTo = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, knife._target.x, knife._target.y);
+                                    knife._baseAng = Phaser.Math.Angle.RotateTo(knife._baseAng, angTo, homingStrength);
+                                }
+                            } else if (knife._homing) {
+                                knife._homing = false;
+                            }
+                            const vx = Math.cos(knife._baseAng) * knife._speed;
+                            const vy = Math.sin(knife._baseAng) * knife._speed;
+                            if (knife.body && knife.body.setVelocity) knife.body.setVelocity(vx, vy); else { knife.x += vx * 0.016; knife.y += vy * 0.016; }
+                        }
+                    };
+                    if (scene.time && scene.time.addEvent) scene.time.addEvent({ delay: 32, loop: true, callback: updateKnives });
+
+                    const impactFx = (ex, ey, ang) => {
+                        try {
+                            const slash = scene.add.rectangle(ex, ey, 22, 3, 0xcfe9ff, 0.85).setDepth(knifeDepth + 0.25);
+                            slash.setRotation(ang);
+                            if (scene.tweens) scene.tweens.add({ targets: slash, alpha: 0, scaleX: 0.2, duration: 160, ease: 'Cubic.easeIn', onComplete: () => { try { slash.destroy(); } catch (e) {} } });
+                        } catch (e) {}
+                    };
+                    for (let i = 0; i < knives.length; i++) {
+                        const knife = knives[i];
+                        if (!knife || !knife.body || !scene.physics || !scene.enemies || !scene.enemies.getChildren) continue;
+                        try {
+                            scene.physics.add.overlap(knife, scene.enemies, function(proj, enemy) {
+                                if (!enemy || !safeGetData(enemy, 'alive')) return;
+                                try { _dealPlayerDamage(scene, enemy, knifeDamage, '#fffbcc'); impactFx(enemy.x, enemy.y, knife.rotation || 0); } catch (ee) {}
                                 try { if (proj && proj.destroy) proj.destroy(); } catch (ee) {}
                             });
-                        }
-
-                        if (scene.time && scene.time.addEvent) {
-                            scene.time.addEvent({
-                                delay: launchDelay + lifetime,
-                                callback: () => { try { if (knife && knife.destroy) knife.destroy(); } catch (e) {} }
-                            });
-                        } else {
-                            try { scene.time && scene.time.delayedCall && scene.time.delayedCall(lifetime, () => { try { knife.destroy(); } catch (e) {} }); } catch (e) {}
-                        }
+                        } catch (e) {}
                     }
+                    if (scene.time && scene.time.addEvent) scene.time.addEvent({ delay: lifetime + 120, callback: () => { for (const k of knives) { try { k.destroy(); } catch (e) {} } } });
                     try { if (scene._showToast) scene._showToast('Knife Swarm!', 700); } catch (e) {}
-                    if (scene._showToast) scene._showToast('[DEBUG] About to markActivationSuccess for knife_swarm', 1500);
                     markActivationSuccess(scene, tid);
-                    if (scene._showToast) scene._showToast('[DEBUG] markActivationSuccess completed for knife_swarm', 1500);
                 } catch (e) {
                     if (scene._showToast) scene._showToast(`[DEBUG] knife_swarm exception: ${e.message}`, 2000);
                 }
