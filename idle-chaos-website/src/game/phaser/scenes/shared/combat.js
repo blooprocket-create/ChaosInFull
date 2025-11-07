@@ -730,6 +730,7 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
     //  - Fallback: class primary stat (previous behavior)
     let baseDamage = 0;
     let isStaff = false; // retain for spell visual cues
+    let isBow = false; // fast physical projectile (arrow)
     let scalingKey = primaryStatKey; // start with class primary
     try {
         if (weaponDef) {
@@ -737,7 +738,7 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
             const wname = String(weaponDef.name || '').toLowerCase();
             if (/staff/.test(wid) || /staff/.test(wname)) { scalingKey = 'int'; isStaff = true; }
             else if (/dagger/.test(wid) || /dagger/.test(wname)) { scalingKey = 'agi'; }
-            else if (/bow/.test(wid) || /bow/.test(wname) || /crossbow/.test(wid) || /crossbow/.test(wname)) { scalingKey = 'agi'; }
+            else if (/bow/.test(wid) || /bow/.test(wname) || /crossbow/.test(wid) || /crossbow/.test(wname)) { scalingKey = 'agi'; isBow = true; }
             else if (/sword/.test(wid) || /sword/.test(wname)) { scalingKey = 'str'; }
             else if (/polearm/.test(wid) || /polearm/.test(wname)) { scalingKey = 'str'; }
         }
@@ -777,12 +778,20 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
         }
     } catch (e) {}
     // Determine the effective melee/ranged reach before attempting to find targets.
-    // Weapon may change attack range: staffs and items with "range" should be treated as ranged
-    let defaultRange = (this.attackRange != null) ? this.attackRange : 68;
+    // Staffs & bows/crossbows are ranged (220); polearms are melee with double base reach.
+    let baseMeleeRange = (this.attackRange != null) ? this.attackRange : 68;
+    let defaultRange = baseMeleeRange;
     try {
         if (weaponDef) {
-            if (typeof weaponDef.range === 'number') defaultRange = weaponDef.range;
-            else if (/staff/i.test(weaponDef.id || '') || /staff/i.test(weaponDef.name || '')) defaultRange = 220;
+            const wid = String(weaponDef.id || '').toLowerCase();
+            const wname = String(weaponDef.name || '').toLowerCase();
+            if (typeof weaponDef.range === 'number') {
+                defaultRange = weaponDef.range; // explicit override wins
+            } else if (/staff/.test(wid) || /staff/.test(wname) || /bow/.test(wid) || /bow/.test(wname) || /crossbow/.test(wid) || /crossbow/.test(wname)) {
+                defaultRange = 220; // ranged projectile reach
+            } else if (/polearm/.test(wid) || /polearm/.test(wname)) {
+                defaultRange = Math.round(baseMeleeRange * 2); // extended melee reach
+            }
         }
     } catch (e) {}
     let range = defaultRange;
@@ -885,30 +894,51 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
             
             // route player damage through the centralized handler so crits/lifesteal apply
             try {
-                if (isStaff && this.add && this.tweens) {
-                    // Visual: spawn a lightning orb that travels to the enemy then applies damage
+                if ((isStaff || isBow) && this.add && this.tweens) {
+                    // Ranged projectile (staff orb or fast arrow) traveling to the target then applying damage
                     try {
                         const _pc = getPlayerCenter(this);
                         const startX = _pc.x || 0;
                         const startY = _pc.y || 0;
-                        const orb = this.add.circle(startX, startY, 8, 0x88ccff, 0.95).setDepth(10);
-                        if (orb.setBlendMode) try { orb.setBlendMode(Phaser.BlendModes.ADD); } catch (e) {}
-                        // small pulse/tween to travel
-                        const dist = Phaser.Math.Distance.Between(startX, startY, enemy.x || 0, enemy.y || 0);
-                        const speed = 1200; // px/s
-                        const duration = Math.max(140, Math.round((dist / speed) * 1000));
-                        this.tweens.add({ targets: orb, x: enemy.x, y: enemy.y, duration: duration, ease: 'Quad.easeOut', onComplete: () => {
+                        let proj = null;
+                        if (isBow) {
+                            // Arrow: triangle primitive; fallback to small circle if creation fails
                             try {
-                                // impact flash
-                                try { const fx = this.add.circle(enemy.x, enemy.y, 18, 0x88ddff, 0.28).setDepth((enemy.depth || 7) + 0.2); if (this.tweens) this.tweens.add({ targets: fx, alpha: 0, scale: 1.6, duration: 240, onComplete: () => { try { fx.destroy(); } catch (e) {} } }); } catch (e) {}
-                                // apply damage now
-                                try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: true }); } catch (e) {}
+                                proj = this.add.triangle(startX, startY, -10, -3, 14, 0, -10, 3, 0xffe0b3).setDepth(10);
+                                proj.setOrigin(0.5, 0.5);
+                                const ang = Phaser.Math.Angle.Between(startX, startY, enemy.x, enemy.y);
+                                proj.setRotation(ang);
+                                if (proj.setBlendMode) try { proj.setBlendMode(Phaser.BlendModes.ADD); } catch (e) {}
+                            } catch (e) { proj = this.add.circle(startX, startY, 4, 0xffe0b3, 0.95).setDepth(10); }
+                        } else {
+                            proj = this.add.circle(startX, startY, 8, 0x88ccff, 0.95).setDepth(10);
+                            if (proj.setBlendMode) try { proj.setBlendMode(Phaser.BlendModes.ADD); } catch (e) {}
+                        }
+                        const dist = Phaser.Math.Distance.Between(startX, startY, enemy.x || 0, enemy.y || 0);
+                        const speed = isBow ? 2200 : 1200; // px/s (arrows travel faster)
+                        const minDur = isBow ? 90 : 140;
+                        const duration = Math.max(minDur, Math.round((dist / speed) * 1000));
+                        this.tweens.add({ targets: proj, x: enemy.x, y: enemy.y, duration: duration, ease: isBow ? 'Linear' : 'Quad.easeOut', onComplete: () => {
+                            try {
+                                if (isBow) {
+                                    // Arrow impact: brief streak fade
+                                    try {
+                                        const fx = this.add.rectangle(enemy.x, enemy.y, 22, 3, 0xffe0b3, 0.9).setDepth((enemy.depth || 7) + 0.2);
+                                        fx.setRotation(Phaser.Math.Angle.Between(startX, startY, enemy.x, enemy.y));
+                                        if (this.tweens) this.tweens.add({ targets: fx, alpha: 0, scaleX: 0.2, duration: 140, ease: 'Cubic.easeIn', onComplete: () => { try { fx.destroy(); } catch (e) {} } });
+                                    } catch (e) {}
+                                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffd8b3', { isSpell: false }); } catch (e) {}
+                                } else {
+                                    // Staff orb impact: radial flash
+                                    try { const fx = this.add.circle(enemy.x, enemy.y, 18, 0x88ddff, 0.28).setDepth((enemy.depth || 7) + 0.2); if (this.tweens) this.tweens.add({ targets: fx, alpha: 0, scale: 1.6, duration: 240, onComplete: () => { try { fx.destroy(); } catch (e) {} } }); } catch (e) {}
+                                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: true }); } catch (e) {}
+                                }
                             } catch (e) {}
-                            try { if (orb && orb.destroy) orb.destroy(); } catch (e) {}
+                            try { if (proj && proj.destroy) proj.destroy(); } catch (e) {}
                         } });
                     } catch (e) {
                         // fallback to direct damage if VFX fails
-                        try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: true }); } catch (ee) {}
+                        try { _dealPlayerDamage(this, enemy, baseDamage, isBow ? '#ffd8b3' : '#ffee66', { isSpell: isStaff && !isBow }); } catch (ee) {}
                     }
                 } else {
                     // Melee attack: delay damage until ~70% through attack animation
