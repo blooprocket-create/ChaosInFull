@@ -266,6 +266,23 @@ export function createHUD(scene) {
         if (typeof window !== 'undefined' && window.__shared_ui && typeof window.__shared_ui.bindSkillBarKeys === 'function') {
             try { window.__shared_ui.bindSkillBarKeys(scene); } catch (e) {}
         }
+        // Keep skill cooldown overlays ticking even when the scene is idle (e.g., in Town).
+        // Create a lightweight interval to update the skill bar once per second.
+        try {
+            if (scene._skillbarTimer) { try { clearInterval(scene._skillbarTimer); } catch (_) {} }
+            scene._skillbarTimer = setInterval(() => {
+                try {
+                    if (typeof window !== 'undefined' && window.__shared_ui && typeof window.__shared_ui.refreshSkillBarHUD === 'function') {
+                        window.__shared_ui.refreshSkillBarHUD(scene);
+                    }
+                } catch (e) { /* ignore */ }
+            }, 1000);
+            if (scene.events && scene.events.once) {
+                // Ensure we clear the timer on scene shutdown/destroy
+                scene.events.once('shutdown', () => { try { if (scene._skillbarTimer) { clearInterval(scene._skillbarTimer); scene._skillbarTimer = null; } } catch (e) {} });
+                scene.events.once('destroy', () => { try { if (scene._skillbarTimer) { clearInterval(scene._skillbarTimer); scene._skillbarTimer = null; } } catch (e) {} });
+            }
+        } catch (e) { /* ignore timer errors */ }
     } catch (e) {}
     // Re-apply persisted UI settings (e.g., attack range indicator) for this scene
     try {
@@ -427,6 +444,8 @@ export function destroyHUD(scene) {
         try { scene._hudStateUnsub(); } catch (e) { /* ignore */ }
     }
     scene._hudStateUnsub = null;
+    // Clear any skill bar refresh timer
+    try { if (scene._skillbarTimer) { clearInterval(scene._skillbarTimer); scene._skillbarTimer = null; } } catch (e) {}
     try { if (scene.hud && scene.hud.parentNode) scene.hud.parentNode.removeChild(scene.hud); } catch (e) { /* ignore */ }
     scene.hud = null;
     // Destroy quest tracker for this scene

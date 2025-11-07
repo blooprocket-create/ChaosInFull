@@ -18,77 +18,77 @@ const makeTalent = (id, name, options = {}) => ({
 
 const beginnerTalents = [
     makeTalent('sharpened_axe', 'Sharpened Axe', {
-        description: 'Pirouette through marrow. Projectile penetration +{value}%.',
+        description: 'Increase weapon damage by {value}%.',
         scaling: { type: 'flat', target: 'weaponDamage', base: 0.5, perRank: 0.5 },
         tags: ['combat', 'universal']
     }),
     makeTalent('quickness_boots', 'Quickness Boots', {
-        description: 'Take the floor; the dark follows. Casting shadow dance grants {value}% dodge for 4s.',
+        description: 'Move with the shadows. Movement speed +{value}%.',
         scaling: { type: 'percent', target: 'movementSpeed', base: 3, perRank: 0.6 },
         tags: ['utility', 'movement']
     }),
     makeTalent('book_of_the_wise', 'Book of the Wise', {
-        description: 'Leave the silhouette to take the hit. {value}% chance to create a decoy when struck.',
+        description: 'Wisdom in the dark. Experience gain +{value}%.',
         scaling: { type: 'percent', target: 'characterXpGain', base: 5, perRank: 1.5 },
         tags: ['progression']
     }),
     makeTalent('healthy_spirit', 'Healthy Spirit', {
-        description: 'Cut a step through the gloom. Shadow dash cooldown −{value}%.',
+        description: 'Endure the night. Max HP +{value}%.',
         scaling: { type: 'flat', target: 'maxHp', base: 10, perRank: 6 },
         tags: ['survivability']
     }),
     makeTalent('mana_pool', 'Mana Pool', {
-        description: 'Loose a volley like falling night. Volley damage +{value}%.',
+        description: 'Expand your dark well. Max mana +{value}.',
         scaling: { type: 'flat', target: 'maxMana', base: 8, perRank: 5 },
         tags: ['mana']
     }),
     makeTalent('thick_skin', 'Thick Skin', {
-        description: 'String your traps on black thread. Traps arm {value}% faster and last longer.',
+        description: 'Harden your hide against attacks. Defense +{value}.',
         scaling: { type: 'flat', target: 'defense', base: 3, perRank: 2 },
         tags: ['survivability']
     }),
     makeTalent('work_ethic', 'Work Ethic', {
-        description: 'Dodge, build tempo. Gain {value}% haste after every dodge (stacks 3).',
+        description: 'Mine like the night never ends. Gathering speed +{value}%.',
         scaling: { type: 'percent', target: 'skillXpGain', base: 4, perRank: 1.25 },
         tags: ['progression', 'skills']
     }),
     makeTalent('resourcefulness', 'Resourcefulness', {
-        description: 'Rip the veil and their plates. Piercing shots ignore {value}% armor.',
+        description: 'Dig deep into the shadows. Gathering speed +{value}%.',
         scaling: { type: 'percent', target: 'gatherSpeed', base: 3, perRank: 0.7 },
         tags: ['skills']
     }),
     makeTalent('refined_reflexes', 'Refined Reflexes', {
-        description: 'Stand on the seam of seen and unseen. Move {value}% faster while firing.',
+        description: 'Move like a wraith. Attack speed +{value}%.',
         scaling: { type: 'percent', target: 'attackSpeed', base: 2, perRank: 0.5 },
         tags: ['combat']
     }),
     makeTalent('keen_eye', 'Keen Eye', {
-        description: 'Lead them under the eclipse. Trapped enemies take {value}% more damage.',
+        description: 'Strike true from the shadows. Critical strike chance +{value}%.',
         scaling: { type: 'percent', target: 'critChance', base: 1.5, perRank: 0.35 },
         tags: ['combat']
     }),
     makeTalent('precision_training', 'Precision Training', {
-        description: 'Crank the bow with shadowed sinew. Reload speed +{value}%.',
+        description: 'Hit vital points for deadly strikes. Critical strike damage +{value}%.',
         scaling: { type: 'percent', target: 'critDmg', base: 5, perRank: 1.2 },
         tags: ['combat']
     }),
     makeTalent('loot_lure', 'Loot Lure', {
-        description: 'Under a silver metronome, you always land first. Ambush damage +{value}%.',
+        description: 'Monsters drop more items, attracted to your shadowy presence. Item drop rate +{value}%.',
         scaling: { type: 'percent', target: 'dropRate', base: 4, perRank: 0.9 },
         tags: ['utility', 'loot']
     }),
     makeTalent('plus1str', "Str +1", {
-        description: 'Your dusk rubs off. Nearby allies gain +{value}% shadow damage.',
+        description: 'Strength for crushing bones. Increases Strength by {value}.',
         scaling: { type: 'flat', target: 'str', base: 1, perRank: 1 },
         tags: ['utility', 'combat']
     }),
     makeTalent('plus1int', "Int +1", {
-        description: 'Intellect for plotting revenge. Increases Intellect by {value}.',
+        description: 'Intelligence for arcane mastery. Increases Intelligence by {value}.',
         scaling: { type: 'flat', target: 'int', base: 1, perRank: 1 },
         tags: ['utility', 'combat']
     }),
     makeTalent('plus1agi', 'Agi +1', {
-        description: 'Agility for dodging fate. Increases Agility by {value}.',
+        description: 'Agility for swift strikes. Increases Agility by {value}.',
         scaling: { type: 'flat', target: 'agi', base: 1, perRank: 1 },
         tags: ['utility', 'combat']
     })
@@ -134,14 +134,14 @@ const horrorTalents = [
         tags: ['survivability']
     }),
     makeTalent('terror_form', 'Terror Form', {
-    description: 'Wear fear like a crown. Melee attackers take damage equal to {value}% of their max HP over 3 seconds if they get too close. Costs {secondValue} mana per second to maintain.',
-    scaling: { type: 'percent', target: 'terrorAuraDamage', base: 5, perRank: 0.15 },
-    secondScaling: { type: 'flat', target: 'manaCostPerSec', base: 5, perRank: 0.35 },
-    tags: ['damage', 'aura'],
-    kind: 'active',
-    activeType: 'offensive',
-    cooldownSeconds: 1,
-    manaCost: 0
+        description: 'Wear fear like a crown. Melee attackers take damage equal to {value}% of their max HP over 3 seconds if they get too close. Costs {secondValue} mana per second to maintain.',
+        scaling: { type: 'percent', target: 'terrorAuraDamage', base: 5, perRank: 0.15 },
+        secondScaling: { type: 'flat', target: 'manaCostPerSec', base: 5, perRank: 0.35 },
+        tags: ['damage', 'aura'],
+        kind: 'active',
+        activeType: 'offensive',
+        cooldownSeconds: 1,
+        manaCost: 0
     }),
     makeTalent('money_pit', 'Money Pit', {
         description: 'Monsters drop more gold, because misery loves company. Gold drop rate +{value}%.',
@@ -301,7 +301,7 @@ const occultistTalents = [
         tags: ['combat', 'occultist']
     }),
     makeTalent('occult_resurgence', 'Occult Resurgence', {
-        description: 'Whisper to the red river. Blood sacrifice damage +{value}%.',
+        description: 'Spells that bend time. Cooldown reset chance +{value}%.',
         scaling: { type: 'percent', target: 'cooldownResetChance', base: 1.5, perRank: 0.25 },
         tags: ['utility', 'occultist']
     })
