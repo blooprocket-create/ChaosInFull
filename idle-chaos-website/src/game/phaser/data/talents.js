@@ -227,12 +227,12 @@ const occultistTalents = [
     makeTalent('void_path', 'Void Path', {//works
         description: 'Absence follows in your footsteps. Leave short‑lived void zones along your path that each deal {value}% damage once to enemies who enter. Zones last 1.2s. Zone radius = {secondValue}px + per‑rank increases.',
         scaling: { type: 'percent', target: 'voidPathDamage', base: 6, perRank: 2.25 },
-        secondScaling: { type: 'flat', target: 'voidPathRadius', base: 22, perRank: 2 },
+        secondScaling: { type: 'flat', target: 'voidPathRadius', base: 22, perRank: 0.2 },
         tags: ['movement', 'aoe', 'occultist'],
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 14,
-        manaCost: 20,
+        manaCost: 100,
         // Note: placement interval and max concurrent zones are runtime-tuned in code and are not expressed via scaling fields.
     }),
     makeTalent('dark_shield', 'Dark Shield', {
