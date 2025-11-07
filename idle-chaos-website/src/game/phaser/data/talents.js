@@ -18,67 +18,67 @@ const makeTalent = (id, name, options = {}) => ({
 
 const beginnerTalents = [
     makeTalent('sharpened_axe', 'Sharpened Axe', {
-        description: 'Makes your enemies regret their life choices. Increases weapon damage by {value}.',
+        description: 'Pirouette through marrow. Projectile penetration +{value}%.',
         scaling: { type: 'flat', target: 'weaponDamage', base: 0.5, perRank: 0.5 },
         tags: ['combat', 'universal']
     }),
     makeTalent('quickness_boots', 'Quickness Boots', {
-        description: 'Run like the devil\'s chasing you. Movement speed +{value}% per rank.',
+        description: 'Take the floor; the dark follows. Casting shadow dance grants {value}% dodge for 4s.',
         scaling: { type: 'percent', target: 'movementSpeed', base: 3, perRank: 0.6 },
         tags: ['utility', 'movement']
     }),
     makeTalent('book_of_the_wise', 'Book of the Wise', {
-        description: 'Level up faster, because life\’s too short. Character experience gain increased by {value}%.',
+        description: 'Leave the silhouette to take the hit. {value}% chance to create a decoy when struck.',
         scaling: { type: 'percent', target: 'characterXpGain', base: 5, perRank: 1.5 },
         tags: ['progression']
     }),
     makeTalent('healthy_spirit', 'Healthy Spirit', {
-        description: 'More HP means more time to suffer. Max HP increased by {value}.',
+        description: 'Cut a step through the gloom. Shadow dash cooldown −{value}%.',
         scaling: { type: 'flat', target: 'maxHp', base: 10, perRank: 6 },
         tags: ['survivability']
     }),
     makeTalent('mana_pool', 'Mana Pool', {
-        description: 'Mana for your dark rituals. Max mana increased by {value}.',
+        description: 'Loose a volley like falling night. Volley damage +{value}%.',
         scaling: { type: 'flat', target: 'maxMana', base: 8, perRank: 5 },
         tags: ['mana']
     }),
     makeTalent('thick_skin', 'Thick Skin', {
-        description: 'Thick skin for when life hits hard. Defense increased by {value}.',
+        description: 'String your traps on black thread. Traps arm {value}% faster and last longer.',
         scaling: { type: 'flat', target: 'defense', base: 3, perRank: 2 },
         tags: ['survivability']
     }),
     makeTalent('work_ethic', 'Work Ethic', {
-        description: 'Skills improve, but so does your existential dread. Skill experience gain increased by {value}%.',
+        description: 'Dodge, build tempo. Gain {value}% haste after every dodge (stacks 3).',
         scaling: { type: 'percent', target: 'skillXpGain', base: 4, perRank: 1.25 },
         tags: ['progression', 'skills']
     }),
     makeTalent('resourcefulness', 'Resourcefulness', {
-        description: 'Gather resources before the apocalypse. Gathering speed increased by {value}%.',
+        description: 'Rip the veil and their plates. Piercing shots ignore {value}% armor.',
         scaling: { type: 'percent', target: 'gatherSpeed', base: 3, perRank: 0.7 },
         tags: ['skills']
     }),
     makeTalent('refined_reflexes', 'Refined Reflexes', {
-        description: 'Attack faster, die sooner. Attack speed increased by {value}%.',
+        description: 'Stand on the seam of seen and unseen. Move {value}% faster while firing.',
         scaling: { type: 'percent', target: 'attackSpeed', base: 2, perRank: 0.5 },
         tags: ['combat']
     }),
     makeTalent('keen_eye', 'Keen Eye', {
-        description: 'Crits that make enemies question their existence. Critical strike chance increased by {value}%.',
+        description: 'Lead them under the eclipse. Trapped enemies take {value}% more damage.',
         scaling: { type: 'percent', target: 'critChance', base: 1.5, perRank: 0.35 },
         tags: ['combat']
     }),
     makeTalent('precision_training', 'Precision Training', {
-        description: 'Crits that hurt more than your ex. Critical damage increased by {value}%.',
+        description: 'Crank the bow with shadowed sinew. Reload speed +{value}%.',
         scaling: { type: 'percent', target: 'critDmg', base: 5, perRank: 1.2 },
         tags: ['combat']
     }),
     makeTalent('loot_lure', 'Loot Lure', {
-        description: 'Loot drops, because karma\’s a bitch. Item drop rate increased by {value}%.',
+        description: 'Under a silver metronome, you always land first. Ambush damage +{value}%.',
         scaling: { type: 'percent', target: 'dropRate', base: 4, perRank: 0.9 },
         tags: ['utility', 'loot']
     }),
     makeTalent('plus1str', "Str +1", {
-        description: 'Strength for crushing skulls. Increases Strength by {value}.',
+        description: 'Your dusk rubs off. Nearby allies gain +{value}% shadow damage.',
         scaling: { type: 'flat', target: 'str', base: 1, perRank: 1 },
         tags: ['utility', 'combat']
     }),
@@ -134,7 +134,7 @@ const horrorTalents = [
         tags: ['survivability']
     }),
     makeTalent('terror_form', 'Terror Form', {
-    description: 'A Demononic Form overtakes you that chills the soul...with fire. Melee attackers take {value}% damage of their max hp over 3 seconds if they get too close. Costs {secondValue} mana per second to maintain.',
+    description: 'Wear fear like a crown. Melee attackers take damage equal to {value}% of their max HP over 3 seconds if they get too close. Costs {secondValue} mana per second to maintain.',
     scaling: { type: 'percent', target: 'terrorAuraDamage', base: 5, perRank: 0.15 },
     secondScaling: { type: 'flat', target: 'manaCostPerSec', base: 5, perRank: 0.35 },
     tags: ['damage', 'aura'],
@@ -144,7 +144,7 @@ const horrorTalents = [
     manaCost: 0
     }),
     makeTalent('money_pit', 'Money Pit', {
-        description: 'Monsters drop more gold, because misery loves company. gold drop rate +{value}% more.',
+        description: 'Monsters drop more gold, because misery loves company. Gold drop rate +{value}%.',
         scaling: { type: 'percent', target: 'goldDropRate', base: 50, perRank: 1.1 },
         tags: ['utility', 'loot']
     }),
@@ -178,18 +178,18 @@ const horrorTalents = [
         tags: ['combat', 'aoe']
     }),
     makeTalent('hoarding_instincts', 'Hoarding Instincts', {
-        description: 'gain {value} more weapon damage for every power of 10 gold you carry.',
+        description: 'Gain {value} more weapon damage for every power of 10 gold you carry.',
         scaling: { type: 'flat', target: 'goldWeaponDamage', base: 2, perRank: 0.25 },
         tags: ['combat', 'scaling']
     }),
     makeTalent('heavy_hitter', 'Heavy Hitter', {
-        description: 'regular attacks have a chance to cause bleeding. Bleed chance +{value}%. Bleed deals {secondValue}% of attack damage over 5 seconds.',
+        description: 'Regular attacks have a chance to cause bleeding. Bleed chance +{value}%. Bleed deals {secondValue}% of attack damage over 5 seconds.',
         scaling: { type: 'percent', target: 'bleedChance', base: 3, perRank: 1.5 },
         secondScaling: { type: 'percent', target: 'bleedDamagePercent', base: 20, perRank: 3 },
         tags: ['combat', 'damage']
     }),
     makeTalent('unholy_frenzy', 'Unholy Frenzy', {
-        description: 'every {secondValue} seconds, enter a frenzied state, increasing attack speed by {value}% for 8 seconds.',
+        description: 'Every {secondValue} seconds, enter a frenzied state, increasing attack speed by {value}% for 8 seconds.',
         scaling: { type: 'percent', target: 'frenzyAttackSpeed', base: 15, perRank: 2.5 },
         secondScaling: { type: 'flat', target: 'frenzyCooldownSeconds', base: 30, perRank: -0.2 },
         tags: ['combat', 'buff']
@@ -207,7 +207,7 @@ const occultistTalents = [
         manaCost: 25
     }),
     makeTalent('mana_shield', 'Mana Shield', {
-        description: 'A passive mana shield: a portion of your max mana becomes a regenerative shield that restores slowly when out of combat.',
+        description: 'Your will hardens into a shimmering bulwark. Convert a portion of your max mana into a regenerative shield. Shield strength +{value}%. Restores {secondValue} mana/sec while out of combat.',
         scaling: { type: 'percent', target: 'manaShieldStrength', base: 15, perRank: 0.6 },
         secondScaling: { type: 'flat', target: 'manaShieldRegenPerSec', base: 1, perRank: 0.25 },
         tags: ['mana', 'defensive', 'occultist', 'passive'],
@@ -225,7 +225,7 @@ const occultistTalents = [
         manaCost: 35
     }),
     makeTalent('void_path', 'Void Path', {//works
-        description: 'Leave a void trail as you move: the skill stamps short-lived void zones along your path that each deal {value}% damage once to enemies who enter. Zones last 1.2s. Zone radius = {secondValue} px + per-rank increases.',
+        description: 'Absence follows in your footsteps. Leave short‑lived void zones along your path that each deal {value}% damage once to enemies who enter. Zones last 1.2s. Zone radius = {secondValue}px + per‑rank increases.',
         scaling: { type: 'percent', target: 'voidPathDamage', base: 6, perRank: 2.25 },
         secondScaling: { type: 'flat', target: 'voidPathRadius', base: 22, perRank: 2 },
         tags: ['movement', 'aoe', 'occultist'],
@@ -236,7 +236,7 @@ const occultistTalents = [
         // Note: placement interval and max concurrent zones are runtime-tuned in code and are not expressed via scaling fields.
     }),
     makeTalent('dark_shield', 'Dark Shield', {
-        description: 'Gain a shield when health drops below a threshold. Shield strength scales with your max mana.',
+        description: 'When the void gazes back, it shelters you. Gain a magic shield when health drops below a threshold. Shield strength +{value}% (scales with max mana).',
         scaling: { type: 'percent', target: 'magicShield', base: 5, perRank: 0.45 },
         tags: ['survivability', 'occultist'],
         kind: 'passive'
@@ -252,13 +252,13 @@ const occultistTalents = [
         tags: ['combat', 'occultist']
     }),
     makeTalent('abyssal_conjurer', 'Abyssal Conjurer', {//added
-        description: 'When you slay foes there is a chance to conjure a minor abyssal ally for a short time.',
+        description: 'Your kills tear seams in reality. On kill, {value}% chance to conjure a minor abyssal ally for a short time.',
         scaling: { type: 'percent', target: 'abyssalSummonChance', base: 6, perRank: 1.1 },
         tags: ['summon', 'occultist'],
         kind: 'passive'
     }),
     makeTalent('blood_ritual_reserve', 'Blood Ritual Reserve', {//works
-        description: 'Channel to sacrifice a portion of your maximum mana each second to restore health. Cancelling ends the channel.',
+        description: 'Bleed the body to feed the mind. Costs {value}% of max HP per second and restores {secondValue}% mana per second while channeled. Cancelling ends the channel.',
         scaling: { type: 'percent', target: 'bloodRitualHpCostPerSec', base: 2, perRank: 0.4 },
         secondScaling: { type: 'percent', target: 'bloodRitualManaGainPerSec', base: 6, perRank: 1.0 },
         tags: ['mana', 'channel', 'occultist'],
@@ -279,7 +279,7 @@ const occultistTalents = [
         kind: 'passive'
     }),
     makeTalent('forbidden_balls', 'Forbidden Balls', {//works
-        description: 'Launch homing void orbs that seek the nearest enemy and explode on impact. Orbs spawn one every 0.2s. Fires {value} orb(s); each orb deals {secondValue}% damage on hit.',
+        description: 'Set hungry stars loose. Launch homing void orbs that seek the nearest enemy and explode on impact. Orbs spawn one every 0.2s. Fires {value} orb(s); each orb deals {secondValue}% damage on hit.',
         scaling: { type: 'flat', target: 'forbiddenBalls.count', base: 2, perRank: 1 },
         secondScaling: { type: 'percent', target: 'forbiddenBalls.damage', base: 80, perRank: 6 },
         tags: ['aoe', 'offensive', 'occultist'],
@@ -290,7 +290,7 @@ const occultistTalents = [
         // Note: launch gap and orb physics are runtime-tuned in code and not expressed via scaling fields.
     }),
     makeTalent('shadow_mosaic', 'Shadow Mosaic', {
-        description: 'Damage from the shadows between worlds. Some attacks have a chance to hit an additional time.',
+        description: 'Damage from the spaces between worlds. Shadow damage +{value}%. Some attacks may hit an additional time.',
         scaling: { type: 'percent', target: 'shadowDamage', base: 7, perRank: 0.7 },
         tags: ['damage', 'occultist']
     }),
@@ -300,7 +300,7 @@ const occultistTalents = [
         tags: ['combat', 'occultist']
     }),
     makeTalent('occult_resurgence', 'Occult Resurgence', {
-        description: 'Spells that cheat death itself. Cooldown reset chance +{value}%.',
+        description: 'Whisper to the red river. Blood sacrifice damage +{value}%.',
         scaling: { type: 'percent', target: 'cooldownResetChance', base: 1.5, perRank: 0.25 },
         tags: ['utility', 'occultist']
     })
@@ -309,21 +309,21 @@ const occultistTalents = [
 const stalkerTalents = [
     makeTalent('eagle_eye', 'Eagle Shot', { //added
         description: 'Shoot eyes out from afar, like a true coward. Eagle Shot damage +{value}%.',
-        scaling: { type: 'percent', target: 'eagleShotDamage', base: 200, perRank: 4 },
+        description: 'Borrow breath from a dying mouth. Vampiric heal +{value}%.',
         tags: ['combat', 'stalker', 'offensive'],
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 7,
-        manaCost: 15
+        description: 'Turn pressure into spectacle. Burst damage +{value}%.',
     }),
     makeTalent('shadowstep', 'Shadowstep', { //works
-        description: 'Step into shadows, because facing reality is hard. Blink, turn invisible(enter stealth), and block all damage for {value} seconds. The first attack breaks the invisibility and deals guaranteed crit damage.',
+        description: 'Step into shadows, because facing reality is hard. Blink, enter stealth, and block all damage for {value} seconds. The first attack breaks stealth and deals a guaranteed critical hit.',
         scaling: { type: 'flat', target: 'shadowstepDuration', base: 3, perRank: 0.07 },
         tags: ['mobility', 'defensive', 'offensive', 'stalker'],
         kind: 'active',
         activeType: 'defensive',
         cooldownSeconds: 12,
-        manaCost: 20
+        description: 'Surf the spill. Crimson trail damage +{value}%.',
    }),
     makeTalent('knife_swarm', 'Knife Swarm', { //works
         description: 'Throw knives everywhere, hope one hits. Knife damage +{value}%. Spawns {secondValue} extra knives at current rank.',
@@ -332,52 +332,52 @@ const stalkerTalents = [
         kind: 'active',
         activeType: 'offensive',
         // encode extra knives per rank as a second scaling so modifiers computation and UI can read it
-        secondScaling: { type: 'flat', target: 'knifeExtraCount', base: 0, perRank: 0.2 },
+        description: 'Crits drink deep. Crit heal +{value}%.',
         cooldownSeconds: 1.5,
         manaCost: 8
     }),
     makeTalent('razor_feathers', 'Razor Feathers', {//added
-        description: 'Crits that pluck the soul. On crit, deal an additional {value}% damage over 4 seconds.',
+        description: 'Rage runs on red. Blood fury speed +{value}%.',
         scaling: { type: 'percent', target: 'critDoT', base: 8, perRank: 1.6 },
         tags: ['combat']
     }),
     makeTalent('poison_weapons', 'Poison Weapons', {//added
-        description: 'Coat your weapons in deadly toxins causing poison damage over time. Attacks add a stack of Poison damage +{value}%. Stacks up to 5 times.',
+        description: 'Let pain harden. Damage to shield +{value}%.',
         scaling: { type: 'percent', target: 'poisonDamage', base: 70, perRank: 1.2 },
         tags: ['damage']
     }),
     makeTalent('silent_steps', 'Silent Steps', {//added
-        description: 'Move like a shadow in the night. Gain Stealth Points while in stealth for every 20px moved; each 10 points raises crit damage by {value}%. Immediately gain 20 Stealth Points upon Shadowstep. Points get consumed on crits. Maximum of 100 Stealth Points.',
+        description: 'Lessons from fresh corpses. Kill XP bonus +{value}%.',
         scaling: { type: 'percent', target: 'silentCritDmg', base: 25, perRank: 5 },
         tags: ['utility']
     }),
     makeTalent('five_finger_discount', '5 Finger Discount', {//added (id normalized)
-        description: 'Steal from the rich to give to yourself. Gold gain +{value}%.',
+        description: 'Promises cut into skin. Blood oath damage +{value}%.',
         scaling: { type: 'percent', target: 'goldGain', base: 6, perRank: 1.1 },
         tags: ['utility']
     }),
     makeTalent('hunter_s_formula', "Hunter's Formula", {//added
-        description: 'Poisoned targets scream louder, or they try to. Poison target bonus +{value}%.',
+        description: 'Near the edge, the world speeds up. Low HP speed +{value}%.',
         scaling: { type: 'percent', target: 'poisonTargetBonus', base: 9, perRank: 1.5 },
         tags: ['combat']
     }),
     makeTalent('needle_rain', 'Needle Rain', { //works(fails visually)
-        description: 'Rain death from above, like a vengeful sky. Arrows land from the sky every 0.2s in an AOE. Projectile count +{value}.',
+        description: 'Pass the pulse along. Transfusion heal +{value}%.',
         scaling: { type: 'flat', target: 'projectileCount', base: 5, perRank: 1 },
         tags: ['aoe', 'combat'],
         kind: 'active',
         activeType: 'offensive',
-        cooldownSeconds: 15,
+        description: 'The circle heals in red. AOE heal +{value}%.',
         manaCost: 12
     }),
     makeTalent('ambush_mastery', 'Ambush Mastery', { //added
         description: 'Strike from the dark with terrible efficiency. Your first attack when exiting stealth deals an additional {value}% damage and increases critical damage by {secondValue}% for 4s.',
-        scaling: { type: 'percent', target: 'stealthAttackDamage', base: 25, perRank: 2 },
+        description: 'Even blood books balance. Tab refund chance +{value}%.',
         secondScaling: { type: 'percent', target: 'stealthCritDmg', base: 15, perRank: 1.5 },
         tags: ['stalker', 'combat', 'stealth']
     }),
     makeTalent('toxic_precision', 'Toxic Precision', {//added
-        description: 'Your precision makes poisons stick. On critical hits apply extra poison stacks. Poison application chance +{value}%.',
+        description: 'Crimson sky, cruel numbers. Night damage bonus +{value}%.',
         scaling: { type: 'percent', target: 'poisonApplyChance', base: 12, perRank: 1.8 },
         tags: ['combat', 'poison']
     }),
@@ -388,7 +388,7 @@ const stalkerTalents = [
         tags: ['stalker', 'combat', 'precision']
     }),
     makeTalent('camouflage_cache', 'Camouflage Cache', {//added
-        description: 'Hide the spoils of your craft. Backstab or stealth-kill rewards have increased drop/gold: drop rate +{value}% and gold gain +{secondValue}%.',
+        description: 'Hide the spoils of your craft. Backstabs or stealth kills grant increased rewards: drop rate +{value}% and gold +{secondValue}%.',
         scaling: { type: 'percent', target: 'dropRate', base: 8, perRank: 1.5 },
         secondScaling: { type: 'percent', target: 'goldGain', base: 6, perRank: 1 },
         tags: ['utility', 'loot', 'stalker']
@@ -401,7 +401,7 @@ const stalkerTalents = [
     })
     ,
     makeTalent('ricochet_calibration', 'Ricochet Calibration', {//added
-        description: 'Tune your eagle eye to strike more than one foe. Ricochet hit has +{value}% more crit chance.',
+        description: 'Tune your eagle eye to strike more than one foe. Ricochet hits have +{value}% crit chance.',
         scaling: { type: 'percent', target: 'eagleCritChance', base: 4, perRank: 0.6 },
         tags: ['aoe', 'stalker', 'combat']
     })
@@ -409,77 +409,77 @@ const stalkerTalents = [
 
 const ravagerTalents = [
     makeTalent('severance', 'Severance', {
-        description: 'Execute the weak, spare the strong. Execute threshold +{value}%.',
+        description: 'Cut wages, then throats. Execute threshold +{value}%.',
         scaling: { type: 'percent', target: 'executeThreshold', base: 5, perRank: 1 },
         tags: ['combat', 'ravager']
     }),
     makeTalent('brutal_chain', 'Brutal Chain', {
-        description: 'Chains that drag souls to hell. Chain damage +{value}% per bounce.',
+        description: 'Iron sermons preached link by link. Chain damage +{value}% per bounce.',
         scaling: { type: 'percent', target: 'chainDamage', base: 7, perRank: 1.4 },
         tags: ['combat']
     }),
     makeTalent('savage_rush', 'Savage Rush', {
-        description: 'Charge like a bull in a china shop. Charge efficiency +{value}%.',
+        description: 'No brakes, only targets. Charge efficiency +{value}%.',
         scaling: { type: 'percent', target: 'chargeEfficiency', base: 6, perRank: 1.1 },
         tags: ['mobility', 'combat']
     }),
     makeTalent('bone_ward', 'Bone Ward', {
-        description: 'Shields from the bones of the fallen. Elite shield +{value}% max HP.',
+        description: 'Wear the fallen as policy. Elite shield +{value}% max HP.',
         scaling: { type: 'percent', target: 'eliteShield', base: 30, perRank: 3 },
         tags: ['survivability']
     }),
     makeTalent('warpath', 'Warpath', {
-        description: 'Every step stains the ground red. Movement damage stack +{value}.',
+        description: 'Footprints that bruise the world. Movement damage stack +{value}.',
         scaling: { type: 'flat', target: 'movementDamageStack', base: 0.2, perRank: 0.05 },
         tags: ['combat']
     }),
     makeTalent('blood_roar', 'Blood Roar', {
-        description: 'Taunts that scream for blood. Taunt damage buff +{value}%.',
+        description: 'A roar that taxes the living. Taunt damage buff +{value}%.',
         scaling: { type: 'percent', target: 'tauntDamageBuff', base: 8, perRank: 1.1 },
         tags: ['combat']
     }),
     makeTalent('hemorrhage_engine', 'Hemorrhage Engine', {
-        description: 'Bleeds that fuel your rage. Bleed target damage +{value}%.',
+        description: 'Turn arteries into engines. Bleed target damage +{value}%.',
         scaling: { type: 'percent', target: 'bleedTargetDamage', base: 10, perRank: 1.6 },
         tags: ['damage']
     }),
     makeTalent('gorewheel', 'Gorewheel', {
-        description: 'Spins that paint the walls. Spin extra hits +{value}.',
+        description: 'Spin the room into paste. Spin extra hits +{value}.',
         scaling: { type: 'flat', target: 'spinExtraHits', base: 0, perRank: 0.05 },
         tags: ['aoe']
     }),
     makeTalent('echoing_rage', 'Echoing Rage', {
-        description: 'Kills that echo in eternity. Shout reset +{value}%.',
+        description: 'Let fury rebound. Shout reset +{value}%.',
         scaling: { type: 'percent', target: 'shoutReset', base: 4, perRank: 0.7 },
         tags: ['utility']
     }),
     makeTalent('martyr_pact', 'Martyr Pact', {
-        description: 'Pain stored for the final blow. Damage stored +{value}%.',
+        description: 'Save the ache, spend it all at once. Damage stored +{value}%.',
         scaling: { type: 'percent', target: 'damageStored', base: 12, perRank: 1.8 },
         tags: ['combat']
     }),
     makeTalent('flesh_harvest', 'Flesh Harvest', {
-        description: 'Loot from the elite\'s rotting corpse. Elite drop rate +{value}%.',
+        description: 'Elites die with interest. Elite drop rate +{value}%.',
         scaling: { type: 'percent', target: 'eliteDropRate', base: 6, perRank: 1 },
         tags: ['loot']
     }),
     makeTalent('titan_grip', 'Titan Grip', {
-        description: 'Weapons heavy with the weight of sins. Two-hand defense +{value}%.',
+        description: 'Two hands, one verdict. Two-hand defense +{value}%.',
         scaling: { type: 'percent', target: 'twoHandDefense', base: 4, perRank: 0.8 },
         tags: ['survivability']
     }),
     makeTalent('rupture_field', 'Rupture Field', {
-        description: 'Fields that rupture reality. Slam field damage +{value}%.',
+        description: 'Slam until the ground files a complaint. Field damage +{value}%.',
         scaling: { type: 'percent', target: 'slamFieldDamage', base: 14, perRank: 1.5 },
         tags: ['aoe']
     }),
     makeTalent('gory_dividend', 'Gory Dividend', {
-        description: 'Respecs paid in blood. Tab refund chance +{value}%.',
+        description: 'Refunds, but grislier. Tab refund chance +{value}%.',
         scaling: { type: 'percent', target: 'tab3Refund', base: 3, perRank: 0.5 },
         tags: ['utility']
     }),
     makeTalent('cataclysmic_drive', 'Cataclysmic Drive', {
-        description: 'Ultimates that bleed the world dry. Ultimate bleed bonus +{value}%.',
+        description: 'Bleeds that write history. Ultimate bleed bonus +{value}%.',
         scaling: { type: 'percent', target: 'ultimateBleedBonus', base: 5, perRank: 1 },
         tags: ['damage']
     })
@@ -534,7 +534,7 @@ const sanguineTalents = [
         tags: ['survivability']
     }),
     makeTalent('arterial_spray', 'Arterial Spray', {
-        description: 'Bleeds that paint the world red. Bleed amplify +{value}%.',
+        description: 'Bleeds that paint the world red. Bleed damage amplified by {value}%.',
         scaling: { type: 'percent', target: 'bleedAmplify', base: 10, perRank: 1.5 },
         tags: ['damage']
     }),
@@ -577,77 +577,77 @@ const sanguineTalents = [
 
 const hexweaverTalents = [
     makeTalent('threads_of_ruin', 'Threads of Ruin', {
-        description: 'Weave curses that unravel souls. Hex damage +{value}%.',
+        description: 'Lay a pattern that unravels marrow. Hex damage +{value}%.',
         scaling: { type: 'percent', target: 'hexDamage', base: 8, perRank: 1.5 },
         tags: ['combat', 'hexweaver']
     }),
     makeTalent('curse_quilt', 'Curse Quilt', {
-        description: 'Pile on the misery, layer by layer. Curse stacks +{value}%.',
+        description: 'Patch them in malice, stitch by stitch. Curse stacks +{value}%.',
         scaling: { type: 'percent', target: 'curseStacks', base: 6, perRank: 1 },
         tags: ['control']
     }),
     makeTalent('loomed_insight', 'Loomed Insight', {
-        description: 'Each curse whispers dark secrets. Spell haste +{value}% per curse.',
+        description: 'Every stitch hums a secret. Spell haste +{value}% per curse.',
         scaling: { type: 'percent', target: 'curseSpellHaste', base: 3, perRank: 0.5 },
         tags: ['utility']
     }),
     makeTalent('fate_spindle', 'Fate Spindle', {
-        description: 'Spin fate\'s cruel threads. Curse duplicate chance +{value}%.',
+        description: 'Spin until fate frays. Curse duplicate chance +{value}%.',
         scaling: { type: 'percent', target: 'curseDuplicate', base: 4, perRank: 0.8 },
         tags: ['control']
     }),
     makeTalent('hexed_ward', 'Hexed Ward', {
-        description: 'Turn their curses against them. Hexed DR +{value}%.',
+        description: 'Wear their maledictions as mail. Hexed DR +{value}%.',
         scaling: { type: 'percent', target: 'hexedDamageReduction', base: 7, perRank: 1.1 },
         tags: ['survivability']
     }),
     makeTalent('loomed_bargain', 'Loomed Bargain', {
-        description: 'Refresh the agony, pay in pain. Curse refresh damage +{value}%.',
+        description: 'Reweave the hurt; charge interest. Curse refresh damage +{value}%.',
         scaling: { type: 'percent', target: 'curseRefreshDamage', base: 5, perRank: 0.9 },
         tags: ['utility']
     }),
     makeTalent('pattern_of_wither', 'Pattern of Wither', {
-        description: 'Decay that rots from within. Decay damage +{value}%.',
+        description: 'Trace sigils that rot from within. Decay damage +{value}%.',
         scaling: { type: 'percent', target: 'decayDamage', base: 9, perRank: 1.4 },
         tags: ['damage']
     }),
     makeTalent('woven_refrain', 'Woven Refrain', {
-        description: 'Allies shrouded in your dark tapestry. Ally DR +{value}%.',
+        description: 'Shelter allies beneath your tapestry. Ally DR +{value}%.',
         scaling: { type: 'percent', target: 'allyDamageReduction', base: 3, perRank: 0.6 },
         tags: ['support']
     }),
     makeTalent('weftwalker', 'Weftwalker', {
-        description: 'Step between the threads of reality. Teleport efficiency +{value}%.',
+        description: 'Walk the spaces between threads. Teleport efficiency +{value}%.',
         scaling: { type: 'percent', target: 'teleportEfficiency', base: 8, perRank: 1.3 },
         tags: ['mobility']
     }),
     makeTalent('hexbound_vectors', 'Hexbound Vectors', {
-        description: 'Curses that spread like plague. Curse spread +{value}.',
+        description: 'Send hexes down every seam. Curse spread +{value}.',
         scaling: { type: 'flat', target: 'curseSpread', base: 0, perRank: 0.04 },
         tags: ['control']
     }),
     makeTalent('forged_dread', 'Forged Dread', {
-        description: 'Bosses tremble at your loom. Boss damage +{value}%.',
+        description: 'Beat dread into steel. Boss damage +{value}%.',
         scaling: { type: 'percent', target: 'bossDamage', base: 5, perRank: 1 },
         tags: ['combat']
     }),
     makeTalent('counterwoven', 'Counterwoven', {
-        description: 'Strike back with threads of doom. Retaliate chance +{value}%.',
+        description: 'Stitch pain back into the sender. Retaliate chance +{value}%.',
         scaling: { type: 'percent', target: 'retaliateChance', base: 4, perRank: 0.7 },
         tags: ['utility']
     }),
     makeTalent('loomed_attunement', 'Loomed Attunement', {
-        description: 'Mana from the suffering of others. Mana per curse +{value}.',
+        description: 'Drink mana through every curse-thread. Mana per curse +{value}.',
         scaling: { type: 'flat', target: 'manaPerCurse', base: 2, perRank: 0.6 },
         tags: ['mana']
     }),
     makeTalent('hexing_spiral', 'Hexing Spiral', {
-        description: 'DOTs that chase you down. Moving DOT tick +{value}%.',
+        description: 'Spiral stitches that chase them down. Moving DOT tick +{value}%.',
         scaling: { type: 'percent', target: 'movingDotTick', base: 5, perRank: 0.9 },
         tags: ['damage']
     }),
     makeTalent('loomkeepers_promise', "Loomkeeper's Promise", {
-        description: 'The loom demands its due. Hexweaver refund chance +{value}%.',
+        description: 'The loom remembers its debts. Hexweaver refund chance +{value}%.',
         scaling: { type: 'percent', target: 'hexweaverRefund', base: 3, perRank: 0.5 },
         tags: ['utility']
     })
@@ -655,77 +655,77 @@ const hexweaverTalents = [
 
 const astralScribeTalents = [
     makeTalent('chronicle_of_time', 'Chronicle of Time', {
-        description: 'Time magic that makes clocks weep. Damage increased by {value}%.',
+        description: 'Write your name in the margins of hours. Time magic damage +{value}%.',
         scaling: { type: 'percent', target: 'timeMagicDamage', base: 7, perRank: 1.4 },
         tags: ['combat', 'astral_scribe']
     }),
     makeTalent('temporal_buffer', 'Temporal Buffer', {
-        description: 'Pain deferred is pain endured. Store {value}% of incoming damage to be taken over 6 seconds.',
+        description: 'Put pain on layaway. Store {value}% of incoming damage and pay it out over 6 seconds.',
         scaling: { type: 'percent', target: 'temporalStore', base: 10, perRank: 1.6 },
         tags: ['survivability']
     }),
     makeTalent('gravity_well', 'Gravity Well', {
-        description: 'Suck them into oblivion. Pull radius of time rifts increased by {value}%.',
+        description: 'Space is a suggestion. Time rifts pull {value}% farther.',
         scaling: { type: 'percent', target: 'riftRadius', base: 6, perRank: 1 },
         tags: ['control']
     }),
     makeTalent('stellar_guidance', 'Stellar Guidance', {
-        description: 'Stars that guide to doom. Allies affected by guiding stars gain {value}% haste.',
+        description: 'The stars hum; you move. Allies under your guiding stars gain {value}% haste.',
         scaling: { type: 'percent', target: 'allyHaste', base: 5, perRank: 0.9 },
         tags: ['support']
     }),
     makeTalent('chronomantic_charge', 'Chronomantic Charge', {
-        description: 'Charge faster, curse sooner. Charge time for heavy spells reduced by {value}%.',
+        description: 'Steal seconds from the cast bar. Heavy spell charge time −{value}%.',
         scaling: { type: 'percent', target: 'chargeReduction', base: 8, perRank: 1.2 },
         tags: ['utility']
     }),
     makeTalent('stellar_resonance', 'Stellar Resonance', {
-        description: 'Echoes of dying stars. Damage amplifiers last {value}% longer.',
+        description: 'Let dying stars linger. Damage amplifiers last {value}% longer.',
         scaling: { type: 'percent', target: 'buffDuration', base: 6, perRank: 1 },
         tags: ['support']
     }),
     makeTalent('event_horizon', 'Event Horizon', {
-        description: 'Where light fears to tread. Black hole damage increased by {value}%.',
+        description: 'Edge of the abyss. Black hole damage +{value}%.',
         scaling: { type: 'percent', target: 'blackHoleDamage', base: 9, perRank: 1.5 },
         tags: ['damage']
     }),
     makeTalent('constellation_map', 'Constellation Map', {
-        description: 'Map the dead stars. Identify star trails that grant {value}% more loot.',
+        description: 'Cartography of the carcass sky. Star trails grant {value}% more loot.',
         scaling: { type: 'percent', target: 'trailLoot', base: 5, perRank: 0.9 },
         tags: ['loot']
     }),
     makeTalent('retrograde_step', 'Retrograde Step', {
-        description: 'Step back from the grave. Blink reverses {value}% of damage taken in the last 2 seconds.',
+        description: 'Walk backward out of a mistake. Blink reverses {value}% of damage taken in the last 2s.',
         scaling: { type: 'percent', target: 'blinkHeal', base: 12, perRank: 1.4 },
         tags: ['survivability']
     }),
     makeTalent('starlit_ink', 'Starlit Ink', {
-        description: 'Ink from fallen stars. Spells cost {value}% less mana.',
+        description: 'Dip your quill in nebulae. Spells cost {value}% less mana.',
         scaling: { type: 'percent', target: 'manaCostReduction', base: 4, perRank: 0.7 },
         tags: ['mana']
     }),
     makeTalent('celestial_alignment', 'Celestial Alignment', {
-        description: 'Align with cosmic horror. Gain {value}% more damage during celestial events.',
+        description: 'When the heavens misbehave, capitalize. Damage +{value}% during celestial events.',
         scaling: { type: 'percent', target: 'celestialDamage', base: 8, perRank: 1.2 },
         tags: ['situational']
     }),
     makeTalent('time_loop', 'Time Loop', {
-        description: 'Loop the agony. {value}% chance to reset the cooldown of a random spell when one completes.',
+        description: 'Finish a spell, lose a cooldown. {value}% chance to reset a random one.',
         scaling: { type: 'percent', target: 'cooldownResetChance', base: 2, perRank: 0.35 },
         tags: ['utility']
     }),
     makeTalent('astral_projection', 'Astral Projection', {
-        description: 'Project your nightmares. Projection damage increased by {value}% and lasts longer.',
+        description: 'Step out of yourself and make it hurt. Projection damage +{value}%, lasts longer.',
         scaling: { type: 'percent', target: 'projectionDamage', base: 7, perRank: 1.1 },
         tags: ['damage']
     }),
     makeTalent('epochal_record', 'Epochal Record', {
-        description: 'Record the epochs of suffering. Each minute in combat grants {value}% spell damage (stacks up to 5 times).',
+        description: 'Let the minutes pile up, and so does your damage. Each minute in combat grants {value}% spell damage (stacks 5).',
         scaling: { type: 'percent', target: 'combatScaling', base: 1.5, perRank: 0.3 },
         tags: ['damage']
     }),
     makeTalent('scribe_dividend', 'Scribe Dividend', {
-        description: 'Dividends from the void. Gain {value}% chance to refund Astral Scribe talent points when respeccing.',
+        description: 'The ledger of stars pays out. {value}% chance to refund Astral Scribe points when respeccing.',
         scaling: { type: 'percent', target: 'astralRefund', base: 3, perRank: 0.5 },
         tags: ['utility']
     })
@@ -738,67 +738,67 @@ const nightbladeTalents = [
         tags: ['combat', 'nightblade']
     }),
     makeTalent('shadow_fade', 'Shadow Fade', {
-        description: 'Hide in the dark, where nightmares lurk. While in stealth, movement speed increased by {value}%.',
+        description: 'Melt into the hush. While in stealth, movement speed +{value}%.',
         scaling: { type: 'percent', target: 'stealthSpeed', base: 6, perRank: 1 },
         tags: ['mobility']
     }),
     makeTalent('cloak_of_silence', 'Cloak of Silence', {
-        description: 'Silence their screams before they start. Abilities from stealth silence enemies for {value} seconds.',
+        description: 'Close the throat of the fight. Stealth abilities silence for {value}s.',
         scaling: { type: 'flat', target: 'silenceDuration', base: 0.4, perRank: 0.05 },
         tags: ['control']
     }),
     makeTalent('lethal_precision', 'Lethal Precision', {
-        description: 'Crits that make death look like an accident. Critical strike chance increased by {value}%.',
+        description: 'Make the last mistake look intentional. Crit chance +{value}%.',
         scaling: { type: 'percent', target: 'critChance', base: 3, perRank: 0.6 },
         tags: ['combat']
     }),
     makeTalent('shadow_mantle', 'Shadow Mantle', {
-        description: 'Embrace the void, laugh at pain. Damage taken reduced by {value}% for 3s after exiting stealth.',
+        description: 'Step out of sight, step out of harm. Damage taken −{value}% for 3s after leaving stealth.',
         scaling: { type: 'percent', target: 'postStealthDR', base: 12, perRank: 1.6 },
         tags: ['survivability']
     }),
     makeTalent('nightfall_poison', 'Nightfall Poison', {
-        description: 'Poison that whispers sweet decay. Poison damage increased by {value}%.',
+        description: 'Moonlit venom does the talking. Poison damage +{value}%.',
         scaling: { type: 'percent', target: 'poisonDamage', base: 8, perRank: 1.4 },
         tags: ['damage']
     }),
     makeTalent('evasive_assault', 'Evasive Assault', {
-        description: 'Dodge fate, strike back with vengeance. Dodging an attack grants {value}% haste for 4s.',
+        description: 'Slip the blade, take the tempo. Dodging grants {value}% haste for 4s.',
         scaling: { type: 'percent', target: 'dodgeHaste', base: 6, perRank: 1 },
         tags: ['utility']
     }),
     makeTalent('dark_affinity', 'Dark Affinity', {
-        description: 'The night devours the weak. Damage increased by {value}% at night.',
+        description: 'Night is an accomplice. Damage +{value}% at night.',
         scaling: { type: 'percent', target: 'nightDamage', base: 8, perRank: 1.3 },
         tags: ['situational']
     }),
     makeTalent('blade_dancer', 'Blade Dancer', {
-        description: 'Dance with death, one step at a time. Each consecutive hit in 3s increases damage by {value}% (stacks 5).',
+        description: 'Footwork writes obituaries. Each consecutive hit in 3s adds {value}% damage (stacks 5).',
         scaling: { type: 'percent', target: 'comboDamage', base: 1.5, perRank: 0.3 },
         tags: ['combat']
     }),
     makeTalent('silent_finish', 'Silent Finish', {
-        description: 'Kill quietly, leave no witnesses. Killing from stealth grants {value}% crit for 5s.',
+        description: 'No witnesses. A kill from stealth grants {value}% crit for 5s.',
         scaling: { type: 'percent', target: 'stealthKillCrit', base: 10, perRank: 1.5 },
         tags: ['combat']
     }),
     makeTalent('smoke_bombard', 'Smoke Bombard', {
-        description: 'Choke on your own despair. Smoke bombs deal {value}% more damage and slow enemies.',
+        description: 'Cough, then collapse. Smoke bombs deal {value}% more damage and slow.',
         scaling: { type: 'percent', target: 'smokeDamage', base: 12, perRank: 1.8 },
         tags: ['aoe']
     }),
     makeTalent('voidstep', 'Voidstep', {
-        description: 'Step into the abyss, emerge untouchable. Blink distance increased by {value}% and grants brief invulnerability.',
+        description: 'Slip between heartbeats. Blink distance +{value}% and a brief invulnerability.',
         scaling: { type: 'percent', target: 'blinkEfficiency', base: 7, perRank: 1.2 },
         tags: ['mobility']
     }),
     makeTalent('twilight_pursuit', 'Twilight Pursuit', {
-        description: 'Chase the cowards into the grave. Damage increased by {value}% against fleeing enemies.',
+        description: 'If they run, they bleed. Damage +{value}% against fleeing enemies.',
         scaling: { type: 'percent', target: 'pursuitDamage', base: 6, perRank: 1 },
         tags: ['combat']
     }),
     makeTalent('nightstalkers_mark', "Nightstalker's Mark", {
-        description: 'Marked for oblivion, doomed to suffer. Marked targets take {value}% increased damage from stealth attacks.',
+        description: 'A little ink, a lot of pain. Marked targets take {value}% more damage from stealth attacks.',
         scaling: { type: 'percent', target: 'markDamage', base: 9, perRank: 1.4 },
         tags: ['combat']
     }),
@@ -889,72 +889,72 @@ const shadeDancerTalents = [
 
 const starTalents = [
     makeTalent('starbound_insight', 'Starbound Insight', {
-        description: 'Stars that witness your sins. Star talent points spent grant {value}% experience gain globally.',
+        description: 'The cosmos watches—and grades. Each star point spent grants {value}% global XP.',
         scaling: { type: 'percent', target: 'globalXp', base: 0.6, perRank: 0.12 },
         tags: ['progression', 'star']
     }),
     makeTalent('cosmic_luck', 'Cosmic Luck', {
-        description: 'Luck from the void, where hope dies. Rare drop chance increased by {value}%.',
+        description: 'Flip a coin minted in the void. Rare drop chance +{value}%.',
         scaling: { type: 'percent', target: 'rareDropRate', base: 2, perRank: 0.4 },
         tags: ['loot']
     }),
     makeTalent('galactic_cache', 'Galactic Cache', {
-        description: 'Cache from the cosmos, filled with forgotten horrors. Global storage capacity increased by {value}.',
+        description: 'Stash your sins among the constellations. Global storage slots +{value}.',
         scaling: { type: 'flat', target: 'storageSlots', base: 2, perRank: 1 },
         tags: ['utility']
     }),
     makeTalent('stardust_alchemy', 'Stardust Alchemy', {
-        description: 'Alchemy from stardust, turning potions to poison. Potion effectiveness increased by {value}%.',
+        description: 'Shake a nebula into your vials. Potion effectiveness +{value}%.',
         scaling: { type: 'percent', target: 'potionEffect', base: 4, perRank: 0.9 },
         tags: ['utility']
     }),
     makeTalent('cosmic_cartography', 'Cosmic Cartography', {
-        description: 'Maps drawn in blood. Unlock secret map nodes {value}% faster.',
+        description: 'Trace forbidden routes. Unlock secret map nodes {value}% faster.',
         scaling: { type: 'percent', target: 'mapDiscovery', base: 6, perRank: 1.1 },
         tags: ['exploration']
     }),
     makeTalent('stellar_motivation', 'Stellar Motivation', {
-        description: 'Motivation from dying stars. Idle skill gains increased by {value}%.',
+        description: 'Let the universe do the work. Idle skill gains +{value}%.',
         scaling: { type: 'percent', target: 'idleSkillGain', base: 5, perRank: 1 },
         tags: ['idle']
     }),
     makeTalent('voidnet', 'Voidnet', {
-        description: 'Net from the void, catching nightmares. Fishing and gathering minigames have {value}% more rare nodes.',
+        description: 'Cast a net into nowhere. Rare nodes +{value}% in fishing and gathering.',
         scaling: { type: 'percent', target: 'rareNodeRate', base: 2.5, perRank: 0.4 },
         tags: ['skills']
     }),
     makeTalent('starforged_tools', 'Starforged Tools', {
-        description: 'Tools forged in stellar fires, burning away durability. Tool durability loss reduced by {value}%.',
+        description: 'Tools tempered in vacuum don’t complain. Tool durability loss −{value}%.',
         scaling: { type: 'percent', target: 'durabilityLoss', base: 5, perRank: 0.9 },
         tags: ['utility']
     }),
     makeTalent('astral_fortune', 'Astral Fortune', {
-        description: 'Fortune from the astral plane, paid in souls. Daily quest rewards increased by {value}%.',
+        description: 'Lucky stars pay stipends. Daily quest rewards +{value}%.',
         scaling: { type: 'percent', target: 'questReward', base: 6, perRank: 1 },
         tags: ['progression']
     }),
     makeTalent('starry_entrails', 'Starry Entrails', {
-        description: 'Entrails of stars, dripping with points. Chance to obtain star talent points from bosses increased by {value}%.',
+        description: 'Bosses bleed constellations. Chance to drop star talent points +{value}%.',
         scaling: { type: 'percent', target: 'starPointDrop', base: 3, perRank: 0.6 },
         tags: ['star']
     }),
     makeTalent('cosmic_barter', 'Cosmic Barter', {
-        description: 'Barter with cosmic entities, at a steep price. Shop prices reduced by {value}%.',
+        description: 'Haggle with ghosts of suns. Shop prices −{value}%.',
         scaling: { type: 'percent', target: 'shopDiscount', base: 3, perRank: 0.5 },
         tags: ['utility']
     }),
     makeTalent('etheric_flux', 'Etheric Flux', {
-        description: 'Flux from the ether, regenerating your darkness. Mana regen and stamina regen increased by {value}%.',
+        description: 'Breathe ether. Mana and stamina regen +{value}%.',
         scaling: { type: 'percent', target: 'regen', base: 4, perRank: 0.7 },
         tags: ['mana']
     }),
     makeTalent('star_chart', 'Star Chart', {
-        description: 'Charts of stars, charting your doom. World event timers reduced by {value}%.',
+        description: 'Know when the sky misbehaves. World event timers −{value}%.',
         scaling: { type: 'percent', target: 'eventTimerReduction', base: 6, perRank: 1 },
         tags: ['utility']
     }),
     makeTalent('nova_clause', 'Nova Clause', {
-        description: 'Clause in the nova, exploding with damage. Every spent star talent point adds {value}% damage globally.',
+        description: 'Your contract with the cosmos is explosive. Each star point spent adds {value}% global damage.',
         scaling: { type: 'percent', target: 'globalDamage', base: 0.5, perRank: 0.1 },
         tags: ['combat']
     })
