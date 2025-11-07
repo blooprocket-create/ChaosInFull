@@ -2802,19 +2802,33 @@ export function refreshStatsModal(scene) {
         } catch (e) {}
         const spellDmgEst = Math.round(6 + ((eff && eff.int) || 0) * 2);
 
-        // Detect if the equipped weapon is a staff so the UI can show that auto-attacks
-        // are treated as spell damage (staffs scale off INT in combat).
+        // Detect equipped weapon and choose scaling stat (staff: INT; dagger/bow: AGI; sword/polearm: STR)
         let isStaffEquipped = false;
+        let scalingKeyForUI = 'str';
         let weaponDefForUI = null;
         try {
             const itemDefs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
             const we = (char && char.equipment && char.equipment.weapon) ? char.equipment.weapon : null;
             if (we && we.id && itemDefs[we.id]) weaponDefForUI = itemDefs[we.id];
-            isStaffEquipped = !!(weaponDefForUI && (weaponDefForUI.weaponType === 'staff' || /staff/i.test(weaponDefForUI.id || '') || /staff/i.test(weaponDefForUI.name || '')));
-        } catch (e) { isStaffEquipped = false; }
+            const wid = String((weaponDefForUI && weaponDefForUI.id) || '').toLowerCase();
+            const wname = String((weaponDefForUI && weaponDefForUI.name) || '').toLowerCase();
+            isStaffEquipped = !!(weaponDefForUI && (/staff/.test(wid) || /staff/.test(wname)));
+            if (isStaffEquipped) scalingKeyForUI = 'int';
+            else if (/dagger/.test(wid) || /dagger/.test(wname)) scalingKeyForUI = 'agi';
+            else if (/bow/.test(wid) || /bow/.test(wname) || /crossbow/.test(wid) || /crossbow/.test(wname)) scalingKeyForUI = 'agi';
+            else if (/sword/.test(wid) || /sword/.test(wname)) scalingKeyForUI = 'str';
+            else if (/polearm/.test(wid) || /polearm/.test(wname)) scalingKeyForUI = 'str';
+            else {
+                // fallback to class primary stat mapping
+                const cls = (char && char.class) ? String(char.class).toLowerCase() : 'beginner';
+                scalingKeyForUI = (cls === 'occultist' || cls === 'hexweaver' || cls === 'astral_scribe') ? 'int'
+                    : (cls === 'stalker' || cls === 'nightblade' || cls === 'shade_dancer') ? 'agi'
+                    : (cls === 'beginner') ? 'luk' : 'str';
+            }
+        } catch (e) { isStaffEquipped = false; scalingKeyForUI = 'str'; }
 
-        // Compute an Auto Attack estimate that mirrors combat: use INT scaling when a staff is equipped,
-        // otherwise use the melee estimate. Apply weaponDamage and goldWeaponDamage talent modifiers
+        // Compute an Auto Attack estimate that mirrors combat: use staff INT scaling or weapon-type scaling key,
+        // otherwise use STR baseline. Apply weaponDamage and goldWeaponDamage talent modifiers
         // for display consistency with combat calculations.
         let autoAttackEst = meleeDmgEst;
         try {
@@ -2847,7 +2861,26 @@ export function refreshStatsModal(scene) {
                 }
                 autoAttackEst = Math.max(1, Math.round(base));
             } else {
-                autoAttackEst = meleeDmgEst;
+                // Non-staff: use weapon-type scaling key for estimate
+                const statVal = (eff && typeof eff[scalingKeyForUI] === 'number') ? eff[scalingKeyForUI] : 0;
+                let base = Math.round(Phaser && Phaser.Math && Phaser.Math.Between ? (8 + statVal * 2) : (8 + statVal * 2));
+                // apply talent mods like combat
+                const talentMods = (char && char._talentModifiers) ? char._talentModifiers : {};
+                const wmod = talentMods['weaponDamage'] || null;
+                if (wmod) {
+                    const flat = Number(wmod.flat || 0);
+                    const pct = Number(wmod.percent || 0);
+                    base = Math.max(1, Math.round((base + flat) * (1 + (pct / 100))));
+                }
+                const gw = talentMods['goldWeaponDamage'] || null;
+                if (gw && char && typeof char.gold === 'number' && char.gold >= 10) {
+                    const flatPerPower = Number(gw.flat || 0);
+                    if (flatPerPower) {
+                        const power = Math.floor(Math.log10(Math.max(1, char.gold)));
+                        if (power > 0) base += Math.round(power * flatPerPower);
+                    }
+                }
+                autoAttackEst = Math.max(1, Math.round(base));
             }
         } catch (e) { autoAttackEst = meleeDmgEst; }
 
@@ -2944,7 +2977,7 @@ export function refreshStatsModal(scene) {
                                     // list weapon/item stat lines if any
                                     try { if (char && char.equipment) { const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {}; for (const s of Object.keys(char.equipment||{})) { const it = char.equipment[s]; if (!it || !it.id) continue; const idef2 = defs[it.id]||null; if (!idef2) continue; const sl = buildStatLines(idef2)||[]; for (const li of sl) { if (li.indexOf('DMG')!==-1 || li.indexOf('DMG:')!==-1 || li.toLowerCase().indexOf('weapon')!==-1) lines.push(`${li} (from ${idef2.name||it.id})`); } } } } catch (e) {}
                                 } catch (e) {}
-                                // If staff equipped, show INT scaling and applied talent mods; otherwise show STR scaling info
+                                // If staff equipped, show INT scaling; otherwise show weapon-type scaling info
                                 try {
                                     const mods = char._talentModifiers || {};
                                     if (isStaffEquipped) {
@@ -2978,9 +3011,10 @@ export function refreshStatsModal(scene) {
                                         }
                                         lines.push(`Estimate: ${est}`);
                                     } else {
-                                        // melee path
-                                        lines.push(`STR scaling: +${(eff && eff.str) ? (eff.str*2) : 0} approx`);
-                                        const baseEst = Math.round(8 + ((eff && eff.str) || 0) * 2);
+                                        const label = (scalingKeyForUI === 'agi') ? 'AGI' : (scalingKeyForUI === 'int' ? 'INT' : (scalingKeyForUI === 'luk' ? 'LUK' : 'STR'));
+                                        const sval = (eff && typeof eff[scalingKeyForUI] === 'number') ? eff[scalingKeyForUI] : 0;
+                                        lines.push(`${label} scaling: +${sval ? (sval*2) : 0} approx`);
+                                        const baseEst = Math.round(8 + sval * 2);
                                         let est = baseEst;
                                         const wmod = mods['weaponDamage'] || null;
                                         if (wmod) {
@@ -3004,7 +3038,10 @@ export function refreshStatsModal(scene) {
                                         }
                                         lines.push(`Estimate: ${est}`);
                                     }
-                                } catch (e) { lines.push(`Estimate: ${isStaffEquipped ? spellDmgEst : Math.round(8 + ((eff && eff.str) || 0) * 2)}`); }
+                                } catch (e) {
+                                    const sval = (eff && typeof eff[scalingKeyForUI] === 'number') ? eff[scalingKeyForUI] : ((eff && eff.str) || 0);
+                                    lines.push(`Estimate: ${isStaffEquipped ? spellDmgEst : Math.round(8 + sval * 2)}`);
+                                }
                             } else if (title.indexOf('Spell DMG') !== -1) {
                                 lines.push(`INT scaling: +${(eff && eff.int) ? (eff.int*2) : 0} approx`);
                                 lines.push(`Estimate: ${Math.round(6 + ((eff && eff.int) || 0) * 2)}`);

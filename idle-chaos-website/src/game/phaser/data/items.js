@@ -242,7 +242,7 @@ const ITEM_DEFS = {
             3
         ],
         "statBonus": {
-            "agi": 1
+            "agi": 3
         },
         "value": 6,
         "description": "Sharp enough to ruin someone's day, but still mostly useful for opening suspiciously labeled crates."
@@ -260,7 +260,7 @@ const ITEM_DEFS = {
             4
         ],
         "statBonus": {
-            "agi": 2
+            "agi": 5
         },
         "value": 10,
         "description": "A stabby object with commitment issues — looks menacing until it meets armor."
@@ -459,11 +459,11 @@ const ITEM_DEFS = {
         "weapon": true,
         "slot": "weapon",
         "damage": [
-            3,
-            6
+            7,
+            7
         ],
         "statBonus": {
-            "luk": 4
+            "luk": 7
         },
         "value": 1920,
         "description": "A dagger that brings fortune to its wielder. Ideal for those who like to live on the edge and roll the dice."
@@ -499,7 +499,7 @@ const ITEM_DEFS = {
             7
         ],
         "statBonus": {
-            "agi": 4
+            "agi": 7
         },
         "value": 130,
         "description": "A sharp iron dagger that strikes quickly and efficiently. Perfect for those who value speed in combat."
@@ -579,11 +579,11 @@ const ITEM_DEFS = {
         "weapon": true,
         "slot": "weapon",
         "damage": [
-            5,
-            9
+            9,
+            15
         ],
         "statBonus": {
-            "agi": 5
+            "agi": 10
         },
         "value": 100,
         "description": "A sharp steel dagger that strikes swiftly and accurately. Perfect for those who prefer speed over brute strength."
@@ -830,8 +830,8 @@ const ITEM_DEFS = {
             90
         ],
         "statBonus": {
-            "agi": 5,
-            "luk": 2
+            "agi": 15,
+            "luk": 7
         },
         "value": 2600,
         "description": "A dagger with a wicked curve, perfect for swift and unexpected strikes. Favored by rogues and those who enjoy a bit of chaos."
@@ -2642,6 +2642,152 @@ const ITEM_DEFS = {
         "maxStack": 50,
         "value": 60,
         "description": "An eerie eye from the Lurker, said to hold mysterious powers."
+    },
+
+    //new items!
+    "basic_bow": {
+        "id": "basic_bow",
+        "name": "Basic Bow",
+        "rarity": "common",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            4,
+            7
+        ],
+        "statBonus": {
+            "agi": 4
+        },
+        "value": 130,
+        "description": "A sharp iron dagger that strikes quickly and efficiently. Perfect for those who value speed in combat."
+    },
+    "oak_bow": {
+        "id": "oak_bow",
+        "name": "Oak Bow",
+        "rarity": "uncommon",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            6,
+            10
+        ],
+        "statBonus": {
+            "agi": 8
+        },
+        "value": 200,
+        "description": "A sturdy oak bow that offers improved range and accuracy."
+    },
+    "maple_bow": {
+        "id": "maple_bow",
+        "name": "Maple Bow",
+        "rarity": "rare",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            8,
+            12
+        ],
+        "statBonus": {
+            "agi": 16
+        },
+        "value": 300,
+        "description": "A finely crafted maple bow that offers excellent range and precision."
+    },
+    "birch_bow": {
+        "id": "birch_bow",
+        "name": "Birch Bow",
+        "rarity": "rare",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            10,
+            14
+        ],
+        "statBonus": {
+            "agi": 12
+        },
+        "value": 400,
+        "description": "A lightweight birch bow known for its balance and durability."
+    },
+    "iron_crossbow": {
+        "id": "iron_crossbow",
+        "name": "Iron Crossbow",
+        "rarity": "uncommon",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            12,
+            16
+        ],
+        "statBonus": {
+            "agi": 14
+        },
+        "value": 500,
+        "description": "A heavy iron crossbow that delivers powerful shots with high accuracy."
+    },
+    "mithril_crossbow": {
+        "id": "mithril_crossbow",
+        "name": "Mithril Crossbow",
+        "rarity": "epic",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            14,
+            20
+        ],
+        "statBonus": {
+            "agi": 18
+        },
+        "value": 800,
+        "description": "A lightweight mithril crossbow that offers exceptional power and speed."
+    },
+    "bronze_polearm": {
+        "id": "bronze_polearm",
+        "name": "Bronze Polearm",
+        "rarity": "common",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            10,
+            15
+        ],
+        "statBonus": {
+            "str": 10
+        },
+        "value": 350,
+        "description": "A sturdy bronze polearm favored by novice warriors."
+    },
+    "golden_polearm": {
+        "id": "golden_polearm",
+        "name": "Golden Polearm",
+        "rarity": "rare",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            14,
+            20
+        ],
+        "statBonus": {
+            "str": 14
+        },
+        "value": 600,
+        "description": "A finely crafted golden polearm favored by elite warriors."
     }
 };
 

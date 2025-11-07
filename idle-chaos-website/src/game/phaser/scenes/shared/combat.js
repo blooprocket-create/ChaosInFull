@@ -663,9 +663,25 @@ function createKnifeTrailEmitter(scene, target, depth) {
 function sharedTryAttack(silentMiss = false, preferredTarget = null) {
     if (!this.player || !this.enemies) return;
     // Pull effective stats first so we can derive a sane base cooldown when no explicit override is set
-    const effStats = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats)
-        ? window.__shared_ui.stats.effectiveStats(this.char)
-        : { str: 0 };
+    // Pull effective stats first so we can derive a sane base cooldown when no explicit override is set.
+    // Previous fallback only provided { str:0 } which caused primary stat lookups (e.g. 'agi' for Stalker)
+    // to fail and default to STR. Provide full zeroed shape and add a secondary fallback to raw char.stats.
+    let effStats = null;
+    try {
+        if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) {
+            effStats = window.__shared_ui.stats.effectiveStats(this.char);
+        }
+    } catch (e) { effStats = null; }
+    if (!effStats || typeof effStats !== 'object') {
+        // full stat shape so primaryStatKey lookup doesn't silently fall back to STR
+        const raw = (this.char && this.char.stats) ? this.char.stats : {};
+        effStats = {
+            str: Number(raw.str)||0,
+            int: Number(raw.int)||0,
+            agi: Number(raw.agi)||0,
+            luk: Number(raw.luk)||0
+        };
+    }
     const baseCd = (this.attackCooldown != null)
         ? this.attackCooldown
         : ((effStats && typeof effStats.attackSpeedMs === 'number') ? effStats.attackSpeedMs : 520);
@@ -692,25 +708,54 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
     // Class-based primary stat: beginner->luk, horror->str, occultist->int, stalker->agi
     const cls = (this.char && this.char.class) ? this.char.class : 'beginner';
     const primaryStatKey = getPrimaryStatKeyForClass(cls);
-    const primaryStat = (effStats && typeof effStats[primaryStatKey] === 'number') ? effStats[primaryStatKey] : ((effStats && effStats.str) || 0);
+    // Use the resolved primary stat; do NOT fall back to STR if missing (was causing Stalker to scale with STR).
+    let primaryStat = (effStats && typeof effStats[primaryStatKey] === 'number') ? effStats[primaryStatKey] : null;
+    if (primaryStat == null) {
+        // secondary fallback to raw character stats for robustness
+        const rawStats = (this.char && this.char.stats) ? this.char.stats : {};
+        if (typeof rawStats[primaryStatKey] === 'number') primaryStat = rawStats[primaryStatKey];
+    }
+    if (primaryStat == null) primaryStat = 0;
+    if (window && window.__DEBUG_PRIMARY_STAT_MISMATCH && typeof window.__DEBUG_PRIMARY_STAT_MISMATCH === 'function') {
+        if (primaryStatKey !== 'str' && primaryStat === effStats.str) {
+            try { window.__DEBUG_PRIMARY_STAT_MISMATCH({ cls, expected: primaryStatKey, used: 'str', effStats }); } catch(e){}
+        }
+    }
 
-    // Compute base damage: handle staffs as spell/ranged weapons (use INT as primary) and preserve melee for others
+    // Compute base damage: weapon-type driven scaling overrides class primary stat.
+    // Scaling mapping:
+    //  - Staff: INT
+    //  - Dagger / Bow / Crossbow: AGI
+    //  - Sword / Polearm: STR
+    //  - Fallback: class primary stat (previous behavior)
     let baseDamage = 0;
-    let isStaff = false;
+    let isStaff = false; // retain for spell visual cues
+    let scalingKey = primaryStatKey; // start with class primary
     try {
-        isStaff = !!(weaponDef && (weaponDef.weaponType === 'staff' || /staff/i.test(weaponDef.id || '') || /staff/i.test(weaponDef.name || '')));
+        if (weaponDef) {
+            const wid = String(weaponDef.id || '').toLowerCase();
+            const wname = String(weaponDef.name || '').toLowerCase();
+            if (/staff/.test(wid) || /staff/.test(wname)) { scalingKey = 'int'; isStaff = true; }
+            else if (/dagger/.test(wid) || /dagger/.test(wname)) { scalingKey = 'agi'; }
+            else if (/bow/.test(wid) || /bow/.test(wname) || /crossbow/.test(wid) || /crossbow/.test(wname)) { scalingKey = 'agi'; }
+            else if (/sword/.test(wid) || /sword/.test(wname)) { scalingKey = 'str'; }
+            else if (/polearm/.test(wid) || /polearm/.test(wname)) { scalingKey = 'str'; }
+        }
+    } catch (e) { /* ignore pattern errors */ }
+    // Resolve scaling stat value
+    let scalingStatVal = (effStats && typeof effStats[scalingKey] === 'number') ? effStats[scalingKey] : 0;
+    if (scalingStatVal == null) scalingStatVal = 0;
+    try {
         if (isStaff) {
-            // Staffs scale from INT (spell power). Use a spell-style base but keep weapon damage range as flavour.
-            const intPrimary = (effStats && typeof effStats.int === 'number') ? effStats.int : 0;
+            const intPrimary = (effStats && typeof effStats.int === 'number') ? effStats.int : scalingStatVal;
             const baseSpell = Math.max(8, (intPrimary * 2) + 6);
             baseDamage = Phaser.Math.Between(weaponMin, weaponMax) + (intPrimary * 2);
-            // If no weapon damage present, fall back to baseSpell
             if (!weaponDef || !Array.isArray(weaponDef.damage) || weaponDef.damage.length < 2) baseDamage = baseSpell;
         } else {
-            baseDamage = Phaser.Math.Between(weaponMin, weaponMax) + (primaryStat * 2);
+            baseDamage = Phaser.Math.Between(weaponMin, weaponMax) + (scalingStatVal * 2);
         }
     } catch (e) {
-        baseDamage = Phaser.Math.Between(weaponMin, weaponMax) + (primaryStat * 2);
+        baseDamage = Phaser.Math.Between(weaponMin, weaponMax) + (scalingStatVal * 2);
     }
     // Apply talent-based weapon damage modifiers (flat then percent) and gold-based weapon bonus
     try {
@@ -1099,7 +1144,13 @@ function sharedHandleEnemyDeath(enemy) {
                                         // class primary stat mapping (best-effort): use effective stats computed earlier
                                         const cls = (this.char && this.char.class) ? this.char.class : 'beginner';
                                         const pkey = getPrimaryStatKeyForClass(cls);
-                                        const pstat = (eff && typeof eff[pkey] === 'number') ? eff[pkey] : ((eff && eff.str) || 0);
+                                        let pstat = (eff && typeof eff[pkey] === 'number') ? eff[pkey] : null;
+                                        if (pstat == null && eff) {
+                                            // secondary fallback to raw stats to avoid silently substituting STR for AGI/INT
+                                            const rawStats = (this.char && this.char.stats) ? this.char.stats : {};
+                                            if (typeof rawStats[pkey] === 'number') pstat = rawStats[pkey];
+                                        }
+                                        if (pstat == null) pstat = 0;
                                         // approximate player damage similar to sharedTryAttack: weapon base + primaryStat*2
                                         playerAvgDmg = Math.max(1, Math.round(avgWeapon + (pstat * 2)));
                                     } catch (e) { playerAvgDmg = 6; }
@@ -1566,10 +1617,14 @@ function sharedAttachEnemyBars(enemy) {
                 const defId = safeGetData(enemy, 'defId');
                 const def = (defId && this.enemyDefs) ? this.enemyDefs[defId] : null;
                 const name = (def && def.name) || defId || 'Enemy';
-                let level = 1;
-                if (def && typeof def.level === 'number') level = def.level;
-                else if (def && def.tier === 'epic') level = 5;
-                else if (def && def.tier === 'boss') level = 10;
+                // Prefer runtime randomized level stored on the enemy, fallback to static def heuristics
+                let level = Number(safeGetData(enemy, 'level')) || 1;
+                if (!level || Number.isNaN(level)) {
+                    if (def && typeof def.level === 'number') level = def.level;
+                    else if (def && def.tier === 'epic') level = 5;
+                    else if (def && def.tier === 'boss') level = 10;
+                    else level = 1;
+                }
                 const labelOffset = (cfg.nameOffset != null) ? cfg.nameOffset : (offsetY + 14);
                 const rarity = _inferEnemyRarity(defId, def);
                 const nameColor = _rarityToColor(rarity);

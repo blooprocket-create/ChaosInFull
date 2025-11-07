@@ -6,6 +6,7 @@ import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { attach as attachCleanup } from '../shared/cleanupManager.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
+import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
 export class FlameRoad extends Phaser.Scene {
     constructor() { super('FlameRoad'); }
@@ -183,14 +184,17 @@ export class FlameRoad extends Phaser.Scene {
     _spawnEnemy(spawn) {
         if (!spawn || spawn.active) return;
         const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 86 };
-        const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
+        const randomizedLevel = getAreaEnemyLevel('FlameRoad', rawDef.tier, rawDef.level || 1);
+        const defInput = { ...rawDef, level: randomizedLevel };
+        const def = ((defInput && defInput.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(defInput) : defInput;
     const tex = ensureEnemyTexture(this, spawn.type) || (this.textures.exists(spawn.type) ? spawn.type : 'goblin_flamebinder');
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.9);
         enemy.body.setCollideWorldBounds(true);
         try { enemy.body.setCircle(Math.max(12, (enemy.width || 20) / 2)); } catch (e) {}
         enemy.setData('defId', spawn.type);
-        enemy.setData('hp', def.maxhp || 12);
-        enemy.setData('maxhp', def.maxhp || 12);
+    enemy.setData('level', randomizedLevel);
+    enemy.setData('hp', def.maxhp || 12);
+    enemy.setData('maxhp', def.maxhp || 12);
         enemy.setData('alive', true);
         enemy.setData('spawn', spawn);
         enemy.setData('nextAttack', 0);

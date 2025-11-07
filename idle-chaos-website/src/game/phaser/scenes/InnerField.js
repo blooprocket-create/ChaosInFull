@@ -7,6 +7,7 @@ import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { attach } from '../shared/cleanupManager.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
+import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
 export class InnerField extends Phaser.Scene {
     constructor() {
@@ -329,13 +330,17 @@ export class InnerField extends Phaser.Scene {
     _spawnEnemy(spawn) {
         if (!spawn || spawn.active) return;
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 60 };
-    const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
+    // Randomize level based on area and enemy tier
+    const randomizedLevel = getAreaEnemyLevel('InnerField', rawDef.tier, rawDef.level || 1);
+    const defInput = { ...rawDef, level: randomizedLevel };
+    const def = ((defInput && defInput.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(defInput) : defInput;
         // choose generated texture when possible
     const tex = ensureEnemyTexture(this, spawn.type) || spawn.type || 'slime_common';
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.8);
         enemy.body.setCollideWorldBounds(true);
     try { setCircleCentered(enemy, Math.max(12, (enemy.width||16)/2)); } catch (e) {}
         enemy.setData('defId', spawn.type);
+        enemy.setData('level', randomizedLevel);
     enemy.setData('hp', def.maxhp || 10);
     enemy.setData('maxhp', def.maxhp || 10);
         enemy.setData('alive', true);

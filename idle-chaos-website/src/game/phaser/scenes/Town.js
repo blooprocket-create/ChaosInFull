@@ -303,7 +303,9 @@ export class Town extends Phaser.Scene {
         'rusty_rod',
         'good_rod',
         'minor_health_potion',
-        'minor_mana_potion'
+        'minor_mana_potion',
+        'twisted_dagger',
+        'admin_weapon',
     ];
     // smithing skill on character
     if (!this.char.smithing) this.char.smithing = { level: 1, exp: 0, expToLevel: 100 };

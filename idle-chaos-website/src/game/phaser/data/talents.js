@@ -310,6 +310,7 @@ const occultistTalents = [
 const stalkerTalents = [
     makeTalent('eagle_eye', 'Eagle Shot', { // cleaned
         description: 'Shoot eyes out from afar, like a true coward. Eagle Shot damage +{value}%.',
+        scaling: { type: 'percent', target: 'eagleShotDamage', base: 35, perRank: 5 },
         tags: ['combat', 'stalker', 'offensive'],
         kind: 'active',
         activeType: 'offensive',
@@ -365,7 +366,8 @@ const stalkerTalents = [
         tags: ['aoe', 'combat'],
         kind: 'active',
         activeType: 'offensive',
-        manaCost: 12
+        manaCost: 12,
+        cooldownSeconds: 10
     }),
     makeTalent('ambush_mastery', 'Ambush Mastery', { // cleaned
         description: 'Strike from the dark with terrible efficiency. Your first attack when exiting stealth deals an additional {value}% damage and increases critical damage by {secondValue}% for 4s.',

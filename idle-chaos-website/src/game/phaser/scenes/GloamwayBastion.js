@@ -9,6 +9,7 @@ import { CLASS_DEFS } from '../data/classes.js';
 import { RACE_DEFS } from '../data/races.js';
 import { attach as attachCleanup, addTimeEvent, registerDisposer } from '../shared/cleanupManager.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
+import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
 const QUEST_CHAIN = [
     'mother_lumen_slime_cull',
@@ -313,12 +314,15 @@ export class GloamwayBastion extends Phaser.Scene {
     _spawnEnemy(spawn) {
         if (!spawn || spawn.active) return;
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 86 };
-    const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
+    const randomizedLevel = getAreaEnemyLevel('GloamwayBastion', rawDef.tier, rawDef.level || 1);
+    const defInput = { ...rawDef, level: randomizedLevel };
+    const def = ((defInput && defInput.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(defInput) : defInput;
     const tex = ensureEnemyTexture(this, spawn.type) || (this.textures.exists(spawn.type) ? spawn.type : 'goblin_slicer');
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.9);
         enemy.body.setCollideWorldBounds(true);
         try { enemy.body.setCircle(Math.max(12, (enemy.width || 20) / 2)); } catch (e) {}
         enemy.setData('defId', spawn.type);
+    enemy.setData('level', randomizedLevel);
     enemy.setData('hp', def.maxhp || 12);
     enemy.setData('maxhp', def.maxhp || 12);
         enemy.setData('alive', true);

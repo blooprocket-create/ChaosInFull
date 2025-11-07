@@ -7,6 +7,7 @@ import { computeEnemyStats } from '../data/statFormulas.js';
 import { setCircleCentered } from '../shared/physicsHelpers.js';
 import { attach } from '../shared/cleanupManager.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
+import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
 export class OuterField extends Phaser.Scene {
     constructor() { super('OuterField'); }
@@ -221,7 +222,9 @@ export class OuterField extends Phaser.Scene {
     _spawnEnemy(spawn) {
         if (!spawn || spawn.active) return;
     const rawDef = this.enemyDefs[spawn.type] || { tier: 'common', level: 1, moveSpeed: 60 };
-    const def = ((rawDef && rawDef.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(rawDef) : rawDef;
+    const randomizedLevel = getAreaEnemyLevel('OuterField', rawDef.tier, rawDef.level || 1);
+    const defInput = { ...rawDef, level: randomizedLevel };
+    const def = ((defInput && defInput.dynamicStats) || (typeof window !== 'undefined' && window.USE_DYNAMIC_ENEMY_STATS)) ? computeEnemyStats(defInput) : defInput;
         // choose generated texture when possible
     const tex = ensureEnemyTexture(this, spawn.type) || spawn.type || 'rat';
         const enemy = this.physics.add.sprite(spawn.x, spawn.y, tex).setDepth(1.8);
@@ -229,6 +232,7 @@ export class OuterField extends Phaser.Scene {
         // approximate circular body for rats
     try { setCircleCentered(enemy, Math.max(10, (enemy.width || 16) / 2)); } catch (e) { /* ignore */ }
         enemy.setData('defId', spawn.type);
+    enemy.setData('level', randomizedLevel);
     enemy.setData('hp', def.maxhp || 8);
     enemy.setData('maxhp', def.maxhp || 8);
         enemy.setData('alive', true);
