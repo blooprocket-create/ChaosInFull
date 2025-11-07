@@ -3885,18 +3885,34 @@ function _talentActivatedHandler(payload) {
                     const depth = (scene.player && typeof scene.player.depth === 'number') ? scene.player.depth + 0.2 : 9.2;
 
                     // spawn projectiles over time (every 200ms)
-                    const interval = 200;
+                    const interval = 180; // slightly faster cadence to reduce enemy escape window
                     let spawned = 0;
                     const rainEvent = (scene.time && scene.time.addEvent) ? scene.time.addEvent({ delay: interval, repeat: Math.max(0, projCount - 1), callback: function() {
                         try {
-                            // choose random point in circle
-                            const ang = Phaser.Math.FloatBetween(0, Math.PI * 2);
-                            const r = Phaser.Math.FloatBetween(0, areaRadius);
-                            const tx = cx + Math.cos(ang) * r;
-                            const ty = cy + Math.sin(ang) * r;
+                            // Choose a target point: bias toward a nearby enemy to increase hit reliability.
+                            const enemies = (scene.enemies && scene.enemies.getChildren) ? scene.enemies.getChildren().filter(e => e && safeGetData(e, 'alive')) : [];
+                            // pick nearest enemy to center (cx, cy) within a generous radius; else fall back to random point
+                            let tgt = null; let bestD = Infinity;
+                            for (let ii = 0; ii < enemies.length; ii++) {
+                                const e = enemies[ii];
+                                const d = Phaser.Math.Distance.Between(cx, cy, e.x, e.y);
+                                if (d < bestD && d <= areaRadius * 1.4) { bestD = d; tgt = e; }
+                            }
+                            let tx, ty;
+                            if (tgt) {
+                                const jitter = 14;
+                                tx = tgt.x + Phaser.Math.FloatBetween(-jitter, jitter);
+                                ty = tgt.y + Phaser.Math.FloatBetween(-jitter, jitter);
+                            } else {
+                                // choose random point in circle
+                                const ang = Phaser.Math.FloatBetween(0, Math.PI * 2);
+                                const r = Phaser.Math.FloatBetween(0, areaRadius);
+                                tx = cx + Math.cos(ang) * r;
+                                ty = cy + Math.sin(ang) * r;
+                            }
                                     // spawn off-screen above the camera so needles come from the top
                                     const camTop = (scene.cameras && scene.cameras.main && scene.cameras.main.worldView) ? scene.cameras.main.worldView.y : Math.max(0, ty - 240);
-                                    const topOffset = Phaser.Math.Between(40, 120);
+                                    const topOffset = Phaser.Math.Between(40, 110);
                                     const spawnY = camTop - topOffset;
                                     const spawnX = tx + Phaser.Math.FloatBetween(-24, 24);
                                     let proj = null;
@@ -3929,30 +3945,34 @@ function _talentActivatedHandler(payload) {
                                     try { if (proj.body) proj.body.allowGravity = false; } catch (e) {}
 
                                     // compute falling motion and land at (tx,ty) with an AOE on impact
-                                    const vx = Phaser.Math.FloatBetween(-40, 40);
-                                    const vy = Phaser.Math.Between(420, 680);
+                                    const vx = Phaser.Math.FloatBetween(-36, 36);
+                                    const vy = Phaser.Math.Between(560, 820); // faster fall to reduce target drift
                                     try {
                                         // compute duration based on distance and vertical speed
                                         const dist = Math.max(1, ty - spawnY);
-                                        const fallDuration = Math.max(120, Math.round((dist / (vy || 420)) * 1000));
+                                        const fallDuration = Math.max(90, Math.round((dist / (vy || 560)) * 1000));
                                         // ensure no lingering velocity
                                         try { if (proj.body && typeof proj.body.setVelocity === 'function') proj.body.setVelocity(0, 0); } catch (e) {}
 
                                         const impact = () => {
                                             try {
-                                                const impactRadius = 32; // landing AOE
+                                                // Slightly scale impact radius with projectile count to improve reliability on higher ranks
+                                                const impactRadius = Math.min(56, Math.max(28, Math.round(28 + (projCount * 0.8))));
+                                                // If we had a chosen target enemy, re-center the impact at its live position right before resolving
+                                                const cxNow = (tgt && safeGetData(tgt, 'alive')) ? tgt.x : tx;
+                                                const cyNow = (tgt && safeGetData(tgt, 'alive')) ? tgt.y : ty;
                                                 const enemies = (scene.enemies && scene.enemies.getChildren) ? scene.enemies.getChildren() : [];
                                                 for (let ii = 0; ii < enemies.length; ii++) {
                                                     const e = enemies[ii];
                                                     if (!e || !safeGetData(e, 'alive')) continue;
                                                     try {
-                                                        const d = Phaser.Math.Distance.Between(tx, ty, e.x, e.y);
+                                                        const d = Phaser.Math.Distance.Between(cxNow, cyNow, e.x, e.y);
                                                         if (d <= impactRadius) _dealPlayerDamage(scene, e, perNeedleDmg, '#fff0dd');
                                                     } catch (ee) {}
                                                 }
                                                 // visual impact pulse
                                                 try {
-                                                    const fx = scene.add.circle(tx, ty, impactRadius, 0xffeedd, 0.14).setDepth((scene.player && scene.player.depth ? scene.player.depth + 0.2 : 9.2));
+                                                    const fx = scene.add.circle(cxNow, cyNow, impactRadius, 0xffeedd, 0.14).setDepth((scene.player && scene.player.depth ? scene.player.depth + 0.2 : 9.2));
                                                     if (scene.tweens) scene.tweens.add({ targets: fx, alpha: 0, scale: 1.2, duration: 320, ease: 'Cubic.easeOut', onComplete: () => { try { fx.destroy(); } catch (e) {} } });
                                                 } catch (ee) {}
                                             } catch (e) {}
