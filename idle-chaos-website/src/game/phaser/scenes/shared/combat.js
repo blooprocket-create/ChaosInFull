@@ -3663,16 +3663,22 @@ function _talentActivatedHandler(payload) {
                 try {
                     if (scene._showToast) scene._showToast('[DEBUG] knife_swarm handler entered', 1500);
                     const baseKnives = 6;
+                    // Prefer talent modifiers for count; fallback to simple rank heuristic
+                    const tmods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : (typeof computeTalentModifiers === 'function' ? computeTalentModifiers(scene.char) : {}) || {};
+                    const knifeCountMod = tmods['knifeCount'] || null;
+                    const extraFromMod = Number((knifeCountMod && (knifeCountMod.flat != null ? knifeCountMod.flat : knifeCountMod.percent)) || 0);
                     const extraPerFive = Math.floor(Math.max(0, rank || 0) / 5);
-                    const total = baseKnives + extraPerFive;
+                    const total = Math.max(1, Math.round(baseKnives + extraFromMod + extraPerFive));
                     const [projMin, projMax] = getWeaponDamageRange(scene);
                     const avgWeapon = (projMin + projMax) / 2;
                     const baseRanged = Math.max(6, avgWeapon + (((eff && eff.agi) || 0) * 1.1) + (((eff && eff.luk) || 0) * 0.35));
-                    let dmgPercent = scaledValue || 6;
-                    const knifeMods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers['knifeDamage'] : null;
+                    // Damage percent comes from talent modifiers; fall back to scaledValue if missing
+                    const knifeMods = tmods['knifeDamage'] || null;
+                    let dmgPercent = 0;
                     if (knifeMods) {
-                        dmgPercent += Number(knifeMods.flat || 0);
-                        dmgPercent *= (1 + (Number(knifeMods.percent || 0) / 100));
+                        dmgPercent = Number(knifeMods.percent || 0) + Number(knifeMods.flat || 0);
+                    } else {
+                        dmgPercent = Number(scaledValue || 6);
                     }
                     const knifeDamage = Math.max(1, baseRanged * (dmgPercent / 100));
 
@@ -3804,12 +3810,17 @@ function _talentActivatedHandler(payload) {
                 try {
                     if (scene._showToast) scene._showToast('[DEBUG] needle_rain handler entered', 1500);
                     // Needle Rain: spawn projectiles from above into an AOE over time
-                    const projCount = Math.max(1, Math.round(scaledValue || 5));
+                    const tmods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : (typeof computeTalentModifiers === 'function' ? computeTalentModifiers(scene.char) : {}) || {};
+                    const projMod = tmods['projectileCount'] || null;
+                    const projCount = Math.max(1, Math.round(Number((projMod && (projMod.flat != null ? projMod.flat : projMod.percent)) || scaledValue || 5)));
                     const [projMin, projMax] = getWeaponDamageRange(scene);
                     const avgWeapon = (projMin + projMax) / 2;
                     const baseRanged = Math.max(6, avgWeapon + (((eff && eff.agi) || 0) * 1.1) + (((eff && eff.luk) || 0) * 0.35));
-                    // damage per needle is a modest portion of weapon base
-                    const perNeedleDmg = Math.max(1, Math.round(baseRanged * 0.45));
+                    // Damage percent from talent modifiers (needleRainDamage); fallback to a tuned default if absent
+                    const nd = tmods['needleRainDamage'] || null;
+                    let needlePct = Number((nd && (nd.percent || nd.flat)) || 0);
+                    if (!needlePct || needlePct <= 0) needlePct = 45; // default fallback when not specified
+                    const perNeedleDmg = Math.max(1, Math.round(baseRanged * (needlePct / 100)));
 
                     // area center: pointer if available, otherwise player
                     let cx = scene.player.x; let cy = scene.player.y;

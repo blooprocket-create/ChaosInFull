@@ -308,14 +308,12 @@ const occultistTalents = [
 ];
 
 const stalkerTalents = [
-    makeTalent('eagle_eye', 'Eagle Shot', { //added
+    makeTalent('eagle_eye', 'Eagle Shot', { // cleaned
         description: 'Shoot eyes out from afar, like a true coward. Eagle Shot damage +{value}%.',
-        description: 'Borrow breath from a dying mouth. Vampiric heal +{value}%.',
         tags: ['combat', 'stalker', 'offensive'],
         kind: 'active',
         activeType: 'offensive',
-        cooldownSeconds: 7,
-        description: 'Turn pressure into spectacle. Burst damage +{value}%.',
+        cooldownSeconds: 7
     }),
     makeTalent('shadowstep', 'Shadowstep', { //works
         description: 'Step into shadows, because facing reality is hard. Blink, enter stealth, and block all damage for {value} seconds. The first attack breaks stealth and deals a guaranteed critical hit.',
@@ -323,11 +321,10 @@ const stalkerTalents = [
         tags: ['mobility', 'defensive', 'offensive', 'stalker'],
         kind: 'active',
         activeType: 'defensive',
-        cooldownSeconds: 12,
-        description: 'Surf the spill. Crimson trail damage +{value}%.',
+        cooldownSeconds: 12
    }),
     makeTalent('knife_swarm', 'Knife Swarm', { //works
-        description: 'Throw knives everywhere, hope one hits. Knife damage +{value}%. Spawns {secondValue} extra knives at current rank.',
+        description: 'Throw knives everywhere, hope one hits. Knife damage +{value}%. Spawns {secondValue} extra knives at current rank. Damage scales with Attack base (weapon avg + 1.1×AGI + 0.35×LUK).',
         scaling: { type: 'percent', target: 'knifeDamage', base: 5, perRank: 0.45 },
         secondScaling: { type: 'flat', target: 'knifeCount', base: 8, perRank: 0.22 },
         tags: ['aoe', 'combat'],
@@ -337,32 +334,32 @@ const stalkerTalents = [
         manaCost: 8
     }),
     makeTalent('razor_feathers', 'Razor Feathers', {//added
-        description: 'Rage runs on red. Blood fury speed +{value}%.',
+        description: 'Critical hits cause cuts that keep bleeding. Your crits apply an additional DoT equal to {value}% of the crit damage over a short duration.',
         scaling: { type: 'percent', target: 'critDoT', base: 8, perRank: 1.6 },
         tags: ['combat']
     }),
     makeTalent('poison_weapons', 'Poison Weapons', {//added
-        description: 'Let pain harden. Damage to shield +{value}%.',
+        description: 'Coat your blades in venom. Poison damage +{value}%.',
         scaling: { type: 'percent', target: 'poisonDamage', base: 70, perRank: 1.2 },
         tags: ['damage']
     }),
     makeTalent('silent_steps', 'Silent Steps', {//added
-        description: 'Lessons from fresh corpses. Kill XP bonus +{value}%.',
+        description: 'Move unheard, strike harder. On a critical hit, consume Stealth Points in chunks of 10; each chunk adds {value}% critical damage to that crit.',
         scaling: { type: 'percent', target: 'silentCritDmg', base: 25, perRank: 5 },
         tags: ['utility']
     }),
     makeTalent('five_finger_discount', '5 Finger Discount', {//added (id normalized)
-        description: 'Promises cut into skin. Blood oath damage +{value}%.',
+        description: 'Sticky fingers, heavier purse. Gold gained +{value}%.',
         scaling: { type: 'percent', target: 'goldGain', base: 6, perRank: 1.1 },
         tags: ['utility']
     }),
     makeTalent('hunter_s_formula', "Hunter's Formula", {//added
-        description: 'Near the edge, the world speeds up. Low HP speed +{value}%.',
+        description: 'Study the toxin’s path. Deal {value}% increased damage to poisoned targets.',
         scaling: { type: 'percent', target: 'poisonTargetBonus', base: 9, perRank: 1.5 },
         tags: ['combat']
     }),
     makeTalent('needle_rain', 'Needle Rain', { //works
-        description: '{value} needles fall from the sky doing +{secondValue}% damage.',
+        description: 'Call down {value} needles that each deal +{secondValue}% of your Attack base. Scales with Attack base (weapon avg + 1.1×AGI + 0.35×LUK).',
         scaling: { type: 'flat', target: 'projectileCount', base: 5, perRank: 1 },
         secondScaling: { type: 'percent', target: 'needleRainDamage', base: 2, perRank: 0.5 },
         tags: ['aoe', 'combat'],
@@ -370,14 +367,14 @@ const stalkerTalents = [
         activeType: 'offensive',
         manaCost: 12
     }),
-    makeTalent('ambush_mastery', 'Ambush Mastery', { //added
+    makeTalent('ambush_mastery', 'Ambush Mastery', { // cleaned
         description: 'Strike from the dark with terrible efficiency. Your first attack when exiting stealth deals an additional {value}% damage and increases critical damage by {secondValue}% for 4s.',
-        description: 'Even blood books balance. Tab refund chance +{value}%.',
+        scaling: { type: 'percent', target: 'stealthAttackDamage', base: 22, perRank: 1.25 },
         secondScaling: { type: 'percent', target: 'stealthCritDmg', base: 15, perRank: 1.5 },
         tags: ['stalker', 'combat', 'stealth']
     }),
     makeTalent('toxic_precision', 'Toxic Precision', {//added
-        description: 'Crimson sky, cruel numbers. Night damage bonus +{value}%.',
+        description: 'Aim for the vein. Chance to apply poison +{value}%.',
         scaling: { type: 'percent', target: 'poisonApplyChance', base: 12, perRank: 1.8 },
         tags: ['combat', 'poison']
     }),
