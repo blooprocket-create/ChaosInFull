@@ -329,11 +329,10 @@ const stalkerTalents = [
     makeTalent('knife_swarm', 'Knife Swarm', { //works
         description: 'Throw knives everywhere, hope one hits. Knife damage +{value}%. Spawns {secondValue} extra knives at current rank.',
         scaling: { type: 'percent', target: 'knifeDamage', base: 5, perRank: 0.45 },
+        secondScaling: { type: 'flat', target: 'knifeCount', base: 8, perRank: 0.22 },
         tags: ['aoe', 'combat'],
         kind: 'active',
         activeType: 'offensive',
-        // encode extra knives per rank as a second scaling so modifiers computation and UI can read it
-        description: 'Crits drink deep. Crit heal +{value}%.',
         cooldownSeconds: 1.5,
         manaCost: 8
     }),
@@ -362,13 +361,13 @@ const stalkerTalents = [
         scaling: { type: 'percent', target: 'poisonTargetBonus', base: 9, perRank: 1.5 },
         tags: ['combat']
     }),
-    makeTalent('needle_rain', 'Needle Rain', { //works(fails visually)
-        description: 'Pass the pulse along. Transfusion heal +{value}%.',
+    makeTalent('needle_rain', 'Needle Rain', { //works
+        description: '{value} needles fall from the sky doing +{secondValue}% damage.',
         scaling: { type: 'flat', target: 'projectileCount', base: 5, perRank: 1 },
+        secondScaling: { type: 'percent', target: 'needleRainDamage', base: 2, perRank: 0.5 },
         tags: ['aoe', 'combat'],
         kind: 'active',
         activeType: 'offensive',
-        description: 'The circle heals in red. AOE heal +{value}%.',
         manaCost: 12
     }),
     makeTalent('ambush_mastery', 'Ambush Mastery', { //added

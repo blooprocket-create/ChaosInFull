@@ -851,19 +851,19 @@ export class Cave extends Phaser.Scene {
             const states = objectiveStateFn ? objectiveStateFn(this.char, equipQuestId) : null;
             const list = ui.buildObjectiveList(equipQuestDef, states, '#d4a574');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'Hand over the ore', onClick: () => { try { if (completeQuest) completeQuest(this.char, equipQuestId); const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); this._showToast('Quest completed: ' + ((equipQuestDef && equipQuestDef.name) || equipQuestId), 2200); } catch (e) {} finally { try { closeDialogue(); } catch (e) {} } }, variant: 'success' });
-            optionConfigs.push({ label: 'Give me a moment.', onClick: () => { closeDialogue(); } });
+            optionConfigs.push({ label: 'Hand over the ore', onClick: () => { try { if (completeQuest) completeQuest(this.char, equipQuestId); const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); this._showToast('Quest completed: ' + ((equipQuestDef && equipQuestDef.name) || equipQuestId), 2200); } catch (e) {} }, variant: 'success', closeOnClick: true });
+            optionConfigs.push({ label: 'Give me a moment.', onClick: () => {}, closeOnClick: true });
         } else if (activeEquipQuest) {
             bodyNodes.push(ui.createDialogueParagraph('Keep using that pickaxe. The cave yields more if you get the rhythm right.'));
             const states = objectiveStateFn ? objectiveStateFn(this.char, equipQuestId) : null;
             const list = ui.buildObjectiveList(equipQuestDef, states, '#d4a574');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'Back to mining.', onClick: () => { closeDialogue(); } });
+            optionConfigs.push({ label: 'Back to mining.', onClick: () => {}, closeOnClick: true });
         } else if (otherActiveWayne && otherActiveDef) {
             bodyNodes.push(ui.createDialogueParagraph(`You're already working on ${otherActiveDef.name || otherActiveWayne.id}. Stay focused and report back when it's done.`));
             const list = ui.buildObjectiveList(otherActiveDef, otherActiveStates, '#d4a574');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'Understood.', onClick: () => { closeDialogue(); } });
+            optionConfigs.push({ label: 'Understood.', onClick: () => {}, closeOnClick: true });
         } else if (justCompleted || nowCompleted) {
             bodyNodes.push(ui.createDialogueParagraph('You learned the basics of mining. Keep at it and you will make your fortune.'));
             if (!equipQuestCompleted) {
@@ -878,10 +878,8 @@ export class Cave extends Phaser.Scene {
                         try { if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); } catch (e) {}
                         this._showToast('Quest started: ' + ((equipQuestDef && equipQuestDef.name) || equipQuestId), 2200);
                     }
-                    // Close the dialogue after handling the click so players can get back to mining.
-                    closeDialogue();
-                }, variant: 'success' });
-                optionConfigs.push({ label: 'Maybe later.', onClick: () => { closeDialogue(); } });
+                }, variant: 'success', closeOnClick: true });
+                optionConfigs.push({ label: 'Maybe later.', onClick: () => {}, closeOnClick: true });
             } else if (nextWayneQuest) {
                 if (nextWayneQuest.description) bodyNodes.push(ui.createDialogueParagraph(nextWayneQuest.description));
                 const list = ui.buildObjectiveList(nextWayneQuest, null, '#d4a574');
@@ -897,16 +895,16 @@ export class Cave extends Phaser.Scene {
                         this._showToast('Quest started: ' + ((nextWayneQuest && nextWayneQuest.name) || nextWayneQuest.id), 2200);
                     }
                 }, variant: 'success' });
-                optionConfigs.push({ label: 'Maybe later.', onClick: () => { closeDialogue(); } });
+                optionConfigs.push({ label: 'Maybe later.', onClick: () => {}, closeOnClick: true });
             } else {
-                optionConfigs.push({ label: 'Goodbye.', onClick: () => { closeDialogue(); } });
+                optionConfigs.push({ label: 'Goodbye.', onClick: () => {}, closeOnClick: true });
             }
         } else if (activeWayne) {
             bodyNodes.push(ui.createDialogueParagraph('Wayne here. Focus your swings and watch the ore glint.'));
             const states = objectiveStateFn ? objectiveStateFn(this.char, questId) : null;
             const list = ui.buildObjectiveList(questDef, states, '#d4a574');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: "I'll do it.", onClick: () => {} });
+            optionConfigs.push({ label: "I'll do it.", onClick: () => {}, closeOnClick: true });
         } else {
             bodyNodes.push(ui.createDialogueParagraph('Ah, fresh face! I can show you the basics of mining if you like.'));
             optionConfigs.push({ label: 'Teach me mining', onClick: () => {
@@ -920,7 +918,7 @@ export class Cave extends Phaser.Scene {
                     this._showToast('Quest started: ' + ((questDef && questDef.name) || questId), 2200);
                 }
             }, variant: 'success' });
-            optionConfigs.push({ label: 'Not now', onClick: () => { closeDialogue(); } });
+            optionConfigs.push({ label: 'Not now', onClick: () => {}, closeOnClick: true });
         }
 
         ui.renderDialogue('Wayne Mineson', '⛏️', bodyNodes, optionConfigs, '#d4a574');
