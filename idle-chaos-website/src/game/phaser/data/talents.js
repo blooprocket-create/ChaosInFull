@@ -326,7 +326,7 @@ const stalkerTalents = [
    }),
     makeTalent('knife_swarm', 'Knife Swarm', { //works
         description: 'Throw knives everywhere, hope one hits. Knife damage +{value}%. Spawns {secondValue} extra knives at current rank. Damage scales with Attack base (weapon avg + 1.1×AGI + 0.35×LUK).',
-        scaling: { type: 'percent', target: 'knifeDamage', base: 5, perRank: 0.45 },
+        scaling: { type: 'percent', target: 'knifeDamage', base: 15, perRank: 0.45 },
         secondScaling: { type: 'flat', target: 'knifeCount', base: 8, perRank: 0.22 },
         tags: ['aoe', 'combat'],
         kind: 'active',
@@ -361,8 +361,8 @@ const stalkerTalents = [
     }),
     makeTalent('needle_rain', 'Needle Rain', { //works
         description: 'Call down {value} needles that each deal +{secondValue}% of your Attack base. Scales with Attack base (weapon avg + 1.1×AGI + 0.35×LUK).',
-        scaling: { type: 'flat', target: 'projectileCount', base: 5, perRank: 1 },
-        secondScaling: { type: 'percent', target: 'needleRainDamage', base: 2, perRank: 0.5 },
+        scaling: { type: 'flat', target: 'projectileCount', base: 15, perRank: 0.5 },
+        secondScaling: { type: 'percent', target: 'needleRainDamage', base: 5, perRank: 1.5 },
         tags: ['aoe', 'combat'],
         kind: 'active',
         activeType: 'offensive',
