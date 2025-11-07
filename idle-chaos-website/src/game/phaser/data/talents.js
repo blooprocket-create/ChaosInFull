@@ -204,7 +204,7 @@ const occultistTalents = [
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 10,
-        manaCost: 25
+        manaCost: 300
     }),
     makeTalent('mana_shield', 'Mana Shield', {
         description: 'Your will hardens into a shimmering bulwark. Convert a portion of your max mana into a regenerative shield. Shield strength +{value}%. Restores {secondValue} mana/sec while out of combat.',
@@ -222,7 +222,7 @@ const occultistTalents = [
         activeType: 'buff',
         // base cooldown in seconds (UI consumers use cooldownMs / cooldownSeconds)
         cooldownSeconds: 12,
-        manaCost: 35
+        manaCost: 50
     }),
     makeTalent('void_path', 'Void Path', {//works
         description: 'Absence follows in your footsteps. Leave short‑lived void zones along your path that each deal {value}% damage once to enemies who enter. Zones last 1.2s. Zone radius = {secondValue}px + per‑rank increases.',
@@ -232,7 +232,7 @@ const occultistTalents = [
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 14,
-        manaCost: 100,
+        manaCost: 150,
         // Note: placement interval and max concurrent zones are runtime-tuned in code and are not expressed via scaling fields.
     }),
     makeTalent('dark_shield', 'Dark Shield', {
@@ -265,7 +265,7 @@ const occultistTalents = [
         kind: 'active',
         activeType: 'utility',
         cooldownSeconds: 10,
-        manaCost: 0
+        manaCost: 150
     }),
     makeTalent('planar_echo', 'Planar Echo', {
         description: 'Spells that echo from the void. Spell duplicate chance +{value}%.',
@@ -287,7 +287,7 @@ const occultistTalents = [
         kind: 'active',
         activeType: 'offensive',
         cooldownSeconds: 14,
-        manaCost: 22,
+        manaCost: 250,
         // Note: launch gap and orb physics are runtime-tuned in code and not expressed via scaling fields.
     }),
     makeTalent('shadow_mosaic', 'Shadow Mosaic', {

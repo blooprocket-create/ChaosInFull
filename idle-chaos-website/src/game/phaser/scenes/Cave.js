@@ -164,10 +164,8 @@ export class Cave extends Phaser.Scene {
     this._smeltingEvent = null;
     this.smeltingInterval = 2800;
 
-    // Procedural mining node generation: open cave (no blocking walls),
-    // with balanced clusters near the center and blue-noise scatter elsewhere.
-    // Prefer reading ore definitions from `src/data/ores.js` if available
-    // (window.ORE_DEFS or import)
+    // Procedural mining node generation: match GraveForest's clustered distribution.
+    // Prefer reading ore definitions from `src/data/ores.js` if available (window.ORE_DEFS or import)
     let oreConfigs = [];
     try {
         const defs = (typeof ORE_DEFS !== 'undefined') ? ORE_DEFS : (window && window.ORE_DEFS) ? window.ORE_DEFS : null;
@@ -197,8 +195,9 @@ export class Cave extends Phaser.Scene {
         // avoid furnace and portal
         try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 120) return true; } catch (e) {}
         try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
-        // avoid player spawn
+        // avoid player spawn and Wayne NPC (tutorial mining guide)
         try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
+        try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 110) return true; } catch (e) {}
         for (const p of placedNodes) {
             const pr = (typeof p.r === 'number') ? p.r : NODE_RADIUS;
             const req = pr + NODE_RADIUS + WALKWAY_BUFFER;
@@ -206,72 +205,43 @@ export class Cave extends Phaser.Scene {
         }
         return false;
     };
-    
-    // Balanced distribution: per-ore clusters near center + blue-noise scatter
-    // Limit total nodes to avoid overcrowding on smaller screens. Distribute the cap
-    // across ores so each ore gets at least one chance to spawn.
-    const MAX_NODES = Math.max(16, Math.round((this.scale.width * this.scale.height) / 45000));
-    const perOreCap = Math.max(1, Math.ceil(MAX_NODES / Math.max(1, oreConfigs.length)));
 
-    const placeNode = (tx, ty, oreType) => {
-        tx = Phaser.Math.Clamp(tx, bounds.x1, bounds.x2);
-        ty = Phaser.Math.Clamp(ty, bounds.y1, bounds.y2);
-        if (isTooClose(tx, ty)) return false;
-        this._createMiningNode(tx, ty, oreType);
-        placedNodes.push({ x: tx, y: ty, r: NODE_RADIUS, type: oreType });
-        return true;
-    };
-
-    // 1) Per-ore clusters near center
-    const centerArea = { x1: bounds.x1 + 140, x2: bounds.x2 - 140, y1: bounds.y1 + 100, y2: bounds.y2 - 100 };
+    // Clustered placement per ore type, mirroring GraveForest's tree placement
     for (const cfg of oreConfigs) {
-        let remainingForThisOre = perOreCap;
-        const clusterCount = Math.min(2, Math.max(1, cfg.centerClusters || Math.floor((cfg.clusters || 2) / 1)));
-        const perCluster = Math.max(2, Math.round((cfg.perCluster || 3)));
-        for (let c = 0; c < clusterCount; c++) {
-            if (placedNodes.length >= MAX_NODES || remainingForThisOre <= 0) break;
-            let cx = Phaser.Math.Between(centerArea.x1, centerArea.x2);
-            let cy = Phaser.Math.Between(centerArea.y1, centerArea.y2);
-            let attempts = 0;
-            while (isTooClose(cx, cy) && attempts < 40) { cx = Phaser.Math.Between(centerArea.x1, centerArea.x2); cy = Phaser.Math.Between(centerArea.y1, centerArea.y2); attempts++; }
+        const clusters = Math.max(1, cfg.clusters || 1);
+        const perCluster = Math.max(1, cfg.perCluster || 3);
+        const clusterRadius = Math.max(40, cfg.clusterRadius || 96);
+        for (let c = 0; c < clusters; c++) {
+            let cx = 0, cy = 0, attempts = 0;
+            do {
+                cx = Phaser.Math.Between(bounds.x1, bounds.x2);
+                cy = Phaser.Math.Between(bounds.y1, bounds.y2);
+                attempts++;
+            } while (isTooClose(cx, cy) && attempts < 30);
             if (isTooClose(cx, cy)) continue;
             for (let i = 0; i < perCluster; i++) {
-                if (placedNodes.length >= MAX_NODES || remainingForThisOre <= 0) break;
-                const angle = Math.random() * Math.PI * 2;
-                const rad = Math.random() * (cfg.clusterRadius || 80);
-                const nx = Math.round(cx + Math.cos(angle) * rad);
-                const ny = Math.round(cy + Math.sin(angle) * rad);
-                if (placeNode(nx, ny, cfg.type)) remainingForThisOre--;
+                let angle = Math.random() * Math.PI * 2;
+                let rad = Math.random() * clusterRadius;
+                let nx = Math.round(cx + Math.cos(angle) * rad);
+                let ny = Math.round(cy + Math.sin(angle) * rad);
+                // clamp to bounds
+                nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
+                ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
+                let innerAttempts = 0;
+                while (isTooClose(nx, ny) && innerAttempts < 20) {
+                    angle = Math.random() * Math.PI * 2; rad = Math.random() * clusterRadius;
+                    nx = Math.round(cx + Math.cos(angle) * rad);
+                    ny = Math.round(cy + Math.sin(angle) * rad);
+                    nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
+                    ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
+                    innerAttempts++;
+                }
+                if (!isTooClose(nx, ny)) {
+                    try { this._createMiningNode(nx, ny, cfg.type); } catch (e) {}
+                    placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type: cfg.type });
+                }
             }
         }
-        cfg._remaining = remainingForThisOre; // carry into scatter phase for balance
-    }
-
-    // 2) Blue-noise scatter: dart throwing with min separation until cap
-    let scatterAttempts = 0;
-    while (placedNodes.length < MAX_NODES && scatterAttempts < MAX_NODES * 20) {
-        scatterAttempts++;
-        const sx = Phaser.Math.Between(bounds.x1, bounds.x2);
-        const sy = Phaser.Math.Between(bounds.y1, bounds.y2);
-        // cycle ore types to keep variety; prefer ones with remaining quota
-        const preferred = oreConfigs.find(c => (c._remaining || 0) > 0) || oreConfigs[placedNodes.length % oreConfigs.length];
-        if (placeNode(sx, sy, preferred.type)) {
-            if (preferred._remaining && preferred._remaining > 0) preferred._remaining--;
-        }
-    }
-    // Add several scattered filler nodes (proportional to MAX_NODES) and ensure they're tracked
-    const fillerCount = Math.max(8, Math.round(MAX_NODES * 0.18));
-    for (let i = 0; i < fillerCount; i++) {
-        if (placedNodes.length >= MAX_NODES) break;
-        let sx = Phaser.Math.Between(bounds.x1, bounds.x2);
-        let sy = Phaser.Math.Between(bounds.y1, bounds.y2);
-        let tries = 0;
-        while (isTooClose(sx, sy) && tries < 40) { sx = Phaser.Math.Between(bounds.x1, bounds.x2); sy = Phaser.Math.Between(bounds.y1, bounds.y2); tries++; }
-        if (isTooClose(sx, sy)) continue;
-        // pick an ore type cycling through available configs so distribution stays varied
-        const oreType = (oreConfigs && oreConfigs.length) ? oreConfigs[i % oreConfigs.length].type : ((i % 2 === 0) ? 'tin' : 'copper');
-        this._createMiningNode(sx, sy, oreType);
-        placedNodes.push({ x: sx, y: sy, r: NODE_RADIUS, type: oreType });
     }
 
     // Cave decorations: rocks and stalactites
