@@ -1625,6 +1625,16 @@ function sharedAttachEnemyBars(enemy) {
                     else if (def && def.tier === 'boss') level = 10;
                     else level = 1;
                 }
+                // Extract a defense value if present (support multiple key spellings / sources)
+                let defenseVal = 0;
+                try {
+                    if (def && typeof def.defense === 'number') defenseVal = def.defense;
+                    else if (def && typeof def.def === 'number') defenseVal = def.def;
+                    else if (def && typeof def.defence === 'number') defenseVal = def.defence;
+                    // allow enemy instance override
+                    const instDef = safeGetData(enemy, 'defense') || safeGetData(enemy, 'def') || safeGetData(enemy, 'defence');
+                    if (typeof instDef === 'number') defenseVal = instDef;
+                } catch (e) { defenseVal = 0; }
                 const labelOffset = (cfg.nameOffset != null) ? cfg.nameOffset : (offsetY + 14);
                 const rarity = _inferEnemyRarity(defId, def);
                 const nameColor = _rarityToColor(rarity);
@@ -1640,6 +1650,10 @@ function sharedAttachEnemyBars(enemy) {
                         strokeThickness: 3
                     }
                 ).setOrigin(0.5).setDepth(depth);
+                // Store cached info for tooltip usage
+                enemy._cachedName = name;
+                enemy._cachedLevel = level;
+                enemy._cachedDefense = defenseVal;
             } catch (e) {
                 enemy.nameLabel = null;
             }
@@ -1662,6 +1676,70 @@ function sharedAttachEnemyBars(enemy) {
             enemy.poisonLabel = null;
         }
         this._updateEnemyBarPosition(enemy);
+        // Attach hover tooltip with enemy stats (level / HP / max HP / DEF)
+        try {
+            if (enemy.setInteractive && typeof enemy.setInteractive === 'function') enemy.setInteractive();
+            const showTip = (pointer) => {
+                try {
+                    // Build or reuse a lightweight tooltip container anchored above the enemy
+                    const hp = Math.max(0, Number(safeGetData(enemy, 'hp') || enemy._cachedHP || 0));
+                    const maxhp = Math.max(1, Number(safeGetData(enemy, 'maxhp') || enemy._cachedMaxHP || 1));
+                    const level = Number(safeGetData(enemy, 'level') || enemy._cachedLevel || 1);
+                    // re-derive defense (instance override > def > cached)
+                    let defVal = 0; try {
+                        const defId = safeGetData(enemy, 'defId');
+                        const def = (defId && this.enemyDefs) ? this.enemyDefs[defId] : null;
+                        const instDef = safeGetData(enemy, 'defense') || safeGetData(enemy, 'def') || safeGetData(enemy, 'defence');
+                        if (typeof instDef === 'number') defVal = instDef;
+                        else if (def && typeof def.defense === 'number') defVal = def.defense;
+                        else if (def && typeof def.def === 'number') defVal = def.def;
+                        else if (def && typeof def.defence === 'number') defVal = def.defence;
+                        else defVal = (typeof enemy._cachedDefense === 'number') ? enemy._cachedDefense : 0;
+                    } catch (e) { defVal = (typeof enemy._cachedDefense === 'number') ? enemy._cachedDefense : 0; }
+
+                    const label = `Lv ${level}  HP ${hp}/${maxhp}  DEF ${Math.max(0, Math.round(defVal))}`;
+                    // create graphics+text if missing
+                    if (!enemy._hoverTipGroup) {
+                        const padX = 8, padY = 5;
+                        const txt = this.add.text(enemy.x, enemy.y - (offsetY + 34), label, { fontSize: '12px', color: '#fff', fontFamily: 'Segoe UI, Roboto, sans-serif' }).setOrigin(0.5).setDepth(depth + 2);
+                        const bg = this.add.rectangle(txt.x, txt.y, Math.max(80, txt.width + padX * 2), txt.height + padY * 2, 0x0b0f14, 0.85).setDepth(depth + 1).setOrigin(0.5);
+                        try { bg.setStrokeStyle(1, 0xffffff, 0.08); } catch (e) {}
+                        enemy._hoverTipText = txt; enemy._hoverTipBg = bg; enemy._hoverTipGroup = true;
+                    } else {
+                        if (enemy._hoverTipText) enemy._hoverTipText.setText(label);
+                        if (enemy._hoverTipBg && enemy._hoverTipText) enemy._hoverTipBg.setSize(Math.max(80, enemy._hoverTipText.width + 16), enemy._hoverTipText.height + 10);
+                    }
+                    // position to follow enemy
+                    if (enemy._hoverTipText && enemy._hoverTipBg) {
+                        const tipY = enemy.y - (offsetY + 34);
+                        enemy._hoverTipText.setPosition(enemy.x, tipY);
+                        enemy._hoverTipBg.setPosition(enemy.x, tipY);
+                        enemy._hoverTipText.setVisible(true);
+                        enemy._hoverTipBg.setVisible(true);
+                    }
+                } catch (e) {}
+            };
+            const hideTip = () => {
+                try {
+                    if (enemy._hoverTipText) enemy._hoverTipText.setVisible(false);
+                    if (enemy._hoverTipBg) enemy._hoverTipBg.setVisible(false);
+                } catch (e) {}
+            };
+            if (enemy.on && typeof enemy.on === 'function') {
+                enemy.on('pointerover', showTip);
+                enemy.on('pointerout', hideTip);
+                // keep the tip updated while hovering
+                enemy.on('pointermove', showTip);
+            }
+            // Clean up tooltip on death/destroy
+            try {
+                enemy.once && enemy.once('destroy', () => {
+                    try { if (enemy._hoverTipText) enemy._hoverTipText.destroy(); } catch (e) {}
+                    try { if (enemy._hoverTipBg) enemy._hoverTipBg.destroy(); } catch (e) {}
+                    enemy._hoverTipText = null; enemy._hoverTipBg = null; enemy._hoverTipGroup = null;
+                });
+            } catch (e) {}
+        } catch (e) { /* hover tooltip optional */ }
     } catch (e) { /* ignore */ }
 }
 
@@ -1707,6 +1785,11 @@ function sharedUpdateEnemyBarPosition(enemy) {
         enemy.healthBarBg.setPosition(enemy.x, y);
         if (enemy.healthBar) enemy.healthBar.setPosition(enemy.x, y);
         if (enemy.nameLabel) enemy.nameLabel.setPosition(enemy.x, enemy.y - nameOffset);
+        // Keep cached runtime values fresh for tooltip
+        try {
+            enemy._cachedHP = safeGetData(enemy, 'hp');
+            enemy._cachedMaxHP = safeGetData(enemy, 'maxhp');
+        } catch (e) {}
     } catch (e) { /* ignore */ }
 }
 
@@ -3598,16 +3681,17 @@ function _talentActivatedHandler(payload) {
                     } catch (e) { ang = 0; }
                     const startX = scene.player.x;
                     const startY = scene.player.y;
+                    // compute teleport destination and move the player
                     const tx = startX + Math.cos(ang) * teleDist;
                     const ty = startY + Math.sin(ang) * teleDist;
-                    if (scene.player && scene.player.body && typeof scene.player.body.reset === 'function') {
-                        scene.player.body.reset(tx, ty);
-                        try { scene.player.setVelocity(0, 0); } catch (e) {}
-                    } else if (scene.tweens && scene.player) {
-                        scene.tweens.add({ targets: scene.player, x: tx, y: ty, duration: 150, ease: 'Cubic.easeOut' });
-                    } else {
-                        scene.player.x = tx; scene.player.y = ty;
-                    }
+                    try {
+                        if (scene.player && scene.player.body && typeof scene.player.body.reset === 'function') {
+                            scene.player.body.reset(tx, ty);
+                            try { scene.player.setVelocity(0, 0); } catch (ee) {}
+                        } else if (scene.player) {
+                            scene.player.x = tx; scene.player.y = ty;
+                        }
+                    } catch (e) {}
 
                     const now = Date.now();
                     const durMs = Math.max(300, Math.round(stealthSeconds * 1000));
