@@ -3140,7 +3140,7 @@ export function openTalentModal(scene) {
         style.id = 'talent-modal-styles';
         style.textContent = `
             #talent-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:250; }
-            #talent-modal .talent-shell { background:linear-gradient(135deg,#1b1b21,#101014); border:3px solid #111; border-left:8px solid rgba(120,20,20,0.9); border-radius:14px; min-width:1080px; max-width:1360px; max-height:82vh; display:flex; flex-direction:column; box-shadow:0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.04); font-family:'Share Tech Mono', monospace; color:#f0c9b0; overflow:hidden; }
+            #talent-modal .talent-shell { background:linear-gradient(135deg,#1b1b21,#101014); border:3px solid #111; border-left:8px solid rgba(120,20,20,0.9); border-radius:14px; width:clamp(1080px, 50vw, 1360px); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.04); font-family:'Share Tech Mono', monospace; color:#f0c9b0; overflow:hidden; }
             #talent-modal .talent-head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding:16px 20px 14px; background:linear-gradient(90deg,rgba(50,40,34,0.8),rgba(32,24,20,0.7)); border-bottom:2px solid rgba(255,210,122,0.25); }
             #talent-modal .talent-head h1 { font-family:'Metal Mania',cursive; font-size:1.85rem; margin:0; letter-spacing:1px; color:#ffd8a0; text-shadow:0 3px 10px rgba(0,0,0,0.8); }
             #talent-modal .talent-head .meta { display:flex; flex-wrap:wrap; gap:12px; font-size:0.75rem; letter-spacing:0.08em; color:#caa78e; }

@@ -881,7 +881,7 @@ export class Cave extends Phaser.Scene {
             const states = objectiveStateFn ? objectiveStateFn(this.char, equipQuestId) : null;
             const list = ui.buildObjectiveList(equipQuestDef, states, '#d4a574');
             if (list) bodyNodes.push(list);
-            optionConfigs.push({ label: 'Hand over the ore', onClick: () => { try { if (completeQuest) completeQuest(this.char, equipQuestId); const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); this._showToast('Quest completed: ' + ((equipQuestDef && equipQuestDef.name) || equipQuestId), 2200); } catch (e) {} }, variant: 'success' });
+            optionConfigs.push({ label: 'Hand over the ore', onClick: () => { try { if (completeQuest) completeQuest(this.char, equipQuestId); const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); this._showToast('Quest completed: ' + ((equipQuestDef && equipQuestDef.name) || equipQuestId), 2200); } catch (e) {} finally { try { closeDialogue(); } catch (e) {} } }, variant: 'success' });
             optionConfigs.push({ label: 'Give me a moment.', onClick: () => { closeDialogue(); } });
         } else if (activeEquipQuest) {
             bodyNodes.push(ui.createDialogueParagraph('Keep using that pickaxe. The cave yields more if you get the rhythm right.'));
