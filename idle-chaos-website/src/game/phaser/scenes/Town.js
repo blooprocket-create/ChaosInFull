@@ -25,8 +25,13 @@ export class Town extends Phaser.Scene {
     // Ensure cleanup manager is attached early for this scene
     try { attach(this); } catch (e) {}
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
-    // Atmospheric fog overlay using Phaser particle system
-    try { if (window && window.__overlays_shared && window.__overlays_shared.createAtmosphericOverlays) { this._overlays = window.__overlays_shared.createAtmosphericOverlays(this, { idPrefix: 'town', zIndexBase: 120, layers: ['fog'] }); } } catch (e) { this._overlays = null; }
+    // Atmospheric fog overlay (skip when low graphics mode enabled)
+    try {
+        const lowGfx = (window && window.__game_settings && window.__game_settings.lowGraphics) || false;
+        if (!lowGfx && window && window.__overlays_shared && window.__overlays_shared.createAtmosphericOverlays) {
+            this._overlays = window.__overlays_shared.createAtmosphericOverlays(this, { idPrefix: 'town', zIndexBase: 120, layers: ['fog'] });
+        }
+    } catch (e) { this._overlays = null; }
 
     this._startSafeZoneRegen();
     setSceneKey('Town');
@@ -40,6 +45,7 @@ export class Town extends Phaser.Scene {
     } catch (e) {
         this.cameras.main.setBackgroundColor('#3b3b33');
     }
+    // Apply ambient FX (internally respects low graphics mode for particles/tweens)
     applyAmbientFx(this, 'town');
 
     // Bounds within which we place town objects

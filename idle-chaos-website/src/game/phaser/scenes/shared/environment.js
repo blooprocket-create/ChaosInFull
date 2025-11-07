@@ -436,39 +436,42 @@ function ensureParticleTexture(scene, key, color) {
 }
 
 export function applyAmbientFx(scene, themeKey, options = {}) {
+    // Low graphics mode: drastically reduce or skip ambient FX to improve performance on older hardware.
+    const lowGraphics = (typeof window !== 'undefined' && window.__game_settings && window.__game_settings.lowGraphics) ? true : false;
     const defaults = AMBIENT_THEMES[themeKey] || AMBIENT_THEMES.town;
     const theme = mergeNested(defaults, options);
     const width = scene.scale.width;
     const height = scene.scale.height;
-
+    // Overlay (minimal and static if low graphics)
     const overlay = scene.add.graphics().setScrollFactor(0).setDepth(theme.overlayDepth != null ? theme.overlayDepth : 4);
     const topColor = theme.overlayTop || 0x222530;
     const bottomColor = theme.overlayBottom || 0x111217;
     overlay.clear();
     overlay.fillGradientStyle(topColor, topColor, bottomColor, bottomColor, 1);
-    overlay.fillRect(0, 0, width, height);
-    overlay.setAlpha(theme.overlayAlpha != null ? theme.overlayAlpha : 0.2);
+    const baseAlpha = theme.overlayAlpha != null ? theme.overlayAlpha : 0.2;
+    overlay.setAlpha(lowGraphics ? baseAlpha * 0.4 : baseAlpha);
     overlay.setBlendMode(theme.overlayBlend != null ? theme.overlayBlend : Phaser.BlendModes.SOFT_LIGHT);
-
-    scene.tweens.add({
-        targets: overlay,
-        alpha: {
-            from: overlay.alpha,
-            to: overlay.alpha * Phaser.Math.FloatBetween(0.55, 0.75)
-        },
-        duration: Phaser.Math.Between(3800, 5200),
-        ease: 'Sine.easeInOut',
-        yoyo: true,
-        repeat: -1
-    });
-
+    if (!lowGraphics) {
+        scene.tweens.add({
+            targets: overlay,
+            alpha: {
+                from: overlay.alpha,
+                to: overlay.alpha * Phaser.Math.FloatBetween(0.55, 0.75)
+            },
+            duration: Phaser.Math.Between(3800, 5200),
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        });
+    }
     registerAmbient(scene, overlay);
 
     const particleKey = theme.particleKey || '__ambient_particle';
-    ensureParticleTexture(scene, particleKey, theme.particleColor || 0xffffff);
+    if (!lowGraphics) ensureParticleTexture(scene, particleKey, theme.particleColor || 0xffffff);
 
     const sprites = [];
-    const particleCount = Math.max(8, (theme.particleQuantity != null ? theme.particleQuantity : 2) * 10);
+    const particleCountRaw = Math.max(8, (theme.particleQuantity != null ? theme.particleQuantity : 2) * 10);
+    const particleCount = lowGraphics ? Math.min(8, Math.round(particleCountRaw * 0.25)) : particleCountRaw;
     const minLife = theme.particleLife ? theme.particleLife[0] : 5200;
     const maxLife = theme.particleLife ? theme.particleLife[1] : 9400;
     const speed = theme.particleSpeed || 16;
@@ -478,7 +481,8 @@ export function applyAmbientFx(scene, themeKey, options = {}) {
     const endScale = theme.particleScale ? theme.particleScale[1] : 0.15;
     const blendMode = theme.particleBlend != null ? theme.particleBlend : Phaser.BlendModes.ADD;
 
-    for (let i = 0; i < particleCount; i++) {
+    if (!lowGraphics) {
+        for (let i = 0; i < particleCount; i++) {
         const sx = Phaser.Math.Between(0, width);
         const sy = Phaser.Math.Between(0, height);
         const scaleStart = Phaser.Math.FloatBetween(startScale * 0.7, startScale * 1.1);
@@ -508,6 +512,7 @@ export function applyAmbientFx(scene, themeKey, options = {}) {
         });
         scene._ambientTweens = scene._ambientTweens || [];
         scene._ambientTweens.push(tween);
+        }
     }
 
     return { overlay, sprites };

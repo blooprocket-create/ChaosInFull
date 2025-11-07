@@ -27,6 +27,10 @@ declare global {
     __overlays_shared: unknown;
     __portal_shared: unknown;
     __workbench_shared: unknown;
+    // Expose Phaser registry for React polling (QuestPanel)
+    __phaserRegistry?: PhaserTypes.Data.DataManager;
+    // Expose game instance (used sparsely for registry access)
+    GAME?: PhaserTypes.Game;
   }
 }
 
@@ -211,6 +215,10 @@ export async function createPhaserGame(opts: {
   // Expose game instance
   if (typeof window !== 'undefined') {
     window.GAME = game;
+    try {
+      // Expose Phaser registry so React UI can poll questDirtyCount and other flags
+      window.__phaserRegistry = game.registry;
+    } catch {}
   }
 
   // Start with the specified scene or Boot
