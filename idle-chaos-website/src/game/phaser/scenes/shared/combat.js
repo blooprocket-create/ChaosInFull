@@ -927,23 +927,23 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                                         fx.setRotation(Phaser.Math.Angle.Between(startX, startY, enemy.x, enemy.y));
                                         if (this.tweens) this.tweens.add({ targets: fx, alpha: 0, scaleX: 0.2, duration: 140, ease: 'Cubic.easeIn', onComplete: () => { try { fx.destroy(); } catch (e) {} } });
                                     } catch (e) {}
-                                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffd8b3', { isSpell: false }); } catch (e) {}
+                                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffd8b3', { isSpell: false, breaksStealth: true }); } catch (e) {}
                                 } else {
                                     // Staff orb impact: radial flash
                                     try { const fx = this.add.circle(enemy.x, enemy.y, 18, 0x88ddff, 0.28).setDepth((enemy.depth || 7) + 0.2); if (this.tweens) this.tweens.add({ targets: fx, alpha: 0, scale: 1.6, duration: 240, onComplete: () => { try { fx.destroy(); } catch (e) {} } }); } catch (e) {}
-                                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: true }); } catch (e) {}
+                                    try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: true, breaksStealth: true }); } catch (e) {}
                                 }
                             } catch (e) {}
                             try { if (proj && proj.destroy) proj.destroy(); } catch (e) {}
                         } });
                     } catch (e) {
                         // fallback to direct damage if VFX fails
-                        try { _dealPlayerDamage(this, enemy, baseDamage, isBow ? '#ffd8b3' : '#ffee66', { isSpell: isStaff && !isBow }); } catch (ee) {}
+                        try { _dealPlayerDamage(this, enemy, baseDamage, isBow ? '#ffd8b3' : '#ffee66', { isSpell: isStaff && !isBow, breaksStealth: true }); } catch (ee) {}
                     }
                 } else {
                     // Melee attack: delay damage until ~70% through attack animation
                     const applyMeleeDamage = () => {
-                        try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: isStaff }); } catch (e) {}
+                        try { _dealPlayerDamage(this, enemy, baseDamage, '#ffee66', { isSpell: isStaff, breaksStealth: true }); } catch (e) {}
                     };
                     if (animDelayMs > 0 && this.time && this.time.delayedCall) {
                         this.time.delayedCall(animDelayMs, applyMeleeDamage);
@@ -981,7 +981,7 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                                 const d = pdist(this, e.x, e.y);
                                 if (d <= cleaveRadius) {
                                     const cleaveDmg = Math.max(1, (baseDamage * (cleavePct / 100)));
-                                    _dealPlayerDamage(this, e, cleaveDmg, '#ffd4b3');
+                                    _dealPlayerDamage(this, e, cleaveDmg, '#ffd4b3', { breaksStealth: true });
                                     // small visual
                                     try { highlightEnemy(this, e, { color: 0xffcc88, duration: 220 }); } catch (ee) {}
                                     taken++;
@@ -2846,9 +2846,11 @@ function _dealPlayerDamage(scene, enemy, baseAmount, color, opts) {
                 }
             }
         } catch (e) {}
-        // If Shadowstep stealth is active, end stealth on first player-sourced damage (consume)
+        // If Shadowstep stealth is active, only break stealth when explicitly requested by the damage source.
+        // Rule: only a regular (basic) attack should break stealth. Skills like Needle Rain should not.
         try {
-            if (scene && scene.char && scene.char._shadowstep && scene.char._shadowstep.stealth) {
+            const shouldBreak = !!(opts && opts.breaksStealth === true);
+            if (shouldBreak && scene && scene.char && scene.char._shadowstep && scene.char._shadowstep.stealth) {
                 try {
                     // apply post-stealth effects (e.g., evasive_flourish) before clearing stealth
                     try { applyPostStealthEffects && applyPostStealthEffects(scene); } catch (e) {}
@@ -4098,7 +4100,7 @@ function _talentActivatedHandler(payload) {
                                                     if (!e || !safeGetData(e, 'alive')) continue;
                                                     try {
                                                         const d = Phaser.Math.Distance.Between(cxNow, cyNow, e.x, e.y);
-                                                        if (d <= impactRadius) _dealPlayerDamage(scene, e, perNeedleDmg, '#fff0dd');
+                                                        if (d <= impactRadius) _dealPlayerDamage(scene, e, perNeedleDmg, '#fff0dd', { breaksStealth: false });
                                                     } catch (ee) {}
                                                 }
                                                 // visual impact pulse
