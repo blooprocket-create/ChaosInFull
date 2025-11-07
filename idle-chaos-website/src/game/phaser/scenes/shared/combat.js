@@ -295,6 +295,56 @@ function getWeaponDamageRange(scene) {
     return [1, 3];
 }
 
+// Compute the "Spell base" exactly like the stats/skills modal:
+// - If a staff is equipped: (average weapon damage) + 2*INT
+// - Otherwise: 6 + 2*INT
+function computeSpellBase(scene, effStats) {
+    try {
+        const eff = effStats || ((window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(scene && scene.char ? scene.char : {}) : {});
+        const intStat = Number((eff && eff.int) || (scene && scene.char && scene.char.int) || 0) || 0;
+
+        // Try to read equipped weapon via item defs (supports id -> ITEM_DEFS lookup) or direct min/max fields
+        const itemDefs = (typeof window !== 'undefined' && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+        let weaponDef = null;
+        try {
+            const we = (scene && scene.char && scene.char.equipment && scene.char.equipment.weapon) ? scene.char.equipment.weapon :
+                       (scene && scene.char && scene.char.equipped && scene.char.equipped.weapon) ? scene.char.equipped.weapon : null;
+            if (we) {
+                if (we.id && itemDefs[we.id]) weaponDef = itemDefs[we.id];
+                else weaponDef = we; // may already contain minDamage/maxDamage or damage range
+            }
+        } catch (e) { weaponDef = null; }
+
+        let isStaff = false;
+        try {
+            const key = (weaponDef && (weaponDef.id || weaponDef.name || weaponDef.weaponType)) ? (weaponDef.weaponType || weaponDef.id || weaponDef.name) : '';
+            isStaff = /staff/i.test(String(key));
+        } catch (e) { isStaff = false; }
+
+        let avgWeapon = 0;
+        try {
+            if (weaponDef) {
+                if (Array.isArray(weaponDef.damage) && weaponDef.damage.length >= 2) {
+                    const min = Number(weaponDef.damage[0]) || 0;
+                    const max = Number(weaponDef.damage[1]) || 0;
+                    avgWeapon = (min + max) / 2;
+                } else if (typeof weaponDef.minDamage === 'number' && typeof weaponDef.maxDamage === 'number') {
+                    avgWeapon = (Number(weaponDef.minDamage) + Number(weaponDef.maxDamage)) / 2;
+                } else {
+                    const [minR, maxR] = getWeaponDamageRange(scene);
+                    avgWeapon = (Number(minR) + Number(maxR)) / 2;
+                }
+            }
+        } catch (e) { avgWeapon = 0; }
+
+        if (isStaff) {
+            return Math.max(1, Math.round(avgWeapon + (2 * intStat)));
+        } else {
+            return Math.max(1, Math.round(6 + (2 * intStat)));
+        }
+    } catch (e) { return 6; }
+}
+
 function spawnArcaneSigil(scene, x, y, radius, opts = {}) {
     if (!scene || !scene.add) return null;
     try {
@@ -3163,16 +3213,14 @@ function _talentActivatedHandler(payload) {
             }
             case 'forbidden_balls': {
                 try {
-                    // Forbidden Balls: spawn a ring of void-orbs that orbit the player for a short duration.
-                    // If an enemy enters trigger range, that orb will detach and home to the enemy.
-                    const count = Math.max(3, Math.round(scaledValue || (1 + (Number(rank || 0)))));
-                    const baseSpell = Math.max(6, ((eff && eff.int) || 0) * 2 + 6);
-                    const dmgPercent = (typeof secondScaling !== 'undefined' && secondScaling) ? (secondScaling.base || scaledValue || 100) : (scaledValue || 100);
-                    // secondScaling is used in talents.js to express percent damage; prefer that when present
-                    const dmg = Math.max(1, Math.round(baseSpell * ((Number((eff && eff.secondScaling && eff.secondScaling.value) || 0) || (typeof secondScaling !== 'undefined' && secondScaling && secondScaling.base) || (dmgPercent)) / 100)));
-                    // fallback simpler dmg derivation if above fails
-                    const finalDmg = Math.max(1, Math.round(baseSpell * ((Number((scaledValue || 100)) / 100))));
-                    const usedDmg = isNaN(dmg) || dmg <= 0 ? finalDmg : dmg;
+                    // Forbidden Balls: spawn a ring of void-orbs that orbit, detach on nearby enemy, and home/impact.
+                    // Damage basis must match the stats/skills modal's "Spell base" to keep UI and combat aligned.
+                    const tmods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : {};
+                    const countFlat = (tmods['forbiddenBalls.count'] && (tmods['forbiddenBalls.count'].flat != null)) ? Number(tmods['forbiddenBalls.count'].flat) : (scaledValue || 2);
+                    const count = Math.max(1, Math.round(countFlat));
+                    const dmgPct = (tmods['forbiddenBalls.damage'] && (tmods['forbiddenBalls.damage'].percent != null)) ? Number(tmods['forbiddenBalls.damage'].percent) : 0;
+                    const baseSpell = computeSpellBase(scene, eff);
+                    const usedDmg = Math.max(1, Math.round(Number(baseSpell) * (Number(dmgPct) / 100)));
                     const ballDepth = (scene.player && typeof scene.player.depth === 'number') ? scene.player.depth + 0.2 : 9.2;
                     // orbit parameters
                     const orbitDuration = 2200; // ms the orbs orbit before expiring
@@ -3180,12 +3228,14 @@ function _talentActivatedHandler(payload) {
                     const orbitRadius = 48;
                     const orbitSpeedBase = 0.15; // radians per tick (~40ms)
                     const triggerRange = 96; // when an enemy is within this distance from the orb, it will detach
+                    const launchGapMs = 200; // spawn cadence between orbs
 
                     // ensure assets
                     try { ensureVoidOrbAssets && ensureVoidOrbAssets(scene); } catch (e) {}
 
                     const orbs = [];
-                    for (let i = 0; i < count; i++) {
+
+                    const spawnOne = (i) => {
                         try {
                             const ang = (Math.PI * 2 * i) / Math.max(1, count);
                             const spawnX = scene.player.x + Math.cos(ang) * orbitRadius;
@@ -3195,7 +3245,7 @@ function _talentActivatedHandler(payload) {
                             if (!orb) {
                                 try { orb = scene.add.circle(spawnX, spawnY, 8, 0x2b004b, 0.95).setDepth(ballDepth); if (scene.physics && scene.physics.add) scene.physics.add.existing(orb); } catch (e) { orb = null; }
                             }
-                            if (!orb) continue;
+                            if (!orb) return;
                             if (orb.setOrigin) orb.setOrigin(0.5, 0.5);
                             if (orb.setDepth) orb.setDepth(ballDepth);
                             try { if (orb.setBlendMode) orb.setBlendMode(Phaser.BlendModes.ADD); } catch (e) {}
@@ -3211,7 +3261,7 @@ function _talentActivatedHandler(payload) {
                             orb._dmg = usedDmg;
 
                             // trail/glow polish
-                            try { if (typeof createVoidOrbTrail === 'function') orb._trail = createVoidOrbTrail(scene, orb, ballDepth - 0.1); } catch (e) {}
+                            try { if (typeof createVoidOrbTrailEmitter === 'function') orb._trail = createVoidOrbTrailEmitter(scene, orb, ballDepth - 0.1); } catch (e) {}
 
                             // per-orb orbit updater: position around current player position and look for enemies
                             let orbitTimer = null;
@@ -3332,6 +3382,14 @@ function _talentActivatedHandler(payload) {
 
                             orbs.push(orb);
                         } catch (e) {}
+                    };
+
+                    for (let i = 0; i < count; i++) {
+                        if (scene.time && scene.time.addEvent) {
+                            scene.time.addEvent({ delay: i * launchGapMs, callback: () => spawnOne(i) });
+                        } else {
+                            spawnOne(i);
+                        }
                     }
 
                     try { if (scene._showToast) scene._showToast('Forbidden Balls!', 700); } catch (e) {}

@@ -900,7 +900,7 @@ export class Cave extends Phaser.Scene {
                 if (equipQuestDef && equipQuestDef.description) bodyNodes.push(ui.createDialogueParagraph(equipQuestDef.description));
                 optionConfigs.push({ label: 'I will equip and mine.', onClick: () => {
                     if (!startQuest) { return; }
-                    if ((this.char.activeQuests || []).some(q => q.id === equipQuestId)) { return; }
+                    if ((this.char.activeQuests || []).some(q => q.id === equipQuestId)) { closeDialogue(); return; }
                     const started = startQuest(this.char, equipQuestId);
                     if (started) {
                         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
@@ -908,6 +908,8 @@ export class Cave extends Phaser.Scene {
                         try { if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); } catch (e) {}
                         this._showToast('Quest started: ' + ((equipQuestDef && equipQuestDef.name) || equipQuestId), 2200);
                     }
+                    // Close the dialogue after handling the click so players can get back to mining.
+                    closeDialogue();
                 }, variant: 'success' });
                 optionConfigs.push({ label: 'Maybe later.', onClick: () => { closeDialogue(); } });
             } else if (nextWayneQuest) {

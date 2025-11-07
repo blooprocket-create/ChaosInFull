@@ -279,9 +279,10 @@ const occultistTalents = [
         kind: 'passive'
     }),
     makeTalent('forbidden_balls', 'Forbidden Balls', {//works
-        description: 'Set hungry stars loose. Launch homing void orbs that seek the nearest enemy and explode on impact. Orbs spawn one every 0.2s. Fires {value} orb(s); each orb deals {secondValue}% damage on hit.',
+        description: 'Set hungry stars loose. Launch homing void orbs that seek the nearest enemy and explode on impact. Orbs spawn one every 0.2s. Fires {value} orb(s). Each orb deals {secondValue}% of your Spell DMG on hit, then crits and enemy reductions apply.',
         scaling: { type: 'flat', target: 'forbiddenBalls.count', base: 2, perRank: 1 },
-        secondScaling: { type: 'percent', target: 'forbiddenBalls.damage', base: 80, perRank: 6 },
+        // Rebalanced: rank 1 = 22%, rank 100 = 165% using base + per*(rank-1). per = (165-22)/99 ≈ 1.4444
+        secondScaling: { type: 'percent', target: 'forbiddenBalls.damage', base: 22, perRank: 1.45 },
         tags: ['aoe', 'offensive', 'occultist'],
         kind: 'active',
         activeType: 'offensive',
