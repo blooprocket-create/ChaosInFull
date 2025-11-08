@@ -3880,61 +3880,36 @@ function _talentActivatedHandler(payload) {
                 } catch (e) {}
                 break;
             }
-            case 'shadowstep': {
-                try {
-                    // Reuse Ghastly Drive / Hex Engine direction priority but apply Shadowstep effects only (no teleport already handled earlier? This adds directional dash if not implemented.)
-                    const dashDist = 160;
-                    let ang = 0;
-                    try {
-                        if (scene.autoTarget && scene.autoTarget.getData && scene.autoTarget.getData('alive')) {
-                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.autoTarget.x, scene.autoTarget.y);
-                        } else {
-                            let wx = null, wy = null;
-                            const pointer = scene.input && scene.input.activePointer;
-                            if (scene.cameras && scene.cameras.main && pointer) {
-                                try { const wp = scene.cameras.main.getWorldPoint(pointer.x, pointer.y); wx = wp.x; wy = wp.y; } catch (e) {}
-                            }
-                            if ((wx === null || wy === null) && pointer && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') { wx = pointer.worldX; wy = pointer.worldY; }
-                            if (wx !== null && wy !== null) {
-                                ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, wx, wy);
-                            } else {
-                                const body = scene.player && scene.player.body;
-                                if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) ang = Math.atan2(body.velocity.y, body.velocity.x);
-                                else if (scene._facing) { const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 }; ang = fmap[scene._facing] || 0; }
-                                else if (scene.player && typeof scene.player.rotation === 'number') ang = scene.player.rotation;
-                            }
-                        }
-                    } catch (e) { ang = 0; }
-                    const sx = scene.player.x; const sy = scene.player.y;
-                    const tx = sx + Math.cos(ang) * dashDist; const ty = sy + Math.sin(ang) * dashDist;
-                    try {
-                        if (scene.player && scene.player.body && typeof scene.player.body.reset === 'function') { scene.player.body.reset(tx, ty); try { scene.player.setVelocity(0,0); } catch(e){} }
-                        else { scene.player.x = tx; scene.player.y = ty; }
-                    } catch(e){}
-                    try { spawnDashTrail && spawnDashTrail(scene, sx, sy, tx, ty, 0x222244); } catch(e){}
-                    try { if (scene._showToast) scene._showToast('Shadowstep dash', 600); } catch(e){}
-                    markActivationSuccess(scene, tid);
-                } catch(e){}
-                break;
-            }
+            // Removed duplicate early Shadowstep dash override; Shadowstep movement now integrated into the original stealth/teleport block below.
             case 'shadowstep': {
                 try {
                     const teleDist = 120;
                     // Interpret scaledValue as stealth duration (seconds)
                     const stealthSeconds = Number(scaledValue) || 3;
-                    // DR amount while stealthed: fully block (100%). Keep UI-compatible _shadowstepDR for display.
-                    const drAmount = 100;
-                    // Teleport in the direction the player is facing or moving. Fallback to pointer if unknown.
+                    const drAmount = 100; // DR while stealthed
+                    // Direction priority (mouse world > autoTarget > movement velocity > facing > rotation) to match Ghastly Drive / Hex Engine style
                     let ang = 0;
                     try {
-                        const body = scene.player && scene.player.body;
-                        if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
-                            ang = Math.atan2(body.velocity.y, body.velocity.x);
-                        } else if (scene._facing) {
-                            const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
-                            ang = fmap[scene._facing] || 0;
-                        } else if (scene.input && scene.input.activePointer) {
-                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.input.activePointer.worldX, scene.input.activePointer.worldY);
+                        let wx = null, wy = null;
+                        const pointer = scene.input && scene.input.activePointer;
+                        if (scene.cameras && scene.cameras.main && pointer) {
+                            try { const wp = scene.cameras.main.getWorldPoint(pointer.x, pointer.y); wx = wp.x; wy = wp.y; } catch (e) {}
+                        }
+                        if ((wx === null || wy === null) && pointer && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') { wx = pointer.worldX; wy = pointer.worldY; }
+                        if (wx !== null && wy !== null) {
+                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, wx, wy);
+                        } else if (scene.autoTarget && scene.autoTarget.getData && scene.autoTarget.getData('alive')) {
+                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.autoTarget.x, scene.autoTarget.y);
+                        } else {
+                            const body = scene.player && scene.player.body;
+                            if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
+                                ang = Math.atan2(body.velocity.y, body.velocity.x);
+                            } else if (scene._facing) {
+                                const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
+                                ang = fmap[scene._facing] || 0;
+                            } else if (scene.player && typeof scene.player.rotation === 'number') {
+                                ang = scene.player.rotation;
+                            }
                         }
                     } catch (e) { ang = 0; }
                     const startX = scene.player.x;
@@ -4015,6 +3990,8 @@ function _talentActivatedHandler(payload) {
                     } catch (e) {}
 
                     try { if (scene._showToast) scene._showToast('Shadowstep - stealthed', 900); } catch (e) {}
+                    // Visual dash trail toward destination for feedback (non-intrusive)
+                    try { spawnDashTrail && spawnDashTrail(scene, startX, startY, tx, ty, 0x222244); } catch(e){}
                     markActivationSuccess(scene, tid);
                 } catch (e) {}
                 break;
