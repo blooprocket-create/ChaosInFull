@@ -10,6 +10,7 @@ import { updateSmoothPlayerMovement, playDirectionalAnimation, updateDepthForTop
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { applyCombatMixin } from './shared/combat.js';
 import { attach as attachCleanup, addTimeEvent, addDocumentListener } from '../shared/cleanupManager.js';
+import { getQuestById, getQuestObjectiveState, startQuest, checkQuestCompletion, completeQuest, updateQuestProgress } from '../data/quests.js';
 
 const FISHING_RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const FISHING_RARITY_RANK = FISHING_RARITY_ORDER.reduce((acc, key, idx) => { acc[key] = idx; return acc; }, {});
@@ -166,6 +167,8 @@ export class BrokenDock extends Phaser.Scene {
     try { ensureCharTalents && ensureCharTalents(this.char); } catch (e) {}
         // Ensure dock questline flag exists
         try { if (!this.char.flags) this.char.flags = {}; if (typeof this.char.flags.dockStage !== 'number') this.char.flags.dockStage = 0; } catch(e) {}
+    // Migrate existing dockStage into quest completions (if any) to keep systems in sync
+    try { this._migrateDockQuestsFromStage && this._migrateDockQuestsFromStage(); } catch (e) {}
             // Ensure a portable _persistCharacter helper is available early so code in create()
             // that conditionally calls it (if present) will work even before the end-of-create wiring.
             try {
@@ -2026,15 +2029,21 @@ export class BrokenDock extends Phaser.Scene {
     }
 
     // --- Dock Repair Questline ---
-    _getDockRepairPlan() {
-        // stages: 0 -> 4 inclusive; max at 4
-        // each entry describes requirements to advance FROM that stage to next stage
-        return [
-            { to: 1, gold: 100, items: { iron_bar: 5 } },
-            { to: 2, gold: 250, items: { iron_bar: 12 } },
-            { to: 3, gold: 500, items: { iron_bar: 20 } },
-            { to: 4, gold: 1000, items: { iron_bar: 35 } }
-        ];
+    _getCurrentDockQuestId() {
+        const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+        if (stage >= 4) return null;
+        const next = stage + 1;
+        return `dock_repair_stage_${next}`;
+    }
+
+    _isDockQuestActive(qid) {
+        if (!qid || !this.char || !Array.isArray(this.char.activeQuests)) return false;
+        return this.char.activeQuests.some(q => q && q.id === qid);
+    }
+
+    _isDockQuestCompleted(qid) {
+        if (!qid || !this.char || !Array.isArray(this.char.completedQuests)) return false;
+        return this.char.completedQuests.includes(qid);
     }
 
     _countInventoryItem(itemId) {
@@ -2047,27 +2056,60 @@ export class BrokenDock extends Phaser.Scene {
         return total;
     }
 
-    _attemptDockRepair() {
-        const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
-        const plan = this._getDockRepairPlan();
-        if (stage >= 4) { this._showToast && this._showToast('Dock fully restored.'); return; }
-        const req = plan[stage];
-        if (!req) return;
-        const gold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
-        const haveIron = this._countInventoryItem('iron_bar');
-        const needIron = req.items.iron_bar || 0;
-        const needGold = req.gold || 0;
-        if (gold < needGold || haveIron < needIron) {
-            this._showToast && this._showToast('Not enough materials.');
+    _attemptDockContribution() {
+        const qid = this._getCurrentDockQuestId();
+        if (!qid) { this._showToast && this._showToast('Dock fully restored.'); return; }
+        const quest = getQuestById(qid);
+        if (!quest) { this._showToast && this._showToast('Dock repair data missing.'); return; }
+        // Ensure quest is active; if not, try to start
+        if (!this._isDockQuestActive(qid) && !this._isDockQuestCompleted(qid)) {
+            const started = startQuest(this.char, qid);
+            if (!started) { this._showToast && this._showToast('Cannot start repair quest yet.'); return; }
+        }
+        // Compute remaining requirements from objective state (support gold + any contribute_item targets)
+        const statuses = getQuestObjectiveState(this.char, qid) || [];
+        let needGold = 0;
+        const itemNeeds = {}; // target -> remaining
+        for (const s of statuses) {
+            const remain = Math.max(0, (s.required || 0) - (s.current || 0));
+            if (s.type === 'contribute_gold') needGold = remain;
+            if (s.type === 'contribute_item' && s.target) itemNeeds[s.target] = remain;
+        }
+        const haveGold = this.char.gold || 0;
+        const giveGold = needGold > 0 ? Math.min(needGold, haveGold) : 0;
+        const itemGives = {}; // target -> to contribute now
+        for (const [itemId, need] of Object.entries(itemNeeds)) {
+            if (need <= 0) continue;
+            const have = this._countInventoryItem(itemId);
+            if (have > 0) itemGives[itemId] = Math.min(need, have);
+        }
+        const hasAnyItems = Object.values(itemGives).some(v => v > 0);
+        if (giveGold <= 0 && !hasAnyItems) {
+            if (checkQuestCompletion(this.char, qid)) {
+                this._showToast && this._showToast('Ready to turn in.');
+            } else {
+                this._showToast && this._showToast('Not enough materials.');
+            }
             return;
         }
-        // consume
-        try { this.char.gold = gold - needGold; } catch (e) {}
-        try { this._consumeInventoryItem('iron_bar', needIron); } catch (e) {}
-        try { this.char.flags.dockStage = stage + 1; } catch (e) {}
+        // Consume and update quest progress
+        if (giveGold > 0) {
+            this.char.gold = Math.max(0, haveGold - giveGold);
+            updateQuestProgress(this.char, 'contribute_gold', null, giveGold);
+        }
+        for (const [itemId, qty] of Object.entries(itemGives)) {
+            if (qty > 0) {
+                this._consumeInventoryItem(itemId, qty);
+                updateQuestProgress(this.char, 'contribute_item', itemId, qty);
+            }
+        }
         this._persistCharacterState();
-        this._refreshDockVisual(this.char.flags.dockStage);
-        this._showToast && this._showToast(`Dock upgraded to Stage ${this.char.flags.dockStage}`);
+        // If complete, allow turn-in now
+        if (checkQuestCompletion(this.char, qid)) {
+            this._setDockUiStatus && this._setDockUiStatus('Ready to turn in', 'ready');
+        } else {
+            this._setDockUiStatus && this._setDockUiStatus('Contribution applied', 'active');
+        }
         if (this._dockUi) this._updateDockRepairOverlay();
     }
 
@@ -2129,7 +2171,7 @@ export class BrokenDock extends Phaser.Scene {
                 <div class="bdock-metric">
                     <label>Materials</label>
                     <div class="bdock-metric-value" data-role="mats">-</div>
-                    <div class="bdock-progress-meta" data-role="mats-note">Iron bars and gold fund the rebuild.</div>
+                    <div class="bdock-progress-meta" data-role="mats-note">Gold, logs and iron bars fund the rebuild.</div>
                 </div>
             </section>
             <div class="bdock-content">
@@ -2153,9 +2195,11 @@ export class BrokenDock extends Phaser.Scene {
                     </section>
                     <section class="bdock-section">
                         <h3>Action</h3>
-                        <div class="bdock-progress-meta" data-role="action-note">Contribute materials to progress the rebuild.</div>
+                        <div class="bdock-progress-meta" data-role="action-note">Accept the current stage, contribute materials, then turn in.</div>
                         <div class="bdock-footer-actions">
+                            <button class="bdock-btn outline" type="button" data-role="accept">Accept Stage</button>
                             <button class="bdock-btn primary" type="button" data-role="contribute">Contribute</button>
+                            <button class="bdock-btn ghost" type="button" data-role="turnin">Turn In</button>
                         </div>
                     </section>
                 </div>
@@ -2170,7 +2214,9 @@ export class BrokenDock extends Phaser.Scene {
             modal,
             statusEl: modal.querySelector('[data-role="status"]'),
             closeBtn: modal.querySelector('[data-role="close"]'),
+            acceptBtn: modal.querySelector('[data-role="accept"]'),
             contributeBtn: modal.querySelector('[data-role="contribute"]'),
+            turnInBtn: modal.querySelector('[data-role="turnin"]'),
             stageEl: modal.querySelector('[data-role="stage"]'),
             stageBar: modal.querySelector('[data-role="stage-bar"]'),
             stageNoteEl: modal.querySelector('[data-role="stage-note"]'),
@@ -2193,9 +2239,39 @@ export class BrokenDock extends Phaser.Scene {
         overlay.addEventListener('click', handleOverlayClick);
         ui.listeners.push(() => overlay.removeEventListener('click', handleOverlayClick));
 
-        const onContrib = () => this._attemptDockRepair();
+        this._setDockUiStatus = (text, tone = 'idle') => { try { if (ui.statusEl) { ui.statusEl.textContent = text; ui.statusEl.dataset.tone = tone; } } catch (e) {} };
+
+        const onAccept = () => {
+            const qid = this._getCurrentDockQuestId();
+            if (!qid) { this._setDockUiStatus('Dock fully restored', 'ready'); return; }
+            if (this._isDockQuestCompleted(qid)) { this._setDockUiStatus('Already completed; turn in next stage', 'ready'); return; }
+            if (this._isDockQuestActive(qid)) { this._setDockUiStatus('Stage already accepted', 'active'); return; }
+            const ok = startQuest(this.char, qid);
+            this._setDockUiStatus(ok ? 'Stage accepted' : 'Cannot accept stage yet', ok ? 'ready' : 'warn');
+            this._updateDockRepairOverlay();
+        };
+        const onContrib = () => this._attemptDockContribution();
+        const onTurnIn = () => {
+            const qid = this._getCurrentDockQuestId();
+            if (!qid) { this._setDockUiStatus('Dock fully restored', 'ready'); return; }
+            if (!checkQuestCompletion(this.char, qid)) { this._setDockUiStatus('Requirements not yet met', 'warn'); return; }
+            const ok = completeQuest(this.char, qid);
+            if (ok) {
+                this.char.flags = this.char.flags || {}; this.char.flags.dockStage = ((this.char.flags.dockStage || 0) + 1);
+                this._persistCharacterState();
+                this._refreshDockVisual(this.char.flags.dockStage);
+                this._setDockUiStatus(`Dock upgraded to Stage ${this.char.flags.dockStage}`, 'ready');
+            } else {
+                this._setDockUiStatus('Turn-in failed', 'warn');
+            }
+            this._updateDockRepairOverlay();
+        };
+        ui.acceptBtn.addEventListener('click', onAccept);
         ui.contributeBtn.addEventListener('click', onContrib);
+        ui.turnInBtn.addEventListener('click', onTurnIn);
+        ui.listeners.push(() => ui.acceptBtn.removeEventListener('click', onAccept));
         ui.listeners.push(() => ui.contributeBtn.removeEventListener('click', onContrib));
+        ui.listeners.push(() => ui.turnInBtn.removeEventListener('click', onTurnIn));
 
         this._dockUi = ui;
         this._updateDockRepairOverlay();
@@ -2205,44 +2281,90 @@ export class BrokenDock extends Phaser.Scene {
         if (!this._dockUi) return;
         const ui = this._dockUi;
         const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
-        const plan = this._getDockRepairPlan();
         const maxStage = 4;
         if (ui.stageEl) ui.stageEl.textContent = `${stage} / ${maxStage}`;
         if (ui.stageBar) ui.stageBar.style.width = `${Math.max(0, Math.min(100, Math.round((stage / maxStage) * 100)))}%`;
         if (ui.stageNoteEl) ui.stageNoteEl.textContent = stage >= 1 ? 'Repairs underway. Hotspots active.' : 'Begin repairs to unlock hotspots.';
-
-        // materials summary
+        // dynamic materials summary
         const gold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
         const iron = this._countInventoryItem('iron_bar');
-        if (ui.matsEl) ui.matsEl.textContent = `${gold}g · ${iron}x Iron Bars`;
+        const normalLogs = this._countInventoryItem('normal_log');
+        const oakLogs = this._countInventoryItem('oak_log');
+        if (ui.matsEl) ui.matsEl.textContent = `${gold}g · ${normalLogs}x Normal Logs · ${oakLogs}x Oak Logs · ${iron}x Iron Bars`;
 
         if (stage >= maxStage) {
             if (ui.statusEl) { ui.statusEl.textContent = 'Dock fully restored'; ui.statusEl.dataset.tone = 'ready'; }
             if (ui.nextEl) ui.nextEl.innerHTML = `<div class="bdock-progress-meta">All repairs complete. Enjoy the restored dock!</div>`;
+            if (ui.acceptBtn) ui.acceptBtn.disabled = true;
             if (ui.contributeBtn) ui.contributeBtn.disabled = true;
+            if (ui.turnInBtn) ui.turnInBtn.disabled = true;
             return;
         }
 
-        const req = plan[stage];
-        if (!req) return;
-        const needIron = req.items.iron_bar || 0;
-        const needGold = req.gold || 0;
-        const can = gold >= needGold && iron >= needIron;
+        const qid = this._getCurrentDockQuestId();
+        const isCompleted = qid ? this._isDockQuestCompleted(qid) : false;
+        const isActive = qid ? this._isDockQuestActive(qid) : false;
+
+        if (!qid) return; // defensive
+        const q = getQuestById(qid);
+        if (!q) return;
+
+        const statuses = getQuestObjectiveState(this.char, qid) || [];
+        const goldObj = statuses.find(s => s.type === 'contribute_gold');
+        const itemObjectives = statuses.filter(s => s.type === 'contribute_item');
+        const needGold = Math.max(0, (goldObj?.required || 0) - (goldObj?.current || 0));
+        const canGold = gold > 0 && needGold > 0;
+        const canItems = itemObjectives.some(obj => {
+            const remain = Math.max(0, (obj.required || 0) - (obj.current || 0));
+            if (remain <= 0) return false;
+            const have = this._countInventoryItem(obj.target);
+            return have > 0;
+        });
+        const canAny = canGold || canItems;
+
         if (ui.statusEl) {
-            ui.statusEl.textContent = can ? 'Ready to contribute' : 'Gather materials';
-            ui.statusEl.dataset.tone = can ? 'ready' : 'warn';
+            if (isCompleted) { ui.statusEl.textContent = 'Ready to turn in'; ui.statusEl.dataset.tone = 'ready'; }
+            else if (isActive) { ui.statusEl.textContent = canAny ? 'Ready to contribute' : 'Gather materials'; ui.statusEl.dataset.tone = canAny ? 'active' : 'warn'; }
+            else { ui.statusEl.textContent = 'Accept the stage to begin'; ui.statusEl.dataset.tone = 'idle'; }
         }
-        if (ui.contributeBtn) ui.contributeBtn.disabled = !can;
+
+        if (ui.acceptBtn) ui.acceptBtn.disabled = isActive || isCompleted;
+        if (ui.contributeBtn) ui.contributeBtn.disabled = !isActive || !canAny;
+        if (ui.turnInBtn) ui.turnInBtn.disabled = !isCompleted;
+
         if (ui.nextEl) {
+            const toStage = stage + 1;
+            let listHtml = `<li>Gold: ${(goldObj?.current || 0)} / ${(goldObj?.required || 0)}</li>`;
+            for (const obj of itemObjectives) {
+                listHtml += `<li>${(obj.target || 'Item')}: ${(obj.current || 0)} / ${(obj.required || 0)}</li>`;
+            }
             ui.nextEl.innerHTML = `
-                <div class="bdock-preview-title">Upgrade to Stage ${req.to}</div>
+                <div class="bdock-preview-title">Upgrade to Stage ${toStage}</div>
                 <div class="bdock-preview-desc">Requirements to strengthen the dock:</div>
-                <ul class="bdock-preview-list" style="margin:0; padding:0;">
-                    <li>Gold: ${gold} / ${needGold}</li>
-                    <li>Iron Bars: ${iron} / ${needIron}</li>
-                </ul>
+                <ul class="bdock-preview-list" style="margin:0; padding:0;">${listHtml}</ul>
             `;
         }
+    }
+
+    _migrateDockQuestsFromStage() {
+        try {
+            const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+            this.char.completedQuests = this.char.completedQuests || [];
+            // If quests already reflect stage, sync stage from quests (prefer quest truth)
+            const completedStages = ['dock_repair_stage_1','dock_repair_stage_2','dock_repair_stage_3','dock_repair_stage_4']
+                .filter(qid => this.char.completedQuests.includes(qid)).length;
+            if (completedStages > stage) {
+                this.char.flags.dockStage = completedStages;
+                return;
+            }
+            // If stage ahead of quests, mark quests up to stage as completed (no rewards) to keep systems aligned
+            if (stage > completedStages) {
+                for (let s = 1; s <= stage; s++) {
+                    const qid = `dock_repair_stage_${s}`;
+                    if (!this.char.completedQuests.includes(qid)) this.char.completedQuests.push(qid);
+                }
+            }
+        } catch (e) { /* ignore migration errors */ }
     }
 
     _startSafeZoneRegen() {
