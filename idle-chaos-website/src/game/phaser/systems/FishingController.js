@@ -10,6 +10,7 @@ export class FishingController {
         this.state = 'idle';
         this.activeFish = null;
         this.baitId = null;
+        this._activeTimeOfDay = null; // 'day' | 'night' | null
         this.castCooldownMs = 1200;
         this.lastCastAt = 0;
         this.waitTimer = 0;
@@ -29,6 +30,7 @@ export class FishingController {
         this._nextFocusAt = 0;
         this._focusActiveUntil = 0;
         this._focusSatisfied = true;
+        this._lastTickTelemetryAt = 0;
         this._createHud();
     }
 
@@ -51,6 +53,7 @@ export class FishingController {
     }
 
     startCast(baitId, options = {}) {
+        this._activeTimeOfDay = options.timeOfDay || null;
         const fishOptions = this._eligibleFishForBait(baitId, options);
         if (!fishOptions.length) { this._toast('Nothing bites this bait yet (rod tier?)'); return; }
         this.baitId = baitId;
@@ -71,6 +74,7 @@ export class FishingController {
         this.failCount = 0;
         this._scheduleNextFocus();
         this._emitTelemetry('cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot });
+        this._emitTelemetry('fishing_cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, timeOfDay: this._activeTimeOfDay });
         this.lastCastAt = performance.now ? performance.now() : Date.now();
         this._showMessage(`Casting... (${this.activeFish.name})`);
     }
@@ -84,6 +88,8 @@ export class FishingController {
                 if (this.waitTimer >= this.waitDuration) {
                     this.state = 'bite';
                     this._showMessage('Bite! Press [Space] to begin reeling');
+                    this._emitTelemetry('bite', { fishId: this.activeFish && this.activeFish.id });
+                    this._emitTelemetry('fishing_bite', { fishId: this.activeFish && this.activeFish.id, timeOfDay: this._activeTimeOfDay });
                 }
                 break;
             case 'bite':
@@ -170,6 +176,25 @@ export class FishingController {
                 if (this.failCount >= this.maxFails) this._fail('Line snapped');
             }
         }
+        // Telemetry: tension tick (throttled)
+        const nowMs = performance.now ? performance.now() : Date.now();
+        if (!this._lastTickTelemetryAt || nowMs - this._lastTickTelemetryAt > 250) {
+            this._emitTelemetry('tension_tick', {
+                pos: this.tension,
+                zoneMin: this.targetMin,
+                zoneMax: this.targetMax,
+                progress: this.progress,
+            });
+            this._emitTelemetry('fishing_tension_tick', {
+                pos: this.tension,
+                zoneMin: this.targetMin,
+                zoneMax: this.targetMax,
+                progress: this.progress,
+                fishId: this.activeFish && this.activeFish.id,
+                timeOfDay: this._activeTimeOfDay,
+            });
+            this._lastTickTelemetryAt = nowMs;
+        }
     }
 
     _completeCatch() {
@@ -181,6 +206,7 @@ export class FishingController {
         if (this.scene && typeof this.scene._grantFishingXp === 'function') this.scene._grantFishingXp(xp);
         if (this.scene && typeof this.scene._addItemToInventory === 'function') this.scene._addItemToInventory(fish.id, 1);
         this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp });
+        this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay });
         this._toast(`Caught ${fish.name}! +${xp}xp`);
         this._showMessage('Catch successful!');
         setTimeout(() => this._reset(), 1200);
@@ -189,6 +215,7 @@ export class FishingController {
     _fail(reason) {
         this._toast(reason);
         this._emitTelemetry('fail', { reason, fishId: this.activeFish ? this.activeFish.id : null });
+        this._emitTelemetry('fishing_abort', { reason, fishId: this.activeFish ? this.activeFish.id : null, timeOfDay: this._activeTimeOfDay });
         this._showMessage('Failed');
         this._reset();
     }
@@ -236,6 +263,7 @@ export class FishingController {
     _weightedPick(list) {
         if (!list.length) return null;
         const tag = this._activeHotspot && this._activeHotspot.tag;
+        const tod = this._activeTimeOfDay; // 'day' | 'night' | null
         let total = 0; const weights = [];
         for (const f of list) {
             const diff = f.difficulty || 10;
@@ -243,6 +271,13 @@ export class FishingController {
             // Tag bias: common_school favors common; deep_epic favors epic
             if (tag === 'common_school' && (f.rarity === 'common' || f.rarity === 'uncommon')) w *= 1.35;
             if (tag === 'deep_epic' && (f.rarity === 'epic' || f.rarity === 'rare')) w *= 1.45;
+            // Time-of-day bias (simple): nights favor rarer species slightly; days favor common/uncommon
+            if (tod === 'night') {
+                if (f.rarity === 'rare' || f.rarity === 'epic' || f.rarity === 'legendary') w *= 1.12;
+                if (f.rarity === 'common') w *= 0.92;
+            } else if (tod === 'day') {
+                if (f.rarity === 'common' || f.rarity === 'uncommon') w *= 1.08;
+            }
             weights.push({ f, w }); total += w;
         }
         let r = Math.random() * total;

@@ -439,12 +439,14 @@ export class BrokenDock extends Phaser.Scene {
         // show prompts for fishing node and bucket
         const px = this.player.x; const py = this.player.y;
         const fn = this.fishingNode; if (fn) {
+            const castDist = this._getCastInteractDistance();
             const d = Phaser.Math.Distance.Between(px, py, fn.x, fn.y);
-            fn.prompt.setVisible(d <= 56);
-            if (d <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+            fn.prompt.setVisible(d <= castDist);
+            if (d <= castDist && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                 // Use new active controller with hotspot context if present
                 const hotspot = this._resolveNearbyHotspot(fn.x, fn.y);
-                if (this.fishingController) this.fishingController.tryInteract(fn, { hotspot }); else this._openFishingModal();
+                const timeOfDay = this._getTimeOfDay();
+                if (this.fishingController) this.fishingController.tryInteract(fn, { hotspot, timeOfDay }); else this._openFishingModal();
             }
         }
         const b = this.baitBucket; if (b) {
@@ -461,6 +463,28 @@ export class BrokenDock extends Phaser.Scene {
             if (this.harborwrightPrompt) this.harborwrightPrompt.setVisible(d4 <= 56);
             if (d4 <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                 try { this._openDockRepairOverlay(); } catch (e) { console.warn('dock repair overlay failed', e); }
+            }
+        }
+
+        // Boat mooring (Stage >= 3)
+        if (this.boatMooring && this.boatMooringPrompt) {
+            const dB = Phaser.Math.Distance.Between(px, py, this.boatMooring.x, this.boatMooring.y);
+            const show = (this.char?.flags?.dockStage || 0) >= 3;
+            this.boatMooring.setVisible(show);
+            this.boatMooringPrompt.setVisible(show && dB <= 56);
+            if (show && dB <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                try { this._openBoatPanel(); } catch (e) { console.warn('boat panel failed', e); }
+            }
+        }
+
+        // Event board (Stage >= 4)
+        if (this.eventBoard && this.eventBoardPrompt) {
+            const dE = Phaser.Math.Distance.Between(px, py, this.eventBoard.x, this.eventBoard.y);
+            const showE = (this.char?.flags?.dockStage || 0) >= 4;
+            this.eventBoard.setVisible(showE);
+            this.eventBoardPrompt.setVisible(showE && dE <= 56);
+            if (showE && dE <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                try { this._openEventBoard(); } catch (e) { console.warn('event board failed', e); }
             }
         }
 
@@ -549,7 +573,7 @@ export class BrokenDock extends Phaser.Scene {
         if (now >= this._nextHotspotAt) {
             // limit simultaneous hotspots
             if (this._hotspots.length < 3) this._spawnHotspot();
-            // faster spawn as dock improves
+            // faster spawn as dock improves (Stage 2+)
             let minDelay = 9000, maxDelay = 16000;
             if (stage >= 2) { minDelay = 7000; maxDelay = 12000; }
             if (stage >= 3) { minDelay = 5000; maxDelay = 10000; }
@@ -564,6 +588,22 @@ export class BrokenDock extends Phaser.Scene {
                 this._hotspots.splice(i,1);
             }
         }
+    }
+
+    _getCastInteractDistance() {
+        const base = 56;
+        const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+        return base + (stage >= 1 ? 16 : 0);
+    }
+
+    _getTimeOfDay() {
+        try {
+            const world = (typeof window !== 'undefined' && window.__world) ? window.__world : null;
+            const tod = world && (world.timeOfDay || world.tod);
+            if (tod === 'day' || tod === 'night') return tod;
+        } catch (e) {}
+        const hour = new Date().getHours();
+        return (hour >= 6 && hour < 18) ? 'day' : 'night';
     }
 
     _resolveNearbyHotspot(x, y) {
@@ -2139,7 +2179,94 @@ export class BrokenDock extends Phaser.Scene {
             } else {
                 if (this._dockLantern) { try { this._dockLantern.destroy(); } catch (e) {} this._dockLantern = null; }
             }
+
+            // Ensure boat mooring and event board exist and toggle visibility by stage
+            try {
+                if (!this.boatMooring) {
+                    const bx = dock.x + Math.round((dock.width || 80) / 2) + 48;
+                    const by = dock.y - Math.round((dock.height || 140) / 2) - 8;
+                    this.boatMooring = this.add.circle(bx, by, 18, 0x264a3a, 0.95).setDepth(1.25);
+                    this.boatMooring.setStrokeStyle(2, 0x76e2c4, 0.9);
+                    this.boatMooringPrompt = this.add.text(bx, by - 34, '[E] Board Boat', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+                }
+                const boatVisible = stage >= 3;
+                this.boatMooring.setVisible(boatVisible);
+                if (this.boatMooringPrompt) this.boatMooringPrompt.setVisible(false);
+            } catch (e) {}
+
+            try {
+                if (!this.eventBoard) {
+                    const ex = dock.x - Math.round((dock.width || 80) / 2) - 80;
+                    const ey = dock.y + Math.round((dock.height || 140) / 2) - 48;
+                    this.eventBoard = this.add.rectangle(ex, ey, 34, 24, 0x2a3550, 0.95).setDepth(1.25);
+                    this.eventBoard.setStrokeStyle(2, 0x7fb1ff, 0.85);
+                    this.eventBoardPrompt = this.add.text(ex, ey - 30, '[E] Event Board', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+                }
+                const boardVisible = stage >= 4;
+                this.eventBoard.setVisible(boardVisible);
+                if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(false);
+            } catch (e) {}
         } catch (e) { /* no-op */ }
+    }
+
+    _openBoatPanel() {
+        if (typeof document === 'undefined') return;
+        this._ensureFishingUiStyles();
+        const overlay = document.createElement('div'); overlay.className = 'bdock-overlay';
+        const modal = document.createElement('section'); modal.className = 'bdock-modal';
+        modal.innerHTML = `
+            <header class="bdock-header">
+                <div>
+                    <div class="bdock-title">Boat Mooring</div>
+                    <div class="bdock-status" data-tone="active">Stage 3 Unlock</div>
+                </div>
+                <button class="bdock-btn ghost" type="button" data-role="close">Close</button>
+            </header>
+            <div class="bdock-content">
+                <div class="bdock-section" style="grid-column:1/-1;">
+                    <h3>Open Water (coming online)</h3>
+                    <div class="bdock-progress-meta">Sail to deeper waters for rarer fish and special events. This is a preview panel; travel hooks are stubbed for now.</div>
+                </div>
+            </div>
+        `;
+        overlay.appendChild(modal);
+        const closeBtn = modal.querySelector('[data-role="close"]');
+        const onClose = () => { try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {} };
+        closeBtn && closeBtn.addEventListener('click', onClose);
+        overlay.addEventListener('click', (evt) => { if (evt.target === overlay) onClose(); });
+        document.body.appendChild(overlay);
+    }
+
+    _openEventBoard() {
+        if (typeof document === 'undefined') return;
+        this._ensureFishingUiStyles();
+        const overlay = document.createElement('div'); overlay.className = 'bdock-overlay';
+        const modal = document.createElement('section'); modal.className = 'bdock-modal';
+        modal.innerHTML = `
+            <header class="bdock-header">
+                <div>
+                    <div class="bdock-title">Dock Events</div>
+                    <div class="bdock-status" data-tone="active">Stage 4 Unlock</div>
+                </div>
+                <button class="bdock-btn ghost" type="button" data-role="close">Close</button>
+            </header>
+            <div class="bdock-content">
+                <div class="bdock-section">
+                    <h3>Active Events</h3>
+                    <div class="bdock-forecast-empty">No events currently running. Check back later!</div>
+                </div>
+                <div class="bdock-section">
+                    <h3>Leaderboard</h3>
+                    <div class="bdock-forecast-empty">Leaderboards refresh every 10s. (Stubbed)</div>
+                </div>
+            </div>
+        `;
+        overlay.appendChild(modal);
+        const closeBtn = modal.querySelector('[data-role="close"]');
+        const onClose = () => { try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {} };
+        closeBtn && closeBtn.addEventListener('click', onClose);
+        overlay.addEventListener('click', (evt) => { if (evt.target === overlay) onClose(); });
+        document.body.appendChild(overlay);
     }
 
     _openDockRepairOverlay() {
