@@ -2467,6 +2467,34 @@ export const combatMixin = {
     _findNearestEnemy: sharedFindNearestEnemy,
     _setAutoTarget: sharedSetAutoTarget,
     _clearAutoTarget: sharedClearAutoTarget,
+    // Click-to-target helper returns an enemy under a given world point (prefers closest sprite whose bounds contain point)
+    _getEnemyAtPoint: function(x, y) {
+        try {
+            if (!this.enemies || !this.enemies.getChildren) return null;
+            const children = this.enemies.getChildren();
+            let best = null; let bestDist = Infinity;
+            for (let i = 0; i < children.length; i++) {
+                const e = children[i];
+                if (!e || !safeGetData(e, 'alive')) continue;
+                // Use bounds containment (rectangle) first; fallback to radial check
+                let contains = false;
+                try {
+                    const b = (e.getBounds && e.getBounds()) || null;
+                    if (b && Phaser.Geom.Rectangle.Contains(b, x, y)) contains = true;
+                } catch (err) { contains = false; }
+                if (!contains) {
+                    const radius = Math.max(12, ((e.displayWidth || e.width || 32) + (e.displayHeight || e.height || 32)) * 0.25);
+                    const dCenter = Phaser.Math.Distance.Between(x, y, e.x, e.y);
+                    if (dCenter <= radius) contains = true;
+                }
+                if (contains) {
+                    const d = Phaser.Math.Distance.Between(x, y, e.x, e.y);
+                    if (d < bestDist) { bestDist = d; best = e; }
+                }
+            }
+            return best;
+        } catch (e) { return null; }
+    },
     _isPathBlocked: sharedIsPathBlocked,
     _startAvoidance: sharedStartAvoidance,
     _clearAvoidance: sharedClearAvoidance
@@ -2499,6 +2527,67 @@ export function applyCombatMixin(target) {
                     if (typeof console !== 'undefined' && console.error) console.error('[applyCombatMixin] registerTalentHandlers failed for scene', key, err);
                 } catch (logErr) { /* ignore logging failure */ }
             }
+            // Enable click-to-select + attack behavior after scene create succeeds
+            try {
+                if (this.input && !this._clickAttackBound) {
+                    this.input.on('pointerdown', (pointer) => {
+                        try {
+                            // Ignore clicks originating from UI overlays/modals if project sets a flag
+                            if (this._uiModalOpen) return;
+                            const worldX = pointer.worldX != null ? pointer.worldX : pointer.x;
+                            const worldY = pointer.worldY != null ? pointer.worldY : pointer.y;
+                            const enemy = (this._getEnemyAtPoint) ? this._getEnemyAtPoint(worldX, worldY) : null;
+                            if (enemy) {
+                                // Set as manual/auto target so existing indicator logic applies
+                                if (this._setAutoTarget) this._setAutoTarget(enemy);
+                                // Attempt attack using shared cooldown logic, focusing only this target
+                                if (this._tryAttack) this._tryAttack(false, enemy);
+                            } else {
+                                // Optional: clear target if clicking empty space
+                                if (this._clearAutoTarget) this._clearAutoTarget();
+                            }
+                            // Start hold-to-attack state
+                            this._mouseAttackHeld = true;
+                        } catch (e) { /* swallow click errors */ }
+                    });
+                    // Stop holding on pointer release or when pointer leaves game
+                    this.input.on('pointerup', () => { try { this._mouseAttackHeld = false; } catch (e) {} });
+                    this.input.on('gameout', () => { try { this._mouseAttackHeld = false; } catch (e) {} });
+                    this._clickAttackBound = true;
+                }
+                // Disable legacy Spacebar attack if present
+                try {
+                    if (this.attackKey) {
+                        try { if (typeof this.attackKey.destroy === 'function') this.attackKey.destroy(); } catch (e) {}
+                        this.attackKey = null;
+                    }
+                } catch (e) { /* ignore */ }
+                // Attach per-frame updater to perform attempts while button held (cooldown enforced inside _tryAttack)
+                if (!this._attackHoldUpdateBound && this.events && this.events.on) {
+                    const holdTick = () => {
+                        try {
+                            const aliveTarget = (this.autoTarget && this.autoTarget.getData && this.autoTarget.getData('alive')) ? this.autoTarget : null;
+                            // Keep target highlight glued to the target each frame
+                            if (this.autoTargetIndicator) {
+                                if (aliveTarget) {
+                                    try { this.autoTargetIndicator.setPosition(aliveTarget.x, aliveTarget.y); } catch (e) { try { this.autoTargetIndicator.x = aliveTarget.x; this.autoTargetIndicator.y = aliveTarget.y; } catch (ee) {} }
+                                } else {
+                                    // target lost: clear indicator
+                                    try { if (this._clearAutoTarget) this._clearAutoTarget(); } catch (e) {}
+                                }
+                            }
+                            // Auto attack if holding OR we have a living target (continuous attack design)
+                            if ((this._mouseAttackHeld || aliveTarget) && this._tryAttack) {
+                                // Silence miss feedback when auto-firing; visible hits still show damage numbers
+                                this._tryAttack(true, aliveTarget);
+                            }
+                        } catch (e) { /* ignore per-frame errors */ }
+                    };
+                    this._attackHoldUpdateFn = holdTick;
+                    this.events.on('update', holdTick);
+                    this._attackHoldUpdateBound = true;
+                }
+            } catch (e) { /* ignore binding errors */ }
         };
         const originalShutdown = target.shutdown;
         target.shutdown = function wrappedShutdown() {
@@ -2508,6 +2597,16 @@ export function applyCombatMixin(target) {
                     if (typeof console !== 'undefined' && console.error) console.error('[applyCombatMixin] unregisterTalentHandlers failed for scene', key, err);
                 } catch (logErr) { /* ignore logging failure */ }
             }
+            // Clean up hold-to-attack update hook
+            try {
+                if (this._attackHoldUpdateBound && this.events && this.events.off) {
+                    if (this._attackHoldUpdateFn) this.events.off('update', this._attackHoldUpdateFn);
+                    this._attackHoldUpdateBound = false;
+                    this._attackHoldUpdateFn = null;
+                }
+                this._mouseAttackHeld = false;
+                this._clickAttackBound = false;
+            } catch (e) { /* ignore */ }
             try {
                 if (typeof originalShutdown === 'function') originalShutdown.apply(this, arguments);
             } catch (err) {
@@ -3076,19 +3175,39 @@ function _talentActivatedHandler(payload) {
             case 'ghastly_drive': {
                 try {
                     const dashDist = 160;
-                    // Prefer player's movement direction (velocity) when dashing, fallback to facing or pointer
+                    // Aim priority: selected target > mouse pointer (world) > movement velocity > facing > rotation
                     let ang = 0;
                     try {
-                        const body = scene.player && scene.player.body;
-                        if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
-                            ang = Math.atan2(body.velocity.y, body.velocity.x);
-                        } else if (scene._facing) {
-                            const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
-                            ang = fmap[scene._facing] || 0;
-                        } else if (scene.input && scene.input.activePointer) {
-                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.input.activePointer.worldX, scene.input.activePointer.worldY);
-                        } else if (scene.player && typeof scene.player.rotation === 'number') {
-                            ang = scene.player.rotation;
+                        if (scene.autoTarget && scene.autoTarget.getData && scene.autoTarget.getData('alive')) {
+                            // Aim directly at selected target if present
+                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.autoTarget.x, scene.autoTarget.y);
+                        } else {
+                            // Try to resolve pointer world position using camera for accuracy
+                            let wx = null, wy = null;
+                            const pointer = scene.input && scene.input.activePointer;
+                            if (scene.cameras && scene.cameras.main && pointer) {
+                                try {
+                                    const wp = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                                    wx = wp.x; wy = wp.y;
+                                } catch (e) {}
+                            }
+                            if ((wx === null || wy === null) && pointer && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') {
+                                wx = pointer.worldX; wy = pointer.worldY;
+                            }
+                            if (wx !== null && wy !== null) {
+                                ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, wx, wy);
+                            } else {
+                                // Fallbacks
+                                const body = scene.player && scene.player.body;
+                                if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
+                                    ang = Math.atan2(body.velocity.y, body.velocity.x);
+                                } else if (scene._facing) {
+                                    const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
+                                    ang = fmap[scene._facing] || 0;
+                                } else if (scene.player && typeof scene.player.rotation === 'number') {
+                                    ang = scene.player.rotation;
+                                }
+                            }
                         }
                     } catch (e) { ang = 0; }
                     const startX = scene.player.x;
@@ -3125,6 +3244,12 @@ function _talentActivatedHandler(payload) {
                         });
                     } catch (e) {}
                     try { if (scene._showToast) scene._showToast('Ghastly Drive!', 700); } catch (e) {}
+                    // Add a faint directional indicator (optional) aiming toward target for feedback
+                    try {
+                        const fx = scene.add.rectangle(startX, startY, 42, 6, 0xff6677, 0.4).setDepth(9.8);
+                        fx.setRotation(ang);
+                        if (scene.tweens) scene.tweens.add({ targets: fx, alpha: 0, scaleX: 0.3, duration: 300, ease: 'Quad.easeOut', onComplete: () => { try { fx.destroy(); } catch (e) {} } });
+                    } catch (e) {}
                     markActivationSuccess(scene, tid);
                 } catch (e) {}
                 break;

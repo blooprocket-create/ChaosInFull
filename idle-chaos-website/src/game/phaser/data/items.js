@@ -1463,10 +1463,10 @@ const ITEM_DEFS = {
         "stackable": true,
         "maxStack": 99,
         "icon": "/phaser-game/assets/items/Minor Health Potion.png",
-        "healAmount": 20,
+        "healPercent": 15,
         "value": 8,
         "usable": true,
-        "description": "A small vial of red liquid that tastes like cherry-flavored hope. Restores a modest amount of health."
+        "description": "Restores 15% of your maximum Health. Scales as you grow."
     },
     "major_health_potion": {
         "id": "major_health_potion",
@@ -1475,10 +1475,10 @@ const ITEM_DEFS = {
         "stackable": true,
         "maxStack": 99,
         "icon": "/phaser-game/assets/items/Major Health Potion.png",
-        "healAmount": 75,
+        "healPercent": 35,
         "value": 35,
         "usable": true,
-        "description": "A large bottle of crimson concoction that smells like victory. Heals a significant portion of health."
+        "description": "Restores 35% of your maximum Health. Powerful scaling recovery."
     },
     "minor_mana_potion": {
         "id": "minor_mana_potion",
@@ -1486,11 +1486,11 @@ const ITEM_DEFS = {
         "rarity": "common",
         "stackable": true,
         "maxStack": 99,
-        "manaAmount": 15,
+        "manaPercent": 15,
         "icon": "/phaser-game/assets/items/Minor Mana Potion.png",
         "value": 8,
         "usable": true,
-        "description": "A small vial of blue liquid that tastes like blueberry dreams. Restores a modest amount of mana."
+        "description": "Restores 15% of your maximum Mana. Scales with your arcane growth."
     },
     "major_mana_potion": {
         "id": "major_mana_potion",
@@ -1498,11 +1498,11 @@ const ITEM_DEFS = {
         "rarity": "uncommon",
         "stackable": true,
         "maxStack": 99,
-        "manaAmount": 60,
+        "manaPercent": 35,
         "icon": "/phaser-game/assets/items/Major Mana Potion.png",
         "value": 35,
         "usable": true,
-        "description": "A large bottle of azure elixir that smells like arcane triumph. Replenishes a significant portion of mana."
+        "description": "Restores 35% of your maximum Mana. A surge of arcane energy."
     },
     "blue_bull": {
         "id": "blue_bull",

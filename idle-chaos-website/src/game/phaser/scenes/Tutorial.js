@@ -81,7 +81,7 @@ export class Tutorial extends Phaser.Scene {
         this.physics.add.existing(dummy, true);
     this.markers.dummy = { x: dummyX, y: dummyY, obj: dummy, hp: 3 };
     // Visual prompt above dummy
-    this.dummyPrompt = this.add.text(dummyX, dummyY - 72, 'Press Space', { font: '14px sans-serif', fill: '#fff', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 6, y: 4 } }).setDepth(60).setOrigin(0.5);
+    this.dummyPrompt = this.add.text(dummyX, dummyY - 72, 'Click to Start Attacking', { font: '14px sans-serif', fill: '#fff', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 6, y: 4 } }).setDepth(60).setOrigin(0.5);
     this.dummyPrompt.setVisible(false);
 
         // HUD text (Phaser text so it's inside canvas)
@@ -118,8 +118,8 @@ export class Tutorial extends Phaser.Scene {
             this.hudHint.setText('Press E near the crate');
         } else if (stepName === 'Attack') {
             this.hudTitle.setText('Attack');
-            this.hudText.setText('Press Space to attack. Approach the red training dummy and press Space to damage it until it falls.');
-            this.hudHint.setText('Press Space near the dummy');
+            this.hudText.setText('Click an enemy (or the dummy) to attack it. Approach the red training dummy and click it until it falls. (Space still works)');
+            this.hudHint.setText('Click the dummy to attack');
         } else if (stepName === 'UI') {
             this.hudTitle.setText('UI & Character');
             this.hudText.setText('Inventory: I. View Stats: X. Open Equipment: U. Talent Tree: T. Press each key once to continue.');
@@ -205,23 +205,19 @@ export class Tutorial extends Phaser.Scene {
                 }
             }
         } else if (step === 2) {
-            // Attack: if near dummy and SPACE pressed
+            // Attack step: allow click OR Space key presses near dummy
             const d = this.markers.dummy;
             if (d && this.player) {
                 const dx = this.player.x - d.x; const dy = this.player.y - d.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                // show dummy prompt when near
-                if (this.dummyPrompt) this.dummyPrompt.setVisible(dist < 120);
-                if (dist < 80 && Phaser.Input.Keyboard.JustDown(this.keySpace)) {
-                    d.hp -= 1;
-                    // flash dummy to indicate hit
-                    d.obj.fillColor = 0xffffff;
-                    try { addTimeEvent(this, { delay: 120, callback: () => { try { d.obj.fillColor = 0xff6666; } catch (e) {} } }); } catch (e) { this.time.delayedCall(120, () => { try { d.obj.fillColor = 0xff6666; } catch (e2) {} }); }
-                    this.hudText.setText(`Dummy hit! HP: ${d.hp}`);
-                    if (d.hp <= 0) {
-                        // remove dummy and advance
-                        try { d.obj.destroy(); } catch (e) {}
-                        try { addTimeEvent(this, { delay: 300, callback: () => this._advanceStep() }); } catch (e) { this.time.delayedCall(300, () => this._advanceStep()); }
-                    }
+                if (this.dummyPrompt) this.dummyPrompt.setVisible(dist < 140);
+                // handle queued click hits captured by pointer listener
+                if (d._pendingHit) {
+                    d._pendingHit = false;
+                    this._applyDummyHit(d);
+                }
+                // legacy Space key support
+                if (dist < 90 && Phaser.Input.Keyboard.JustDown(this.keySpace)) {
+                    this._applyDummyHit(d);
                 }
             }
         } else if (step === 3) {
@@ -284,6 +280,47 @@ export class Tutorial extends Phaser.Scene {
             this.scene.start(last.scene, { character: this._character, username: this._username, spawnX: last.x, spawnY: last.y });
         } else {
             this.scene.start('Town', { character: this._character, username: this._username });
+        }
+    }
+
+    // Centralize dummy hit logic so both click and Space can reuse timing/visuals
+    _applyDummyHit(d) {
+        try {
+            d.hp -= 1;
+            d.obj.fillColor = 0xffffff;
+            try { addTimeEvent(this, { delay: 120, callback: () => { try { d.obj.fillColor = 0xff6666; } catch (e) {} } }); } catch (e) { this.time.delayedCall(120, () => { try { d.obj.fillColor = 0xff6666; } catch (e2) {} }); }
+            this.hudText.setText(`Dummy hit! HP: ${d.hp}`);
+            if (d.hp <= 0) {
+                try { d.obj.destroy(); } catch (e) {}
+                try { addTimeEvent(this, { delay: 300, callback: () => this._advanceStep() }); } catch (e) { this.time.delayedCall(300, () => this._advanceStep()); }
+            }
+        } catch (e) {}
+    }
+
+    // Bind pointer click for attack step
+    preUpdate() {
+        // Phaser calls preUpdate before update; ensure we only attach once
+        if (!this._clickBound && this.input) {
+            try {
+                this.input.on('pointerdown', (pointer) => {
+                    if (this.stepIndex !== 2) return; // only during attack step
+                    const d = this.markers && this.markers.dummy;
+                    if (!d || !d.obj) return;
+                    const worldX = pointer.worldX != null ? pointer.worldX : pointer.x;
+                    const worldY = pointer.worldY != null ? pointer.worldY : pointer.y;
+                    const b = d.obj.getBounds ? d.obj.getBounds() : null;
+                    let inside = false;
+                    try { if (b && Phaser.Geom.Rectangle.Contains(b, worldX, worldY)) inside = true; } catch (e) {}
+                    if (!inside) {
+                        const dist = Phaser.Math.Distance.Between(worldX, worldY, d.x, d.y);
+                        inside = dist < 48;
+                    }
+                    if (inside) {
+                        d._pendingHit = true;
+                    }
+                });
+                this._clickBound = true;
+            } catch (e) { this._clickBound = true; }
         }
     }
 }

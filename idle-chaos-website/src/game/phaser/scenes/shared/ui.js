@@ -900,7 +900,21 @@ export function maybeAutoUsePotions(scene) {
                 if (!s || !s.id) continue;
                 const d = defs[s.id] || {};
                 if (!d.usable) continue;
-                const amt = isHP ? Number(d.healAmount || 0) : Number(d.manaAmount || 0);
+                // Support percent-based potions (healPercent / manaPercent)
+                let amt = 0;
+                if (isHP) {
+                    if (typeof d.healPercent === 'number' && d.healPercent > 0) {
+                        amt = Math.floor(maxhp * (d.healPercent / 100));
+                    } else {
+                        amt = Number(d.healAmount || 0);
+                    }
+                } else {
+                    if (typeof d.manaPercent === 'number' && d.manaPercent > 0) {
+                        amt = Math.floor(maxmana * (d.manaPercent / 100));
+                    } else {
+                        amt = Number(d.manaAmount || 0);
+                    }
+                }
                 if (!amt) continue;
                 candidates.push({ idx: i, amount: amt });
             }
@@ -1349,8 +1363,10 @@ function useItemFromSlot(scene, slotIndex) {
         let acted = false;
         let attempted = false; // whether we attempted to use the item (so clicks are considered handled even if no effect)
         // heal
-        if (def.healAmount) {
-            try { console.log && console.log('[useItemFromSlot] healAmount detected', def.healAmount, 'usable?', def.usable); } catch(e) {}
+        const hasHealFlat = !!def.healAmount;
+        const hasHealPercent = typeof def.healPercent === 'number' && def.healPercent > 0;
+        if (hasHealFlat || hasHealPercent) {
+            try { console.log && console.log('[useItemFromSlot] heal detected', { healAmount: def.healAmount, healPercent: def.healPercent, usable: def.usable }); } catch(e) {}
             attempted = true;
             if (!def.usable) { if (scene._showToast) scene._showToast('Cannot use that item'); }
             else {
@@ -1361,15 +1377,25 @@ function useItemFromSlot(scene, slotIndex) {
                 if (currentHp >= maxhp) {
                     if (scene._showToast) scene._showToast('Already at full health');
                 } else {
-                    scene.char.hp = Math.min(maxhp, currentHp + Number(def.healAmount || 0));
+                    let rawHeal = hasHealPercent ? Math.floor(maxhp * (def.healPercent / 100)) : Number(def.healAmount || 0);
+                    // Apply potionEffect scaling if present in effective stats
+                    if (eff && typeof eff.potionEffect === 'number' && eff.potionEffect > 0) {
+                        rawHeal = Math.floor(rawHeal * (1 + eff.potionEffect / 100));
+                    }
+                    rawHeal = Math.max(1, rawHeal);
+                    const before = currentHp;
+                    scene.char.hp = Math.min(maxhp, currentHp + rawHeal);
+                    const actual = scene.char.hp - before;
                     acted = true;
-                    if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.healAmount} HP)`);
+                    if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${actual} HP${hasHealPercent ? ' / ' + def.healPercent + '%': ''})`);
                 }
             }
         }
         // mana
-        if (def.manaAmount) {
-            try { console.log && console.log('[useItemFromSlot] manaAmount detected', def.manaAmount, 'usable?', def.usable); } catch(e) {}
+        const hasManaFlat = !!def.manaAmount;
+        const hasManaPercent = typeof def.manaPercent === 'number' && def.manaPercent > 0;
+        if (hasManaFlat || hasManaPercent) {
+            try { console.log && console.log('[useItemFromSlot] mana detected', { manaAmount: def.manaAmount, manaPercent: def.manaPercent, usable: def.usable }); } catch(e) {}
             attempted = true;
             if (!def.usable) { if (scene._showToast) scene._showToast('Cannot use that item'); }
             else {
@@ -1379,9 +1405,16 @@ function useItemFromSlot(scene, slotIndex) {
                 if (currentMana >= maxmana) {
                     if (scene._showToast) scene._showToast('Already at full mana');
                 } else {
-                    scene.char.mana = Math.min(maxmana, currentMana + Number(def.manaAmount || 0));
+                    let rawMana = hasManaPercent ? Math.floor(maxmana * (def.manaPercent / 100)) : Number(def.manaAmount || 0);
+                    if (eff && typeof eff.potionEffect === 'number' && eff.potionEffect > 0) {
+                        rawMana = Math.floor(rawMana * (1 + eff.potionEffect / 100));
+                    }
+                    rawMana = Math.max(1, rawMana);
+                    const beforeM = currentMana;
+                    scene.char.mana = Math.min(maxmana, currentMana + rawMana);
+                    const actualM = scene.char.mana - beforeM;
                     acted = true;
-                    if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${def.manaAmount} Mana)`);
+                    if (scene._showToast) scene._showToast(`${def.name || s.id} used (+${actualM} Mana${hasManaPercent ? ' / ' + def.manaPercent + '%': ''})`);
                 }
             }
         }
