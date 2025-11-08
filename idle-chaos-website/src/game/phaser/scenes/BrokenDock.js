@@ -130,6 +130,17 @@ export class BrokenDock extends Phaser.Scene {
             try { if (this.baitBucket && this.baitBucket.sprite) this.baitBucket.sprite.setDepth(1.15); } catch (e) {}
         } catch (e) {}
 
+        // Harborwright NPC (Dock repair questline entry)
+        try {
+            const npcX = Math.min(this.scale.width - 120, dockX + dockWidth + 60);
+            const npcY = Math.min(this.scale.height - 64, groundTop + 40);
+            const r = 22;
+            this.harborwright = this.add.circle(npcX, npcY, r, 0x3a556b, 1).setDepth(1.2);
+            this.harborwright.setStrokeStyle(2, 0x89b4ff, 0.9);
+            this.harborwrightPrompt = this.add.text(npcX, npcY - 46, '[E] Help Repair Dock', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            this.harborwrightPrompt.setVisible(false);
+        } catch (e) {}
+
         // animate water: simple ripple circles that subtly move
         try {
             this._waterRipples = this._waterRipples || [];
@@ -151,6 +162,8 @@ export class BrokenDock extends Phaser.Scene {
         if (window && window.__shared_keys && window.__shared_keys.attachCommonKeys) this.keys = window.__shared_keys.attachCommonKeys(this);
     this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
     try { ensureCharTalents && ensureCharTalents(this.char); } catch (e) {}
+        // Ensure dock questline flag exists
+        try { if (!this.char.flags) this.char.flags = {}; if (typeof this.char.flags.dockStage !== 'number') this.char.flags.dockStage = 0; } catch(e) {}
             // Ensure a portable _persistCharacter helper is available early so code in create()
             // that conditionally calls it (if present) will work even before the end-of-create wiring.
             try {
@@ -424,8 +437,9 @@ export class BrokenDock extends Phaser.Scene {
             const d = Phaser.Math.Distance.Between(px, py, fn.x, fn.y);
             fn.prompt.setVisible(d <= 56);
             if (d <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                // Use new active controller instead of opening modal
-                if (this.fishingController) this.fishingController.tryInteract(fn); else this._openFishingModal();
+                // Use new active controller with hotspot context if present
+                const hotspot = this._resolveNearbyHotspot(fn.x, fn.y);
+                if (this.fishingController) this.fishingController.tryInteract(fn, { hotspot }); else this._openFishingModal();
             }
         }
         const b = this.baitBucket; if (b) {
@@ -433,6 +447,15 @@ export class BrokenDock extends Phaser.Scene {
             b.prompt.setVisible(d2 <= 56);
             if (d2 <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                 this._openBucketShop();
+            }
+        }
+
+        // Harborwright interaction
+        const hw = this.harborwright; if (hw) {
+            const d4 = Phaser.Math.Distance.Between(px, py, hw.x, hw.y);
+            if (this.harborwrightPrompt) this.harborwrightPrompt.setVisible(d4 <= 56);
+            if (d4 <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                try { this._openDockRepairOverlay(); } catch (e) { console.warn('dock repair overlay failed', e); }
             }
         }
 
@@ -447,6 +470,8 @@ export class BrokenDock extends Phaser.Scene {
 
         // Update new fishing controller
         try { if (this.fishingController && typeof this.fishingController.update === 'function') this.fishingController.update(time, delta); } catch(e) {}
+    // Hotspot lifecycle update
+    try { this._updateHotspots(delta); } catch(e) {}
 
     }
 
@@ -482,6 +507,67 @@ export class BrokenDock extends Phaser.Scene {
         }
 
         this._updateFishingOverlay(context);
+    }
+
+    // --- Hotspot Prototype (Phase 2 groundwork) ---
+    _spawnHotspot() {
+        if (!this._hotspots) this._hotspots = [];
+        const waterTop = 0;
+        const waterBottom = Math.round(this.scale.height * 0.5);
+        // random x not overlapping dock central x band
+        const dockX = this._dockVisual ? this._dockVisual.x : this.scale.width/2;
+        const dockW = this._dockVisual ? this._dockVisual.width : 120;
+        let x = Phaser.Math.Between(32, this.scale.width - 32);
+        let tries = 0;
+        while (x > dockX - dockW/2 - 32 && x < dockX + dockW/2 + 32 && tries < 8) { x = Phaser.Math.Between(32, this.scale.width - 32); tries++; }
+        const y = Phaser.Math.Between(waterTop + 24, waterBottom - 24);
+        const radius = Phaser.Math.Between(42, 68);
+        const tagRoll = Math.random();
+        const tag = tagRoll < 0.65 ? 'common_school' : (tagRoll < 0.9 ? 'mixed_swirl' : 'deep_epic');
+        const lifespan = Phaser.Math.Between(12000, 22000);
+        const expiresAt = performance.now() + lifespan;
+        const gfx = this.add.circle(x, y, radius, 0x6fb1ff, 0.18).setDepth(0.8);
+        gfx.setStrokeStyle(2, 0x9dd6ff, 0.85);
+        try { this.tweens.add({ targets: gfx, alpha: { from: 0.22, to: 0.06 }, scale: { from: 1, to: 1.08 }, yoyo: true, repeat: -1, duration: 1800, ease: 'Sine.easeInOut' }); } catch(e) {}
+        const hotspot = { x, y, radius, tag, expiresAt, gfx };
+        this._hotspots.push(hotspot);
+    }
+
+    _updateHotspots(delta) {
+        const now = performance.now();
+    if (!this._hotspots) this._hotspots = [];
+    // If dock not repaired at least once, no hotspots yet
+    const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+    if (stage < 1) return;
+    // spawn logic: simple timer
+        if (!this._nextHotspotAt) this._nextHotspotAt = now + 5000;
+        if (now >= this._nextHotspotAt) {
+            // limit simultaneous hotspots
+            if (this._hotspots.length < 3) this._spawnHotspot();
+            // faster spawn as dock improves
+            let minDelay = 9000, maxDelay = 16000;
+            if (stage >= 2) { minDelay = 7000; maxDelay = 12000; }
+            if (stage >= 3) { minDelay = 5000; maxDelay = 10000; }
+            if (stage >= 4) { minDelay = 4000; maxDelay = 8000; }
+            this._nextHotspotAt = now + Phaser.Math.Between(minDelay, maxDelay);
+        }
+        // cleanup expired
+        for (let i = this._hotspots.length - 1; i >= 0; i--) {
+            const h = this._hotspots[i];
+            if (now >= h.expiresAt) {
+                try { h.gfx.destroy(); } catch(e) {}
+                this._hotspots.splice(i,1);
+            }
+        }
+    }
+
+    _resolveNearbyHotspot(x, y) {
+        if (!this._hotspots || !this._hotspots.length) return null;
+        for (const h of this._hotspots) {
+            const d = Phaser.Math.Distance.Between(x, y, h.x, h.y);
+            if (d <= h.radius) return h;
+        }
+        return null;
     }
 
     _ensureFishingUiStyles() {
@@ -1926,13 +2012,235 @@ export class BrokenDock extends Phaser.Scene {
     _removeAllOverlays() {
         try { if (this._fishingUi && typeof this._fishingUi.close === 'function') this._fishingUi.close('cleanup'); } catch (e) {}
         try { if (this._bucketUi && typeof this._bucketUi.close === 'function') this._bucketUi.close('cleanup'); } catch (e) {}
+        try { if (this._dockUi && typeof this._dockUi.close === 'function') this._dockUi.close('cleanup'); } catch (e) {}
         this._fishingUi = null;
         this._bucketUi = null;
+        this._dockUi = null;
         if (!this._activeOverlays) return;
         for (const overlay of this._activeOverlays) {
             try { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {}
         }
         this._activeOverlays = [];
+    }
+
+    // --- Dock Repair Questline ---
+    _getDockRepairPlan() {
+        // stages: 0 -> 4 inclusive; max at 4
+        // each entry describes requirements to advance FROM that stage to next stage
+        return [
+            { to: 1, gold: 100, items: { iron_bar: 5 } },
+            { to: 2, gold: 250, items: { iron_bar: 12 } },
+            { to: 3, gold: 500, items: { iron_bar: 20 } },
+            { to: 4, gold: 1000, items: { iron_bar: 35 } }
+        ];
+    }
+
+    _countInventoryItem(itemId) {
+        if (!this.char || !Array.isArray(this.char.inventory)) return 0;
+        let total = 0;
+        for (const slot of this.char.inventory) {
+            if (!slot || slot.id !== itemId) continue;
+            total += (slot.qty || 1);
+        }
+        return total;
+    }
+
+    _attemptDockRepair() {
+        const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+        const plan = this._getDockRepairPlan();
+        if (stage >= 4) { this._showToast && this._showToast('Dock fully restored.'); return; }
+        const req = plan[stage];
+        if (!req) return;
+        const gold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
+        const haveIron = this._countInventoryItem('iron_bar');
+        const needIron = req.items.iron_bar || 0;
+        const needGold = req.gold || 0;
+        if (gold < needGold || haveIron < needIron) {
+            this._showToast && this._showToast('Not enough materials.');
+            return;
+        }
+        // consume
+        try { this.char.gold = gold - needGold; } catch (e) {}
+        try { this._consumeInventoryItem('iron_bar', needIron); } catch (e) {}
+        try { this.char.flags.dockStage = stage + 1; } catch (e) {}
+        this._persistCharacterState();
+        this._refreshDockVisual(this.char.flags.dockStage);
+        this._showToast && this._showToast(`Dock upgraded to Stage ${this.char.flags.dockStage}`);
+        if (this._dockUi) this._updateDockRepairOverlay();
+    }
+
+    _refreshDockVisual(stage = null) {
+        stage = stage == null ? ((this.char && this.char.flags && this.char.flags.dockStage) || 0) : stage;
+        const dock = this._dockVisual;
+        if (!dock) return;
+        try {
+            // base style
+            let color = 0x8b5a33, stroke = 0x6b3f22, alpha = 1, width = dock.width, length = dock.height;
+            // stage-based improvements
+            if (stage >= 1) { color = 0x91603a; }
+            if (stage >= 2) { color = 0x9a6a45; stroke = 0x7a4a2a; }
+            if (stage >= 3) { color = 0xa87750; stroke = 0x845233; alpha = 1; }
+            if (stage >= 4) { color = 0xb58460; stroke = 0x8f5b3a; alpha = 1; width = Math.min(this.scale.width * 0.12, width + 12); }
+            dock.fillColor = color;
+            dock.alpha = alpha;
+            dock.setStrokeStyle(2, stroke, 0.95);
+            if (width && width !== dock.width) dock.width = width;
+            // lantern at stage >= 3
+            if (stage >= 3) {
+                if (!this._dockLantern) {
+                    const lx = dock.x; const ly = dock.y - Math.round(dock.height / 2) - 10;
+                    this._dockLantern = this.add.circle(lx, ly, 6, 0xffffaa, 0.9).setDepth(1.8);
+                    try { this.tweens.add({ targets: this._dockLantern, alpha: { from: 0.9, to: 0.6 }, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); } catch (e) {}
+                }
+            } else {
+                if (this._dockLantern) { try { this._dockLantern.destroy(); } catch (e) {} this._dockLantern = null; }
+            }
+        } catch (e) { /* no-op */ }
+    }
+
+    _openDockRepairOverlay() {
+        if (typeof document === 'undefined') return;
+        this._ensureFishingUiStyles();
+        if (this._dockUi && typeof this._dockUi.close === 'function') {
+            try { this._dockUi.close('reopen'); } catch (e) {}
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'bdock-overlay';
+        const modal = document.createElement('section');
+        modal.className = 'bdock-modal';
+        modal.innerHTML = `
+            <header class="bdock-header">
+                <div>
+                    <div class="bdock-title">Broken Dock · Repairs</div>
+                    <div class="bdock-status" data-role="status" data-tone="idle">Assessing damage...</div>
+                </div>
+                <button class="bdock-btn ghost" type="button" data-role="close">Close</button>
+            </header>
+            <section class="bdock-metrics">
+                <div class="bdock-metric">
+                    <label>Dock Stage</label>
+                    <div class="bdock-metric-value" data-role="stage">0 / 4</div>
+                    <div class="bdock-progress"><div class="bdock-progress-bar" data-role="stage-bar" style="width:0%;"></div></div>
+                    <div class="bdock-progress-meta" data-role="stage-note">Begin repairs to unlock new fishing features.</div>
+                </div>
+                <div class="bdock-metric">
+                    <label>Materials</label>
+                    <div class="bdock-metric-value" data-role="mats">-</div>
+                    <div class="bdock-progress-meta" data-role="mats-note">Iron bars and gold fund the rebuild.</div>
+                </div>
+            </section>
+            <div class="bdock-content">
+                <div class="bdock-column">
+                    <section class="bdock-section">
+                        <h3>Next Upgrade</h3>
+                        <div class="bdock-preview" data-role="next">
+                            <div class="bdock-progress-meta">All repairs complete.</div>
+                        </div>
+                    </section>
+                </div>
+                <div class="bdock-column">
+                    <section class="bdock-section">
+                        <h3>Benefits</h3>
+                        <ul class="bdock-preview-list" style="margin:0; padding:0;">
+                            <li>Stage 1: Hotspots begin appearing</li>
+                            <li>Stage 2: Faster hotspot spawns</li>
+                            <li>Stage 3: Lantern light and better odds</li>
+                            <li>Stage 4: Best spawn rates and aesthetics</li>
+                        </ul>
+                    </section>
+                    <section class="bdock-section">
+                        <h3>Action</h3>
+                        <div class="bdock-progress-meta" data-role="action-note">Contribute materials to progress the rebuild.</div>
+                        <div class="bdock-footer-actions">
+                            <button class="bdock-btn primary" type="button" data-role="contribute">Contribute</button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        `;
+        overlay.appendChild(modal);
+        this._registerOverlay(overlay);
+        document.body.appendChild(overlay);
+
+        const ui = {
+            overlay,
+            modal,
+            statusEl: modal.querySelector('[data-role="status"]'),
+            closeBtn: modal.querySelector('[data-role="close"]'),
+            contributeBtn: modal.querySelector('[data-role="contribute"]'),
+            stageEl: modal.querySelector('[data-role="stage"]'),
+            stageBar: modal.querySelector('[data-role="stage-bar"]'),
+            stageNoteEl: modal.querySelector('[data-role="stage-note"]'),
+            matsEl: modal.querySelector('[data-role="mats"]'),
+            matsNoteEl: modal.querySelector('[data-role="mats-note"]'),
+            nextEl: modal.querySelector('[data-role="next"]'),
+            listeners: []
+        };
+
+        const onClose = () => ui.close('close');
+        ui.close = (reason = 'closed') => {
+            for (const off of ui.listeners.splice(0)) { try { off(); } catch (e) {} }
+            try { this._removeOverlay(overlay); } catch (e) {}
+            if (this._dockUi === ui) this._dockUi = null;
+        };
+        ui.closeBtn.addEventListener('click', onClose);
+        ui.listeners.push(() => ui.closeBtn.removeEventListener('click', onClose));
+
+        const handleOverlayClick = (evt) => { if (evt.target === overlay) ui.close('dismiss'); };
+        overlay.addEventListener('click', handleOverlayClick);
+        ui.listeners.push(() => overlay.removeEventListener('click', handleOverlayClick));
+
+        const onContrib = () => this._attemptDockRepair();
+        ui.contributeBtn.addEventListener('click', onContrib);
+        ui.listeners.push(() => ui.contributeBtn.removeEventListener('click', onContrib));
+
+        this._dockUi = ui;
+        this._updateDockRepairOverlay();
+    }
+
+    _updateDockRepairOverlay() {
+        if (!this._dockUi) return;
+        const ui = this._dockUi;
+        const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+        const plan = this._getDockRepairPlan();
+        const maxStage = 4;
+        if (ui.stageEl) ui.stageEl.textContent = `${stage} / ${maxStage}`;
+        if (ui.stageBar) ui.stageBar.style.width = `${Math.max(0, Math.min(100, Math.round((stage / maxStage) * 100)))}%`;
+        if (ui.stageNoteEl) ui.stageNoteEl.textContent = stage >= 1 ? 'Repairs underway. Hotspots active.' : 'Begin repairs to unlock hotspots.';
+
+        // materials summary
+        const gold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
+        const iron = this._countInventoryItem('iron_bar');
+        if (ui.matsEl) ui.matsEl.textContent = `${gold}g · ${iron}x Iron Bars`;
+
+        if (stage >= maxStage) {
+            if (ui.statusEl) { ui.statusEl.textContent = 'Dock fully restored'; ui.statusEl.dataset.tone = 'ready'; }
+            if (ui.nextEl) ui.nextEl.innerHTML = `<div class="bdock-progress-meta">All repairs complete. Enjoy the restored dock!</div>`;
+            if (ui.contributeBtn) ui.contributeBtn.disabled = true;
+            return;
+        }
+
+        const req = plan[stage];
+        if (!req) return;
+        const needIron = req.items.iron_bar || 0;
+        const needGold = req.gold || 0;
+        const can = gold >= needGold && iron >= needIron;
+        if (ui.statusEl) {
+            ui.statusEl.textContent = can ? 'Ready to contribute' : 'Gather materials';
+            ui.statusEl.dataset.tone = can ? 'ready' : 'warn';
+        }
+        if (ui.contributeBtn) ui.contributeBtn.disabled = !can;
+        if (ui.nextEl) {
+            ui.nextEl.innerHTML = `
+                <div class="bdock-preview-title">Upgrade to Stage ${req.to}</div>
+                <div class="bdock-preview-desc">Requirements to strengthen the dock:</div>
+                <ul class="bdock-preview-list" style="margin:0; padding:0;">
+                    <li>Gold: ${gold} / ${needGold}</li>
+                    <li>Iron Bars: ${iron} / ${needIron}</li>
+                </ul>
+            `;
+        }
     }
 
     _startSafeZoneRegen() {
