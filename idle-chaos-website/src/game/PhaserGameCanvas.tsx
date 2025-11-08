@@ -3,6 +3,9 @@ import { useEffect, useRef } from "react";
 import createPhaserGame, { CharacterHUD } from "./createPhaserGame";
 import type * as PhaserTypes from "phaser";
 
+// Augmented window type (declared globally in createPhaserGame, duplicated locally for type narrowing convenience)
+interface GameWindow extends Window { GAME?: PhaserTypes.Game }
+
 export default function PhaserGameCanvas({ 
   character, 
   initialScene 
@@ -22,25 +25,27 @@ export default function PhaserGameCanvas({
         // If a Phaser game already exists (window.GAME) and its canvas is still in DOM, reuse it instead of creating a second instance.
         // This guards against double-boot on first navigation or React hydration quirks.
         try {
-          if (typeof window !== 'undefined' && (window as any).GAME) {
-            const existing = (window as any).GAME as PhaserTypes.Game;
-            // Verify the existing game's parent still exists; if so, just move it into our container if needed.
-            const existingParent = (existing && existing.canvas && existing.canvas.parentElement) ? existing.canvas.parentElement : null;
-            // Phaser v3 doesn't expose a public isDestroyed flag; infer viability by presence of systems & renderer.
-            const alive = !!(existing && (existing as any).systems && !(existing as any).pendingDestroy);
-            if (alive) {
-              // If the canvas parent differs, append canvas to our ref container.
-              if (existingParent && existingParent !== ref.current) {
-                try { ref.current!.appendChild(existing.canvas); } catch {}
+          if (typeof window !== 'undefined') {
+            const w = window as GameWindow;
+            if (w.GAME) {
+              const existing = w.GAME;
+              // Parent element of existing canvas
+              const existingParent = existing.canvas?.parentElement || null;
+              // Determine liveness: check for systems present and absence of pendingDestroy (if typed)
+              const maybePendingDestroy = (existing as unknown as { pendingDestroy?: boolean }).pendingDestroy;
+              const alive = 'systems' in existing && !maybePendingDestroy;
+              if (alive) {
+                if (existingParent && existingParent !== ref.current) {
+                  try { ref.current!.appendChild(existing.canvas); } catch {}
+                }
+                gameRef.current = existing;
+                try {
+                  const wWidth = ref.current!.clientWidth;
+                  const hHeight = Math.max(360, Math.floor(wWidth * 9 / 16));
+                  existing.scale.resize(wWidth, hHeight);
+                } catch {}
+                return; // reuse singleton
               }
-              gameRef.current = existing;
-              // Resize to fit current container immediately.
-              try {
-                const w = ref.current!.clientWidth;
-                const h = Math.max(360, Math.floor(w * 9 / 16));
-                existing.scale.resize(w, h);
-              } catch {}
-              return; // Skip new initialization.
             }
           }
         } catch {}
@@ -131,7 +136,16 @@ export default function PhaserGameCanvas({
       if (el) {
         el.removeEventListener("keydown", onKeydown);
       }
-      gameRef.current?.destroy(true);
+      // Destroy only if we own the instance (avoid killing reused singleton prematurely)
+      try {
+        const w = (typeof window !== 'undefined' ? (window as GameWindow) : null);
+        if (gameRef.current && w && w.GAME === gameRef.current) {
+          gameRef.current.destroy(true);
+          w.GAME = undefined;
+        } else if (gameRef.current) {
+          gameRef.current.destroy(true);
+        }
+      } catch {}
       gameRef.current = null;
       // Aggressively clean up any DOM UI created outside the canvas (HUD, modals, tooltips, skill bar)
       try {

@@ -38,15 +38,19 @@ export async function createPhaserGame(opts: {
   const { parent, character, initialScene } = opts;
   // Reuse existing singleton if it's alive; just move its canvas under the new parent
   try {
-    if (typeof window !== 'undefined' && (window as any).GAME) {
-      const existing = (window as any).GAME as PhaserTypes.Game;
-      const alive = !!(existing && (existing as any).systems && !(existing as any).pendingDestroy);
-      if (alive) {
-        const currentParent = (existing && (existing.canvas && existing.canvas.parentElement)) ? existing.canvas.parentElement : null;
-        if (currentParent !== parent) {
-          try { parent.appendChild((existing as any).canvas); } catch {}
+    if (typeof window !== 'undefined') {
+      const w = window as (Window & { GAME?: PhaserTypes.Game });
+      if (w.GAME) {
+        const existing = w.GAME;
+        const maybePendingDestroy = (existing as unknown as { pendingDestroy?: boolean }).pendingDestroy;
+        const alive = 'systems' in existing && !maybePendingDestroy;
+        if (alive) {
+          const currentParent = existing.canvas?.parentElement || null;
+          if (currentParent !== parent) {
+            try { parent.appendChild(existing.canvas); } catch {}
+          }
+          return existing;
         }
-        return existing;
       }
     }
   } catch {}
@@ -223,7 +227,9 @@ export async function createPhaserGame(opts: {
   }
 
   // Expose game instance
-  if (typeof window !== 'undefined') { (window as any).GAME = game; }
+  if (typeof window !== 'undefined') {
+    (window as Window & { GAME?: PhaserTypes.Game }).GAME = game;
+  }
 
   // Start with the specified scene or Boot
   const startSceneKey = initialScene || 'Boot';

@@ -3923,17 +3923,39 @@ function _talentActivatedHandler(payload) {
                     try { const dbg = (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.debugTalent); if (dbg) console.debug('[hex_engine] activating blink for', scene && scene.char && scene.char.talents ? scene.char.talents : null); } catch (e) {}
                     // Simple blink/teleport effect for the Hex Engine talent
                     const teleDist = 160;
-                    // Teleport in the direction the player is facing or moving. Fallback to pointer if unknown.
+                    // Aim priority (mirrors Ghastly Drive): selected target > mouse pointer (world) > movement velocity > facing > rotation
                     let ang = 0;
                     try {
-                        const body = scene.player && scene.player.body;
-                        if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
-                            ang = Math.atan2(body.velocity.y, body.velocity.x);
-                        } else if (scene._facing) {
-                            const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
-                            ang = fmap[scene._facing] || 0;
-                        } else if (scene.input && scene.input.activePointer) {
-                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.input.activePointer.worldX, scene.input.activePointer.worldY);
+                        if (scene.autoTarget && scene.autoTarget.getData && scene.autoTarget.getData('alive')) {
+                            // Directly toward selected target
+                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.autoTarget.x, scene.autoTarget.y);
+                        } else {
+                            // Attempt precise world-space pointer via camera
+                            let wx = null, wy = null;
+                            const pointer = scene.input && scene.input.activePointer;
+                            if (scene.cameras && scene.cameras.main && pointer) {
+                                try {
+                                    const wp = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                                    wx = wp.x; wy = wp.y;
+                                } catch (e) {}
+                            }
+                            if ((wx === null || wy === null) && pointer && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') {
+                                wx = pointer.worldX; wy = pointer.worldY;
+                            }
+                            if (wx !== null && wy !== null) {
+                                ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, wx, wy);
+                            } else {
+                                // Fallback chain
+                                const body = scene.player && scene.player.body;
+                                if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
+                                    ang = Math.atan2(body.velocity.y, body.velocity.x);
+                                } else if (scene._facing) {
+                                    const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 };
+                                    ang = fmap[scene._facing] || 0;
+                                } else if (scene.player && typeof scene.player.rotation === 'number') {
+                                    ang = scene.player.rotation;
+                                }
+                            }
                         }
                     } catch (e) { ang = 0; }
                     const startX = scene.player.x; const startY = scene.player.y;
