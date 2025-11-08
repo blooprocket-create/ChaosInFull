@@ -825,7 +825,15 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                 const _pc = getPlayerCenter(this);
                 const ang = Phaser.Math.Angle.Between(_pc.x, _pc.y, enemy.x, enemy.y);
                 const dx = Math.cos(ang); const dy = Math.sin(ang);
-                const facing = (Math.abs(dx) > Math.abs(dy)) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+                // Preserve current facing if we are nearly vertical to avoid accidental row swap when attacking straight up.
+                let facing = (Math.abs(dx) > Math.abs(dy)) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+                try {
+                    // If vertical intent (|dy| significantly larger than |dx|) and scene._facing already set to up/down, keep that.
+                    if (this._facing && (this._facing === 'up' || this._facing === 'down')) {
+                        const verticalBias = Math.abs(dy) - Math.abs(dx);
+                        if (verticalBias > 0.2 && (facing === 'up' || facing === 'down')) facing = this._facing;
+                    }
+                } catch (e) {}
                 const atkKey = 'mine_' + facing;
                 // Ensure directional or fallback mine animation matches the attack cooldown
                 try {
@@ -840,12 +848,38 @@ function sharedTryAttack(silentMiss = false, preferredTarget = null) {
                     let fps = 8;
                     if (framesPerRow > 0) {
                         fps = Math.max(1, Math.round(framesPerRow / (durationMs / 1000)));
-                        // recreate directional animation so fps matches
-                        const rowIndex = { up: 0, left: 1, down: 2, right: 3 }[facing] || 2;
+                        // Dynamic mapping support: allow runtime cycling of row order to diagnose asset orientation issues.
+                        // Preset orders we may encounter: ULDR, DLUR, UDLR, LURD, etc.
+                        try {
+                            if (typeof window !== 'undefined' && !window.__mineRowOrders) {
+                                window.__mineRowOrders = [
+                                    ['up','left','down','right'], // ULDR (expected for walk)
+                                    ['down','left','up','right'], // DLUR (suspected for mine)
+                                    ['up','down','left','right'], // UDLR
+                                    ['down','up','left','right'], // DULR
+                                    ['left','up','down','right'], // LUDR
+                                ];
+                                window.__mineRowOrderIndex = 0;
+                                window.cycleMineRowOrder = () => {
+                                    try { window.__mineRowOrderIndex = (window.__mineRowOrderIndex + 1) % window.__mineRowOrders.length; } catch (e) {}
+                                    const cur = window.__mineRowOrders[window.__mineRowOrderIndex];
+                                    console.log('[mineRowOrder] Now using order', cur);
+                                };
+                            }
+                        } catch (e) {}
+                        let activeOrder = null;
+                        try {
+                            if (typeof window !== 'undefined' && window.__mineRowOrders) {
+                                activeOrder = window.__mineRowOrders[window.__mineRowOrderIndex || 0];
+                            }
+                        } catch (e) { activeOrder = null; }
+                        if (!activeOrder) activeOrder = ['up','left','down','right'];
+                        const rowIndex = Math.max(0, activeOrder.indexOf(facing));
                         const start = rowIndex * framesPerRow;
                         const end = start + framesPerRow - 1;
                         try { if (this.anims.exists(atkKey)) this.anims.remove(atkKey); } catch (e) {}
                         try { this.anims.create({ key: atkKey, frames: this.anims.generateFrameNumbers(mineKey, { start: start, end: end }), frameRate: fps, repeat: 0 }); } catch (e) {}
+                        try { if (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.debugTalent) console.debug('[attackAnim] facing', facing,'order',activeOrder,'rowIndex',rowIndex,'framesPerRow',framesPerRow); } catch (e) {}
                     } else if (totalFrames > 0) {
                         fps = Math.max(1, Math.round(totalFrames / (durationMs / 1000)));
                         try { if (this.anims.exists('mine')) this.anims.remove('mine'); } catch (e) {}

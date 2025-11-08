@@ -40,8 +40,9 @@ export class Boot extends Phaser.Scene {
     create() {
         // Register global player animations once so all scenes can use the same keys
         try {
-            // Create directional walk/run/idle animations from the spritesheets laid out as 4 rows:
-            // row0 = up, row1 = left, row2 = down, row3 = right. Columns are frames.
+            // Create directional walk/run/idle animations from the spritesheets laid out as 4 rows.
+            // Asset sheet order confirmed by user: row0=up, row1=left, row2=down, row3=right.
+            // Restore ULDR mapping so animations align with visual rows.
             const dirs = ['up', 'left', 'down', 'right'];
             // helper to generate directional animations for a spritesheet
             const makeDirectional = (sheetKey, baseName, frameRate, repeat, singleFrameForIdle = false) => {

@@ -1415,7 +1415,11 @@ export class Cave extends Phaser.Scene {
             const rows = 4;
             const framesPerRow = (totalFrames > 0) ? Math.floor(totalFrames / rows) : 0;
             const dir = this._facing || 'down';
-            const rowIndex = { up: 0, left: 1, down: 2, right: 3 }[dir] || 2;
+            // Dynamic row order (reuse global mine row orders if defined). Fallback to ULDR.
+            let order = ['up','left','down','right'];
+            try { if (typeof window !== 'undefined' && window.__mineRowOrders) order = window.__mineRowOrders[window.__mineRowOrderIndex || 0]; } catch (e) {}
+            const rowIndex = Math.max(0, order.indexOf(dir));
+            try { if (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.debugTalent) console.debug('[caveMine] order',order,'dir',dir,'rowIndex',rowIndex); } catch(e){}
             if (framesPerRow > 0) {
                 const startFrame = rowIndex * framesPerRow;
                 const endFrame = startFrame + framesPerRow - 1;
@@ -1678,7 +1682,10 @@ export class Cave extends Phaser.Scene {
             const rows = 4;
             const framesPerRow = (totalFrames > 0) ? Math.floor(totalFrames / rows) : 0;
             const dir = this._facing || 'down';
-            const rowIndex = { up: 0, left: 1, down: 2, right: 3 }[dir] || 2;
+            let order2 = ['up','left','down','right'];
+            try { if (typeof window !== 'undefined' && window.__mineRowOrders) order2 = window.__mineRowOrders[window.__mineRowOrderIndex || 0]; } catch (e) {}
+            const rowIndex = Math.max(0, order2.indexOf(dir));
+            try { if (typeof window !== 'undefined' && window.__shared_ui && window.__shared_ui.debugTalent) console.debug('[caveStartMining] order',order2,'dir',dir,'rowIndex',rowIndex); } catch(e){}
             if (framesPerRow > 0) {
                 const start = rowIndex * framesPerRow;
                 const end = start + framesPerRow - 1;
