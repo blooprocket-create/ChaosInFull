@@ -21,9 +21,9 @@ export default function SuppressPreloadWarnings() {
     } catch {}
 
     // 2) Mute specific console.warn lines from the browser
-    const originalWarn = console.warn;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (console as any).warn = (...args: unknown[]) => {
+    type WarnArgs = Parameters<typeof console.warn>;
+    const originalWarn = console.warn.bind(console);
+    console.warn = (...args: WarnArgs) => {
       try {
         const msg = String(args[0] ?? "");
         if (
@@ -34,11 +34,11 @@ export default function SuppressPreloadWarnings() {
           return; // swallow this one
         }
       } catch {}
-      // @ts-ignore keep original signature
-      return originalWarn.apply(console, args as []);
+      return originalWarn(...args);
     };
 
     return () => {
+      // restore bound original
       console.warn = originalWarn;
     };
   }, []);

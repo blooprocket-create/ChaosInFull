@@ -3747,7 +3747,15 @@ function _talentActivatedHandler(payload) {
             case 'eagle_eye': {
                 try {
                     // Eagle Shot: spawn a single arrow projectile that flies to the chosen target
-                    const enemy = scene._getEnemyInRange ? scene._getEnemyInRange(520) : null;
+                    // Target priority: explicitly selected autoTarget (alive) > nearest in range > pointer world position > facing
+                    let enemy = null;
+                    try {
+                        if (scene.autoTarget && scene.autoTarget.getData && scene.autoTarget.getData('alive')) {
+                            enemy = scene.autoTarget;
+                        } else if (scene._getEnemyInRange) {
+                            enemy = scene._getEnemyInRange(520);
+                        }
+                    } catch (e) { enemy = null; }
                     const baseRanged = Math.max(6, 10 + ((eff && eff.agi) || 0) * 2);
                     const dmgPercent = scaledValue || 200;
                     const dmg = baseRanged * (dmgPercent / 100);
@@ -3756,16 +3764,38 @@ function _talentActivatedHandler(payload) {
                     const arrow = scene.add.triangle(scene.player.x, scene.player.y, -8, -3, 12, 0, -8, 3, 0xffe0b3).setDepth(9);
                     arrow.setOrigin(0.5, 0.5);
 
-                    // determine aim direction (enemy > pointer > facing > default)
+                    // determine aim direction (autoTarget > precise camera world pointer > pointer worldX/Y fallback > velocity > facing > rotation)
                     let ang = 0;
-                    if (enemy) {
-                        ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, enemy.x, enemy.y);
-                    } else if (scene.input && scene.input.activePointer && (scene.input.activePointer.worldX || scene.input.activePointer.worldY)) {
-                        ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.input.activePointer.worldX, scene.input.activePointer.worldY);
-                    } else if (scene._facing) {
-                        const fmap = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2 };
-                        ang = fmap[scene._facing] || 0;
-                    }
+                    try {
+                        if (enemy && enemy.x != null && enemy.y != null) {
+                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, enemy.x, enemy.y);
+                        } else {
+                            let wx = null, wy = null;
+                            const pointer = scene.input && scene.input.activePointer;
+                            if (scene.cameras && scene.cameras.main && pointer) {
+                                try {
+                                    const wp = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                                    wx = wp.x; wy = wp.y;
+                                } catch (e) {}
+                            }
+                            if ((wx === null || wy === null) && pointer && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') {
+                                wx = pointer.worldX; wy = pointer.worldY;
+                            }
+                            if (wx !== null && wy !== null) {
+                                ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, wx, wy);
+                            } else {
+                                const body = scene.player && scene.player.body;
+                                if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) {
+                                    ang = Math.atan2(body.velocity.y, body.velocity.x);
+                                } else if (scene._facing) {
+                                    const fmap = { left: Math.PI, right: 0, up: -Math.PI / 2, down: Math.PI / 2 };
+                                    ang = fmap[scene._facing] || 0;
+                                } else if (scene.player && typeof scene.player.rotation === 'number') {
+                                    ang = scene.player.rotation;
+                                }
+                            }
+                        }
+                    } catch (e) { ang = 0; }
                     arrow.setRotation(ang);
 
                     // physics and velocity
@@ -3848,6 +3878,43 @@ function _talentActivatedHandler(payload) {
                     try { if (scene._showToast) scene._showToast('Eagle Shot!', 600); } catch (e) {}
                     markActivationSuccess(scene, tid);
                 } catch (e) {}
+                break;
+            }
+            case 'shadowstep': {
+                try {
+                    // Reuse Ghastly Drive / Hex Engine direction priority but apply Shadowstep effects only (no teleport already handled earlier? This adds directional dash if not implemented.)
+                    const dashDist = 160;
+                    let ang = 0;
+                    try {
+                        if (scene.autoTarget && scene.autoTarget.getData && scene.autoTarget.getData('alive')) {
+                            ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, scene.autoTarget.x, scene.autoTarget.y);
+                        } else {
+                            let wx = null, wy = null;
+                            const pointer = scene.input && scene.input.activePointer;
+                            if (scene.cameras && scene.cameras.main && pointer) {
+                                try { const wp = scene.cameras.main.getWorldPoint(pointer.x, pointer.y); wx = wp.x; wy = wp.y; } catch (e) {}
+                            }
+                            if ((wx === null || wy === null) && pointer && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') { wx = pointer.worldX; wy = pointer.worldY; }
+                            if (wx !== null && wy !== null) {
+                                ang = Phaser.Math.Angle.Between(scene.player.x, scene.player.y, wx, wy);
+                            } else {
+                                const body = scene.player && scene.player.body;
+                                if (body && body.velocity && (Math.abs(body.velocity.x) > 0.5 || Math.abs(body.velocity.y) > 0.5)) ang = Math.atan2(body.velocity.y, body.velocity.x);
+                                else if (scene._facing) { const fmap = { left: Math.PI, right: 0, up: -Math.PI/2, down: Math.PI/2 }; ang = fmap[scene._facing] || 0; }
+                                else if (scene.player && typeof scene.player.rotation === 'number') ang = scene.player.rotation;
+                            }
+                        }
+                    } catch (e) { ang = 0; }
+                    const sx = scene.player.x; const sy = scene.player.y;
+                    const tx = sx + Math.cos(ang) * dashDist; const ty = sy + Math.sin(ang) * dashDist;
+                    try {
+                        if (scene.player && scene.player.body && typeof scene.player.body.reset === 'function') { scene.player.body.reset(tx, ty); try { scene.player.setVelocity(0,0); } catch(e){} }
+                        else { scene.player.x = tx; scene.player.y = ty; }
+                    } catch(e){}
+                    try { spawnDashTrail && spawnDashTrail(scene, sx, sy, tx, ty, 0x222244); } catch(e){}
+                    try { if (scene._showToast) scene._showToast('Shadowstep dash', 600); } catch(e){}
+                    markActivationSuccess(scene, tid);
+                } catch(e){}
                 break;
             }
             case 'shadowstep': {
