@@ -3,6 +3,7 @@ import { persistCharacter } from './shared/persistence.js';
 import { createPlayer } from '../shared/playerFactory.js';
 import { onSkillLevelUp, ensureCharTalents } from '../data/talents.js';
 import FISHING_DEFS from '../data/fishing.js';
+import FishingController from '../systems/FishingController.js';
 import { applySafeZoneRegen } from './shared/stats.js';
 import { buildThemedFloor, applyAmbientFx, cleanupAmbientFx } from './shared/environment.js';
 import { updateSmoothPlayerMovement, playDirectionalAnimation, updateDepthForTopDown } from './shared/movement.js';
@@ -233,15 +234,17 @@ export class BrokenDock extends Phaser.Scene {
         this._toastContainer = null;
         this._activeOverlays = [];
 
-        // continuous fishing state and helpers
-        this.fishingActive = false;
-        this.fishingEvent = null;
-        this.fishingIntervalMs = 3000; // default, will use effectiveStats when starting
-        this.fishingIndicator = null;
-        this._fishingUi = null;
-        this._bucketUi = null;
-        this._fishingHooks = null;
-        this._fishingActiveBait = null;
+    // Legacy passive fishing fields (kept temporarily for compatibility with any external calls)
+    this.fishingActive = false; // not used by new controller except as legacy flag
+    this.fishingEvent = null;
+    this.fishingIntervalMs = 3000;
+    this.fishingIndicator = null;
+    this._fishingUi = null; // legacy modal (to be removed in revamp phase 2)
+    this._bucketUi = null;  // legacy shop modal
+    this._fishingHooks = null;
+    this._fishingActiveBait = null;
+    // New active fishing controller (Phase 1 revamp)
+    try { this.fishingController = new FishingController(this); } catch(e) { console.warn('FishingController init failed', e); }
 
         // helper: show a simple fishing indicator near the player
         this._showFishingIndicator = () => {
@@ -421,7 +424,8 @@ export class BrokenDock extends Phaser.Scene {
             const d = Phaser.Math.Distance.Between(px, py, fn.x, fn.y);
             fn.prompt.setVisible(d <= 56);
             if (d <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                this._openFishingModal();
+                // Use new active controller instead of opening modal
+                if (this.fishingController) this.fishingController.tryInteract(fn); else this._openFishingModal();
             }
         }
         const b = this.baitBucket; if (b) {
@@ -441,25 +445,8 @@ export class BrokenDock extends Phaser.Scene {
             }
         }
 
-        // If fishing indicator exists, keep it positioned above the player
-        try {
-            if (this.fishingIndicator && this.player) {
-                this.fishingIndicator.x = this.player.x;
-                this.fishingIndicator.y = this.player.y - 48;
-            }
-        } catch (e) {}
-
-        // If player moves while fishing, stop the fishing loop
-        try {
-            if (this.fishingActive && this.player && this.player.body) {
-                const vx = Math.abs(this.player.body.velocity.x || 0);
-                const vy = Math.abs(this.player.body.velocity.y || 0);
-                if (vx > 2 || vy > 2) {
-                    this._showToast && this._showToast('Stopped fishing (moved)');
-                    this._stopFishingLoop();
-                }
-            }
-        } catch (e) {}
+        // Update new fishing controller
+        try { if (this.fishingController && typeof this.fishingController.update === 'function') this.fishingController.update(time, delta); } catch(e) {}
 
     }
 
@@ -476,7 +463,7 @@ export class BrokenDock extends Phaser.Scene {
         this._updateBucketOverlay(context);
     }
 
-    _openFishingModal() {
+    _openFishingModal() { // retained for transition; may be removed later
         if (typeof document === 'undefined') return;
         this._ensureFishingUiStyles();
         if (this._fishingUi && typeof this._fishingUi.close === 'function') {
