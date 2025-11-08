@@ -235,6 +235,7 @@ export class OuterField extends Phaser.Scene {
     enemy.setData('level', randomizedLevel);
     enemy.setData('hp', def.maxhp || 8);
     enemy.setData('maxhp', def.maxhp || 8);
+    if (typeof def.defense === 'number') enemy.setData('defense', def.defense);
         enemy.setData('alive', true);
         enemy.setData('spawn', spawn);
         enemy.setData('nextAttack', 0);

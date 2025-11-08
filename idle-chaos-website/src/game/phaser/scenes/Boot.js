@@ -27,11 +27,22 @@ export class Boot extends Phaser.Scene {
         try { this.load.spritesheet('birch_tree', 'assets/trees/birch_tree_sway.png', { frameWidth: 48, frameHeight: 80 }); } catch (e) {}
         try { this.load.spritesheet('maple_tree', 'assets/trees/maple_tree_sway.png', { frameWidth: 96, frameHeight: 96 }); } catch (e) {}
     // preload login/character select music (optional file under sound/)
-    // Audio assets: fall back to *_off variants if primary files missing. Prevent 404 spam.
+    // Audio assets: prefer loading fallback-only in dev to avoid 404 spam when primary files are absent.
+    // Can be overridden via NEXT_PUBLIC_AUDIO_PREFER_FALLBACK env var.
     try {
         const addAudio = (key, file) => { try { this.load.audio(key, file); } catch (e) {} };
-        // Check existence by attempting to fetch via <audio>; lightweight best-effort (skip SSR).
-        const withFallback = (key, primary, fallback) => { addAudio(key, primary); addAudio(key + '_fallback', fallback); };
+        const preferFallback = (typeof process !== 'undefined' && process.env && (process.env.NEXT_PUBLIC_AUDIO_PREFER_FALLBACK === 'true'))
+            || (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production');
+        const withFallback = (key, primary, fallback) => {
+            if (preferFallback) {
+                // Dev-safe: only load fallback to avoid network 404 noise
+                addAudio(key + '_fallback', fallback);
+            } else {
+                // Prod: load both, runtime will choose primary if available
+                addAudio(key, primary);
+                addAudio(key + '_fallback', fallback);
+            }
+        };
         withFallback('login_music', 'sound/evolution.mp3', 'sound/evolution_off.mp3');
         withFallback('town_music', 'sound/town.mp3', 'sound/town_off.mp3');
     } catch (e) { /* ignore audio preload errors */ }

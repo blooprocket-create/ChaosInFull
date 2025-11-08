@@ -343,6 +343,8 @@ export class InnerField extends Phaser.Scene {
         enemy.setData('level', randomizedLevel);
     enemy.setData('hp', def.maxhp || 10);
     enemy.setData('maxhp', def.maxhp || 10);
+    // Persist derived defense for tooltip/middleware reads (supports dynamic + static defs)
+    if (typeof def.defense === 'number') enemy.setData('defense', def.defense);
         enemy.setData('alive', true);
         enemy.setData('spawn', spawn);
         enemy.setData('nextAttack', 0);

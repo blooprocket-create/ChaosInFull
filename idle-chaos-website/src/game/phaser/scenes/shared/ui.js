@@ -964,6 +964,10 @@ export function playBackgroundMusic(scene, key, opts = {}) {
         window.__shared_ui._bgMusicCreating = window.__shared_ui._bgMusicCreating || {};
         const gm = scene.sys && scene.sys.game ? scene.sys.game : null;
         if (!gm || !gm.sound) return null;
+        // Allow caller/env to request fallback if primary missing
+        const fallbackKey = (opts && typeof opts.fallbackKey === 'string') ? opts.fallbackKey : (key + '_fallback');
+        const preferFallback = (typeof process !== 'undefined' && process.env && (process.env.NEXT_PUBLIC_AUDIO_PREFER_FALLBACK === 'true'))
+            || (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production');
         const existing = window.__shared_ui._bgMusic || null;
         const existingKey = window.__shared_ui._bgMusicKey || null;
         const loop = (typeof opts.loop === 'boolean') ? opts.loop : true;
@@ -1027,6 +1031,12 @@ export function playBackgroundMusic(scene, key, opts = {}) {
                         } catch (e) {}
                         return s;
                     }
+                    // If preferring fallback or primary not present, also allow matching fallback instance
+                    if (fallbackKey && s.key === fallbackKey) {
+                        try { s.setLoop(loop); s.setVolume(vol); if (!s.isPlaying) s.play(); } catch (e) {}
+                        window.__shared_ui._bgMusic = s; window.__shared_ui._bgMusicKey = fallbackKey;
+                        return s;
+                    }
                 } catch (e) { /* per-sound ignored */ }
             }
         } catch (e) { /* ignore scan errors */ }
@@ -1041,10 +1051,20 @@ export function playBackgroundMusic(scene, key, opts = {}) {
         window.__shared_ui._bgMusicCreating[key] = true;
         let snd = null;
         try {
-            snd = gm.sound.add(key, { loop: loop, volume: vol });
+            // If we prefer fallback in dev, attempt fallback first
+            if (preferFallback && fallbackKey) {
+                try { snd = gm.sound.add(fallbackKey, { loop: loop, volume: vol }); } catch (e) { snd = null; }
+            }
+            if (!snd) {
+                try { snd = gm.sound.add(key, { loop: loop, volume: vol }); } catch (e) { snd = null; }
+            }
+            // If primary failed (e.g., not preloaded), try fallback as a backup
+            if (!snd && fallbackKey) {
+                try { snd = gm.sound.add(fallbackKey, { loop: loop, volume: vol }); } catch (e) { snd = null; }
+            }
             // register as tracked before play to ensure re-entrant callers see the instance
             window.__shared_ui._bgMusic = snd;
-            window.__shared_ui._bgMusicKey = snd ? key : null;
+            window.__shared_ui._bgMusicKey = snd ? (snd && snd.key ? snd.key : key) : null;
             if (snd && typeof snd.play === 'function') snd.play();
             // After creating/playing, aggressively stop/destroy other instances with same key
             try {
@@ -1052,7 +1072,7 @@ export function playBackgroundMusic(scene, key, opts = {}) {
                 for (const other of mgrSounds2) {
                     if (!other || other === snd) continue;
                     try {
-                        if (other.key === key) {
+                        if (other.key === key || (fallbackKey && other.key === fallbackKey)) {
                             if (other.isPlaying) other.stop();
                             try { other.destroy && other.destroy(); } catch (e) {}
                         }
@@ -1060,7 +1080,21 @@ export function playBackgroundMusic(scene, key, opts = {}) {
                 }
             } catch (e) {}
         } catch (e) {
-            try { snd = scene.sound.add(key, { loop: loop, volume: vol }); window.__shared_ui._bgMusic = snd; window.__shared_ui._bgMusicKey = snd ? key : null; if (snd && typeof snd.play === 'function') snd.play(); } catch (e2) { snd = null; }
+            // Fallback path for scene.sound
+            try {
+                if (preferFallback && fallbackKey) {
+                    try { snd = scene.sound.add(fallbackKey, { loop: loop, volume: vol }); } catch (_) { snd = null; }
+                }
+                if (!snd) {
+                    try { snd = scene.sound.add(key, { loop: loop, volume: vol }); } catch (_) { snd = null; }
+                }
+                if (!snd && fallbackKey) {
+                    try { snd = scene.sound.add(fallbackKey, { loop: loop, volume: vol }); } catch (_) { snd = null; }
+                }
+                window.__shared_ui._bgMusic = snd;
+                window.__shared_ui._bgMusicKey = snd ? (snd && snd.key ? snd.key : key) : null;
+                if (snd && typeof snd.play === 'function') snd.play();
+            } catch (e2) { snd = null; }
         } finally {
             try { window.__shared_ui._bgMusicCreating[key] = false; } catch (e) {}
         }

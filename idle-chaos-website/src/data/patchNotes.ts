@@ -8,6 +8,44 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-11-08",
+    version: "0.0.20",
+    title: "Click-to-Strike Combat, Directional Skill Brain, Percent Potions & Armor That Actually Matters",
+    highlights: [
+      "Primary combat input overhauled: hold / click to attack — spacebar retires to emote duty",
+      "All dash / projectile skills now share a unified directional priority (target → nearest → mouse → movement vector → facing → last rotation)",
+      "Enemy Defense stat is live and persisted per spawn: damage math finally has a second dimension",
+      "Health & Mana potions reworked to percentage based (Minor 15%, Major 35%) with smarter auto‑use minimizing overheal",
+      "New weapon families scaffolded: Bows, Crossbows, and Polearms (range + future niche scaling)",
+      "Needle Rain actually hits things; Knife Swarm partially tuned (still flagged for tighter cone)",
+      "Shadowstep, Ghastly Drive, Hex Engine, Eagle Shot all speak the same aiming dialect",
+      "Console noise diet: CSS preload spam, stray ping warnings, and missing audio 404 chatter suppressed",
+      "Dialogue polish: typos & runaway punctuation cleaned; NPC lines stop desyncing mid-scroll",
+      "Light performance wins: fewer duplicate Phaser boots, leaner animation resolution, reduced overdraw from mining / targeting"
+    ],
+    notes: [
+      "Click / Hold Attack: Replaced keydown polling with pointer down → sustained attack loop. Auto‑attack respects target lock and cancels cleanly on pointer up or movement outside range.",
+      "Directional Priority Core: A single resolver now powers Ghastly Drive, Hex Engine, Eagle Shot, Shadowstep (and future actives). Order: explicit selected target → closest valid enemy in arc → mouse world position → current velocity vector → facing direction → preserved last rotation. This eliminates ‘dash south because reasons’.",
+      "Enemy Defense: computeEnemyStats now derives defense from level + rarity curves (with overrides). Each enemy instance stores a frozen defense value (enemy.setData('defense', n)) so multi‑scene transitions & tooltips are consistent. Tooltip line shows DEF n alongside HP / DMG cues.",
+      "Damage & Mitigation: Existing formulas read defense before critical application; future talents can scale off percentPen or flat shred without retrofitting spawn code.",
+      "Animation Direction Fix: Player sprite row mapping restored to ULDR (up/left/down/right). Incorrect ‘down while walking north’ glitch resolved; idle/mine placeholders rebuilt per scene for timing sync.",
+      "Potion Percent Rework: Minor / Major potions now scale with your max pools. Auto‑use algorithm selects the smallest potion covering ≥60% of the deficit to avoid wasting a Major at 5% missing HP. PotionEffect modifiers now multiplicatively boost the computed heal/mana chunk.",
+      "Inventory Use Feedback: Updated toasts show actual heal / mana amount plus percent source when relevant (e.g. “+128 HP / 15%”).",
+      "Needle Rain: Projectile fan recalculated using the unified resolver angle; now samples collision frames instead of trusting spawn-only overlap → reliable multi‑hit contact (within per‑target cap).",
+      "Knife Swarm: Converted to shared angle baseline; current spread uses conservative radial offset. Marked for Phase 2 refinement (tighter clustering + crit synergy).",
+      "Shadowstep Restoration: Removed accidental dash‑only branch that broke stealth. Teleport now: compute target point via resolver → apply stealth state + post‑stealth buff timers → optional dash trail particles for clarity.",
+      "Eagle Shot: Chooses locked target first, else nearest valid in LOS, else mouse; gracefully degrades to movement/facing so you never fire behind yourself while kiting.",
+      "Console Hygiene: Patched CSS preload warnings, gated PostHog disabled logs, throttled /api/ping noise, and added dev‑mode audio fallback loading (preload only *_fallback in dev to stop 404 spam).",
+      "Audio Fallback Logic: Boot scene now conditionally loads only “*_off” tracks in development unless NEXT_PUBLIC_AUDIO_PREFER_FALLBACK is overridden; runtime playBackgroundMusic will probe primary then downgrade silently.",
+      "Phaser Singleton: Creation lock + refcount prevents duplicate canvas + doubled input listeners when React strict/dev remounts occur.",
+      "Mining Guard: Pre‑start validation aborts ‘mine air’ attempts on depleted nodes; initial swing animation skipped if node empties between intent and first tick.",
+      "Dialogue Pass: Normalized capitalization, removed duplicated punctuation, ensured quest markers pause NPC wander so text doesn’t slide off screen mid‑conversation.",
+      "Performance Notes: Fewer redundant animation exists() checks, shielded quest indicator logs (state‑delta only), reduced early ref measurements in HUD construction.",
+      "Tech Hooks for Upcoming Gear: Bow / Crossbow / Polearm categories recognized in weapon range calculation and future talent gating (no live drops yet; seeding incoming).",
+      "Housekeeping: Purged lingering explicit anys in game bootstrap; replaced ts‑ignore suppressions with narrow types; ensured lint + typecheck pass post‑refactor."
+    ]
+  },
+  {
     date: "2025-11-05",
     version: "0.0.19",
     title: "Town Gossip: Steward Fenric, bench glow‑ups, and shortcut buttons",

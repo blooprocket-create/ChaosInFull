@@ -50,6 +50,13 @@ export function computeEnemyStats(def = {}) {
     // Attack range: preserve if present
     const attackRange = (typeof def.attackRange === 'number') ? def.attackRange : Math.round(36 + (Math.min(level, 12) * 2));
 
+    // Defense baseline: scale modestly with level & rarity, allow explicit override in def
+    // Formula keeps early-game values low while letting bosses gain noticeable mitigation.
+    const baseDefense = (typeof def.defense === 'number') ? def.defense
+        : (typeof def.def === 'number') ? def.def
+        : (typeof def.defence === 'number') ? def.defence
+        : Math.round((level * 0.85 + Math.pow(level, 1.05) * 0.15) * (1 + (mult - 1) * 0.55));
+
     return Object.assign({}, def, {
         maxhp: hp,
         damage: [dmgMin, dmgMax],
@@ -57,7 +64,8 @@ export function computeEnemyStats(def = {}) {
         gold: def.gold || { min: goldMin, max: goldMax, chance: 0.9 },
         attackCooldown,
         moveSpeed,
-        attackRange
+        attackRange,
+        defense: baseDefense
     });
 }
 
