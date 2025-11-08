@@ -31,6 +31,20 @@ export default function QuestPanel({ characterId }: { characterId: string }) {
     }
   }, [characterId]);
   useEffect(() => { load(); }, [characterId, load]);
+  // Instant updates: listen for quest progress events dispatched from Phaser side
+  useEffect(() => {
+    const onQuest = () => { load(); };
+    try {
+      window.addEventListener('questProgressChanged', onQuest as EventListener);
+      window.addEventListener('questProgressChangedDetailed', onQuest as EventListener);
+    } catch {}
+    return () => {
+      try {
+        window.removeEventListener('questProgressChanged', onQuest as EventListener);
+        window.removeEventListener('questProgressChangedDetailed', onQuest as EventListener);
+      } catch {}
+    };
+  }, [load]);
   // Listen to a global registry bump (Phaser side) via a polling event to auto-refresh
   useEffect(() => {
     let t: number | null = null;

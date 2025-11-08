@@ -885,8 +885,9 @@ export class Cave extends Phaser.Scene {
                 const list = ui.buildObjectiveList(nextWayneQuest, null, '#d4a574');
                 if (list) bodyNodes.push(list);
                 optionConfigs.push({ label: `Accept "${nextWayneQuest.name || nextWayneQuest.id}"`, onClick: () => {
-                    if (!startQuest) { return; }
-                    if ((this.char.activeQuests || []).some(q => q.id === nextWayneQuest.id)) { return; }
+                    if (!startQuest) { try { closeDialogue(); } catch(e) {} return; }
+                    // If already active, just close the dialogue
+                    if ((this.char.activeQuests || []).some(q => q.id === nextWayneQuest.id)) { try { closeDialogue(); } catch(e) {} return; }
                     const started = startQuest(this.char, nextWayneQuest.id);
                     if (started) {
                         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
@@ -894,7 +895,9 @@ export class Cave extends Phaser.Scene {
                         try { if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); } catch (e) {}
                         this._showToast('Quest started: ' + ((nextWayneQuest && nextWayneQuest.name) || nextWayneQuest.id), 2200);
                     }
-                }, variant: 'success' });
+                    // Always attempt to close the dialogue after handling acceptance
+                    try { closeDialogue(); } catch(e) {}
+                }, variant: 'success', closeOnClick: true });
                 optionConfigs.push({ label: 'Maybe later.', onClick: () => {}, closeOnClick: true });
             } else {
                 optionConfigs.push({ label: 'Goodbye.', onClick: () => {}, closeOnClick: true });

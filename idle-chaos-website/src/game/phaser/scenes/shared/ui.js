@@ -530,6 +530,33 @@ export function hideItemTooltip() {
 }
 
 // Shared helper for updating quest progress and checking completion
+// Internal helper to notify external (React) UI like `QuestPanel` that quest data changed.
+// The React panel polls `window.__phaserRegistry.get('questDirtyCount')` once per second.
+// By bumping this counter immediately after any quest progress mutation we force an
+// immediate refresh (next poll tick) so users see changes without manual refresh.
+function _bumpQuestDirty() {
+    try {
+        const reg = (typeof window !== 'undefined') ? window.__phaserRegistry : null;
+        if (reg && typeof reg.get === 'function' && typeof reg.set === 'function') {
+            const cur = Number(reg.get('questDirtyCount') || 0);
+            reg.set('questDirtyCount', cur + 1);
+        } else if (typeof window !== 'undefined') {
+            // Lightweight fallback shim so future gets don't crash; mimics DataManager subset
+            if (!window.__phaserRegistry) {
+                let _store = { questDirtyCount: 1 };
+                window.__phaserRegistry = {
+                    get: (k) => _store[k],
+                    set: (k, v) => { _store[k] = v; }
+                };
+            }
+        }
+        // Dispatch an instant event for React panels (QuestPanel) to react immediately
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+            try { window.dispatchEvent(new CustomEvent('questProgressChanged', { detail: { dirty: true } })); } catch (e) {}
+        }
+    } catch (e) { /* silent */ }
+}
+
 export function updateQuestProgressAndCheckCompletion(scene, type, itemId, amount = 1) {
     if (!scene || !scene.char) return;
     const updateQuestProgress = (window && window.updateQuestProgress) ? window.updateQuestProgress : null;
@@ -537,6 +564,13 @@ export function updateQuestProgressAndCheckCompletion(scene, type, itemId, amoun
 
     // Update progress
     updateQuestProgress(scene.char, type, itemId, amount);
+    _bumpQuestDirty();
+    // More granular event with context for listeners that care about specific objective types
+    try {
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('questProgressChangedDetailed', { detail: { type, itemId, amount } }));
+        }
+    } catch (e) {}
 
     // Lightweight diagnostics to help verify quest progress wiring in-game
     try {
@@ -4062,11 +4096,13 @@ export function equipItemFromInventory(scene, itemId) {
     
     // Update quest progress for equip objectives
     try {
-    const questModule = window.__questModule || null;
+        const questModule = window.__questModule || null;
         if (questModule && questModule.updateQuestProgress) {
             questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
+            _bumpQuestDirty(); // ensure QuestPanel refreshes immediately after equipping
+            try { if (typeof window !== 'undefined' && window.dispatchEvent) window.dispatchEvent(new CustomEvent('questProgressChangedDetailed', { detail: { type: 'equip', itemId, amount: 1 } })); } catch (e) {}
         }
-    } catch (e) {}
+    } catch (e) { /* ignore quest progress errors */ }
     
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
