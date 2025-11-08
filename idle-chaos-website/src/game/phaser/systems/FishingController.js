@@ -250,6 +250,8 @@ export class FishingController {
         const rod = this._getRodStats();
     const mastery = this._getMastery();
     const baseWidth = Math.max(0.12, (0.42 - diff * 0.0015) * (rod.controlZoneMult || 1.0) * (1 + 0.04 * (mastery.control || 0)));
+        // Apply rod-derived fail tolerance at start of tension
+        this.maxFails = (typeof rod.maxFails === 'number' ? rod.maxFails : 6);
         const start = Math.random() * (1 - baseWidth);
         this.targetMin = start;
         this.targetMax = start + baseWidth;
@@ -347,14 +349,47 @@ export class FishingController {
         const rod = char.equipment && char.equipment.fishing || null;
         const def = rod && defs[rod.id] || null;
         const bonus = (def && def.fishingBonus) || (rod && rod.fishingBonus) || {};
+        const stats = (def && def.fishingStats) || (rod && rod.fishingStats) || null;
+
+        // Derive multipliers from new schema if present
+        let controlZoneMult = 1.0;
+        let sensitivityWaitMult = 1.0;
+        let precisionGainMult = 1.0;
+        let zoneShrinkMult = 1.0;
+        let maxFails = 6;
+
+        if (stats) {
+            const ctrl = Math.max(0, stats.control || 0);
+            const sens = Math.max(0, stats.sensitivity || 0);
+            const prec = Math.max(0, stats.precision || 0);
+            const stab = Math.max(0, stats.stability || 0);
+            // Control: widen safe zone roughly +4% per point
+            controlZoneMult = 1 + 0.04 * ctrl;
+            // Sensitivity: reduce wait time ~3% per point (cap at 0.6x)
+            sensitivityWaitMult = Math.max(0.6, 1 - 0.03 * sens);
+            // Precision: increase progress gain ~5% per point
+            precisionGainMult = 1 + 0.05 * prec;
+            // Stability: slow the zone shrink ~3% per point (cap at 0.7x)
+            zoneShrinkMult = Math.max(0.7, 1 - 0.03 * stab);
+            // Stability also slightly raises fail tolerance: +1 every 2 points
+            maxFails = 6 + Math.floor(stab / 2);
+        }
+
+        // Allow explicit legacy overrides from fishingBonus if provided (highest precedence)
+        if (typeof bonus.controlZoneMult === 'number') controlZoneMult = bonus.controlZoneMult;
+        if (typeof bonus.sensitivityWaitMult === 'number') sensitivityWaitMult = bonus.sensitivityWaitMult;
+        if (typeof bonus.precisionGainMult === 'number') precisionGainMult = bonus.precisionGainMult;
+        if (typeof bonus.zoneShrinkMult === 'number') zoneShrinkMult = bonus.zoneShrinkMult;
+        if (typeof bonus.maxFails === 'number') maxFails = bonus.maxFails;
+
         // Map to controller knobs with safe defaults
         return {
             name: (def && def.name) || (rod && rod.name) || 'None',
-            controlZoneMult: typeof bonus.controlZoneMult === 'number' ? bonus.controlZoneMult : 1.0,
-            sensitivityWaitMult: typeof bonus.sensitivityWaitMult === 'number' ? bonus.sensitivityWaitMult : 1.0,
-            precisionGainMult: typeof bonus.precisionGainMult === 'number' ? bonus.precisionGainMult : 1.0,
-            zoneShrinkMult: typeof bonus.zoneShrinkMult === 'number' ? bonus.zoneShrinkMult : 1.0,
-            maxFails: typeof bonus.maxFails === 'number' ? bonus.maxFails : 6,
+            controlZoneMult,
+            sensitivityWaitMult,
+            precisionGainMult,
+            zoneShrinkMult,
+            maxFails,
         };
     }
 

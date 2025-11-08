@@ -208,3 +208,28 @@ export function unlockMasteryNode(char: any, nodeId: string): boolean {
   char.fishing.masteryPoints -= node.cost;
   return true;
 }
+
+// Attach globals for Phaser scenes (BrokenDock, etc.) which access mastery functions dynamically.
+// This avoids import friction between TS/JS mixed modules in the current build config.
+try {
+  if (typeof window !== 'undefined') {
+    const w: any = window as any;
+    w.computeFishingMasteryBonuses = computeFishingMasteryBonuses;
+    w.ensureFishingMastery = ensureFishingMastery;
+    w.grantMasteryPointsIfNeeded = grantMasteryPointsIfNeeded;
+    w.canUnlockMasteryNode = canUnlockMasteryNode;
+    w.unlockMasteryNode = unlockMasteryNode;
+    w.FISHING_MASTERY_NODES = FISHING_MASTERY_NODES;
+    w.fishingMasteryById = fishingMasteryById;
+    w.__modules = w.__modules || {};
+    w.__modules['fishingMastery'] = {
+      computeFishingMasteryBonuses,
+      ensureFishingMastery,
+      grantMasteryPointsIfNeeded,
+      canUnlockMasteryNode,
+      unlockMasteryNode,
+      FISHING_MASTERY_NODES,
+      fishingMasteryById
+    };
+  }
+} catch {}

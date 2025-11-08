@@ -187,6 +187,23 @@ export class BrokenDock extends Phaser.Scene {
         try { if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses(this); } catch (e) {}
         if (window && window.__hud_shared && window.__hud_shared.createHUD) window.__hud_shared.createHUD(this); else this._createHUD();
         this._startSafeZoneRegen();
+        // Schedule mastery keybinding (M) slightly after create to ensure input keyboard ready
+        try {
+            if (!this._masteryKeyInitScheduled) {
+                this._masteryKeyInitScheduled = true;
+                addTimeEvent(this, { delay: 50, callback: () => {
+                    try {
+                        if (this.input && this.input.keyboard) {
+                            this._keyHandlers = this._keyHandlers || {};
+                            if (!this._keyHandlers.m) {
+                                this._keyHandlers.m = (evt) => { if (evt && evt.repeat) return; try { this._openFishingMasteryOverlay && this._openFishingMasteryOverlay(); } catch (e) {} };
+                                this.input.keyboard.on('keydown-M', this._keyHandlers.m);
+                            }
+                        }
+                    } catch (e) {}
+                }});
+            }
+        } catch (e) {}
 
         // Add a free rusty rod on the floor if not already taken
         try {
@@ -390,6 +407,7 @@ export class BrokenDock extends Phaser.Scene {
                     if (this._keyHandlers.x) this.input.keyboard.off('keydown-X', this._keyHandlers.x);
                     if (this._keyHandlers.q) this.input.keyboard.off('keydown-Q', this._keyHandlers.q);
                     if (this._keyHandlers.t) this.input.keyboard.off('keydown-T', this._keyHandlers.t);
+                    if (this._keyHandlers.m) this.input.keyboard.off('keydown-M', this._keyHandlers.m);
                 } catch (e) { /* ignore key cleanup errors */ }
             }
         });
@@ -2532,6 +2550,85 @@ export class BrokenDock extends Phaser.Scene {
     }
 
     _clearToasts() { if (this._toastContainer && this._toastContainer.parentNode) this._toastContainer.parentNode.removeChild(this._toastContainer); this._toastContainer = null; }
+
+    // -------- Fishing Mastery Overlay (Phase 3 UI) --------
+    _ensureMasteryUiStyles() {
+        if (typeof document === 'undefined') return;
+        if (document.getElementById('broken-dock-mastery-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'broken-dock-mastery-styles';
+        style.textContent = `
+            .bdock-mastery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap:14px; padding:4px 2px; }
+            .bdock-mastery-node { background: rgba(16,26,40,0.92); border:1px solid rgba(118,190,255,0.14); border-radius:12px; padding:12px 14px 44px 14px; position:relative; display:flex; flex-direction:column; gap:6px; transition:border-color 160ms ease, background 160ms ease; }
+            .bdock-mastery-node:hover { border-color: rgba(118,190,255,0.34); }
+            .bdock-mastery-node.taken { border-color: rgba(134,245,196,0.55); background: linear-gradient(160deg, rgba(28,48,42,0.9) 0%, rgba(18,30,26,0.92) 100%); }
+            .bdock-mastery-node.locked { opacity:0.55; }
+            .bdock-mastery-node h4 { margin:0; font-size:14px; font-weight:600; letter-spacing:0.6px; }
+            .bdock-mastery-node p { margin:0; font-size:12px; line-height:1.4; color:rgba(255,255,255,0.72); }
+            .bdock-mastery-meta { font-size:11px; letter-spacing:1px; text-transform:uppercase; color:rgba(255,255,255,0.55); }
+            .bdock-mastery-node button { position:absolute; left:12px; right:12px; bottom:12px; border:none; border-radius:8px; padding:8px 12px; font-weight:600; font-size:12px; letter-spacing:0.5px; cursor:pointer; background:linear-gradient(90deg,#5fb1ff 0%, #8f93ff 100%); color:#081120; box-shadow:0 6px 14px rgba(95,177,255,0.28); }
+            .bdock-mastery-node button:disabled { opacity:0.45; cursor:not-allowed; box-shadow:none; background:rgba(40,60,80,0.6); color:rgba(255,255,255,0.55); }
+            .bdock-mastery-summary { display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:rgba(255,255,255,0.68); }
+            .bdock-mastery-summary span { background: rgba(12,20,32,0.9); padding:6px 10px; border-radius:8px; border:1px solid rgba(118,190,255,0.12); }
+            .bdock-mastery-empty { font-size:12px; color:rgba(255,255,255,0.6); }
+        `;
+        document.head.appendChild(style);
+    }
+
+    _openFishingMasteryOverlay() {
+        if (typeof document === 'undefined') return;
+        this._ensureFishingUiStyles && this._ensureFishingUiStyles();
+        this._ensureMasteryUiStyles();
+        const overlay = document.createElement('div'); overlay.className='bdock-overlay';
+        const modal = document.createElement('section'); modal.className='bdock-modal';
+        modal.innerHTML = `
+            <header class="bdock-header">
+                <div>
+                    <div class="bdock-title">Broken Dock · Fishing Mastery</div>
+                    <div class="bdock-status" data-role="status" data-tone="idle">Progression</div>
+                </div>
+                <button class="bdock-btn ghost" type="button" data-role="close">Close</button>
+            </header>
+            <section class="bdock-metrics">
+                <div class="bdock-metric"><label>Mastery Points</label><div class="bdock-metric-value" data-role="points">0</div><div class="bdock-progress-meta" data-role="points-note">Earn 1 per 5 fishing levels.</div></div>
+                <div class="bdock-metric"><label>Fishing Level</label><div class="bdock-metric-value" data-role="level">Lv 1</div><div class="bdock-progress-meta" data-role="level-note">Level drives point supply.</div></div>
+            </section>
+            <div class="bdock-content" style="grid-template-columns:1fr;">
+                <div class="bdock-column">
+                    <section class="bdock-section"><h3>Tree</h3><div class="bdock-mastery-grid" data-role="grid"></div></section>
+                    <section class="bdock-section"><h3>Summary</h3><div class="bdock-mastery-summary" data-role="summary"></div></section>
+                </div>
+            </div>
+            <footer class="bdock-footer"><div class="bdock-progress-meta" data-role="footer-tip">Press M to reopen. Unlock nodes to amplify active fishing.</div><div class="bdock-footer-actions"><button class="bdock-btn outline" type="button" data-role="refresh">Refresh</button></div></footer>
+        `;
+        overlay.appendChild(modal); this._registerOverlay && this._registerOverlay(overlay); document.body.appendChild(overlay);
+        const statusEl = modal.querySelector('[data-role="status"]');
+        const closeBtn = modal.querySelector('[data-role="close"]');
+        const refreshBtn = modal.querySelector('[data-role="refresh"]');
+        const pointsEl = modal.querySelector('[data-role="points"]');
+        const pointsNoteEl = modal.querySelector('[data-role="points-note"]');
+        const levelEl = modal.querySelector('[data-role="level"]');
+        const gridEl = modal.querySelector('[data-role="grid"]');
+        const summaryEl = modal.querySelector('[data-role="summary"]');
+        const uiState = { overlay, modal, statusEl, closeBtn, refreshBtn, pointsEl, pointsNoteEl, levelEl, gridEl, summaryEl, listeners: [] };
+        const handleKey = (evt) => { if (evt.key === 'Escape') { evt.preventDefault(); uiState.close('escape'); } }; const offDocKey = addDocumentListener(this, 'keydown', handleKey);
+        const handleOverlayClick = (evt) => { if (evt.target === overlay) uiState.close('dismiss'); }; overlay.addEventListener('click', handleOverlayClick);
+        uiState.close = (reason='closed') => { for (const off of uiState.listeners.splice(0)) { try { off(); } catch(e) {} } try { this._removeOverlay && this._removeOverlay(overlay); } catch(e) {} };
+        const onCloseClick = () => uiState.close('close-button'); closeBtn.addEventListener('click', onCloseClick);
+        const renderSummary = (summary) => { if (!summaryEl) return; const parts=[]; const keys=['stability','control','sensitivity','precision','baitEfficiency','rarityBoost','hotspotInsight']; for (const k of keys) { const v=summary[k]||0; if (v) parts.push(`<span>${k}: +${v}</span>`); } summaryEl.innerHTML = parts.length ? parts.join('') : '<div class="bdock-mastery-empty">No bonuses yet. Unlock nodes to begin.</div>'; };
+        const renderNodes = () => { if (!gridEl) return; gridEl.innerHTML=''; const char=this.char||{}; try { if (window && window.ensureFishingMastery) window.ensureFishingMastery(char); } catch(e) {} const nodes=window && window.FISHING_MASTERY_NODES ? window.FISHING_MASTERY_NODES : []; const byId=window && window.fishingMasteryById ? window.fishingMasteryById : {}; const taken=Array.isArray(char.fishing?.masteryNodes)?char.fishing.masteryNodes:[]; const points=char.fishing?.masteryPoints||0; if (pointsEl) pointsEl.textContent=String(points); if (levelEl) levelEl.textContent=`Lv ${(char.fishing?.level)||1}`; if (pointsNoteEl) pointsNoteEl.textContent = points===0 ? 'Earn more points by leveling fishing.' : `${points} point${points===1?'':'s'} available.`; const summary = window && window.computeFishingMasteryBonuses ? window.computeFishingMasteryBonuses(char) : { takenNodes: [], pointsSpent: 0 }; renderSummary(summary); for (const node of nodes) { const card=document.createElement('div'); card.className='bdock-mastery-node'; const isTaken=taken.includes(node.id); const prereqMissing=node.requires && node.requires.some(r=>!taken.includes(r)); const canUnlock=!isTaken && !prereqMissing && points>=node.cost && (window && window.canUnlockMasteryNode ? window.canUnlockMasteryNode(char,node.id) : true); if (isTaken) card.classList.add('taken'); if (!isTaken && prereqMissing) card.classList.add('locked'); card.innerHTML=`<div class=\"bdock-mastery-meta\">${isTaken?'TAKEN':(canUnlock?'READY':(prereqMissing?'LOCKED':'UNAVAILABLE'))}</div><h4>${node.name}</h4><p>${node.description}</p><p style=\"font-size:11px;color:rgba(255,255,255,0.55);\">Cost: ${node.cost} · Tier ${node.tier}${node.requires && node.requires.length ? ` · Req: ${node.requires.map(r => byId[r]?.name || r).join(', ')}` : ''}</p><button type=\"button\" ${canUnlock?'':'disabled'} data-node-id=\"${node.id}\">${isTaken?'Taken':(canUnlock?'Unlock':'Locked')}</button>`; gridEl.appendChild(card); } };
+        const attemptUnlock = (evt) => { const btn=evt.target.closest('button[data-node-id]'); if (!btn) return; const nodeId=btn.getAttribute('data-node-id'); if (!nodeId) return; const char=this.char||{}; if (!(window && window.unlockMasteryNode)) return; const ok=window.unlockMasteryNode(char,nodeId); if (ok) { this._showToast && this._showToast('Unlocked mastery: '+nodeId); try { if (window && window.__telemetry && window.__telemetry.emit) window.__telemetry.emit('fishing_mastery_unlock',{ node: nodeId, remaining: char.fishing?.masteryPoints||0 }); } catch(e) {} try { const username=(this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username)||null; if (this._persistCharacter) this._persistCharacter(username); } catch(e) {} renderNodes(); if (statusEl) { statusEl.textContent='Unlocked '+nodeId; statusEl.dataset.tone='ready'; } } else { if (statusEl) { statusEl.textContent='Cannot unlock '+nodeId; statusEl.dataset.tone='warn'; } } };
+        gridEl.addEventListener('click', attemptUnlock);
+        const onRefresh = () => { renderNodes(); if (statusEl) { statusEl.textContent='Refreshed'; statusEl.dataset.tone='idle'; } };
+        refreshBtn.addEventListener('click', onRefresh);
+        renderNodes();
+        uiState.listeners.push(() => { try { offDocKey && offDocKey(); } catch(e) {} });
+        uiState.listeners.push(() => overlay.removeEventListener('click', handleOverlayClick));
+        uiState.listeners.push(() => closeBtn.removeEventListener('click', onCloseClick));
+        uiState.listeners.push(() => gridEl.removeEventListener('click', attemptUnlock));
+        uiState.listeners.push(() => refreshBtn.removeEventListener('click', onRefresh));
+        return uiState;
+    }
 
 }
 
