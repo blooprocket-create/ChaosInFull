@@ -1645,13 +1645,21 @@ export class Cave extends Phaser.Scene {
 
     _startContinuousMining() {
         if (this.miningActive) return;
+        const node = this._activeNode;
+        // Pre-start validation: ensure node exists & has remaining health (ore) before starting
+        if (!node) return; // nothing targeted
+        const remaining = (typeof node.currentHealth === 'number') ? node.currentHealth : node.maxHealth;
+        if (node.depleted || remaining <= 0) {
+            try { this._showToast && this._showToast('This node is depleted'); } catch (e) {}
+            // Clear active node reference so prompts can hide until respawn
+            this._activeNode = null;
+            return;
+        }
+        // Passed pre-check: begin continuous mining
         this.miningActive = true;
-        // mark activity as mining so HUD shows mining progress
         setSceneActivity(this, 'mining', { source: 'mining-start', timeout: 0 });
         const snapshot = this._getMiningSnapshot();
-        
         // Use node's baseSpeed property (NEW SYSTEM)
-        const node = this._activeNode;
         const baseInterval = (node && node.baseSpeed) ? node.baseSpeed : (this.miningInterval || 2800);
         
         const statReduction = Math.round((snapshot.miningLevel || 1) * 20 + (snapshot.str || 0) * 8);

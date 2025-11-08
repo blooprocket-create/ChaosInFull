@@ -185,10 +185,10 @@ export class Login extends Phaser.Scene {
                 <h1>Veil Keeper</h1>
                 <div class="subtitle">Enter the void</div>
                 <label class="field">Username
-                    <input id="login-username" type="text" autocomplete="username">
+                    <input id="login-username" data-login-username="true" type="text" autocomplete="username">
                 </label>
                 <label class="field">Password
-                    <input id="login-password" type="password" autocomplete="current-password">
+                    <input id="login-password" data-login-password="true" type="password" autocomplete="current-password">
                 </label>
                 <div class="actions">
                     <div style="flex:1; display:flex; gap:8px;">
@@ -215,8 +215,9 @@ export class Login extends Phaser.Scene {
             } catch (e) { /* ignore if unavailable */ }
         } catch (e) {}
 
-        const usernameInput = document.getElementById('login-username');
-        const passwordInput = document.getElementById('login-password');
+    // Query by data-* attributes to avoid duplicate id collisions if scene reboots in dev/StrictMode
+    const usernameInput = document.querySelector('input[data-login-username="true"]');
+    const passwordInput = document.querySelector('input[data-login-password="true"]');
         const errorDiv = document.getElementById('login-error');
 
         const lastSession = this._findLastLoggedInUser();

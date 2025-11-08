@@ -21,12 +21,16 @@ declare global {
     checkQuestCompletion: unknown;
     completeQuest: unknown;
     getQuestObjectiveState: unknown;
-    __shared_ui: unknown;
-    __furnace_shared: unknown;
-    __shared_keys: unknown;
-    __overlays_shared: unknown;
-    __portal_shared: unknown;
-    __workbench_shared: unknown;
+  __shared_ui: unknown;
+  __furnace_shared: unknown;
+  __shared_keys: unknown;
+  __overlays_shared: unknown;
+  __portal_shared: unknown;
+  __workbench_shared: unknown;
+    // Phaser singleton + lifecycle guards
+    GAME?: PhaserTypes.Game;
+    __GAME_CREATING__?: Promise<PhaserTypes.Game> | null;
+    __GAME_REFCOUNT__?: number;
   }
 }
 
@@ -36,10 +40,11 @@ export async function createPhaserGame(opts: {
   initialScene?: string; 
 }) {
   const { parent, character, initialScene } = opts;
-  // Reuse existing singleton if it's alive; just move its canvas under the new parent
+  // Reuse existing singleton if it's alive; or wait for in-flight creation (StrictMode/dev-safe)
   try {
     if (typeof window !== 'undefined') {
-      const w = window as (Window & { GAME?: PhaserTypes.Game });
+      const w = window as Window;
+      // If an instance exists and is alive, increase refcount and reuse
       if (w.GAME) {
         const existing = w.GAME;
         const maybePendingDestroy = (existing as unknown as { pendingDestroy?: boolean }).pendingDestroy;
@@ -49,8 +54,21 @@ export async function createPhaserGame(opts: {
           if (currentParent !== parent) {
             try { parent.appendChild(existing.canvas); } catch {}
           }
+          w.__GAME_REFCOUNT__ = (w.__GAME_REFCOUNT__ || 0) + 1;
           return existing;
         }
+      }
+      // If creation is in-flight due to dev double-invoke or concurrent mounts, await it
+      if (w.__GAME_CREATING__) {
+        const g = await w.__GAME_CREATING__;
+        try {
+          const currentParent = g.canvas?.parentElement || null;
+          if (currentParent !== parent) {
+            try { parent.appendChild(g.canvas); } catch {}
+          }
+        } catch {}
+        w.__GAME_REFCOUNT__ = (w.__GAME_REFCOUNT__ || 0) + 1;
+        return g;
       }
     }
   } catch {}
@@ -216,7 +234,16 @@ export async function createPhaserGame(opts: {
     },
   };
 
-  const game = new Phaser.Game(config);
+  // Mark creation in-flight to avoid duplicate construction
+  if (typeof window !== 'undefined') {
+    (window as Window).__GAME_CREATING__ = (async () => {
+      return new Phaser.Game(config);
+    })();
+  }
+
+  const game = (typeof window !== 'undefined' && (window as Window).__GAME_CREATING__)
+    ? await (window as Window).__GAME_CREATING__!
+    : new Phaser.Game(config);
 
   // Store character info in registry if provided
   if (character) {
@@ -228,7 +255,10 @@ export async function createPhaserGame(opts: {
 
   // Expose game instance
   if (typeof window !== 'undefined') {
-    (window as Window & { GAME?: PhaserTypes.Game }).GAME = game;
+    const w = window as Window;
+    w.GAME = game;
+    w.__GAME_REFCOUNT__ = (w.__GAME_REFCOUNT__ || 0) + 1;
+    w.__GAME_CREATING__ = null;
   }
 
   // Start with the specified scene or Boot
@@ -236,6 +266,20 @@ export async function createPhaserGame(opts: {
   game.scene.start(startSceneKey);
 
   return game;
+}
+
+export function releasePhaserGame() {
+  try {
+    if (typeof window === 'undefined') return;
+    const w = window as Window;
+    if (!w.GAME) return;
+    w.__GAME_REFCOUNT__ = Math.max(0, (w.__GAME_REFCOUNT__ || 0) - 1);
+    if ((w.__GAME_REFCOUNT__ || 0) === 0) {
+      try { w.GAME.destroy(true); } catch {}
+      w.GAME = undefined;
+      w.__GAME_CREATING__ = null;
+    }
+  } catch {}
 }
 
 export default createPhaserGame;

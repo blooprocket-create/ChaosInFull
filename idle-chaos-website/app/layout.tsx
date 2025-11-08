@@ -9,13 +9,33 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import StatusChip from "@/src/components/StatusChip";
 import TelemetryInit from "@/src/components/TelemetryInit";
+import SuppressPreloadWarnings from "@/src/components/SuppressPreloadWarnings";
 
 const display = Cinzel({ variable: "--font-display", subsets: ["latin"], weight: ["400","700"] });
 const mono = Roboto_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400","700"] });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ||
+  (typeof window === 'undefined' ? 'http://localhost:3002' : window.location.origin);
+
 export const metadata: Metadata = {
-  title: "Veil Keeper",
-  description: "A dark action RPG for the browser",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'Veil Keeper',
+    template: '%s | Veil Keeper'
+  },
+  description: 'A dark action RPG for the browser',
+  openGraph: {
+    title: 'Veil Keeper',
+    description: 'A dark action RPG for the browser',
+    url: siteUrl,
+    siteName: 'Veil Keeper',
+    type: 'website'
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Veil Keeper',
+    description: 'A dark action RPG for the browser'
+  }
 };
 
 export const dynamic = "force-dynamic";
@@ -58,6 +78,7 @@ export default async function RootLayout({
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.6))]" />
         </div>
   <CursorAura />
+  <SuppressPreloadWarnings />
   <TelemetryInit />
         <header className="sticky top-0 z-20 backdrop-blur border-b border-white/10 bg-black/50">
           <nav className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">

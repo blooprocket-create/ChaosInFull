@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import createPhaserGame, { CharacterHUD } from "./createPhaserGame";
+import { createPhaserGame, releasePhaserGame, type CharacterHUD } from "./createPhaserGame";
 import type * as PhaserTypes from "phaser";
 
 // Augmented window type (declared globally in createPhaserGame, duplicated locally for type narrowing convenience)
@@ -19,36 +19,10 @@ export default function PhaserGameCanvas({
   useEffect(() => {
     if (!ref.current) return;
 
-    // Initialize the Phaser game
+    // Initialize the Phaser game (singleton-safe)
     const initGame = async () => {
       try {
-        // If a Phaser game already exists (window.GAME) and its canvas is still in DOM, reuse it instead of creating a second instance.
-        // This guards against double-boot on first navigation or React hydration quirks.
-        try {
-          if (typeof window !== 'undefined') {
-            const w = window as GameWindow;
-            if (w.GAME) {
-              const existing = w.GAME;
-              // Parent element of existing canvas
-              const existingParent = existing.canvas?.parentElement || null;
-              // Determine liveness: check for systems present and absence of pendingDestroy (if typed)
-              const maybePendingDestroy = (existing as unknown as { pendingDestroy?: boolean }).pendingDestroy;
-              const alive = 'systems' in existing && !maybePendingDestroy;
-              if (alive) {
-                if (existingParent && existingParent !== ref.current) {
-                  try { ref.current!.appendChild(existing.canvas); } catch {}
-                }
-                gameRef.current = existing;
-                try {
-                  const wWidth = ref.current!.clientWidth;
-                  const hHeight = Math.max(360, Math.floor(wWidth * 9 / 16));
-                  existing.scale.resize(wWidth, hHeight);
-                } catch {}
-                return; // reuse singleton
-              }
-            }
-          }
-        } catch {}
+        // Creation is idempotent and will reuse the singleton or await in-flight creation
         // Defensive: clean up any lingering global UI from a previous session before starting
         try {
           if (typeof document !== 'undefined') {
@@ -136,16 +110,8 @@ export default function PhaserGameCanvas({
       if (el) {
         el.removeEventListener("keydown", onKeydown);
       }
-      // Destroy only if we own the instance (avoid killing reused singleton prematurely)
-      try {
-        const w = (typeof window !== 'undefined' ? (window as GameWindow) : null);
-        if (gameRef.current && w && w.GAME === gameRef.current) {
-          gameRef.current.destroy(true);
-          w.GAME = undefined;
-        } else if (gameRef.current) {
-          gameRef.current.destroy(true);
-        }
-      } catch {}
+      // Release a reference to the singleton; destroy when no more holders remain
+      try { releasePhaserGame(); } catch {}
       gameRef.current = null;
       // Aggressively clean up any DOM UI created outside the canvas (HUD, modals, tooltips, skill bar)
       try {

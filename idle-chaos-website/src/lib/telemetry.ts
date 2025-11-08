@@ -21,13 +21,18 @@ export async function initTelemetry() {
   try {
     const ph = (await import("posthog-js")) as typeof import("posthog-js");
     posthog = ph.default || (ph as unknown as typeof import("posthog-js").default);
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || "", {
+    const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    if (posthogKey) {
+      posthog.init(posthogKey, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
       autocapture: true,
       capture_pageview: true,
       capture_pageleave: true,
       loaded: (client: { group?: (groupType: string, groupKey: string) => void }) => { try { client.group?.("build", VERSION); } catch {} }
     });
+    } else {
+      console.info('[telemetry] PostHog disabled: no NEXT_PUBLIC_POSTHOG_KEY provided');
+    }
   } catch {}
 }
 

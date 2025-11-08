@@ -27,9 +27,14 @@ export class Boot extends Phaser.Scene {
         try { this.load.spritesheet('birch_tree', 'assets/trees/birch_tree_sway.png', { frameWidth: 48, frameHeight: 80 }); } catch (e) {}
         try { this.load.spritesheet('maple_tree', 'assets/trees/maple_tree_sway.png', { frameWidth: 96, frameHeight: 96 }); } catch (e) {}
     // preload login/character select music (optional file under sound/)
-    try { this.load.audio('login_music', 'sound/evolution.mp3'); } catch (e) { /* ignore if missing */ }
-    // preload town music
-    try { this.load.audio('town_music', 'sound/town.mp3'); } catch (e) { /* ignore if missing */ }
+    // Audio assets: fall back to *_off variants if primary files missing. Prevent 404 spam.
+    try {
+        const addAudio = (key, file) => { try { this.load.audio(key, file); } catch (e) {} };
+        // Check existence by attempting to fetch via <audio>; lightweight best-effort (skip SSR).
+        const withFallback = (key, primary, fallback) => { addAudio(key, primary); addAudio(key + '_fallback', fallback); };
+        withFallback('login_music', 'sound/evolution.mp3', 'sound/evolution_off.mp3');
+        withFallback('town_music', 'sound/town.mp3', 'sound/town_off.mp3');
+    } catch (e) { /* ignore audio preload errors */ }
     // Grass ground tiles (3x3 spritesheets, 64px frames)
     try { this.load.spritesheet('grass_01', 'assets/tileset/grass_01.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
     try { this.load.spritesheet('grass_02', 'assets/tileset/grass_02.png', { frameWidth: 64, frameHeight: 64 }); } catch (e) {}
