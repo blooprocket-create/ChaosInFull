@@ -1,9 +1,12 @@
-// Phase 1 Active Fishing Prototype (Hybrid Revamp)
+// Phase 1/3 Active Fishing Prototype (Hybrid Revamp + Mastery integration)
 // Lightweight tension mini-game controller.
 // States: idle -> casting -> waiting -> bite -> tension -> resolve -> idle
 // Integrates with existing scene inventory/xp helpers (_grantFishingXp, _addItemToInventory).
 // Non-modal: small HUD overlay anchored bottom-center.
+// Mastery bonuses applied (stability/control/sensitivity/precision/baitEfficiency/rarityBoost).
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 export class FishingController {
     constructor(scene) {
         this.scene = scene;
@@ -54,6 +57,7 @@ export class FishingController {
 
     startCast(baitId, options = {}) {
         this._activeTimeOfDay = options.timeOfDay || null;
+        const mastery = this._getMastery();
         const fishOptions = this._eligibleFishForBait(baitId, options);
         if (!fishOptions.length) { this._toast('Nothing bites this bait yet (rod tier?)'); return; }
         this.baitId = baitId;
@@ -61,20 +65,23 @@ export class FishingController {
         this.activeFish = this._weightedPick(fishOptions);
         // Bite wait: based on difficulty + small randomness (lower diff = faster)
         const diff = this.activeFish.difficulty || 10;
-        const baseMs = 1800 + Math.min(2400, diff * 40);
+        let baseMs = 1800 + Math.min(2400, diff * 40);
         // Rod sensitivity and hotspot reduce wait
         const rod = this._getRodStats();
         const hotspotWaitMult = options.hotspot ? 0.7 : 1.0;
         const sensitivityMult = rod.sensitivityWaitMult || 1.0;
-        this.waitDuration = Math.round(baseMs * (0.75 + Math.random() * 0.5) * hotspotWaitMult * sensitivityMult);
+        // Mastery sensitivity rank reduces wait by 4% per rank (stacking multiplicatively here as a single multiplier)
+        const masteryWaitMult = Math.max(0.5, 1 - 0.04 * (mastery.sensitivity || 0));
+        this.waitDuration = Math.round(baseMs * (0.75 + Math.random() * 0.5) * hotspotWaitMult * sensitivityMult * masteryWaitMult);
         this.waitTimer = 0;
         this.progress = 0;
         this.tension = 0.5;
         this.state = 'waiting';
         this.failCount = 0;
         this._scheduleNextFocus();
-        this._emitTelemetry('cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot });
-        this._emitTelemetry('fishing_cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, timeOfDay: this._activeTimeOfDay });
+        const masterySummary = mastery;
+        this._emitTelemetry('cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, mastery: masterySummary });
+        this._emitTelemetry('fishing_cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, timeOfDay: this._activeTimeOfDay, mastery: masterySummary });
         this.lastCastAt = performance.now ? performance.now() : Date.now();
         this._showMessage(`Casting... (${this.activeFish.name})`);
     }
@@ -124,7 +131,9 @@ export class FishingController {
         // Random slight velocity change
         if (Math.random() < 0.01) this.targetVel = (Math.random() * 0.6 - 0.3);
         // Pointer passive drift making player adjust
-        this.tension += (Math.random() * 0.12 - 0.06) * (delta / 16);
+    const masteryDrift = this._getMastery();
+    const driftScale = Math.max(0.3, 1 - 0.08 * (masteryDrift.stability || 0));
+    this.tension += (Math.random() * 0.12 - 0.06) * (delta / 16) * driftScale;
         this.tension = Math.max(0, Math.min(1, this.tension));
         // Focus pulse check: occasionally require a quick press
         const now = this.elapsed;
@@ -155,7 +164,8 @@ export class FishingController {
                 const diff = (this.activeFish.difficulty || 10);
                 const rod = this._getRodStats();
                 const gainBase = Math.max(0.02, 0.08 - width * 0.05) * (0.9 + (diff / 160));
-                const gain = gainBase * (rod.precisionGainMult || 1.0);
+                const masteryPrecision = this._getMastery();
+                const gain = gainBase * (rod.precisionGainMult || 1.0) * (1 + 0.05 * (masteryPrecision.precision || 0));
                 this.progress = Math.min(1, this.progress + gain);
                 this._showMessage(`Reeling ${Math.round(this.progress * 100)}%`);
                 // Shrink zone gradually (harder over time)
@@ -202,11 +212,16 @@ export class FishingController {
         const fish = this.activeFish;
         const xp = Math.max(4, Math.round(((fish.difficulty || 10) + (fish.baseValue || fish.value || 0)) * 1.6));
         // Consume one bait on successful catch
-        if (this.baitId) this._consumeItem(this.baitId, 1);
+        if (this.baitId) {
+            const m = this._getMastery();
+            const keepChance = Math.min(0.6, 0.06 * (m.baitEfficiency || 0));
+            if (!(Math.random() < keepChance)) this._consumeItem(this.baitId, 1); // consume unless preserved
+        }
         if (this.scene && typeof this.scene._grantFishingXp === 'function') this.scene._grantFishingXp(xp);
         if (this.scene && typeof this.scene._addItemToInventory === 'function') this.scene._addItemToInventory(fish.id, 1);
-        this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp });
-        this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay });
+    const mastery = this._getMastery();
+    this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp, mastery });
+    this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay, mastery });
         this._toast(`Caught ${fish.name}! +${xp}xp`);
         this._showMessage('Catch successful!');
         setTimeout(() => this._reset(), 1200);
@@ -233,7 +248,8 @@ export class FishingController {
         // Initialize safe zone with width based on fish difficulty & rod control (narrower for higher diff)
         const diff = (this.activeFish && this.activeFish.difficulty) || 10;
         const rod = this._getRodStats();
-        const baseWidth = Math.max(0.12, (0.42 - diff * 0.0015) * (rod.controlZoneMult || 1.0));
+    const mastery = this._getMastery();
+    const baseWidth = Math.max(0.12, (0.42 - diff * 0.0015) * (rod.controlZoneMult || 1.0) * (1 + 0.04 * (mastery.control || 0)));
         const start = Math.random() * (1 - baseWidth);
         this.targetMin = start;
         this.targetMax = start + baseWidth;
@@ -278,11 +294,25 @@ export class FishingController {
             } else if (tod === 'day') {
                 if (f.rarity === 'common' || f.rarity === 'uncommon') w *= 1.08;
             }
+            const mastery = this._getMastery();
+            if ((mastery.rarityBoost || 0) > 0 && (f.rarity === 'rare' || f.rarity === 'epic' || f.rarity === 'legendary')) {
+                w *= (1 + 0.04 * mastery.rarityBoost);
+            }
             weights.push({ f, w }); total += w;
         }
         let r = Math.random() * total;
         for (const e of weights) { r -= e.w; if (r <= 0) return e.f; }
         return weights[weights.length - 1].f;
+    }
+
+    _getMastery() {
+        try {
+            // fishingMastery.ts attaches global compute maybe; check window modules
+            const mod = (typeof window !== 'undefined' && (window.__modules && window.__modules['fishingMastery'])) || null;
+            const fn = (mod && mod.computeFishingMasteryBonuses) || (window && window.computeFishingMasteryBonuses);
+            if (typeof fn === 'function') return fn(this.scene?.char || {});
+        } catch(e) {}
+        return { stability:0, control:0, sensitivity:0, precision:0, baitEfficiency:0, rarityBoost:0, hotspotInsight:0 };
     }
 
     _spaceJustDown() {

@@ -165,6 +165,7 @@ export class BrokenDock extends Phaser.Scene {
         if (window && window.__shared_keys && window.__shared_keys.attachCommonKeys) this.keys = window.__shared_keys.attachCommonKeys(this);
     this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
     try { ensureCharTalents && ensureCharTalents(this.char); } catch (e) {}
+    try { if (window && window.ensureFishingMastery) window.ensureFishingMastery(this.char); } catch (e) {}
         // Ensure dock questline flag exists
         try { if (!this.char.flags) this.char.flags = {}; if (typeof this.char.flags.dockStage !== 'number') this.char.flags.dockStage = 0; } catch(e) {}
     // Migrate existing dockStage into quest completions (if any) to keep systems in sync
@@ -1970,6 +1971,7 @@ export class BrokenDock extends Phaser.Scene {
             fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25);
             leveled = true;
             try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
+            try { if (window && window.grantMasteryPointsIfNeeded) window.grantMasteryPointsIfNeeded(this.char); } catch (e) {}
         }
         if (leveled) this._showToast && this._showToast(`Fishing level up! L${fishing.level}`, 2000);
         this._persistCharacterState();
