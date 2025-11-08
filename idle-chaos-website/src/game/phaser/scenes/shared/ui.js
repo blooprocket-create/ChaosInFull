@@ -555,19 +555,6 @@ export function updateQuestProgressAndCheckCompletion(scene, type, itemId, amoun
 
     // Refresh quest log if open
     try { if (window.__shared_ui && window.__shared_ui.refreshQuestLogModal && scene._questLogModal) window.__shared_ui.refreshQuestLogModal(scene); } catch (e) {}
-
-    // Bump Phaser registry counter so React QuestPanel refreshes immediately
-    try {
-        const game = scene.game || (window && window.GAME);
-        if (game && game.registry) {
-            const prev = game.registry.get('questDirtyCount') || 0;
-            game.registry.set('questDirtyCount', prev + 1);
-            // expose lightweight accessor for React side (if not already)
-            if (typeof window !== 'undefined' && !window.__phaserRegistry) {
-                window.__phaserRegistry = game.registry;
-            }
-        }
-    } catch (e) { /* ignore registry bump errors */ }
 }
 
 // Register quest indicators for multiple NPC display objects.
@@ -821,11 +808,6 @@ function saveSettings(obj) {
 export function applySettingsToScene(scene, settings) {
     if (!scene) return;
     const s = settings || loadSettings();
-    // propagate lowGraphics boolean into global settings for ambient FX/particles
-    if (typeof s.lowGraphics === 'undefined') {
-        // default false unless explicitly set previously
-        s.lowGraphics = false;
-    }
     // apply global sound volumes where possible
     try {
         const g = (scene.sys && scene.sys.game) ? scene.sys.game : (window && window.game) ? window.game : null;
@@ -1120,7 +1102,7 @@ export function ensureAttackRangeIndicator(scene, enabled) {
 export function openSettingsModal(scene) {
     if (!scene) return;
     if (scene._settingsModal) return;
-    const current = Object.assign({ musicVolume: 1, sfxVolume: 1, alwaysRun: false, showAtkRange: false, autoUseHP: false, autoUseHPThreshold: 35, autoUseMana: false, autoUseManaThreshold: 20, lowGraphics: false }, loadSettings());
+    const current = Object.assign({ musicVolume: 1, sfxVolume: 1, alwaysRun: false, showAtkRange: false, autoUseHP: false, autoUseHPThreshold: 35, autoUseMana: false, autoUseManaThreshold: 20 }, loadSettings());
     const modal = document.createElement('div'); modal.id = 'settings-modal'; modal.className = 'modal-overlay show'; modal.style.zIndex = '260';
     modal.innerHTML = `
         <div class='modal-card' style='min-width:520px; max-width:760px; background: linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%); border: 4px solid #111; border-left: 10px solid rgba(80,10,10,0.95); border-right: 2px solid #222; box-shadow: 0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02); border-radius: 6px; overflow: hidden; color: #f0c9b0; font-family: "Share Tech Mono", monospace;'>
@@ -1139,7 +1121,6 @@ export function openSettingsModal(scene) {
                     <div style='margin-top:8px;'><strong>Gameplay</strong></div>
                     <div><label><input id='settings-alwaysrun' type='checkbox' ${current.alwaysRun ? 'checked' : ''} /> Always run</label></div>
                     <div><label><input id='settings-showatk' type='checkbox' ${current.showAtkRange ? 'checked' : ''} /> Show attack range</label></div>
-                    <div><label><input id='settings-lowgfx' type='checkbox' ${current.lowGraphics ? 'checked' : ''} /> Low graphics mode (reduce particles & overlays)</label></div>
                     <div style='margin-top:8px;'><strong>Auto-Use</strong></div>
                     <div style='display:flex;flex-direction:column;gap:6px;'>
                         <label style='display:flex;align-items:center;gap:8px;'><input id='settings-autohp' type='checkbox' ${current.autoUseHP ? 'checked' : ''} /> Auto-use Health Potions at or below <input id='settings-autohp-th' type='number' min='1' max='99' step='1' value='${current.autoUseHPThreshold}' class='input-small' style='width:64px;' />%</label>
@@ -1161,7 +1142,6 @@ export function openSettingsModal(scene) {
     // wire controls
     const music = modal.querySelector('#settings-music'); const sfx = modal.querySelector('#settings-sfx');
     const always = modal.querySelector('#settings-alwaysrun'); const showatk = modal.querySelector('#settings-showatk');
-    const lowgfx = modal.querySelector('#settings-lowgfx');
     const autohp = modal.querySelector('#settings-autohp'); const autohpTh = modal.querySelector('#settings-autohp-th');
     const automp = modal.querySelector('#settings-automp'); const autompTh = modal.querySelector('#settings-automp-th');
     if (music) music.oninput = music.onchange = () => {
@@ -1180,9 +1160,6 @@ export function openSettingsModal(scene) {
     };
     if (showatk) showatk.onchange = () => {
         try { current.showAtkRange = Boolean(showatk.checked); saveSettings(current); applySettingsToScene(scene, current); } catch (e) {}
-    };
-    if (lowgfx) lowgfx.onchange = () => {
-        try { current.lowGraphics = Boolean(lowgfx.checked); saveSettings(current); applySettingsToScene(scene, current); } catch (e) {}
     };
     if (autohp) autohp.onchange = () => {
         try { current.autoUseHP = Boolean(autohp.checked); saveSettings(current); if (typeof window !== 'undefined') window.__game_settings = Object.assign({}, window.__game_settings || {}, { autoUseHP: current.autoUseHP }); } catch (e) {}
@@ -4090,18 +4067,6 @@ export function equipItemFromInventory(scene, itemId) {
             questModule.updateQuestProgress(scene.char, 'equip', itemId, 1);
         }
     } catch (e) {}
-
-    // Bump questDirtyCount so QuestPanel (React) can refetch quickly after equips
-    try {
-        const game = scene.game || (window && window.GAME);
-        if (game && game.registry) {
-            const prev = game.registry.get('questDirtyCount') || 0;
-            game.registry.set('questDirtyCount', prev + 1);
-            if (typeof window !== 'undefined' && !window.__phaserRegistry) {
-                window.__phaserRegistry = game.registry;
-            }
-        }
-    } catch (e) { /* ignore */ }
     
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}

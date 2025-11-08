@@ -38,8 +38,7 @@ export class Cave extends Phaser.Scene {
         } catch (e) {
             this.cameras.main.setBackgroundColor('#2b2a28');
     }
-    // Apply ambient FX (respects low graphics mode internally to reduce particles)
-    applyAmbientFx(this, 'cave');
+        applyAmbientFx(this, 'cave');
 
         this.add.text(centerX, 32, 'The Cave', { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
 
@@ -78,13 +77,7 @@ export class Cave extends Phaser.Scene {
         // HUD (same condensed HUD as Town, without mining bar)
     if (window && window.__hud_shared && window.__hud_shared.createHUD) window.__hud_shared.createHUD(this); else this._createHUD();
     // atmospheric overlays (fog, embers, shadow, vignette, fireflies)
-    // Atmospheric overlays (fireflies etc.) — skip when low graphics is enabled
-    try {
-        const lowGfx = (window && window.__game_settings && window.__game_settings.lowGraphics) || false;
-        if (!lowGfx && window && window.__overlays_shared && window.__overlays_shared.createAtmosphericOverlays) {
-            this._overlays = window.__overlays_shared.createAtmosphericOverlays(this, { idPrefix: 'cave', zIndexBase: 120, layers: ['fireflies'] });
-        }
-    } catch (e) { this._overlays = null; }
+    try { if (window && window.__overlays_shared && window.__overlays_shared.createAtmosphericOverlays) { this._overlays = window.__overlays_shared.createAtmosphericOverlays(this, { idPrefix: 'cave', zIndexBase: 120, layers: ['fireflies'] }); } } catch (e) { this._overlays = null; }
     try { ensureCharTalents && ensureCharTalents(this.char); } catch (e) {}
     this._startSafeZoneRegen();
 
@@ -1481,24 +1474,11 @@ export class Cave extends Phaser.Scene {
         // Refresh inventory modal if open
         try { if (this._inventoryModal) this._refreshInventoryModal && this._refreshInventoryModal(); } catch (e) {}
 
-        // Quest progress + immediate QuestPanel refresh via registry bump
+        // Quest progress
         try {
-            if (window && window.__shared_ui && typeof window.__shared_ui.updateQuestProgressAndCheckCompletion === 'function') {
-                window.__shared_ui.updateQuestProgressAndCheckCompletion(this, 'mine', node.item.id, quantity);
-            } else {
-                updateQuestProgress(this.char, 'mine', node.item.id, quantity);
-                if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal && this._questLogModal) {
-                    window.__shared_ui.refreshQuestLogModal(this);
-                }
-                // Fallback: bump registry manually
-                try {
-                    const game = this.game || (window && window.GAME);
-                    if (game && game.registry) {
-                        const prev = game.registry.get('questDirtyCount') || 0;
-                        game.registry.set('questDirtyCount', prev + 1);
-                        if (typeof window !== 'undefined' && !window.__phaserRegistry) window.__phaserRegistry = game.registry;
-                    }
-                } catch (e2) {}
+            updateQuestProgress(this.char, 'mine', node.item.id, quantity);
+            if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal && this._questLogModal) {
+                window.__shared_ui.refreshQuestLogModal(this);
             }
         } catch (e) {}
 
