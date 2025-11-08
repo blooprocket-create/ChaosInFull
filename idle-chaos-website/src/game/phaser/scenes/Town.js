@@ -25,8 +25,8 @@ export class Town extends Phaser.Scene {
     // Ensure cleanup manager is attached early for this scene
     try { attach(this); } catch (e) {}
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
-    // Atmospheric fog overlay using Phaser particle system
-    try { if (window && window.__overlays_shared && window.__overlays_shared.createAtmosphericOverlays) { this._overlays = window.__overlays_shared.createAtmosphericOverlays(this, { idPrefix: 'town', zIndexBase: 120, layers: ['fog'] }); } } catch (e) { this._overlays = null; }
+    // Atmospheric overlays disabled in Town (remove fog overlay)
+    this._overlays = null;
 
     this._startSafeZoneRegen();
     setSceneKey('Town');

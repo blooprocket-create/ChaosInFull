@@ -19,6 +19,31 @@ export default function PhaserGameCanvas({
     // Initialize the Phaser game
     const initGame = async () => {
       try {
+        // If a Phaser game already exists (window.GAME) and its canvas is still in DOM, reuse it instead of creating a second instance.
+        // This guards against double-boot on first navigation or React hydration quirks.
+        try {
+          if (typeof window !== 'undefined' && (window as any).GAME) {
+            const existing = (window as any).GAME as PhaserTypes.Game;
+            // Verify the existing game's parent still exists; if so, just move it into our container if needed.
+            const existingParent = (existing && existing.canvas && existing.canvas.parentElement) ? existing.canvas.parentElement : null;
+            // Phaser v3 doesn't expose a public isDestroyed flag; infer viability by presence of systems & renderer.
+            const alive = !!(existing && (existing as any).systems && !(existing as any).pendingDestroy);
+            if (alive) {
+              // If the canvas parent differs, append canvas to our ref container.
+              if (existingParent && existingParent !== ref.current) {
+                try { ref.current!.appendChild(existing.canvas); } catch {}
+              }
+              gameRef.current = existing;
+              // Resize to fit current container immediately.
+              try {
+                const w = ref.current!.clientWidth;
+                const h = Math.max(360, Math.floor(w * 9 / 16));
+                existing.scale.resize(w, h);
+              } catch {}
+              return; // Skip new initialization.
+            }
+          }
+        } catch {}
         // Defensive: clean up any lingering global UI from a previous session before starting
         try {
           if (typeof document !== 'undefined') {
