@@ -112,6 +112,8 @@ export class BrokenDock extends Phaser.Scene {
             dock.setStrokeStyle(2, 0x6b3f22, 0.9);
             this._dockVisual = dock;
         } catch (e) {}
+        // Apply initial dock visual based on current repair stage
+        try { this._refreshDockVisual && this._refreshDockVisual((this.char && this.char.flags && this.char.flags.dockStage) || 0); } catch (e) {}
 
         // Place the fishing node at the top end of the dock (over water visually)
         try {
