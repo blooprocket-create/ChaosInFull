@@ -15,56 +15,56 @@ export type ZoneMetadata = {
 // When you add a new scene to the game, it will appear automatically;
 // add an entry here only if you need custom features/connections/enemies
 const ZONE_METADATA: Record<string, ZoneMetadata> = {
-  town: {
+  Town: {
     features: ["Workbench", "Furnace", "Account Storage", "Shop", "Quest Board"],
-    connections: ["cave", "inner-field"],
+    connections: ["Cave", "InnerField"],
     npcs: ["Mayor Grimsley"],
   },
-  cave: {
+  Cave: {
     features: ["Furnace", "Mining (continuous)", "Ambient cave effects"],
-    connections: ["town"],
+    connections: ["Town"],
     // Resources loaded dynamically from ORE_DEFS in WorldExplorer
     npcs: ["Wayne Mineson"],
   },
-  "inner-field": {
+  InnerField: {
     features: ["Intro combat", "Obstacles", "Ambient field effects"],
-    connections: ["town", "outer-field"],
+    connections: ["Town", "OuterField"],
     enemyIds: ["slime_common", "slime_uncommon", "slime_rare", "slime_epic", "slime_legendary", "slime_boss"],
   },
-  "outer-field": {
+  OuterField: {
     features: ["Rats and variants", "Obstacles", "Portals to Goblin Camp and Grave Forest"],
-    connections: ["inner-field", "goblin-camp", "grave-forest"],
+    connections: ["InnerField", "GoblinCamp", "GraveForest"],
     enemyIds: ["rat", "rat_uncommon", "rat_rare", "rat_epic", "rat_legendary", "zombie_rat", "ghost_rat"],
   },
-  "goblin-camp": {
+  GoblinCamp: {
     features: ["Goblin variants", "Obstacles", "Portal toward Gloamway Bastion"],
-    connections: ["outer-field", "gloamway-bastion"],
+    connections: ["OuterField", "GloamwayBastion"],
     enemyIds: ["goblin_common", "goblin_uncommon", "goblin_rare", "goblin_girl", "goblin_epic", "goblin_legendary", "goblin_boss"],
   },
-  "grave-forest": {
+  GraveForest: {
     features: ["Woodcutting (trees)", "Ambient fog", "Portals to Outer Field and Broken Dock"],
-    connections: ["outer-field", "broken-dock"],
+    connections: ["OuterField", "BrokenDock"],
     // Resources loaded dynamically from LOG_DEFS in WorldExplorer
     npcs: ["Rowan Boneaxe"],
   },
-  "gloamway-bastion": {
+  GloamwayBastion: {
     features: ["Elite goblins", "Choke points", "Harder patrol loops"],
-    connections: ["goblin-camp", "gloamway-swamp", "flame-road"],
+    connections: ["GoblinCamp", "GloamwaySwamp", "FlameRoad"],
     enemyIds: ["goblin_epic", "goblin_legendary", "goblin_flamebinder", "goblin_ironhowl", "goblin_boss"],
   },
-  "gloamway-swamp": {
+  GloamwaySwamp: {
     features: ["Undead and rats", "Poison threats"],
-    connections: ["gloamway-bastion"],
+    connections: ["GloamwayBastion"],
     enemyIds: ["rat_uncommon", "rat_rare", "rat_epic", "rat_legendary", "rat_boss"],
   },
-  "flame-road": {
+  FlameRoad: {
     features: ["Fire variants", "Mobility checks"],
-    connections: ["gloamway-bastion"],
+    connections: ["GloamwayBastion"],
     enemyIds: ["goblin_flamebinder"],
   },
-  "broken-dock": {
+  BrokenDock: {
     features: ["Exploration", "Ambient shoreline"],
-    connections: ["grave-forest"],
+    connections: ["GraveForest"],
     resources: ["Driftwood (planned)", "Fishing (planned)"],
   },
 };
