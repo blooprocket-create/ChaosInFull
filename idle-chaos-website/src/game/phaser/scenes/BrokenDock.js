@@ -229,6 +229,28 @@ export class BrokenDock extends Phaser.Scene {
         this._startSafeZoneRegen();
     // Enable click-to-cast fishing on water
     try { this._enableClickCast(); } catch (e) {}
+    
+        // Periodically check for active fishing events to show/hide sparkle effects
+        try {
+            this._eventBoardHasActiveEvent = false;
+            this._checkEventStatus = () => {
+                fetch('/api/events/intro_to_fishing')
+                    .then(r => r.json())
+                    .then(data => {
+                        const hasActiveEvent = data.meta && data.meta.key === 'intro_to_fishing' && data.meta.name;
+                        if (hasActiveEvent !== this._eventBoardHasActiveEvent) {
+                            this._eventBoardHasActiveEvent = hasActiveEvent;
+                            const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+                            if (this._refreshDockVisual) this._refreshDockVisual(stage);
+                        }
+                    })
+                    .catch(() => {/* ignore */});
+            };
+            // Check immediately and then every 5 minutes
+            this._checkEventStatus();
+            addTimeEvent(this, { delay: 300000, loop: true, callback: () => this._checkEventStatus() });
+        } catch (e) {}
+    
         // Schedule mastery keybinding (M) slightly after create to ensure input keyboard ready
         try {
             if (!this._masteryKeyInitScheduled) {
@@ -3236,6 +3258,44 @@ export class BrokenDock extends Phaser.Scene {
                     this.eventBoardPrompt = this.add.text(wobbleX, boardY - 62, '[E] Event Board', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
                     // Pulse on main notice
                     try { this.tweens.add({ targets: this.eventBoardNotice, alpha: { from: 1, to: 0.82 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); } catch (e) {}
+                    
+                    // Create sparkle particles for active event glow
+                    try {
+                        if (!this.eventBoardSparkles) {
+                            const sparkles = [];
+                            for (let i = 0; i < 5; i++) {
+                                const sparkle = this.add.circle(wobbleX, boardY, 3, 0xffd700, 0.8).setDepth(1.31);
+                                sparkles.push(sparkle);
+                                // Animate each sparkle with random delay and movement
+                                this.tweens.add({
+                                    targets: sparkle,
+                                    x: wobbleX + Phaser.Math.Between(-30, 30),
+                                    y: boardY + Phaser.Math.Between(-40, 40),
+                                    alpha: { from: 0.8, to: 0 },
+                                    scale: { from: 1, to: 0.2 },
+                                    duration: 2000,
+                                    delay: i * 400,
+                                    repeat: -1,
+                                    ease: 'Cubic.easeOut'
+                                });
+                            }
+                            this.eventBoardSparkles = sparkles;
+                        }
+                        // Add glow effect to board
+                        if (!this.eventBoardGlow) {
+                            this.eventBoardGlow = this.add.rectangle(wobbleX, boardY, 56, 70, 0xffeb3b, 0.15).setDepth(1.27);
+                            this.eventBoardGlow.setStrokeStyle(2, 0xffeb3b, 0.3);
+                            this.tweens.add({
+                                targets: this.eventBoardGlow,
+                                alpha: { from: 0.15, to: 0.35 },
+                                scale: { from: 1, to: 1.05 },
+                                duration: 1800,
+                                yoyo: true,
+                                repeat: -1,
+                                ease: 'Sine.easeInOut'
+                            });
+                        }
+                    } catch (e) {}
                 };
                 const anyMissing = !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2);
                 if (stage >= 4 && anyMissing) ensureBoard();
@@ -3249,6 +3309,14 @@ export class BrokenDock extends Phaser.Scene {
                 setVis(this.eventBoardNotice2, boardVisible);
                 if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) setVis(n, boardVisible);
                 if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(false);
+                
+                // Show sparkles only when board is visible AND we've confirmed an event is active
+                // Initial state: hide sparkles until event status is fetched
+                const sparkleVisible = boardVisible && (this._eventBoardHasActiveEvent === true);
+                if (this.eventBoardSparkles && Array.isArray(this.eventBoardSparkles)) {
+                    for (const s of this.eventBoardSparkles) setVis(s, sparkleVisible);
+                }
+                setVis(this.eventBoardGlow, sparkleVisible);
             } catch (e) {}
         } catch (e) { /* no-op */ }
     }
@@ -3372,6 +3440,16 @@ export class BrokenDock extends Phaser.Scene {
                 renderMeta(data.meta);
                 renderLeaderboard(data.leaders);
                 renderFishTotals(data.fishTotals);
+                // Check if event is active and update sparkle visibility
+                const hasActiveEvent = data.meta && data.meta.key === EVENT_KEY && data.meta.name;
+                if (hasActiveEvent !== this._eventBoardHasActiveEvent) {
+                    this._eventBoardHasActiveEvent = hasActiveEvent;
+                    // Refresh board visuals to show/hide sparkles
+                    try {
+                        const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+                        if (this._refreshDockVisual) this._refreshDockVisual(stage);
+                    } catch (e) {}
+                }
               })
               .catch(() => {
                 if (metaEl) metaEl.innerHTML = '<h3>Active Event</h3><div class="bdock-forecast-empty">Failed to load.</div>';

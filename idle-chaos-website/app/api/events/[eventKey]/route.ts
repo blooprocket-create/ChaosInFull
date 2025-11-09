@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFishingEventLeaderboard, getFishingEventFishTotals, incrementFishingEventCatch, ensureFishingEventTable } from '@/src/lib/db';
+import { getFishingEventLeaderboard, getFishingEventFishTotals, incrementFishingEventCatch, ensureFishingEventTable, getUsernamesByIds } from '@/src/lib/db';
 import { getSession } from '@/src/lib/auth';
 
 // Active event window config
@@ -30,9 +30,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ eve
     getFishingEventLeaderboard(eventKey, 25),
     getFishingEventFishTotals(eventKey)
   ]);
+  
+  // Enrich leaderboard with actual usernames by fetching from User table
+  const userIds = leaders.map(l => l.userid).filter((id): id is string => !!id);
+  const usernameMap = userIds.length > 0 ? await getUsernamesByIds(userIds) : new Map<string, string>();
+  const enrichedLeaders = leaders.map(l => ({
+    ...l,
+    username: l.userid && usernameMap.has(l.userid) ? usernameMap.get(l.userid) : l.username
+  }));
+  
   // Also expose event metadata (currently only supports the intro event key)
   const meta = eventKey === INTRO_EVENT.key ? INTRO_EVENT : { key: eventKey };
-  return NextResponse.json({ meta, leaders, fishTotals });
+  return NextResponse.json({ meta, leaders: enrichedLeaders, fishTotals });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ eventKey: string }> }) {

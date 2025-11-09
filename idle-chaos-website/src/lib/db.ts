@@ -158,3 +158,18 @@ export async function getFishingEventFishTotals(eventKey: string) {
     return [] as { fishid: string; fishname: string | null; total: number }[];
   }
 }
+
+// Fetch usernames for a list of user IDs (for enriching leaderboard)
+export async function getUsernamesByIds(userIds: string[]) {
+  if (!userIds || userIds.length === 0) return new Map<string, string>();
+  try {
+    const rows = await q<{ id: string; username: string }>`
+      select id, username
+      from "User"
+      where id = any(${userIds})
+    `;
+    return new Map(rows.map(r => [r.id, r.username]));
+  } catch {
+    return new Map<string, string>();
+  }
+}
