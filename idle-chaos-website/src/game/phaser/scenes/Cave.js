@@ -178,7 +178,20 @@ export class Cave extends Phaser.Scene {
     });
 
     // Preselected coordinates (percent-based) for a consistent layout across resolutions
-    const staticNodes = [
+    const staticNodes = [];
+
+    // Helper to push nodes if not conflicting
+    const pushNode = (x, y, type) => {
+        const nx = Phaser.Math.Clamp(x, bounds.x1, bounds.x2);
+        const ny = Phaser.Math.Clamp(y, bounds.y1, bounds.y2);
+        if (!isTooClose(nx, ny)) {
+            staticNodes.push({ x: nx, y: ny, type });
+            placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type });
+        }
+    };
+
+    // Base existing layout (tin/copper spread)
+    const base = [
         { ...pick(0.18, 0.30), type: 'tin' },
         { ...pick(0.12, 0.55), type: 'tin' },
         { ...pick(0.28, 0.68), type: 'tin' },
@@ -188,6 +201,47 @@ export class Cave extends Phaser.Scene {
         { ...pick(0.42, 0.58), type: 'tin' },
         { ...pick(0.26, 0.46), type: 'copper' }
     ];
+    for (const n of base) pushNode(n.x, n.y, n.type);
+
+    // Add 2 more copper near an existing copper node (use the mid-left copper as anchor)
+    const copperAnchor = base[3]; // {0.35,0.38}
+    if (copperAnchor) {
+        const ca = { x: copperAnchor.x, y: copperAnchor.y };
+        pushNode(ca.x + 48, ca.y + 22, 'copper');
+        pushNode(ca.x - 52, ca.y - 18, 'copper');
+    }
+
+    // Add 1 more tin near the existing tin cluster (use the lower-left tin as anchor)
+    const tinAnchor = base[2]; // {0.28,0.68}
+    if (tinAnchor) {
+        pushNode(tinAnchor.x + 36, tinAnchor.y - 20, 'tin');
+    }
+
+    // Add a cluster of 4 iron ore nodes (top-left quadrant)
+    const ironCenter = pick(0.20, 0.22);
+    const ironOffsets = [ {x:0,y:0}, {x:36,y:18}, {x:-32,y:14}, {x:10,y:-28} ];
+    for (const o of ironOffsets) pushNode(ironCenter.x + o.x, ironCenter.y + o.y, 'iron');
+
+    // Add a cluster of 5 coal ore nodes (mid-left)
+    const coalCenter = pick(0.18, 0.48);
+    const coalOffsets = [ {x:0,y:0}, {x:30,y:-18}, {x:-28,y:12}, {x:12,y:26}, {x:-16,y:-22} ];
+    for (const o of coalOffsets) pushNode(coalCenter.x + o.x, coalCenter.y + o.y, 'coal');
+
+    // Add a cluster of 3 mythril ore nodes (bottom-left quadrant)
+    const mythCenter = pick(0.24, 0.78);
+    const mythOffsets = [ {x:0,y:0}, {x:28,y:-16}, {x:-24,y:14} ];
+    for (const o of mythOffsets) pushNode(mythCenter.x + o.x, mythCenter.y + o.y, 'mythril');
+
+    // Add 1 of each gem near the edges (emerald, ruby, sapphire, opal, diamond)
+    const edgePad = 24;
+    const edges = [
+        { x: bounds.x1 + edgePad, y: Math.round((bounds.y1 + bounds.y2)/2), type: 'emerald' }, // left edge mid
+        { x: Math.round((bounds.x1 + bounds.x2)/2), y: bounds.y1 + edgePad, type: 'ruby' }, // top edge mid
+        { x: bounds.x2 - edgePad, y: Math.round((bounds.y1 + bounds.y2)/2), type: 'sapphire' }, // right edge mid
+        { x: Math.round((bounds.x1 + bounds.x2)/2), y: bounds.y2 - edgePad, type: 'opal' }, // bottom edge mid
+        { x: bounds.x2 - edgePad, y: bounds.y1 + edgePad, type: 'diamond' } // top-right corner-ish
+    ];
+    for (const g of edges) pushNode(g.x, g.y, g.type);
 
     const isTooClose = (x, y) => {
         // avoid furnace and portal
