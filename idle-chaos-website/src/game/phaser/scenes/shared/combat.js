@@ -51,7 +51,7 @@ function safeSetData(obj, key, value) {
 // ========== End Safe Data Accessors ==========
 
 // ========== Hellscape Atmosphere Helpers ==========
-// Ember particle overlay to enhance hellish mood during stealth.
+                // Dark Thorns reactive damage: if enabled and sourceSprite is in melee-range
 function ensureHellEmbers(scene) {
     try {
         if (!scene || !scene.add || scene._hellEmbers) return false;
@@ -2116,6 +2116,52 @@ function sharedGetEnemyInRange(range) {
                     } catch (e) {}
                 }
             } catch (e) {}
+            // Dark Thorns (passive): melee attackers take shadow damage equal to a percent of their OWN raw attack damage.
+            // We trigger this after applying incoming damage so shields/mitigation don't alter the retaliatory amount.
+            try {
+                const tmods_dt = (this && this.char && this.char._talentModifiers) ? this.char._talentModifiers : {};
+                const thornsPct = Math.max(0, Number((tmods_dt['darkThornsDamage'] && (tmods_dt['darkThornsDamage'].percent || tmods_dt['darkThornsDamage'].flat)) || 0));
+                if (thornsPct > 0 && enemy && safeGetData(enemy, 'alive')) {
+                    // Treat any attacker within a modest melee radius as "melee" (use enemy def attackRange when available)
+                    let meleeRange = 60;
+                    try { const defLocal = this.enemyDefs ? this.enemyDefs[safeGetData(enemy, 'defId')] : null; if (defLocal && typeof defLocal.attackRange === 'number') meleeRange = Math.max(24, defLocal.attackRange + 4); } catch (e) {}
+                    const dist = pdist(this, enemy.x, enemy.y);
+                    if (dist <= meleeRange) {
+                        // Use the raw (pre-mitigation) enemy attack roll value if available; fall back to mitigated.
+                        let retaliateBase = 0;
+                        try { retaliateBase = typeof raw === 'number' ? raw : mitigated; } catch (e) { retaliateBase = mitigated; }
+                        const retaliate = Math.max(1, Math.round(retaliateBase * (thornsPct / 100)));
+                        try { _applyDamageToEnemy(this, enemy, retaliate, '#aa66ff'); } catch (e) {}
+                        // VFX on enemy: burst of dark spikes
+                        try {
+                            const pieces = 6;
+                            for (let i = 0; i < pieces; i++) {
+                                const ang = (Math.PI * 2 * i / pieces) + Phaser.Math.FloatBetween(-0.15, 0.15);
+                                const rx = Math.cos(ang), ry = Math.sin(ang);
+                                const spike = this.add.rectangle(enemy.x, enemy.y, Phaser.Math.Between(12, 18), 3, 0x6b39a8, 0.85).setDepth((enemy.depth || 7) + 0.3);
+                                spike.setAngle && spike.setAngle(Phaser.Math.RadToDeg(ang));
+                                spike.setBlendMode && spike.setBlendMode(Phaser.BlendModes.ADD);
+                                this.tweens && this.tweens.add({
+                                    targets: spike,
+                                    x: enemy.x + rx * Phaser.Math.Between(12, 18),
+                                    y: enemy.y + ry * Phaser.Math.Between(12, 18),
+                                    alpha: 0,
+                                    duration: Phaser.Math.Between(180, 260),
+                                    onComplete: () => { try { spike.destroy(); } catch (e) {} }
+                                });
+                            }
+                        } catch (e) {}
+                        // subtle pulse on player
+                        try {
+                            const pulse = this.add.circle(this.player.x, this.player.y, 10, 0x5a2f7a, 0.18).setDepth(9);
+                            pulse.setBlendMode && pulse.setBlendMode(Phaser.BlendModes.ADD);
+                            this.tweens && this.tweens.add({ targets: pulse, alpha: 0, scale: 1.4, duration: 220, onComplete: () => { try { pulse.destroy(); } catch (e) {} } });
+                        } catch (e) {}
+                        try { if (this._showDamageNumber) this._showDamageNumber(enemy.x, enemy.y - 22, `-${retaliate} Thorns`, '#aa66ff'); } catch (e) {}
+                        try { if (this._showToast) this._showToast('Dark Thorns', 450); } catch (e) {}
+                    }
+                }
+            } catch (e) {}
             if (this.char.hp <= 0) {
                 try {
                     if (this._onPlayerDown && typeof this._onPlayerDown === 'function') {
@@ -2805,7 +2851,6 @@ function _dealPlayerDamage(scene, enemy, baseAmount, color, opts) {
 
         // apply damage to enemy and show combined crit label when applicable
         try {
-            const labelText = critRoll ? `-${Math.round(final)} CRIT` : null;
             // Hunter's Formula: if target is poisoned, increase damage by poisonTargetBonus
             try {
                 const poisonTargetBonus = Math.max(0, Number((tmods['poisonTargetBonus'] && (tmods['poisonTargetBonus'].percent || tmods['poisonTargetBonus'].flat)) || 0));
@@ -2820,6 +2865,34 @@ function _dealPlayerDamage(scene, enemy, baseAmount, color, opts) {
                     try { if (scene._showToast) scene._showToast("Hunter's Formula: bonus vs poisoned target", 600); } catch (e) {}
                 }
             } catch (e) {}
+            // Apply enemy defense reduction (unless opts.ignoreDefense is true for true damage skills)
+            const ignoreDefense = !!(opts && opts.ignoreDefense);
+            if (!ignoreDefense) {
+                try {
+                    let enemyDefense = 0;
+                    // Try to get defense from enemy instance data first, then fall back to def lookup
+                    const instDef = safeGetData(enemy, 'defense') || safeGetData(enemy, 'def') || safeGetData(enemy, 'defence');
+                    if (typeof instDef === 'number') {
+                        enemyDefense = instDef;
+                    } else if (typeof enemy._cachedDefense === 'number') {
+                        enemyDefense = enemy._cachedDefense;
+                    } else {
+                        // last resort: derive from enemy def if scene has enemyDefs
+                        try {
+                            const defId = safeGetData(enemy, 'defId');
+                            const def = (defId && scene.enemyDefs) ? scene.enemyDefs[defId] : null;
+                            if (def && typeof def.defense === 'number') enemyDefense = def.defense;
+                            else if (def && typeof def.def === 'number') enemyDefense = def.def;
+                            else if (def && typeof def.defence === 'number') enemyDefense = def.defence;
+                        } catch (e) {}
+                    }
+                    if (enemyDefense > 0) {
+                        // Flat reduction formula: subtract (defense / 2), minimum 1 damage
+                        final = Math.max(1, final - Math.floor(enemyDefense / 2));
+                    }
+                } catch (e) {}
+            }
+            const labelText = critRoll ? `-${Math.round(final)} CRIT` : null;
             // Staff / spell damage modifiers (Wood Lover): apply after crits and other multipliers
             try {
                 const tmodsLate = (scene && scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : {};
@@ -4459,6 +4532,72 @@ function _talentActivatedHandler(payload) {
                 } catch (e) {}
                 break;
             }
+            case 'savage_swing': { // wiring: 360 melee cleave
+                // Perform a radial melee attack around the player, hitting all nearby enemies once.
+                // Requirements: can crit, lifesteal, and apply all on-hit effects; also treat damage as "true" with respect to defense (we do not apply enemy defense in our pipeline anyway).
+                try {
+                    const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(scene.char) : {};
+                    const tmods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : {};
+                    // Base melee attack value (reuse logic similar to other melee calcs: weapon avg + STR scaling)
+                    let avgWeapon = 0;
+                    try {
+                        const eq = scene.char && scene.char.equipment;
+                        if (eq) {
+                            const w = eq.weapon || eq.mainHand || null;
+                            if (w && typeof w.min === 'number' && typeof w.max === 'number') avgWeapon = (Number(w.min) + Number(w.max)) / 2;
+                            else if (w && typeof w.avg === 'number') avgWeapon = Number(w.avg);
+                        }
+                    } catch (e) {}
+                    const str = Number((eff && eff.str) || scene.char?.stats?.str || 0);
+                    const baseMelee = Math.max(4, avgWeapon + (str * 1.0));
+                    // Talent scaling percent
+                    const swingMods = tmods['savageSwingDamage'] || null;
+                    const pct = Number((swingMods && (swingMods.percent || swingMods.flat)) || 0);
+                    const dmgEach = Math.max(1, Math.round(baseMelee * (pct / 100)));
+                    const radius = 92; // attack radius
+                    const enemies = (scene.enemies && scene.enemies.getChildren) ? scene.enemies.getChildren() : [];
+                    let hits = 0;
+                    // VFX: pre-swing aura and sweeping arc slashes
+                    try {
+                        // Brief wind-up aura
+                        const aura = scene.add.circle(scene.player.x, scene.player.y, 18, 0xffaa88, 0.12).setDepth(9);
+                        aura.setBlendMode && aura.setBlendMode(Phaser.BlendModes.ADD);
+                        scene.tweens.add({ targets: aura, alpha: 0, scale: 1.6, duration: 220, onComplete: () => { try { aura.destroy(); } catch (e) {} } });
+                        // Sweeping arcs (3 slashes evenly spaced)
+                        for (let i = 0; i < 3; i++) {
+                            const g = scene.add.graphics({ x: scene.player.x, y: scene.player.y }).setDepth(9);
+                            g.fillStyle(0xff8866, 0.18);
+                            const start = (i * (Math.PI * 2) / 3) + Phaser.Math.FloatBetween(-0.15, 0.15);
+                            const end = start + Math.PI * 0.9;
+                            try { g.slice(0, 0, radius, start, end, false); g.fillPath(); } catch (e) {}
+                            g.setBlendMode && g.setBlendMode(Phaser.BlendModes.ADD);
+                            scene.tweens.add({ targets: g, alpha: 0, angle: (i % 2 === 0) ? 28 : -28, duration: 260, onComplete: () => { try { g.destroy(); } catch (e) {} } });
+                        }
+                    } catch (e) {}
+                    for (let i = 0; i < enemies.length; i++) {
+                        const e = enemies[i];
+                        if (!e || !e.active || !e.body) continue;
+                        const dx = e.x - scene.player.x;
+                        const dy = e.y - scene.player.y;
+                        if ((dx*dx + dy*dy) <= radius*radius) {
+                            // Use the standard player damage pipeline so crit/lifesteal/bleed/etc. apply; defense is not considered in this path.
+                            try { _dealPlayerDamage(scene, e, dmgEach, '#ffaacc'); } catch (ee) {}
+                            hits++;
+                        }
+                    }
+                    // Impact visuals
+                    try {
+                        const ring = scene.add.circle(scene.player.x, scene.player.y, radius, 0xaa2244, 0.08).setDepth(9);
+                        ring.setBlendMode && ring.setBlendMode(Phaser.BlendModes.ADD);
+                        scene.tweens.add({ targets: ring, alpha: 0, scale: 1.15, duration: 300, onComplete: () => { try { ring.destroy(); } catch (e) {} } });
+                        // Dust burst debris for extra punch
+                        try { spawnDustBursts(scene, scene.player.x, scene.player.y, Math.min(80, radius)); } catch (e) {}
+                    } catch (e) {}
+                    if (scene._showCombatText) scene._showCombatText(scene.player.x, scene.player.y - 40, `Savage Swing (${hits})`, '#ffaacc');
+                } catch (e) {}
+                break;
+            }
+            // dark_thorns is a passive; no activation case needed. (Left intentionally blank.)
             case 'terror_aura': {
                 try {
                     // Toggle a sustained aura on the character. The aura monitor (registered elsewhere)

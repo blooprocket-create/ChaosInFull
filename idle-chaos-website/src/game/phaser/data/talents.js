@@ -159,7 +159,7 @@ const horrorTalents = [
         tags: ['utility', 'combat']
     }),
     makeTalent('savage_swing', 'Savage Swing', { //needs wiring
-        description: 'Swing your weapon in a 360° arc, hitting all nearby enemies for {value}% damage. Cannot miss. Applies all weapon on‑hit effects.',
+        description: 'Swing your weapon in a 360° arc, hitting all nearby enemies for {value}% damage. Cannot miss, ignores armor. Applies all weapon on‑hit effects.',
         scaling: { type: 'percent', target: 'savageSwingDamage', base: 111, perRank: 0.95 },
         tags: ['combat', 'aoe', 'horror', 'offensive'],
         kind: 'active',
