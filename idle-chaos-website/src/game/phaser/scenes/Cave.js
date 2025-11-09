@@ -179,15 +179,19 @@ export class Cave extends Phaser.Scene {
 
     // Preselected coordinates (percent-based) for a consistent layout across resolutions
     const staticNodes = [];
+    // During initial placement, ignore proximity to NPC/player to avoid over-pruning
+    let _placingLayout = true;
 
     // Proximity check helper must be defined before first use (avoids TDZ errors)
     const isTooClose = (x, y) => {
         // avoid furnace and portal
-        try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 120) return true; } catch (e) {}
-        try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
+        try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 96) return true; } catch (e) {}
+        try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 110) return true; } catch (e) {}
         // avoid Wayne NPC and immediate player spawn
-        try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
-        try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 110) return true; } catch (e) {}
+        if (!_placingLayout) {
+            try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 70) return true; } catch (e) {}
+            try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 96) return true; } catch (e) {}
+        }
         for (const p of placedNodes) {
             const pr = (typeof p.r === 'number') ? p.r : NODE_RADIUS;
             const req = pr + NODE_RADIUS + WALKWAY_BUFFER;
@@ -275,6 +279,18 @@ export class Cave extends Phaser.Scene {
         // Now that it exists, register in placedNodes so later deco generation avoids it
         placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type: def.type });
     }
+    // End of initial placement
+    _placingLayout = false;
+
+    // Debug: report counts actually placed to help diagnose missing nodes
+    try {
+        if (typeof console !== 'undefined' && console.debug) {
+            const counts = {};
+            const list = Array.isArray(this.miningNodes) ? this.miningNodes : [];
+            for (const n of list) { if (!n || !n.type) continue; counts[n.type] = (counts[n.type]||0)+1; }
+            console.debug('[Cave] placed mining nodes', counts);
+        }
+    } catch (e) {}
 
     // Cave decorations: rocks and stalactites
     try {
