@@ -9,7 +9,7 @@ import JsonLd from "@/src/components/JsonLd";
 // Dynamic game data imports
 import { CLASS_DEFS } from "@/src/game/phaser/data/classes.js";
 import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
-import { zones } from "@/src/data/zones";
+import { getWorldZones } from "@/src/data/worldData";
 import type { GameClassDef, EnemyDef } from "@/src/types/phaser-data";
 export const metadata = { title: "Veil Keeper • Action RPG", description: "A dark, fast, and slightly unhinged browser ARPG.", openGraph: { title: "Veil Keeper", description: "A dark, fast, and slightly unhinged browser ARPG", images: ["/og/home.png"] } };
 
@@ -31,9 +31,10 @@ export default async function Home() {
   const classDefs = CLASS_DEFS as Record<string, GameClassDef>;
   // Cast via unknown first because some enemy damage arrays are plain number[] but logically [min,max]
   const enemyDefs = ENEMY_DEFS as unknown as Record<string, EnemyDef>;
+  const worldZones = getWorldZones();
   const classCount = Object.keys(classDefs).length;
   const enemyCount = Object.keys(enemyDefs).length;
-  const zoneCount = zones.length;
+  const zoneCount = worldZones.length;
   const tier1Classes = Object.values(classDefs).filter((c) => c.requiredClass === "beginner").length;
   return (
     <>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useState } from "react";
-import { zones, ZoneDefinition } from "@/src/data/zones";
+import { getWorldZones, type WorldZone } from "@/src/data/worldData";
 import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
 import ORE_DEFS from "@/src/game/phaser/data/ores.js";
 import LOG_DEFS from "@/src/game/phaser/data/logs.js";
@@ -10,7 +10,8 @@ import { itemByKey } from "@/src/data/items";
 import { computeEnemyStats, type ScaledEnemy } from "@/src/lib/statFormulas";
 
 export default function WorldExplorer() {
-  const [active, setActive] = useState<ZoneDefinition>(zones[0]);
+  const zones = getWorldZones();
+  const [active, setActive] = useState<WorldZone>(zones[0]);
   const [openEnemyId, setOpenEnemyId] = useState<string | null>(null);
   // Always display dynamically scaled stats using statFormulas.js
 
@@ -24,11 +25,11 @@ export default function WorldExplorer() {
   
   // Dynamically load resources for Cave zone from ORE_DEFS
   const resourcesForZone = useMemo<string[]>(() => {
-    if (active.key === 'cave' && ORE_DEFS) {
+    if (active.key === 'Cave' && ORE_DEFS) {
       const ores = Object.values(ORE_DEFS as Record<string, OreDef>);
       return ores.map((ore) => ore.label || ore.id).filter(Boolean) as string[];
     }
-    if (active.key === 'grave-forest' && LOG_DEFS) {
+    if (active.key === 'GraveForest' && LOG_DEFS) {
       const logs = Object.values(LOG_DEFS as Record<string, LogDef>);
       return logs.map((log) => log.label || log.id).filter(Boolean) as string[];
     }

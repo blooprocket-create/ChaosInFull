@@ -167,54 +167,93 @@ export class Cave extends Phaser.Scene {
     // Reset mining nodes array to prevent duplicates on scene re-entry
     this.miningNodes = [];
 
-    // Hardcoded mining node positions with proper spacing (70px minimum between nodes)
-    // Node radius: 28px. Canvas: 1280x720. Furnace at center (~640,360), portal at right (~1100,400)
-    // Spread across full cave area with proper distribution
+    // Procedural mining node layout with natural clustering
+    // Node radius: 28px, minimum spacing: 70px
+    // Canvas: 1280x720. Furnace at center (~640,360), portal at right (~1100,400)
     
-    // TIN (5 nodes) - left side, well-spaced vertically
-    try { this._createMiningNode(150, 150, 'tin'); } catch (e) {}
-    try { this._createMiningNode(150, 280, 'tin'); } catch (e) {}
-    try { this._createMiningNode(150, 410, 'tin'); } catch (e) {}
-    try { this._createMiningNode(150, 540, 'tin'); } catch (e) {}
-    try { this._createMiningNode(150, 650, 'tin'); } catch (e) {}
+    const nodeRadius = 28;
+    const minSpacing = 70;
+    const placedNodes = [];
     
-    // COPPER (4 nodes) - left-center column
-    try { this._createMiningNode(280, 180, 'copper'); } catch (e) {}
-    try { this._createMiningNode(280, 340, 'copper'); } catch (e) {}
-    try { this._createMiningNode(280, 500, 'copper'); } catch (e) {}
-    try { this._createMiningNode(280, 640, 'copper'); } catch (e) {}
+    // Helper: Check if position is too close to furnace, portal, or other nodes
+    const isTooClose = (x, y, excludeRadius = minSpacing) => {
+        const furnaceX = Math.round(this.scale.width / 2);
+        const furnaceY = Math.round(this.scale.height / 2);
+        const portalX = Math.max(120, this.scale.width - 120);
+        const portalY = Math.round(this.scale.height * 0.55);
+        
+        // Check furnace (larger exclusion)
+        if (Math.hypot(x - furnaceX, y - furnaceY) < 120) return true;
+        // Check portal (larger exclusion)
+        if (Math.hypot(x - portalX, y - portalY) < 100) return true;
+        // Check other placed nodes
+        for (const n of placedNodes) {
+            if (Math.hypot(x - n.x, y - n.y) < excludeRadius) return true;
+        }
+        return false;
+    };
     
-    // IRON (5 nodes) - center-left area, avoiding furnace
-    try { this._createMiningNode(420, 140, 'iron'); } catch (e) {}
-    try { this._createMiningNode(420, 260, 'iron'); } catch (e) {}
-    try { this._createMiningNode(380, 500, 'iron'); } catch (e) {}
-    try { this._createMiningNode(380, 630, 'iron'); } catch (e) {}
-    try { this._createMiningNode(750, 140, 'iron'); } catch (e) {}
+    // Helper: Create cluster of nodes around a center point
+    const createCluster = (centerX, centerY, type, count, spreadRadius = 80) => {
+        const created = [];
+        for (let i = 0; i < count; i++) {
+            let attempts = 0;
+            let placed = false;
+            while (!placed && attempts < 50) {
+                // Random offset from center with some clustering
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * spreadRadius;
+                const x = Math.round(centerX + Math.cos(angle) * dist);
+                const y = Math.round(centerY + Math.sin(angle) * dist);
+                
+                // Keep within bounds
+                if (x < 100 || x > this.scale.width - 100 || y < 100 || y > this.scale.height - 100) {
+                    attempts++;
+                    continue;
+                }
+                
+                if (!isTooClose(x, y)) {
+                    try {
+                        this._createMiningNode(x, y, type);
+                        placedNodes.push({ x, y, type });
+                        created.push({ x, y, type });
+                        placed = true;
+                    } catch (e) {}
+                }
+                attempts++;
+            }
+        }
+        return created;
+    };
     
-    // COAL (7 nodes) - distributed across top, center, and bottom
-    try { this._createMiningNode(550, 140, 'coal'); } catch (e) {}
-    try { this._createMiningNode(550, 260, 'coal'); } catch (e) {}
-    try { this._createMiningNode(880, 140, 'coal'); } catch (e) {}
-    try { this._createMiningNode(520, 500, 'coal'); } catch (e) {}
-    try { this._createMiningNode(520, 630, 'coal'); } catch (e) {}
-    try { this._createMiningNode(750, 500, 'coal'); } catch (e) {}
-    try { this._createMiningNode(750, 630, 'coal'); } catch (e) {}
+    // Create clusters with guaranteed counts
+    // TIN cluster (5 nodes) - left side
+    createCluster(200, 350, 'tin', 5, 120);
     
-    // MYTHRIL (3 nodes) - right and bottom area
-    try { this._createMiningNode(880, 500, 'mythril'); } catch (e) {}
-    try { this._createMiningNode(880, 630, 'mythril'); } catch (e) {}
-    try { this._createMiningNode(650, 630, 'mythril'); } catch (e) {}
+    // COPPER cluster (4 nodes) - left-center
+    createCluster(350, 250, 'copper', 4, 100);
     
-    // GOLD (2 nodes) - far right, avoiding portal at ~1100,400
-    try { this._createMiningNode(1000, 180, 'gold'); } catch (e) {}
-    try { this._createMiningNode(1000, 600, 'gold'); } catch (e) {}
+    // IRON cluster (5 nodes) - split into two mini-clusters
+    createCluster(450, 180, 'iron', 3, 80);
+    createCluster(400, 550, 'iron', 2, 60);
     
-    // GEMS (5 nodes) - spread across edges and corners
-    try { this._createMiningNode(250, 650, 'emerald'); } catch (e) {}
-    try { this._createMiningNode(640, 100, 'ruby'); } catch (e) {}
-    try { this._createMiningNode(1120, 260, 'sapphire'); } catch (e) {}
-    try { this._createMiningNode(520, 100, 'opal'); } catch (e) {}
-    try { this._createMiningNode(1120, 600, 'diamond'); } catch (e) {}
+    // COAL cluster (7 nodes) - large spread across center
+    createCluster(550, 200, 'coal', 4, 90);
+    createCluster(700, 550, 'coal', 3, 80);
+    
+    // MYTHRIL cluster (3 nodes) - bottom-right
+    createCluster(850, 600, 'mythril', 3, 70);
+    
+    // GOLD (2 nodes) - far right, spread apart
+    createCluster(1000, 250, 'gold', 1, 40);
+    createCluster(950, 550, 'gold', 1, 40);
+    
+    // GEMS (5 nodes) - scattered individual nodes
+    createCluster(200, 150, 'emerald', 1, 30);
+    createCluster(600, 120, 'ruby', 1, 30);
+    createCluster(1100, 300, 'sapphire', 1, 30);
+    createCluster(500, 650, 'opal', 1, 30);
+    createCluster(1050, 150, 'diamond', 1, 30);
     
     // Debug: report counts actually placed
     try {

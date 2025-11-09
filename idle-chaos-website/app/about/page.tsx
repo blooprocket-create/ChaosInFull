@@ -1,12 +1,12 @@
 import { CLASS_DEFS } from "@/src/game/phaser/data/classes.js";
 import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
-import { zones } from "@/src/data/zones";
+import { getWorldZones } from "@/src/data/worldData";
 export const metadata = { title: "About • Chaos In Full", description: "Tech, roadmap, and the questionable vision behind Chaos In Full.", openGraph: { title: "About Chaos In Full", images: ["/og/about.png"] } };
 export default function AboutPage() {
   // Compute live game stats
   const classCount = Object.keys(CLASS_DEFS || {}).length;
   const enemyCount = Object.keys(ENEMY_DEFS || {}).length;
-  const zoneCount = zones.length;
+  const zoneCount = getWorldZones().length;
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-12">
       {/* ambience */}
