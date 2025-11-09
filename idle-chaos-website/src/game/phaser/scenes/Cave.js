@@ -164,111 +164,56 @@ export class Cave extends Phaser.Scene {
     this._smeltingEvent = null;
     this.smeltingInterval = 2800;
 
-    // Static mining node layout: hardcoded positions relative to scene bounds
-    // Keep nodes away from furnace (center) and portal (right) and provide a balanced spread.
-    const placedNodes = [];
-    const margin = 96;
-    const NODE_RADIUS = 28; // matches node.r default
-    const WALKWAY_BUFFER = 24;
-    const bounds = { x1: margin, x2: this.scale.width - margin, y1: 120, y2: this.scale.height - 120 };
-
-    const pick = (px, py) => ({
-        x: Math.round(bounds.x1 + (bounds.x2 - bounds.x1) * px),
-        y: Math.round(bounds.y1 + (bounds.y2 - bounds.y1) * py)
-    });
-
-    // Preselected coordinates (percent-based) for a consistent layout across resolutions
-    const staticNodes = [];
-    // During initial placement, ignore proximity to NPC/player to avoid over-pruning
-    let _placingLayout = true;
-
-    // Proximity check helper must be defined before first use (avoids TDZ errors)
-    const isTooClose = (x, y) => {
-        // avoid furnace and portal
-        try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 96) return true; } catch (e) {}
-        try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 110) return true; } catch (e) {}
-        // avoid Wayne NPC and immediate player spawn
-        if (!_placingLayout) {
-            try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 70) return true; } catch (e) {}
-            try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 96) return true; } catch (e) {}
-        }
-        for (const p of placedNodes) {
-            const pr = (typeof p.r === 'number') ? p.r : NODE_RADIUS;
-            const req = pr + NODE_RADIUS + WALKWAY_BUFFER;
-            if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < req) return true;
-        }
-        return false;
-    };
-
-    // Helper to push nodes if not conflicting
-    const pushNode = (x, y, type) => {
-        const nx = Phaser.Math.Clamp(x, bounds.x1, bounds.x2);
-        const ny = Phaser.Math.Clamp(y, bounds.y1, bounds.y2);
-        // Only record into staticNodes here; defer placedNodes until after we actually create sprites
-        // so the final creation pass doesn't see each node as colliding with itself.
-        if (!isTooClose(nx, ny)) {
-            staticNodes.push({ x: nx, y: ny, type });
-        }
-    };
-
-    // Deterministic explicit layout to guarantee counts
-    const layout = {
-        tin: [pick(0.14,0.30), pick(0.20,0.42), pick(0.10,0.55), pick(0.26,0.60), pick(0.18,0.68)],
-        copper: [pick(0.44,0.30), pick(0.50,0.42), pick(0.56,0.55), pick(0.42,0.68)],
-        iron: [pick(0.08,0.22), pick(0.16,0.24), pick(0.06,0.32), pick(0.14,0.34), pick(0.10,0.40)],
-        coal: [pick(0.24,0.26), pick(0.30,0.32), pick(0.22,0.38), pick(0.28,0.44), pick(0.20,0.50), pick(0.26,0.56), pick(0.18,0.62)],
-        mythril: [pick(0.14,0.74), pick(0.20,0.80), pick(0.26,0.86)],
-        gold: [pick(0.66,0.22), pick(0.70,0.78)]
-    };
-
-    const ensureSpacing = (pt, type) => {
-        let x = pt.x, y = pt.y; let tries = 0;
-        while (tries < 12) {
-            let clash = false;
-            for (const p of placedNodes) {
-                const dist = Phaser.Math.Distance.Between(x,y,p.x,p.y);
-                if (dist < (NODE_RADIUS*2 + 10)) { clash = true; break; }
-            }
-            if (!clash) break;
-            x += 10; y += 10; tries++;
-        }
-        return { x, y, type };
-    };
-    Object.keys(layout).forEach(type => {
-        for (const pt of layout[type]) {
-            const adj = ensureSpacing(pt, type);
-            pushNode(adj.x, adj.y, adj.type);
-        }
-    });
-
-    // Add 1 of each gem near the edges (emerald, ruby, sapphire, opal, diamond)
-    const edgePad = 24;
-    const edges = [
-        { x: bounds.x1 + edgePad, y: Math.round((bounds.y1 + bounds.y2)/2), type: 'emerald' }, // left edge mid
-        { x: Math.round((bounds.x1 + bounds.x2)/2), y: bounds.y1 + edgePad, type: 'ruby' }, // top edge mid
-        { x: bounds.x2 - edgePad, y: Math.round((bounds.y1 + bounds.y2)/2), type: 'sapphire' }, // right edge mid
-        { x: Math.round((bounds.x1 + bounds.x2)/2), y: bounds.y2 - edgePad, type: 'opal' }, // bottom edge mid
-        { x: bounds.x2 - edgePad, y: bounds.y1 + edgePad, type: 'diamond' } // top-right corner-ish
-    ];
-    for (const g of edges) pushNode(g.x, g.y, g.type);
-
-    // Gold nodes already included in deterministic layout.
-
+    // Hardcoded mining node positions (absolute coordinates, manually placed)
+    // Furnace is at center (~400,300 for 800x600), portal at right (~680, 330)
+    // Left/top area for early ores, deeper areas for late ores, right side for gold
     
-
-    for (const def of staticNodes) {
-        const nx = Phaser.Math.Clamp(def.x, bounds.x1, bounds.x2);
-        const ny = Phaser.Math.Clamp(def.y, bounds.y1, bounds.y2);
-        // Re-check proximity (in case bounds clamp changed position)
-        if (isTooClose(nx, ny)) continue;
-        try { this._createMiningNode(nx, ny, def.type); } catch (e) {}
-        // Now that it exists, register in placedNodes so later deco generation avoids it
-        placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type: def.type });
-    }
-    // End of initial placement
-    _placingLayout = false;
-
-    // Debug: report counts actually placed to help diagnose missing nodes
+    // TIN (5 nodes) - left side, various depths
+    try { this._createMiningNode(180, 220, 'tin'); } catch (e) {}
+    try { this._createMiningNode(220, 280, 'tin'); } catch (e) {}
+    try { this._createMiningNode(160, 350, 'tin'); } catch (e) {}
+    try { this._createMiningNode(200, 420, 'tin'); } catch (e) {}
+    try { this._createMiningNode(170, 480, 'tin'); } catch (e) {}
+    
+    // COPPER (4 nodes) - mid-left area
+    try { this._createMiningNode(320, 210, 'copper'); } catch (e) {}
+    try { this._createMiningNode(360, 280, 'copper'); } catch (e) {}
+    try { this._createMiningNode(380, 360, 'copper'); } catch (e) {}
+    try { this._createMiningNode(340, 450, 'copper'); } catch (e) {}
+    
+    // IRON (5 nodes) - upper-left cluster
+    try { this._createMiningNode(140, 160, 'iron'); } catch (e) {}
+    try { this._createMiningNode(200, 170, 'iron'); } catch (e) {}
+    try { this._createMiningNode(120, 230, 'iron'); } catch (e) {}
+    try { this._createMiningNode(180, 240, 'iron'); } catch (e) {}
+    try { this._createMiningNode(160, 300, 'iron'); } catch (e) {}
+    
+    // COAL (7 nodes) - mid band left-to-center
+    try { this._createMiningNode(260, 200, 'coal'); } catch (e) {}
+    try { this._createMiningNode(300, 240, 'coal'); } catch (e) {}
+    try { this._createMiningNode(240, 280, 'coal'); } catch (e) {}
+    try { this._createMiningNode(280, 320, 'coal'); } catch (e) {}
+    try { this._createMiningNode(220, 360, 'coal'); } catch (e) {}
+    try { this._createMiningNode(260, 400, 'coal'); } catch (e) {}
+    try { this._createMiningNode(200, 500, 'coal'); } catch (e) {}
+    
+    // MYTHRIL (3 nodes) - bottom-left (deeper progression)
+    try { this._createMiningNode(180, 520, 'mythril'); } catch (e) {}
+    try { this._createMiningNode(220, 540, 'mythril'); } catch (e) {}
+    try { this._createMiningNode(260, 560, 'mythril'); } catch (e) {}
+    
+    // GOLD (2 nodes) - right side (avoid portal at ~680,330)
+    try { this._createMiningNode(580, 180, 'gold'); } catch (e) {}
+    try { this._createMiningNode(600, 500, 'gold'); } catch (e) {}
+    
+    // GEMS (5 nodes) - edge positions
+    try { this._createMiningNode(120, 320, 'emerald'); } catch (e) {}     // left edge
+    try { this._createMiningNode(400, 140, 'ruby'); } catch (e) {}        // top edge
+    try { this._createMiningNode(680, 320, 'sapphire'); } catch (e) {}    // right edge (near portal)
+    try { this._createMiningNode(400, 560, 'opal'); } catch (e) {}        // bottom edge
+    try { this._createMiningNode(660, 160, 'diamond'); } catch (e) {}     // top-right corner
+    
+    // Debug: report counts actually placed
     try {
         if (typeof console !== 'undefined' && console.debug) {
             const counts = {};
