@@ -58,6 +58,16 @@ export class BrokenDock extends Phaser.Scene {
             if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
         } catch (e) { console.warn('Failed to create player animations in BrokenDock', e); }
 
+        // Create Rowan (Harborwright) NPC animations if sprites available
+        try {
+            if (this.textures && this.textures.exists('rowan_idle') && !this.anims.exists('rowan_idle')) {
+                this.anims.create({ key: 'rowan_idle', frames: this.anims.generateFrameNumbers('rowan_idle', { start: 0, end: 3 }), frameRate: 3, repeat: -1 });
+            }
+            if (this.textures && this.textures.exists('rowan_walk') && !this.anims.exists('rowan_walk')) {
+                this.anims.create({ key: 'rowan_walk', frames: this.anims.generateFrameNumbers('rowan_walk', { start: 0, end: 3 }), frameRate: 6, repeat: -1 });
+            }
+        } catch (e) { console.warn('Failed to create NPC animations in BrokenDock', e); }
+
         // Top-down layout: top 50% = water, bottom 50% = ground. Dock extends from ground up into water.
         const halfH = Math.round(H * 0.5);
         const waterTop = 0;
@@ -122,22 +132,21 @@ export class BrokenDock extends Phaser.Scene {
         // Deprecated: fishing node prompt replaced by click-to-cast on water
         this.fishingNode = null;
 
-        // Bait bucket (shop) positioned on the ground near the dock (left side)
-        try {
-            const bucketX = Math.max(120, dockX - dockWidth - 60);
-            const bucketY = Math.min(this.scale.height - 64, groundTop + 40);
-            this.baitBucket = this._createBucket(bucketX, bucketY);
-            try { if (this.baitBucket && this.baitBucket.sprite) this.baitBucket.sprite.setDepth(1.15); } catch (e) {}
-        } catch (e) {}
-
-        // Harborwright NPC (Dock repair questline entry)
+        // Harborwright NPC (Dock repair questline entry + bait shop) - positioned on the ground near the dock (right side)
         try {
             const npcX = Math.min(this.scale.width - 120, dockX + dockWidth + 60);
             const npcY = Math.min(this.scale.height - 64, groundTop + 40);
-            const r = 22;
-            this.harborwright = this.add.circle(npcX, npcY, r, 0x3a556b, 1).setDepth(1.2);
-            this.harborwright.setStrokeStyle(2, 0x89b4ff, 0.9);
-            this.harborwrightPrompt = this.add.text(npcX, npcY - 46, '[E] Help Repair Dock', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+            // Use Rowan's sprite (reused with blue tint, similar to steward reusing grimsley)
+            if (this.textures && this.textures.exists && this.textures.exists('rowan_idle')) {
+                this.harborwright = this.add.sprite(npcX, npcY, 'rowan_idle').setOrigin(0.5, 0.9).setDepth(1.5);
+                try { this.harborwright.setTint(0x6fa9ff); } catch (e) {}
+                this._playNpcAnimation && this._playNpcAnimation(this.harborwright, 'idle', 'left');
+            } else {
+                // fallback circle if sprite missing
+                this.harborwright = this.add.circle(npcX, npcY, 22, 0x3a556b, 1).setDepth(1.2);
+                this.harborwright.setStrokeStyle(2, 0x89b4ff, 0.9);
+            }
+            this.harborwrightPrompt = this.add.text(npcX, npcY - 68, '[E] Talk to Harborwright', { fontSize: '14px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
             this.harborwrightPrompt.setVisible(false);
         } catch (e) {}
 
@@ -456,23 +465,13 @@ export class BrokenDock extends Phaser.Scene {
         if (!this.fishingActive && !this._attacking) playDirectionalAnimation(this, movement);
         updateDepthForTopDown(this, { min: 0.9, max: 2.4 });
 
-        // show prompt for bucket only (casting is click-to-cast on water now)
+        // Harborwright NPC interaction (dialogue-based)
         const px = this.player.x; const py = this.player.y;
-        // (legacy node removed)
-        const b = this.baitBucket; if (b) {
-            const d2 = Phaser.Math.Distance.Between(px, py, b.x, b.y);
-            b.prompt.setVisible(d2 <= 56);
-            if (d2 <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                this._openBucketShop();
-            }
-        }
-
-        // Harborwright interaction
         const hw = this.harborwright; if (hw) {
             const d4 = Phaser.Math.Distance.Between(px, py, hw.x, hw.y);
             if (this.harborwrightPrompt) this.harborwrightPrompt.setVisible(d4 <= 56);
             if (d4 <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                try { this._openDockRepairOverlay(); } catch (e) { console.warn('dock repair overlay failed', e); }
+                try { this._openHarborwrightDialogue(); } catch (e) { console.warn('harborwright dialogue failed', e); }
             }
         }
 
@@ -2421,6 +2420,155 @@ export class BrokenDock extends Phaser.Scene {
         if (this._dockUi) this._updateDockRepairOverlay();
     }
 
+    // --- Harborwright Dialogue (similar to Steward in Town scene) ---
+    _openHarborwrightDialogue(page = 'root') {
+        this._activeDialogueNpc = 'harborwright';
+        try { updateQuestProgress && updateQuestProgress(this.char, 'talk', 'harborwright', 1); } catch (e) {}
+        this._renderHarborwrightDialoguePage(page);
+    }
+
+    _renderHarborwrightDialoguePage(page) {
+        const ui = window.__shared_ui;
+        if (!ui) return;
+        const bodyNodes = [];
+        const optionConfigs = [];
+
+        const render = () => ui.renderDialogue('Harborwright Finn', '⚓', bodyNodes, optionConfigs, '#6fa9ff');
+
+        if (page === 'root') {
+            const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+            bodyNodes.push(ui.createDialogueParagraph("Name's Finn. I keep this dock from sinking—or at least I try to."));
+            if (stage < 4) {
+                bodyNodes.push(ui.createDialogueParagraph("She's seen better days, but with the right materials we can patch her up proper."));
+            } else {
+                bodyNodes.push(ui.createDialogueParagraph("She's holding strong now. Best dock on this stretch of coast, if I say so myself."));
+            }
+            optionConfigs.push({ label: 'Tell me about the dock repairs', onClick: () => this._openHarborwrightDialogue('repairs'), variant: 'primary' });
+            optionConfigs.push({ label: 'Can I buy some bait?', onClick: () => this._openHarborwrightDialogue('bait_shop') });
+            optionConfigs.push({ label: 'Any fishing advice?', onClick: () => this._openHarborwrightDialogue('advice') });
+            optionConfigs.push({ label: 'Leave', onClick: () => {}, closeOnClick: true });
+            return render();
+        }
+
+        if (page === 'repairs') {
+            const qid = this._getCurrentDockQuestId();
+            const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+            if (stage >= 4) {
+                bodyNodes.push(ui.createDialogueParagraph("All four stages complete. The dock's solid as they come now. Hotspots bloom regular, and the fishing's never been better."));
+                optionConfigs.push({ label: 'Back', onClick: () => this._openHarborwrightDialogue('root') });
+                return render();
+            }
+            bodyNodes.push(ui.createDialogueParagraph(`We're at Stage ${stage} out of 4. Each upgrade draws more fish and unlocks new features.`));
+            if (qid) {
+                const questDef = getQuestById(qid);
+                const isActive = this._isDockQuestActive(qid);
+                const isComplete = checkQuestCompletion(this.char, qid);
+                if (!isActive && !this._isDockQuestCompleted(qid)) {
+                    if (questDef && questDef.description) bodyNodes.push(ui.createDialogueParagraph(questDef.description));
+                    const list = ui.buildObjectiveList(questDef, null, '#6fa9ff');
+                    if (list) bodyNodes.push(list);
+                    optionConfigs.push({
+                        label: `Accept: ${questDef ? questDef.name || qid : qid}`,
+                        onClick: () => {
+                            const ok = startQuest(this.char, qid);
+                            if (ok) {
+                                this._persistCharacterState();
+                                this._showToast && this._showToast('Repair quest accepted');
+                                try { if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); } catch (e) {}
+                                this._openHarborwrightDialogue('repairs');
+                            } else {
+                                bodyNodes.length = 0;
+                                bodyNodes.push(ui.createDialogueParagraph('Hmm, something\'s blocking that quest. Come back later.'));
+                                optionConfigs.length = 0;
+                                optionConfigs.push({ label: 'Back', onClick: () => this._openHarborwrightDialogue('root') });
+                                render();
+                            }
+                        },
+                        variant: 'success'
+                    });
+                    optionConfigs.push({ label: 'Maybe later', onClick: () => {}, closeOnClick: true });
+                } else if (isActive && !isComplete) {
+                    bodyNodes.push(ui.createDialogueParagraph("Bring me what's needed and we'll get this stage patched up."));
+                    const states = getQuestObjectiveState(this.char, qid);
+                    const list = ui.buildObjectiveList(questDef, states, '#6fa9ff');
+                    if (list) bodyNodes.push(list);
+                    optionConfigs.push({
+                        label: 'Contribute materials',
+                        onClick: () => {
+                            this._attemptDockContribution();
+                            setTimeout(() => this._openHarborwrightDialogue('repairs'), 100);
+                        }
+                    });
+                    optionConfigs.push({ label: 'I\'ll gather more', onClick: () => {}, closeOnClick: true });
+                } else if (isComplete) {
+                    bodyNodes.push(ui.createDialogueParagraph("You've got everything I need. Let's finish this stage!"));
+                    const states = getQuestObjectiveState(this.char, qid);
+                    const list = ui.buildObjectiveList(questDef, states, '#6fa9ff');
+                    if (list) bodyNodes.push(list);
+                    optionConfigs.push({
+                        label: 'Complete repairs',
+                        onClick: () => {
+                            const ok = completeQuest(this.char, qid);
+                            if (ok) {
+                                this.char.flags = this.char.flags || {};
+                                this.char.flags.dockStage = ((this.char.flags.dockStage || 0) + 1);
+                                this._persistCharacterState();
+                                this._refreshDockVisual(this.char.flags.dockStage);
+                                const newStage = this.char.flags.dockStage || 0;
+                                this._showToast && this._showToast(newStage === 1 ? 'Hotspots unlocked! Watch the water.' : `Upgraded to Stage ${newStage}.`);
+                                // Kickstart hotspots on Stage 1
+                                if (newStage >= 1) {
+                                    try {
+                                        if (typeof this._spawnHotspot === 'function') {
+                                            this._spawnHotspot();
+                                            if (this.time && this.time.addEvent) this.time.addEvent({ delay: 2000, callback: () => this._spawnHotspot(), callbackScope: this });
+                                        }
+                                        const now = (performance && performance.now ? performance.now() : Date.now());
+                                        this._nextHotspotAt = now + 4000;
+                                    } catch (e) {}
+                                }
+                                try { if (window && window.__shared_ui && window.__shared_ui.refreshQuestLogModal) window.__shared_ui.refreshQuestLogModal(this); } catch (e) {}
+                                this._openHarborwrightDialogue('repairs');
+                            }
+                        },
+                        variant: 'success'
+                    });
+                    optionConfigs.push({ label: 'Back', onClick: () => this._openHarborwrightDialogue('root') });
+                }
+            } else {
+                bodyNodes.push(ui.createDialogueParagraph("The dock's as good as it'll get. No more work needed here."));
+                optionConfigs.push({ label: 'Back', onClick: () => this._openHarborwrightDialogue('root') });
+            }
+            return render();
+        }
+
+        if (page === 'bait_shop') {
+            bodyNodes.push(ui.createDialogueParagraph("I keep a stash of bait for folks who know their way around a rod. What do you need?"));
+            optionConfigs.push({
+                label: 'Open Bait Shop',
+                onClick: () => {
+                    try { this._openBucketShop(); } catch (e) { console.warn('Bait shop failed', e); }
+                },
+                variant: 'primary',
+                closeOnClick: true
+            });
+            optionConfigs.push({ label: 'Back', onClick: () => this._openHarborwrightDialogue('root') });
+            return render();
+        }
+
+        if (page === 'advice') {
+            bodyNodes.push(ui.createDialogueParagraph("Cast into the water—avoid the dock itself. Click where you want your line to land."));
+            bodyNodes.push(ui.createDialogueParagraph("Hotspots show up as glowing circles. Fish bite more often there, and you'll hook rarer catches."));
+            bodyNodes.push(ui.createDialogueParagraph("Upgrade your rod and unlock mastery nodes to boost your odds. Press M to open your mastery tree."));
+            optionConfigs.push({ label: 'Thanks', onClick: () => {}, closeOnClick: true });
+            optionConfigs.push({ label: 'Back', onClick: () => this._openHarborwrightDialogue('root') });
+            return render();
+        }
+
+        // Fallback
+        this._openHarborwrightDialogue('root');
+    }
+
     _refreshDockVisual(stage = null) {
         stage = stage == null ? ((this.char && this.char.flags && this.char.flags.dockStage) || 0) : stage;
         const dock = this._dockVisual;
@@ -2464,14 +2612,66 @@ export class BrokenDock extends Phaser.Scene {
 
             try {
                 if (!this.eventBoard) {
+                    // Position on the ground to the left of dock, standing upright like a bulletin board
                     const ex = dock.x - Math.round((dock.width || 80) / 2) - 80;
-                    const ey = dock.y + Math.round((dock.height || 140) / 2) - 48;
-                    this.eventBoard = this.add.rectangle(ex, ey, 34, 24, 0x2a3550, 0.95).setDepth(1.25);
-                    this.eventBoard.setStrokeStyle(2, 0x7fb1ff, 0.85);
-                    this.eventBoardPrompt = this.add.text(ex, ey - 30, '[E] Event Board', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+                    const groundY = this.scale.height - 60; // ground reference point
+                    // Slight horizontal offset wiggle (makes board feel hand-built)
+                    const wobbleX = ex + Phaser.Math.Between(-2, 2);
+
+                    // Shadow/backer behind the post & board for depth
+                    this.eventBoardShadow = this.add.rectangle(wobbleX + 3, groundY - 44, 50, 92, 0x000000, 0.14).setDepth(1.26);
+                    this.eventBoardShadow.setOrigin(0.5, 0.5);
+
+                    // Pole/post (tall, from ground up to board - behind board) - CREATE FIRST
+                    this.eventBoardPost = this.add.rectangle(wobbleX, groundY - 40, 8, 80, 0x3a2a1a, 1).setDepth(1.27);
+                    this.eventBoardPost.setStrokeStyle(2, 0x2a1a0a, 1);
+
+                    // Board frame at top of pole
+                    const boardY = groundY - 72; // board sits above pole
+                    this.eventBoard = this.add.rectangle(wobbleX, boardY, 46, 60, 0x6a4a2a, 1).setDepth(1.28);
+                    this.eventBoard.setStrokeStyle(4, 0x4a3a1a, 1);
+
+                    // Header plank across top (darker)
+                    this.eventBoardHeader = this.add.rectangle(wobbleX, boardY - 30, 46, 10, 0x54371e, 1).setDepth(1.285);
+                    this.eventBoardHeader.setStrokeStyle(2, 0x3a2714, 0.95);
+
+                    // Main notice paper (slightly rotated)
+                    this.eventBoardNotice = this.add.rectangle(wobbleX - 2, boardY - 2, 30, 44, 0xfff8e0, 1).setDepth(1.29);
+                    this.eventBoardNotice.setStrokeStyle(2, 0xc0b090, 1);
+                    this.eventBoardNotice.setAngle(Phaser.Math.Between(-2, 2));
+
+                    // Secondary paper (smaller, offset & rotated) for visual interest
+                    this.eventBoardNotice2 = this.add.rectangle(wobbleX + 10, boardY + 6, 18, 22, 0xfdf2d4, 1).setDepth(1.295);
+                    this.eventBoardNotice2.setStrokeStyle(2, 0xbcae8c, 1);
+                    this.eventBoardNotice2.setAngle(Phaser.Math.Between(-7, 7));
+
+                    // Nails at the corners of main board
+                    const nailColor = 0xdedede;
+                    this.eventBoardNails = [
+                        this.add.circle(wobbleX - 20, boardY - 28, 2, nailColor, 1).setDepth(1.30),
+                        this.add.circle(wobbleX + 20, boardY - 28, 2, nailColor, 1).setDepth(1.30),
+                        this.add.circle(wobbleX - 20, boardY + 28, 2, nailColor, 1).setDepth(1.30),
+                        this.add.circle(wobbleX + 20, boardY + 28, 2, nailColor, 1).setDepth(1.30)
+                    ];
+                    try { for (const n of this.eventBoardNails) n.setStrokeStyle(1, 0x999999, 1); } catch (e) {}
+
+                    // Prompt (hidden until player near)
+                    this.eventBoardPrompt = this.add.text(wobbleX, boardY - 62, '[E] Event Board', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+
+                    // Gentle pulse on main notice for attention
+                    try {
+                        this.tweens.add({ targets: this.eventBoardNotice, alpha: { from: 1, to: 0.82 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+                    } catch (e) {}
                 }
                 const boardVisible = stage >= 4;
-                this.eventBoard.setVisible(boardVisible);
+                const toggle = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
+                toggle(this.eventBoardShadow, boardVisible);
+                toggle(this.eventBoardPost, boardVisible);
+                toggle(this.eventBoard, boardVisible);
+                toggle(this.eventBoardHeader, boardVisible);
+                toggle(this.eventBoardNotice, boardVisible);
+                toggle(this.eventBoardNotice2, boardVisible);
+                if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) toggle(n, boardVisible);
                 if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(false);
             } catch (e) {}
         } catch (e) { /* no-op */ }
@@ -2938,6 +3138,15 @@ export class BrokenDock extends Phaser.Scene {
         uiState.listeners.push(() => gridEl.removeEventListener('click', attemptUnlock));
         uiState.listeners.push(() => refreshBtn.removeEventListener('click', onRefresh));
         return uiState;
+    }
+
+    // --- NPC Animation Helper ---
+    _playNpcAnimation(sprite, mode, facing) {
+        if (!sprite || !sprite.anims) return;
+        try {
+            const key = mode === 'idle' ? 'rowan_idle' : 'rowan_walk';
+            if (this.anims.exists(key)) sprite.anims.play(key, true);
+        } catch (e) {}
     }
 
 }
