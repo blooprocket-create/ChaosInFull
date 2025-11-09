@@ -99,22 +99,33 @@ export class BrokenDock extends Phaser.Scene {
         // add a small padding so the water colliders do not overlap the dock and block the player body
         const waterPad = 12;
         try {
+            // Water color varies by stage: dark murky -> clearer blue
+            const stage = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+            let waterColor = 0x1a3a52; // stage 0: dark murky
+            let waterAlpha = 0.92;
+            if (stage >= 1) { waterColor = 0x2055aa; waterAlpha = 0.88; }
+            if (stage >= 2) { waterColor = 0x2266aa; waterAlpha = 0.85; }
+            if (stage >= 3) { waterColor = 0x3377bb; waterAlpha = 0.82; }
+            if (stage >= 4) { waterColor = 0x4488cc; waterAlpha = 0.78; }
+            
             const leftEdge = Math.max(0, dockX - Math.round(dockWidth / 2) - waterPad);
             const leftWidth = Math.max(8, leftEdge);
             if (leftWidth > 8) {
                 const wx = leftEdge / 2;
                 const wy = (waterTop + waterBottom) / 2;
-                const wRect = this.add.rectangle(wx, wy, leftWidth, waterBottom - waterTop, 0x2266aa, 0.85).setDepth(0.7);
+                const wRect = this.add.rectangle(wx, wy, leftWidth, waterBottom - waterTop, waterColor, waterAlpha).setDepth(0.7);
                 // add static physics body to block player walking here
                 try { if (this.physics && this.physics.add) { this.physics.add.existing(wRect, true); this._waterColliders.push(wRect); if (this.player && this.player.body) this.physics.add.collider(this.player, wRect); } } catch (e) {}
+                this._leftWater = wRect; // save reference for stage updates
             }
             const rightStart = Math.min(this.scale.width, dockX + Math.round(dockWidth / 2) + waterPad);
             const rightWidth = Math.max(8, this.scale.width - rightStart);
             if (rightWidth > 8) {
                 const rx = rightStart + rightWidth / 2;
                 const ry = (waterTop + waterBottom) / 2;
-                const wRect2 = this.add.rectangle(rx, ry, rightWidth, waterBottom - waterTop, 0x2266aa, 0.85).setDepth(0.7);
+                const wRect2 = this.add.rectangle(rx, ry, rightWidth, waterBottom - waterTop, waterColor, waterAlpha).setDepth(0.7);
                 try { if (this.physics && this.physics.add) { this.physics.add.existing(wRect2, true); this._waterColliders.push(wRect2); if (this.player && this.player.body) this.physics.add.collider(this.player, wRect2); } } catch (e) {}
+                this._rightWater = wRect2; // save reference for stage updates
             }
             // Save water bounds for click-cast tests
             this._waterBounds = { top: waterTop, bottom: waterBottom, dockX, dockWidth, waterPad };
@@ -126,8 +137,21 @@ export class BrokenDock extends Phaser.Scene {
             dock.setStrokeStyle(2, 0x6b3f22, 0.9);
             this._dockVisual = dock;
         } catch (e) {}
+        
+        // Initialize decoration containers
+        this._decorations = {
+            stage0: [],
+            stage1: [],
+            stage2: [],
+            stage3: [],
+            stage4: []
+        };
+        
         // Apply initial dock visual based on current repair stage
-        try { this._refreshDockVisual && this._refreshDockVisual((this.char && this.char.flags && this.char.flags.dockStage) || 0); } catch (e) {}
+        try { 
+            this._refreshDockVisual && this._refreshDockVisual((this.char && this.char.flags && this.char.flags.dockStage) || 0);
+            this._refreshDecorations && this._refreshDecorations((this.char && this.char.flags && this.char.flags.dockStage) || 0);
+        } catch (e) {}
 
         // Deprecated: fishing node prompt replaced by click-to-cast on water
         this.fishingNode = null;
@@ -395,6 +419,18 @@ export class BrokenDock extends Phaser.Scene {
                     window.__shared_ui.closeInventoryModal(this);
                 } else if (typeof this._closeInventoryModal === 'function') {
                     this._closeInventoryModal();
+                }
+            } catch (e) { /* ignore */ }
+            // cleanup decorations
+            try {
+                if (this._decorations) {
+                    for (const stageKey of Object.keys(this._decorations)) {
+                        const decors = this._decorations[stageKey] || [];
+                        for (const obj of decors) {
+                            try { if (obj && obj.destroy) obj.destroy(); } catch (e) {}
+                        }
+                    }
+                    this._decorations = null;
                 }
             } catch (e) { /* ignore */ }
             // cleanup dock collider and water colliders
@@ -2514,6 +2550,7 @@ export class BrokenDock extends Phaser.Scene {
                                 this.char.flags.dockStage = ((this.char.flags.dockStage || 0) + 1);
                                 this._persistCharacterState();
                                 this._refreshDockVisual(this.char.flags.dockStage);
+                                this._refreshDecorations(this.char.flags.dockStage);
                                 const newStage = this.char.flags.dockStage || 0;
                                 this._showToast && this._showToast(newStage === 1 ? 'Hotspots unlocked! Watch the water.' : `Upgraded to Stage ${newStage}.`);
                                 // Kickstart hotspots on Stage 1
@@ -2569,6 +2606,485 @@ export class BrokenDock extends Phaser.Scene {
         this._openHarborwrightDialogue('root');
     }
 
+    _createStage0Decorations() {
+        // Desolate, broken beach scene
+        const W = this.scale.width;
+        const H = this.scale.height;
+        const groundY = Math.round(H * 0.5);
+        const dockX = this._dockVisual ? this._dockVisual.x : W / 2;
+        const decorations = [];
+        
+        // Darker, murky water patches
+        for (let i = 0; i < 6; i++) {
+            const x = Phaser.Math.Between(40, W - 40);
+            const y = Phaser.Math.Between(20, groundY - 20);
+            const rect = this.add.ellipse(x, y, Phaser.Math.Between(60, 120), Phaser.Math.Between(30, 60), 0x1a3a52, 0.3).setDepth(0.65);
+            decorations.push(rect);
+        }
+        
+        // Broken planks and debris on beach
+        const debrisPositions = [
+            { x: dockX - 100, y: groundY + 40 },
+            { x: dockX + 90, y: groundY + 30 },
+            { x: 80, y: groundY + 50 },
+            { x: W - 90, y: groundY + 35 }
+        ];
+        
+        for (const pos of debrisPositions) {
+            // Broken plank
+            const plank = this.add.rectangle(pos.x, pos.y, Phaser.Math.Between(35, 55), 8, 0x5a4530, 1).setDepth(1.1);
+            plank.setAngle(Phaser.Math.Between(-25, 25));
+            decorations.push(plank);
+            
+            // Weathered crate/barrel pieces
+            if (Math.random() > 0.5) {
+                const crate = this.add.rectangle(pos.x + 15, pos.y + 10, 18, 18, 0x4a3a2a, 0.8).setDepth(1.1);
+                crate.setStrokeStyle(2, 0x3a2a1a, 0.9);
+                crate.setAngle(Phaser.Math.Between(-15, 15));
+                decorations.push(crate);
+            }
+        }
+        
+        // Seaweed patches
+        for (let i = 0; i < 5; i++) {
+            const x = Phaser.Math.Between(50, W - 50);
+            const y = Phaser.Math.Between(groundY - 40, groundY + 10);
+            const seaweed = this.add.ellipse(x, y, Phaser.Math.Between(15, 25), Phaser.Math.Between(8, 15), 0x2a4a3a, 0.7).setDepth(0.9);
+            decorations.push(seaweed);
+            // subtle animation
+            try {
+                this.tweens.add({
+                    targets: seaweed,
+                    scaleX: { from: 1, to: 1.15 },
+                    scaleY: { from: 1, to: 0.9 },
+                    duration: 2000 + Math.random() * 1000,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            } catch (e) {}
+        }
+        
+        return decorations;
+    }
+    
+    _createStage1Decorations() {
+        // Early repairs: fresh materials, tools visible
+        const W = this.scale.width;
+        const H = this.scale.height;
+        const groundY = Math.round(H * 0.5);
+        const dockX = this._dockVisual ? this._dockVisual.x : W / 2;
+        const dockW = this._dockVisual ? this._dockVisual.width : 80;
+        const decorations = [];
+        
+        // Fresh lumber stack near dock
+        const lumberX = dockX - dockW/2 - 50;
+        const lumberY = groundY + 45;
+        for (let i = 0; i < 4; i++) {
+            const plank = this.add.rectangle(lumberX + i*3, lumberY - i*4, 50, 10, 0x8a6a4a, 1).setDepth(1.15);
+            plank.setStrokeStyle(1, 0x6a4a2a, 1);
+            decorations.push(plank);
+        }
+        
+        // Tool crate
+        const toolX = dockX + dockW/2 + 40;
+        const toolY = groundY + 40;
+        const crate = this.add.rectangle(toolX, toolY, 30, 30, 0x6a5a4a, 1).setDepth(1.15);
+        crate.setStrokeStyle(2, 0x4a3a2a, 1);
+        decorations.push(crate);
+        
+        // Small fishing net drying
+        const netX = W - 100;
+        const netY = groundY + 30;
+        const net = this.add.ellipse(netX, netY, 40, 55, 0x7a8a9a, 0.6).setDepth(1.1);
+        decorations.push(net);
+        // Net post
+        const post = this.add.rectangle(netX, netY + 15, 6, 35, 0x5a4a3a, 1).setDepth(1.09);
+        decorations.push(post);
+        
+        // Repair bucket
+        const bucket = this.add.ellipse(lumberX + 60, lumberY + 5, 20, 18, 0x5a5a5a, 1).setDepth(1.15);
+        bucket.setStrokeStyle(2, 0x3a3a3a, 1);
+        decorations.push(bucket);
+        
+        return decorations;
+    }
+    
+    _createStage2Decorations() {
+        // Functioning dock: lanterns, barrels, ropes
+        const W = this.scale.width;
+        const H = this.scale.height;
+        const groundY = Math.round(H * 0.5);
+        const dockX = this._dockVisual ? this._dockVisual.x : W / 2;
+        const dockW = this._dockVisual ? this._dockVisual.width : 80;
+        const dockH = this._dockVisual ? this._dockVisual.height : 140;
+        const dockY = this._dockVisual ? this._dockVisual.y : groundY - 12;
+        const decorations = [];
+        
+        // Multiple lanterns along dock
+        const lanternPositions = [
+            { x: dockX, y: dockY - dockH/2 + 15 },
+            { x: dockX, y: dockY + dockH/2 - 15 }
+        ];
+        
+        for (const pos of lanternPositions) {
+            // Lantern post
+            const post = this.add.rectangle(pos.x, pos.y, 4, 24, 0x3a3a3a, 1).setDepth(1.7);
+            decorations.push(post);
+            // Lantern light
+            const light = this.add.circle(pos.x, pos.y - 12, 7, 0xffffaa, 0.85).setDepth(1.75);
+            decorations.push(light);
+            // Glow
+            const glow = this.add.circle(pos.x, pos.y - 12, 14, 0xffffaa, 0.2).setDepth(1.72);
+            decorations.push(glow);
+            
+            try {
+                this.tweens.add({
+                    targets: [light, glow],
+                    alpha: { from: 0.85, to: 0.6 },
+                    duration: 1200,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            } catch (e) {}
+        }
+        
+        // Rope coils on dock
+        const ropeX = dockX - dockW/2 + 15;
+        const ropeY = dockY;
+        const rope = this.add.ellipse(ropeX, ropeY, 18, 14, 0x8a7a6a, 1).setDepth(1.3);
+        rope.setStrokeStyle(2, 0x6a5a4a, 1);
+        decorations.push(rope);
+        
+        // Fishing baskets
+        const basketX = dockX + dockW/2 - 15;
+        const basketY = dockY + 10;
+        const basket = this.add.rectangle(basketX, basketY, 22, 20, 0x7a6a5a, 1).setDepth(1.3);
+        basket.setStrokeStyle(2, 0x5a4a3a, 1);
+        decorations.push(basket);
+        
+        // Barrels on ground near dock
+        const barrelPositions = [
+            { x: dockX - dockW/2 - 45, y: groundY + 40 },
+            { x: dockX + dockW/2 + 50, y: groundY + 35 }
+        ];
+        
+        for (const pos of barrelPositions) {
+            const barrel = this.add.ellipse(pos.x, pos.y, 28, 32, 0x6a5a4a, 1).setDepth(1.2);
+            barrel.setStrokeStyle(3, 0x4a3a2a, 1);
+            decorations.push(barrel);
+            // Barrel bands
+            const band1 = this.add.ellipse(pos.x, pos.y - 8, 28, 4, 0x3a3a3a, 1).setDepth(1.21);
+            const band2 = this.add.ellipse(pos.x, pos.y + 8, 28, 4, 0x3a3a3a, 1).setDepth(1.21);
+            decorations.push(band1, band2);
+        }
+        
+        // Dock pilings visible in water
+        const pilingX1 = dockX - dockW/2 + 8;
+        const pilingX2 = dockX + dockW/2 - 8;
+        const pilingY = dockY + dockH/2 + 15;
+        
+        for (const px of [pilingX1, pilingX2]) {
+            const piling = this.add.rectangle(px, pilingY, 8, 30, 0x4a3a2a, 1).setDepth(0.85);
+            decorations.push(piling);
+        }
+        
+        return decorations;
+    }
+    
+    _createStage3Decorations() {
+        // Boat, more lanterns, plants, flags
+        const W = this.scale.width;
+        const H = this.scale.height;
+        const groundY = Math.round(H * 0.5);
+        const dockX = this._dockVisual ? this._dockVisual.x : W / 2;
+        const dockW = this._dockVisual ? this._dockVisual.width : 80;
+        const dockH = this._dockVisual ? this._dockVisual.height : 140;
+        const dockY = this._dockVisual ? this._dockVisual.y : groundY - 12;
+        const decorations = [];
+        
+        // Replace boat circle with proper boat
+        if (this.boatMooring) {
+            const bx = this.boatMooring.x;
+            const by = this.boatMooring.y;
+            
+            // Boat hull (main body)
+            const hull = this.add.ellipse(bx, by, 50, 70, 0x6a5548, 1).setDepth(1.26);
+            hull.setStrokeStyle(3, 0x4a3528, 1);
+            decorations.push(hull);
+            
+            // Boat deck (lighter)
+            const deck = this.add.ellipse(bx, by + 5, 38, 45, 0x8a7a6a, 1).setDepth(1.27);
+            decorations.push(deck);
+            
+            // Mast
+            const mast = this.add.rectangle(bx, by - 35, 5, 70, 0x5a4a3a, 1).setDepth(1.28);
+            decorations.push(mast);
+            
+            // Sail (furled)
+            const sail = this.add.ellipse(bx + 8, by - 25, 20, 35, 0xf0e8d0, 0.9).setDepth(1.28);
+            decorations.push(sail);
+            
+            // Rigging lines
+            const line1 = this.add.line(0, 0, bx, by - 55, bx - 15, by + 10, 0x4a4a4a, 0.6).setDepth(1.275);
+            line1.setLineWidth(2);
+            decorations.push(line1);
+            
+            const line2 = this.add.line(0, 0, bx, by - 55, bx + 15, by + 10, 0x4a4a4a, 0.6).setDepth(1.275);
+            line2.setLineWidth(2);
+            decorations.push(line2);
+            
+            // Boat ropes to dock
+            const ropeAnchorX = dockX + dockW/2 - 8;
+            const ropeAnchorY = dockY - dockH/2 + 20;
+            const ropeLine = this.add.line(0, 0, ropeAnchorX, ropeAnchorY, bx - 15, by + 25, 0x8a7a6a, 0.8).setDepth(1.25);
+            ropeLine.setLineWidth(3);
+            decorations.push(ropeLine);
+            
+            // Water reflection
+            const reflection = this.add.ellipse(bx, by + 45, 45, 20, 0x2a5a7a, 0.25).setDepth(0.75);
+            decorations.push(reflection);
+            
+            // Hide the original circle
+            try { this.boatMooring.setAlpha(0); } catch (e) {}
+        }
+        
+        // Additional lanterns
+        const extraLanternPositions = [
+            { x: dockX - dockW/2 + 10, y: dockY },
+            { x: dockX + dockW/2 - 10, y: dockY }
+        ];
+        
+        for (const pos of extraLanternPositions) {
+            const post = this.add.rectangle(pos.x, pos.y, 4, 20, 0x3a3a3a, 1).setDepth(1.7);
+            decorations.push(post);
+            const light = this.add.circle(pos.x, pos.y - 10, 6, 0xfff8aa, 0.9).setDepth(1.75);
+            decorations.push(light);
+            const glow = this.add.circle(pos.x, pos.y - 10, 12, 0xfff8aa, 0.25).setDepth(1.72);
+            decorations.push(glow);
+            
+            try {
+                this.tweens.add({
+                    targets: [light, glow],
+                    alpha: { from: 0.9, to: 0.65 },
+                    duration: 1100,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            } catch (e) {}
+        }
+        
+        // Flowering plants in barrels
+        const plantPositions = [
+            { x: dockX - dockW/2 - 55, y: groundY + 38 },
+            { x: dockX + dockW/2 + 60, y: groundY + 42 }
+        ];
+        
+        for (const pos of plantPositions) {
+            // Barrel planter
+            const barrel = this.add.ellipse(pos.x, pos.y, 26, 28, 0x6a5a4a, 1).setDepth(1.2);
+            barrel.setStrokeStyle(2, 0x4a3a2a, 1);
+            decorations.push(barrel);
+            
+            // Flowers/greenery
+            for (let i = 0; i < 5; i++) {
+                const fx = pos.x + Phaser.Math.Between(-8, 8);
+                const fy = pos.y - 15 + Phaser.Math.Between(-5, 5);
+                const flower = this.add.circle(fx, fy, Phaser.Math.Between(3, 5), Phaser.Math.FloatBetween(0, 1) > 0.5 ? 0xff8888 : 0xffdd88, 1).setDepth(1.25);
+                decorations.push(flower);
+            }
+        }
+        
+        // Small flags/bunting
+        const flagX = dockX;
+        const flagY = dockY - dockH/2 - 5;
+        for (let i = 0; i < 3; i++) {
+            const fx = flagX + (i - 1) * 15;
+            const flag = this.add.triangle(fx, flagY, 0, 0, 8, 5, 0, 10, 0xff6666, 1).setDepth(1.8);
+            decorations.push(flag);
+            
+            try {
+                this.tweens.add({
+                    targets: flag,
+                    y: { from: flagY, to: flagY + 3 },
+                    duration: 800 + i * 200,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            } catch (e) {}
+        }
+        
+        return decorations;
+    }
+    
+    _createStage4Decorations() {
+        // Final stage: thriving, beautiful dock
+        const W = this.scale.width;
+        const H = this.scale.height;
+        const groundY = Math.round(H * 0.5);
+        const dockX = this._dockVisual ? this._dockVisual.x : W / 2;
+        const dockW = this._dockVisual ? this._dockVisual.width : 80;
+        const decorations = [];
+        
+        // Colorful awnings/canopy
+        const awningX = dockX + dockW/2 + 70;
+        const awningY = groundY + 25;
+        const awning = this.add.rectangle(awningX, awningY, 60, 8, 0xff9966, 1).setDepth(1.35);
+        decorations.push(awning);
+        const awningPost1 = this.add.rectangle(awningX - 25, awningY + 20, 4, 40, 0x5a4a3a, 1).setDepth(1.3);
+        const awningPost2 = this.add.rectangle(awningX + 25, awningY + 20, 4, 40, 0x5a4a3a, 1).setDepth(1.3);
+        decorations.push(awningPost1, awningPost2);
+        
+        // More potted flowers
+        const flowerPositions = [
+            { x: 100, y: groundY + 45 },
+            { x: W - 100, y: groundY + 48 },
+            { x: dockX - dockW/2 - 70, y: groundY + 40 }
+        ];
+        
+        for (const pos of flowerPositions) {
+            const pot = this.add.ellipse(pos.x, pos.y, 20, 22, 0x8a6a5a, 1).setDepth(1.22);
+            pot.setStrokeStyle(2, 0x6a4a3a, 1);
+            decorations.push(pot);
+            
+            for (let i = 0; i < 6; i++) {
+                const fx = pos.x + Phaser.Math.Between(-7, 7);
+                const fy = pos.y - 12 + Phaser.Math.Between(-6, 6);
+                const colors = [0xff6688, 0xffaa66, 0xff88ff, 0x88ff88, 0x88ddff];
+                const flower = this.add.circle(fx, fy, Phaser.Math.Between(3, 6), Phaser.Utils.Array.GetRandom(colors), 1).setDepth(1.28);
+                decorations.push(flower);
+            }
+        }
+        
+        // Celebratory banners across the top
+        const bannerY = 50;
+        for (let i = 0; i < 5; i++) {
+            const bx = (W / 6) * (i + 1);
+            const colors = [0xff6666, 0xffaa66, 0x66ff88, 0x66aaff, 0xaa66ff];
+            const banner = this.add.rectangle(bx, bannerY, 12, 20, colors[i % colors.length], 1).setDepth(1.9);
+            decorations.push(banner);
+            
+            try {
+                this.tweens.add({
+                    targets: banner,
+                    y: { from: bannerY, to: bannerY + 5 },
+                    duration: 1000 + i * 150,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            } catch (e) {}
+        }
+        
+        // Sparkle effects near water
+        for (let i = 0; i < 8; i++) {
+            const sx = Phaser.Math.Between(50, W - 50);
+            const sy = Phaser.Math.Between(20, groundY - 20);
+            const sparkle = this.add.circle(sx, sy, 2, 0xffffff, 0.8).setDepth(2.5);
+            decorations.push(sparkle);
+            
+            try {
+                this.tweens.add({
+                    targets: sparkle,
+                    alpha: { from: 0.8, to: 0 },
+                    scale: { from: 1, to: 1.5 },
+                    duration: 1500,
+                    delay: i * 200,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeOut'
+                });
+            } catch (e) {}
+        }
+        
+        // Decorative elements around event board
+        if (this.eventBoard) {
+            const ebX = this.eventBoard.x;
+            const ebY = this.eventBoard.y;
+            
+            // Flower pots on each side
+            const pot1 = this.add.ellipse(ebX - 35, groundY + 35, 18, 20, 0x8a6a5a, 1).setDepth(1.3);
+            pot1.setStrokeStyle(2, 0x6a4a3a, 1);
+            decorations.push(pot1);
+            
+            for (let i = 0; i < 4; i++) {
+                const fx = ebX - 35 + Phaser.Math.Between(-6, 6);
+                const fy = groundY + 25 + Phaser.Math.Between(-5, 5);
+                const flower = this.add.circle(fx, fy, 4, 0xffaa88, 1).setDepth(1.35);
+                decorations.push(flower);
+            }
+            
+            const pot2 = this.add.ellipse(ebX + 35, groundY + 35, 18, 20, 0x8a6a5a, 1).setDepth(1.3);
+            pot2.setStrokeStyle(2, 0x6a4a3a, 1);
+            decorations.push(pot2);
+            
+            for (let i = 0; i < 4; i++) {
+                const fx = ebX + 35 + Phaser.Math.Between(-6, 6);
+                const fy = groundY + 25 + Phaser.Math.Between(-5, 5);
+                const flower = this.add.circle(fx, fy, 4, 0xff88aa, 1).setDepth(1.35);
+                decorations.push(flower);
+            }
+        }
+        
+        // Brightest water effect - add some animated light patches
+        for (let i = 0; i < 8; i++) {
+            const x = Phaser.Math.Between(40, W - 40);
+            const y = Phaser.Math.Between(20, groundY - 20);
+            const shimmer = this.add.ellipse(x, y, 40, 25, 0x88ccff, 0.15).setDepth(0.82);
+            decorations.push(shimmer);
+            
+            try {
+                this.tweens.add({
+                    targets: shimmer,
+                    alpha: { from: 0.15, to: 0.05 },
+                    duration: 2000 + Math.random() * 1000,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            } catch (e) {}
+        }
+        
+        return decorations;
+    }
+    
+    _refreshDecorations(stage = null) {
+        stage = stage == null ? ((this.char && this.char.flags && this.char.flags.dockStage) || 0) : stage;
+        
+        // Clear all existing decorations
+        for (const stageKey of Object.keys(this._decorations || {})) {
+            const decors = this._decorations[stageKey] || [];
+            for (const obj of decors) {
+                try { if (obj && obj.destroy) obj.destroy(); } catch (e) {}
+            }
+            this._decorations[stageKey] = [];
+        }
+        
+        // Create decorations for all stages up to and including current stage
+        try {
+            if (stage >= 0) {
+                this._decorations.stage0 = this._createStage0Decorations();
+            }
+            if (stage >= 1) {
+                this._decorations.stage1 = this._createStage1Decorations();
+            }
+            if (stage >= 2) {
+                this._decorations.stage2 = this._createStage2Decorations();
+            }
+            if (stage >= 3) {
+                this._decorations.stage3 = this._createStage3Decorations();
+            }
+            if (stage >= 4) {
+                this._decorations.stage4 = this._createStage4Decorations();
+            }
+        } catch (e) {
+            console.warn('Failed to create decorations', e);
+        }
+    }
+
     _refreshDockVisual(stage = null) {
         stage = stage == null ? ((this.char && this.char.flags && this.char.flags.dockStage) || 0) : stage;
         const dock = this._dockVisual;
@@ -2585,6 +3101,16 @@ export class BrokenDock extends Phaser.Scene {
             dock.alpha = alpha;
             dock.setStrokeStyle(2, stroke, 0.95);
             if (width && width !== dock.width) dock.width = width;
+            
+            // Update water color based on stage
+            let waterColor = 0x1a3a52, waterAlpha = 0.92; // stage 0: dark murky
+            if (stage >= 1) { waterColor = 0x2055aa; waterAlpha = 0.88; }
+            if (stage >= 2) { waterColor = 0x2266aa; waterAlpha = 0.85; }
+            if (stage >= 3) { waterColor = 0x3377bb; waterAlpha = 0.82; }
+            if (stage >= 4) { waterColor = 0x4488cc; waterAlpha = 0.78; }
+            
+            if (this._leftWater) { this._leftWater.setFillStyle(waterColor, waterAlpha); }
+            if (this._rightWater) { this._rightWater.setFillStyle(waterColor, waterAlpha); }
             // lantern at stage >= 3
             if (stage >= 3) {
                 if (!this._dockLantern) {
