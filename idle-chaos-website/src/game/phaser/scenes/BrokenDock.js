@@ -59,70 +59,7 @@ export class BrokenDock extends Phaser.Scene {
         } catch (e) { console.warn('Failed to create player animations in BrokenDock', e); }
 
 
-        // Fetch event data & populate
-        const metaEl = modal.querySelector('[data-role="event-meta"]');
-        const lbEl = modal.querySelector('[data-role="leaderboard"]');
-        const fishEl = modal.querySelector('[data-role="fish-totals"]');
-        const EVENT_KEY = 'intro_to_fishing';
-        const renderMeta = (meta) => {
-            if (!metaEl) return;
-            const active = meta && meta.key === EVENT_KEY;
-            metaEl.innerHTML = `<h3>Active Event</h3>${active ? `<div class="bdock-progress-meta"><strong>${meta.name}</strong> · Ends ${new Date(meta.end).toLocaleDateString()}<br/>${meta.description}</div>` : '<div class="bdock-forecast-empty">No active event.</div>'}`;
-        };
-        const renderLeaderboard = (leaders) => {
-            if (!lbEl) return;
-            lbEl.innerHTML = '<h3>Leaderboard</h3>';
-            if (!leaders || !leaders.length) {
-                lbEl.innerHTML += '<div class="bdock-forecast-empty">No catches yet.</div>';
-                return;
-            }
-            const list = document.createElement('ol');
-            list.style.margin = '0'; list.style.padding = '0 0 0 20px'; list.style.fontSize = '13px';
-            leaders.forEach((row, idx) => {
-                const li = document.createElement('li');
-                const name = row.username || `Anon ${row.userid?.slice(0,6) || '??'}`;
-                li.textContent = `${idx+1}. ${name} — ${row.total} fish`;
-                list.appendChild(li);
-            });
-            lbEl.appendChild(list);
-        };
-        const renderFishTotals = (totals) => {
-            if (!fishEl) return;
-            fishEl.innerHTML = '<h3>Global Catch Totals</h3>';
-            if (!totals || !totals.length) {
-                fishEl.innerHTML += '<div class="bdock-forecast-empty">No data yet.</div>';
-                return;
-            }
-            const wrap = document.createElement('div');
-            wrap.style.display = 'grid';
-            wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(140px, 1fr))';
-            wrap.style.gap = '8px';
-            totals.forEach(t => {
-                const card = document.createElement('div');
-                card.style.background = 'rgba(14,22,34,0.85)';
-                card.style.border = '1px solid rgba(118,190,255,0.12)';
-                card.style.borderRadius = '8px';
-                card.style.padding = '6px 8px';
-                card.innerHTML = `<strong>${(t.fishname || t.fishid)}</strong><br/><span style="opacity:.7;font-size:12px;">${t.total} caught</span>`;
-                wrap.appendChild(card);
-            });
-            fishEl.appendChild(wrap);
-        };
-        const fetchAndRender = () => {
-            fetch(`/api/events/${EVENT_KEY}`)
-              .then(r => r.json())
-              .then(data => {
-                renderMeta(data.meta);
-                renderLeaderboard(data.leaders);
-                renderFishTotals(data.fishTotals);
-              })
-              .catch(() => {
-                if (metaEl) metaEl.innerHTML = '<h3>Active Event</h3><div class="bdock-forecast-empty">Failed to load.</div>';
-              });
-        };
-        fetchAndRender();
-        // Periodic refresh every 15s while overlay open
-        const interval = setInterval(() => { if (document.body.contains(overlay)) fetchAndRender(); else clearInterval(interval); }, 15000);
+        // Event board fetch/render moved to _openEventBoard(). Removed erroneous inline code referencing undefined 'modal'/'overlay'.
         // Create Rowan (Harborwright) NPC animations if sprites available
         try {
             if (this.textures && this.textures.exists('rowan_idle') && !this.anims.exists('rowan_idle')) {
@@ -3358,22 +3295,90 @@ export class BrokenDock extends Phaser.Scene {
                 <button class="bdock-btn ghost" type="button" data-role="close">Close</button>
             </header>
             <div class="bdock-content">
-                <div class="bdock-section">
-                    <h3>Active Events</h3>
-                    <div class="bdock-forecast-empty">No events currently running. Check back later!</div>
+                <div class="bdock-section" data-role="event-meta">
+                    <h3>Active Event</h3>
+                    <div class="bdock-forecast-empty">Loading...</div>
                 </div>
-                <div class="bdock-section">
+                <div class="bdock-section" data-role="leaderboard">
                     <h3>Leaderboard</h3>
-                    <div class="bdock-forecast-empty">Leaderboards refresh every 10s. (Stubbed)</div>
+                    <div class="bdock-forecast-empty">Loading...</div>
+                </div>
+                <div class="bdock-section" data-role="fish-totals">
+                    <h3>Global Catch Totals</h3>
+                    <div class="bdock-forecast-empty">Loading...</div>
                 </div>
             </div>
         `;
         overlay.appendChild(modal);
         const closeBtn = modal.querySelector('[data-role="close"]');
+        const metaEl = modal.querySelector('[data-role="event-meta"]');
+        const lbEl = modal.querySelector('[data-role="leaderboard"]');
+        const fishEl = modal.querySelector('[data-role="fish-totals"]');
         const onClose = () => { try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) {} };
         closeBtn && closeBtn.addEventListener('click', onClose);
         overlay.addEventListener('click', (evt) => { if (evt.target === overlay) onClose(); });
         document.body.appendChild(overlay);
+
+        // Fetch & render event data
+        const EVENT_KEY = 'intro_to_fishing';
+        const renderMeta = (meta) => {
+            if (!metaEl) return;
+            const active = meta && meta.key === EVENT_KEY;
+            metaEl.innerHTML = `<h3>Active Event</h3>${active ? `<div class=\"bdock-progress-meta\"><strong>${'${'}meta.name{'}'}</strong> · Ends ${'${'}new Date(meta.end).toLocaleDateString(){'}'}<br/>${'${'}meta.description{'}'}</div>` : '<div class=\"bdock-forecast-empty\">No active event.</div>'}`;
+        };
+        const renderLeaderboard = (leaders) => {
+            if (!lbEl) return;
+            lbEl.innerHTML = '<h3>Leaderboard</h3>';
+            if (!leaders || !leaders.length) {
+                lbEl.innerHTML += '<div class=\"bdock-forecast-empty\">No catches yet.</div>';
+                return;
+            }
+            const list = document.createElement('ol');
+            list.style.margin = '0'; list.style.padding = '0 0 0 20px'; list.style.fontSize = '13px';
+            leaders.forEach((row, idx) => {
+                const li = document.createElement('li');
+                const name = row.username || `Anon ${'${'}row.userid?.slice(0,6) || '??'{'}'}`;
+                li.textContent = `${'${'}idx+1{'}'}. ${'${'}name{'}'} — ${'${'}row.total{'}'} fish`;
+                list.appendChild(li);
+            });
+            lbEl.appendChild(list);
+        };
+        const renderFishTotals = (totals) => {
+            if (!fishEl) return;
+            fishEl.innerHTML = '<h3>Global Catch Totals</h3>';
+            if (!totals || !totals.length) {
+                fishEl.innerHTML += '<div class=\"bdock-forecast-empty\">No data yet.</div>';
+                return;
+            }
+            const wrap = document.createElement('div');
+            wrap.style.display = 'grid';
+            wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(140px, 1fr))';
+            wrap.style.gap = '8px';
+            totals.forEach(t => {
+                const card = document.createElement('div');
+                card.style.background = 'rgba(14,22,34,0.85)';
+                card.style.border = '1px solid rgba(118,190,255,0.12)';
+                card.style.borderRadius = '8px';
+                card.style.padding = '6px 8px';
+                card.innerHTML = `<strong>${'${'}(t.fishname || t.fishid){'}'}</strong><br/><span style=\"opacity:.7;font-size:12px;\">${'${'}t.total{'}'} caught</span>`;
+                wrap.appendChild(card);
+            });
+            fishEl.appendChild(wrap);
+        };
+        const fetchAndRender = () => {
+            fetch(`/api/events/${'${'}EVENT_KEY{'}'}`)
+              .then(r => r.json())
+              .then(data => {
+                renderMeta(data.meta);
+                renderLeaderboard(data.leaders);
+                renderFishTotals(data.fishTotals);
+              })
+              .catch(() => {
+                if (metaEl) metaEl.innerHTML = '<h3>Active Event</h3><div class=\"bdock-forecast-empty\">Failed to load.</div>';
+              });
+        };
+        fetchAndRender();
+        const interval = setInterval(() => { if (document.body.contains(overlay)) fetchAndRender(); else clearInterval(interval); }, 15000);
     }
 
     _openDockRepairOverlay() {
