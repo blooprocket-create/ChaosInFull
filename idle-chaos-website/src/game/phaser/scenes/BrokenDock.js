@@ -699,6 +699,9 @@ export class BrokenDock extends Phaser.Scene {
             .bdock-status[data-tone="active"] { color: #7dd6ff; }
             .bdock-status[data-tone="warn"] { color: #ff8f7d; }
             .bdock-status[data-tone="ready"] { color: #86f5c4; }
+            .bdock-mat-done { color:#86f5c4; font-weight:600; }
+            .bdock-mat-missing { color:#ff8f7d; font-weight:600; }
+            .bdock-mat-partial { color:#ffc877; font-weight:600; }
             .bdock-metrics {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -2462,7 +2465,21 @@ export class BrokenDock extends Phaser.Scene {
                 this.char.flags = this.char.flags || {}; this.char.flags.dockStage = ((this.char.flags.dockStage || 0) + 1);
                 this._persistCharacterState();
                 this._refreshDockVisual(this.char.flags.dockStage);
-                this._setDockUiStatus(`Dock upgraded to Stage ${this.char.flags.dockStage}`, 'ready');
+                const newStage = this.char.flags.dockStage || 0;
+                this._setDockUiStatus(`Dock upgraded to Stage ${newStage}`, 'ready');
+                try { this._showToast && this._showToast(newStage === 1 ? 'Hotspots unlocked! Watch the water.' : `Upgraded to Stage ${newStage}.`); } catch (e) {}
+                // Kickstart hotspots immediately on Stage 1 turn-in
+                try {
+                    if (newStage >= 1) {
+                        if (typeof this._spawnHotspot === 'function') {
+                            this._spawnHotspot();
+                            // schedule a second one shortly to make it obvious
+                            if (this.time && this.time.addEvent) this.time.addEvent({ delay: 2000, callback: () => this._spawnHotspot(), callbackScope: this });
+                        }
+                        const now = (performance && performance.now ? performance.now() : Date.now());
+                        this._nextHotspotAt = now + 4000;
+                    }
+                } catch (e) {}
             } else {
                 this._setDockUiStatus('Turn-in failed', 'warn');
             }
@@ -2492,7 +2509,28 @@ export class BrokenDock extends Phaser.Scene {
         const iron = this._countInventoryItem('iron_bar');
         const normalLogs = this._countInventoryItem('normal_log');
         const oakLogs = this._countInventoryItem('oak_log');
-        if (ui.matsEl) ui.matsEl.textContent = `${gold}g · ${normalLogs}x Normal Logs · ${oakLogs}x Oak Logs · ${iron}x Iron Bars`;
+        if (ui.matsEl) {
+            // Build per-objective status for current stage
+            const qid = this._getCurrentDockQuestId();
+            let matsHtml = '';
+            if (qid) {
+                const statuses = getQuestObjectiveState(this.char, qid) || [];
+                const renderObj = (label, current, required) => {
+                    const cls = current >= required ? 'bdock-mat-done' : (current > 0 ? 'bdock-mat-partial' : 'bdock-mat-missing');
+                    return `<span class="${cls}" title="${label} ${current}/${required}">${label} ${current}/${required}</span>`;
+                };
+                for (const s of statuses) {
+                    if (s.type === 'contribute_gold') matsHtml += renderObj('Gold', s.current, s.required) + ' · ';
+                    if (s.type === 'contribute_item' && s.target === 'normal_log') matsHtml += renderObj('Normal Logs', s.current, s.required) + ' · ';
+                    if (s.type === 'contribute_item' && s.target === 'oak_log') matsHtml += renderObj('Oak Logs', s.current, s.required) + ' · ';
+                    if (s.type === 'contribute_item' && s.target === 'iron_bar') matsHtml += renderObj('Iron Bars', s.current, s.required) + ' · ';
+                }
+                matsHtml = matsHtml.replace(/ · $/, '');
+            } else {
+                matsHtml = '<span class="bdock-mat-done">All repairs complete</span>';
+            }
+            ui.matsEl.innerHTML = matsHtml;
+        }
 
         if (stage >= maxStage) {
             if (ui.statusEl) { ui.statusEl.textContent = 'Dock fully restored'; ui.statusEl.dataset.tone = 'ready'; }

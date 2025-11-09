@@ -14,6 +14,7 @@ export class FishingController {
         this.activeFish = null;
         this.baitId = null;
         this._activeTimeOfDay = null; // 'day' | 'night' | null
+        this.abortDistance = 100; // px threshold to auto-hide HUD & abort when moving away
         this.castCooldownMs = 1200;
         this.lastCastAt = 0;
         this.waitTimer = 0;
@@ -28,6 +29,9 @@ export class FishingController {
         this.lastInputTime = 0;
         this.failCount = 0;
         this.maxFails = 6;
+    // Continuous line tension model (0..1). Increases outside zone, decays inside.
+    this.lineTension = 0;
+    this.maxLineTension = 1;
         // Segment performance tracking for XP formula
         this.totalSegments = 0; // number of reel attempts (successful or failed)
         this.perfectSegments = 0; // subset counted as "perfect" (pointer centered)
@@ -41,8 +45,36 @@ export class FishingController {
         this._focusActiveUntil = 0;
         this._focusSatisfied = true;
         this._lastTickTelemetryAt = 0;
-        this._createHud();
+        // HUD is created lazily when a cast starts
     }
+
+    /**
+     * Gameplay Primer (Phase 1)
+     * ------------------------------------------------------------
+     * 1. Interact [E] at a fishing spot: controller picks a fish candidate and enters 'waiting'.
+    * 2. After a variable wait a 'bite' triggers and the controller auto-enters tension.
+    * 3. In 'tension' HOLD click/Space to push the pointer (white bar) RIGHT; release to drift LEFT.
+    *    - While INSIDE the blue zone you gain progress; closer to center = more progress.
+    *    - A mint band marks the perfect center; time spent here improves XP performance.
+    *    - While OUTSIDE the zone, line tension (red bar) increases; when it fills, the line snaps.
+     * 4. On reaching 100% progress you resolve the catch; XP is awarded using difficulty + rarity + performance formula.
+     * 5. Bait is only consumed on successful catch (mastery may preserve it).
+     *
+     * Visual Elements
+     *  - Safe Zone (blue/purple gradient band) slides horizontally & occasionally reverses (targetMin/targetMax).
+     *  - Pointer (white slim bar) represents current tension alignment; it has slight procedural drift.
+    *  - A thin mint band marks the "perfect" center region inside the zone; taps while the white bar is within this band count toward better XP.
+     *  - Progress (green overlay) fills from the left showing capture progress.
+     *
+     * Tuning Overview
+     *  - Rod control widens zone; stability reduces drift & raises fail tolerance; precision increases progress gain; sensitivity reduces wait.
+     *  - Mastery adds additive multipliers (control/sensitivity/precision/stability) and rarity + bait efficiency.
+     *  - Focus pulses occasionally require a Space press inside a short window to avoid extra penalties.
+     *
+     * Simplification Notes
+     *  - Drift has been dampened to reduce jitter complaints. Adjust DRIFT_BASE / driftScale if you want more motion.
+     *  - Zone velocity changes are throttled to avoid chaotic motion; see _updateTension for probabilities.
+     */
 
     destroy() { this._removeHud(); }
 
@@ -63,6 +95,9 @@ export class FishingController {
     }
 
     startCast(baitId, options = {}) {
+        // Ensure HUD exists and is visible when starting a cast
+        if (!this.overlay) this._createHud();
+        if (this.overlay) this.overlay.style.display = '';
         this._activeTimeOfDay = options.timeOfDay || null;
         const mastery = this._getMastery();
         const fishOptions = this._eligibleFishForBait(baitId, options);
@@ -111,18 +146,17 @@ export class FishingController {
                 this.waitTimer += delta;
                 if (this.waitTimer >= this.waitDuration) {
                     this.state = 'bite';
-                    this._showMessage('Bite! Press [Space] to begin reeling');
+                    this._showMessage('Bite! Hold click/Space to reel →');
                     this._emitTelemetry('bite', { fishId: this.activeFish && this.activeFish.id });
                     this._emitTelemetry('fishing_bite', { fishId: this.activeFish && this.activeFish.id, timeOfDay: this._activeTimeOfDay });
+                    // Immediately enter tension for hold-to-reel controls
+                    this.state = 'tension';
+                    this._showMessage('Reel! Hold pushes right, release drifts left');
+                    this._initTensionZone();
                 }
                 break;
             case 'bite':
-                // Transition to tension on space
-                if (this._spaceJustDown()) {
-                    this.state = 'tension';
-                    this._showMessage('Reel! Keep pointer in safe zone');
-                    this._initTensionZone();
-                }
+                // Unused, we auto-enter tension above
                 break;
             case 'tension':
                 this._updateTension(delta);
@@ -134,11 +168,12 @@ export class FishingController {
         this._updateHud();
         // Abort if player moved too far
         if (this.state !== 'idle' && this._playerMoved()) {
-            this._fail('Moved away');
+            this._abortForDistance();
         }
     }
 
     _updateTension(delta) {
+        const dt = Math.max(0.5, Math.min(2.0, delta / 16));
         // Move safe zone
         this.targetMin += this.targetVel * (delta / 1000);
         this.targetMax += this.targetVel * (delta / 1000);
@@ -148,9 +183,20 @@ export class FishingController {
         // Random slight velocity change
         if (Math.random() < 0.01) this.targetVel = (Math.random() * 0.6 - 0.3);
         // Pointer passive drift making player adjust
-    const masteryDrift = this._getMastery();
-    const driftScale = Math.max(0.3, 1 - 0.08 * (masteryDrift.stability || 0));
-    this.tension += (Math.random() * 0.12 - 0.06) * (delta / 16) * driftScale;
+        const masteryDrift = this._getMastery();
+        const driftScale = Math.max(0.25, 1 - 0.08 * (masteryDrift.stability || 0));
+        // NERF: gentler pointer movement & input force
+        if (this._ptrVel == null) this._ptrVel = 0;
+        const DRIFT_ACCEL = 0.010; // was 0.018
+        const DAMPING_PER_TICK = 0.92; // slightly less damping to keep feel responsive
+        const INTENT_FORCE = this._isHoldActive() ? 0.028 : -0.020; // was 0.055 / -0.040
+        this._ptrVel += INTENT_FORCE * dt;
+        this._ptrVel += (Math.random() - 0.5) * DRIFT_ACCEL * dt * driftScale;
+        this._ptrVel *= Math.pow(DAMPING_PER_TICK, dt);
+        const MAX_VEL = 0.020; // was 0.035
+    if (this._ptrVel > MAX_VEL) this._ptrVel = MAX_VEL;
+    else if (this._ptrVel < -MAX_VEL) this._ptrVel = -MAX_VEL;
+    this.tension += this._ptrVel * dt;
         this.tension = Math.max(0, Math.min(1, this.tension));
         // Focus pulse check: occasionally require a quick press
         const now = this.elapsed;
@@ -166,46 +212,43 @@ export class FishingController {
             this._scheduleNextFocus();
         }
 
-        // On space press: nudge pointer toward center of safe zone & add progress if inside
-        if (this._spaceJustDown()) {
-            this.lastInputTime = this.elapsed;
-            const zoneCenter = (this.targetMin + this.targetMax) / 2;
-            // Nudge pointer
-            const dir = zoneCenter - this.tension;
-            this.tension += dir * 0.55; // pull toward center
-            this.tension = Math.max(0, Math.min(1, this.tension));
-            // Check success
-            if (this.tension >= this.targetMin && this.tension <= this.targetMax) {
-                // Progress gain scaled by zone width and fish difficulty
-                const width = this.targetMax - this.targetMin;
-                const diff = (this.activeFish.difficulty || 10);
-                const rod = this._getRodStats();
-                const gainBase = Math.max(0.02, 0.08 - width * 0.05) * (0.9 + (diff / 160));
-                const masteryPrecision = this._getMastery();
-                const gain = gainBase * (rod.precisionGainMult || 1.0) * (1 + 0.05 * (masteryPrecision.precision || 0));
-                this.progress = Math.min(1, this.progress + gain);
-                this.totalSegments++;
-                // Perfect segment: pointer within a tighter center band (tolerance fraction of width)
-                const tolerance = width * this._perfectToleranceRatio;
-                if (Math.abs(this.tension - zoneCenter) <= tolerance * 0.5) this.perfectSegments++;
-                this._showMessage(`Reeling ${Math.round(this.progress * 100)}%`);
-                // Shrink zone gradually (harder over time)
-                const shrink = 0.0025 * (rod.zoneShrinkMult || 1.0);
+        // Legacy tap mechanic removed; replaced by continuous scoring below
+        const width = Math.max(0.02, this.targetMax - this.targetMin);
+        const zoneCenter = (this.targetMin + this.targetMax) / 2;
+        const inZone = (this.tension >= this.targetMin && this.tension <= this.targetMax);
+        if (inZone) {
+            const diff = (this.activeFish.difficulty || 10);
+            const rod = this._getRodStats();
+            const masteryPrecision = this._getMastery();
+            const basePerTick = (0.0028 + diff * 0.00002) * dt;
+            const centerDist = Math.abs(this.tension - zoneCenter);
+            const centerFactor = Math.max(0.45, 1 - (centerDist / (width / 2)));
+            const gain = basePerTick * (rod.precisionGainMult || 1.0) * (1 + 0.05 * (masteryPrecision.precision || 0)) * centerFactor;
+            this.progress = Math.min(1, this.progress + gain);
+            // NERF: faster recovery inside zone
+            this.lineTension = Math.max(0, this.lineTension - 0.0060 * dt);
+            this.totalSegments++;
+            const tolerance = width * this._perfectToleranceRatio;
+            if (Math.abs(this.tension - zoneCenter) <= tolerance * 0.5) this.perfectSegments++;
+            this._showMessage(`Reeling ${Math.round(this.progress * 100)}%`);
+            // NERF: gentler, conditional shrink only after 55% progress and much slower
+            if (this.progress > 0.55) {
+                const shrink = 0.0003 * (rod.zoneShrinkMult || 1.0) * dt; // was 0.0012
                 this.targetMin += shrink;
                 this.targetMax -= shrink;
-                if (this.targetMax - this.targetMin < 0.08) {
-                    // Re-expand a bit with a jump to avoid impossible state
-                    this.targetMin -= 0.03; this.targetMax += 0.03;
-                }
-                if (this.progress >= 1) this._completeCatch();
-            } else {
-                this.failCount++;
-                this.totalSegments++;
-                this._showMessage(`Line strain! (${this.failCount}/${this.maxFails})`);
-                // Increase tension random penalty
-                this.tension += (Math.random() * 0.4 - 0.2);
-                this.tension = Math.max(0, Math.min(1, this.tension));
-                if (this.failCount >= this.maxFails) this._fail('Line snapped');
+            }
+            // Maintain a wider minimum floor
+            if (this.targetMax - this.targetMin < 0.11) { this.targetMin -= 0.02; this.targetMax += 0.02; }
+            if (this.progress >= 1) this._completeCatch();
+        } else {
+            this.totalSegments++;
+            const dist = Math.max(0, Math.abs(this.tension - zoneCenter) - width / 2);
+            const distFactor = Math.min(1.0, dist * 3.2); // nerfed slope & cap (was 1.2 & *4)
+            // NERF: slower tension build outside zone
+            this.lineTension = Math.min(this.maxLineTension, this.lineTension + (0.0030 * dt * distFactor)); // was 0.006
+            if (this.lineTension >= this.maxLineTension) {
+                this._fail('Line snapped');
+                return;
             }
         }
         // Telemetry: tension tick (throttled)
@@ -216,6 +259,7 @@ export class FishingController {
                 zoneMin: this.targetMin,
                 zoneMax: this.targetMax,
                 progress: this.progress,
+                lineTension: this.lineTension,
                 totalSegments: this.totalSegments,
                 perfectSegments: this.perfectSegments,
             });
@@ -224,6 +268,7 @@ export class FishingController {
                 zoneMin: this.targetMin,
                 zoneMax: this.targetMax,
                 progress: this.progress,
+                lineTension: this.lineTension,
                 fishId: this.activeFish && this.activeFish.id,
                 timeOfDay: this._activeTimeOfDay,
                 totalSegments: this.totalSegments,
@@ -286,6 +331,8 @@ export class FishingController {
         this.totalSegments = 0;
         this.perfectSegments = 0;
         this._showMessage('Idle');
+        // Remove HUD entirely when done
+        this._removeHud();
     }
 
     _initTensionZone() {
@@ -293,7 +340,8 @@ export class FishingController {
         const diff = (this.activeFish && this.activeFish.difficulty) || 10;
         const rod = this._getRodStats();
     const mastery = this._getMastery();
-    const baseWidth = Math.max(0.12, (0.42 - diff * 0.0015) * (rod.controlZoneMult || 1.0) * (1 + 0.04 * (mastery.control || 0)));
+        // NERF: wider starting zone & softer difficulty scaling
+        const baseWidth = Math.max(0.18, (0.50 - diff * 0.0012) * (rod.controlZoneMult || 1.0) * (1 + 0.04 * (mastery.control || 0)));
         // Apply rod-derived fail tolerance at start of tension
         this.maxFails = (typeof rod.maxFails === 'number' ? rod.maxFails : 6);
         const start = Math.random() * (1 - baseWidth);
@@ -372,7 +420,7 @@ export class FishingController {
         if (!this.scene || !this.scene.player || !this.scene._fishingStartPos) return false;
         const dx = Math.abs(this.scene.player.x - this.scene._fishingStartPos.x);
         const dy = Math.abs(this.scene.player.y - this.scene._fishingStartPos.y);
-        return dx > 28 || dy > 28; // broader threshold for active mini-game
+        return dx > this.abortDistance || dy > this.abortDistance;
     }
 
     _pickDefaultBait() {
@@ -452,8 +500,8 @@ export class FishingController {
         this.overlay = document.createElement('div');
         this.overlay.style.position = 'fixed';
         this.overlay.style.left = '50%';
-        this.overlay.style.bottom = '34px';
-        this.overlay.style.transform = 'translateX(-50%)';
+        this.overlay.style.top = '50%';
+        this.overlay.style.transform = 'translate(-50%, -50%)';
         this.overlay.style.zIndex = '160';
         this.overlay.style.padding = '10px 14px';
         this.overlay.style.background = 'rgba(10,18,30,0.85)';
@@ -469,10 +517,14 @@ export class FishingController {
             <div style="display:flex;flex-direction:column;gap:8px;">
                 <div style="position:relative;height:22px;background:rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;">
                     <div data-role="zone" style="position:absolute;top:0;bottom:0;background:linear-gradient(90deg,#53a8ff,#9d7dff);opacity:.35;"></div>
+                    <div data-role="perfect" style="position:absolute;top:3px;bottom:3px;background:#bfffe0;opacity:.28;border-radius:8px;display:none;"></div>
                     <div data-role="pointer" style="position:absolute;top:0;bottom:0;width:6px;background:#fff;border-radius:3px;box-shadow:0 0 6px rgba(255,255,255,0.6);"></div>
                     <div data-role="progress" style="position:absolute;top:0;bottom:0;left:0;background:linear-gradient(90deg,#6ff5c8,#b0ff9d);opacity:.25;width:0%;"></div>
                 </div>
-                <small style="font-size:11px;color:rgba(255,255,255,0.6);" data-role="hint">Press [E] at spot → Space on bite → Space to reel</small>
+                <div style="position:relative;height:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,120,120,0.18);border-radius:10px;overflow:hidden;margin-top:6px;">
+                    <div data-role="strain" style="position:absolute;top:0;bottom:0;left:0;background:linear-gradient(90deg,rgba(255,120,120,0.5),rgba(255,60,60,0.7));width:0%;"></div>
+                </div>
+                <small style="font-size:11px;color:rgba(255,255,255,0.75);" data-role="hint">Hold Click/Space pushes right · release drifts left · keep pointer centered</small>
             </div>
         `;
         document.body.appendChild(this.overlay);
@@ -484,8 +536,10 @@ export class FishingController {
         if (!this.overlay) return;
         const statusEl = this.overlay.querySelector('[data-role="status"]');
         const zoneEl = this.overlay.querySelector('[data-role="zone"]');
+        const perfectEl = this.overlay.querySelector('[data-role="perfect"]');
         const ptrEl = this.overlay.querySelector('[data-role="pointer"]');
         const progEl = this.overlay.querySelector('[data-role="progress"]');
+        const strainEl = this.overlay.querySelector('[data-role="strain"]');
         const hintEl = this.overlay.querySelector('[data-role="hint"]');
         if (statusEl) statusEl.textContent = this.state.charAt(0).toUpperCase() + this.state.slice(1);
         if (this.state === 'tension') {
@@ -497,15 +551,40 @@ export class FishingController {
                 const focusOn = now >= this._nextFocusAt && now <= this._focusActiveUntil && !this._focusSatisfied;
                 zoneEl.style.opacity = focusOn ? '.6' : '.35';
             }
+            if (perfectEl) {
+                const width = this.targetMax - this.targetMin;
+                const center = (this.targetMin + this.targetMax) / 2;
+                const tolerance = width * (this._perfectToleranceRatio || 0.30); // match scoring tolerance
+                const left = (center - tolerance / 2) * 100;
+                const w = tolerance * 100;
+                perfectEl.style.left = left.toFixed(2) + '%';
+                perfectEl.style.width = Math.max(0, Math.min(100, w)).toFixed(2) + '%';
+                perfectEl.style.display = 'block';
+            }
             if (ptrEl) ptrEl.style.left = (this.tension * 100).toFixed(2) + '%';
             if (progEl) progEl.style.width = (this.progress * 100).toFixed(2) + '%';
-            if (hintEl) hintEl.textContent = 'Tap [Space] to keep pointer inside zone';
+            if (strainEl) strainEl.style.width = Math.max(0, Math.min(100, this.lineTension * 100)).toFixed(2) + '%';
+            if (hintEl) hintEl.textContent = 'Hold pushes right · release drifts left';
         } else {
             if (zoneEl) zoneEl.style.width = '0';
+            if (perfectEl) perfectEl.style.display = 'none';
             if (ptrEl) ptrEl.style.left = (this.tension * 100).toFixed(2) + '%';
             if (progEl) progEl.style.width = (this.progress * 100).toFixed(2) + '%';
+            if (strainEl) strainEl.style.width = '0%';
             if (hintEl) hintEl.textContent = 'Press [E] at spot to cast';
         }
+    }
+
+    _isHoldActive() {
+        const kb = this.scene && this.scene.input && this.scene.input.keyboard;
+        let spaceDown = false;
+        if (kb) {
+            const space = kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            spaceDown = !!(space && space.isDown);
+        }
+        const p = this.scene && this.scene.input && this.scene.input.activePointer;
+        const pointerDown = !!(p && p.isDown);
+        return spaceDown || pointerDown;
     }
 
     _showMessage(msg) {
@@ -522,6 +601,13 @@ export class FishingController {
             if (t && typeof t.emit === 'function') t.emit('fishing', { type, ...data });
             else if (console && console.debug) console.debug('[telemetry:fishing]', type, data);
         } catch(e) {}
+    }
+
+    _abortForDistance() {
+        // Silently abort when moving far from fishing spot; remove the HUD
+        this._emitTelemetry('abort_distance', { fishId: this.activeFish ? this.activeFish.id : null, dx: Math.abs(this.scene.player.x - this.scene._fishingStartPos.x), dy: Math.abs(this.scene.player.y - this.scene._fishingStartPos.y) });
+        this._removeHud();
+        this._reset();
     }
 }
 
