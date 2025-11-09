@@ -390,6 +390,77 @@ export const QUEST_DEFS = {
         location: 'GloamwayBastion',
         handInNpc: 'mother_lumen'
     }
+    ,
+    // Dock repair staged quests (Broken Dock)
+    dock_repair_stage_1: {
+        id: 'dock_repair_stage_1',
+        name: 'Dock Restoration I',
+        description: 'Begin repairing the broken dock with basic materials.',
+        objectives: [
+            { type: 'contribute_gold', required: 100, description: 'Contribute 100 gold' },
+            { type: 'contribute_item', target: 'normal_log', required: 5, description: 'Contribute 5 Normal Logs' },
+            { type: 'contribute_item', target: 'iron_bar', required: 5, description: 'Contribute 5 Iron Bars' }
+        ],
+        rewards: {
+            xp: { fishing: 50 }
+        },
+        prerequisites: [],
+        giver: 'harborwright',
+        location: 'BrokenDock',
+        handInNpc: 'harborwright'
+    },
+    dock_repair_stage_2: {
+        id: 'dock_repair_stage_2',
+        name: 'Dock Restoration II',
+        description: 'Continue reinforcing the dock structure.',
+        objectives: [
+            { type: 'contribute_gold', required: 250, description: 'Contribute 250 gold' },
+            { type: 'contribute_item', target: 'normal_log', required: 12, description: 'Contribute 12 Normal Logs' },
+            { type: 'contribute_item', target: 'iron_bar', required: 12, description: 'Contribute 12 Iron Bars' }
+        ],
+        rewards: {
+            xp: { fishing: 80 }
+        },
+        prerequisites: ['dock_repair_stage_1'],
+        giver: 'harborwright',
+        location: 'BrokenDock',
+        handInNpc: 'harborwright'
+    },
+    dock_repair_stage_3: {
+        id: 'dock_repair_stage_3',
+        name: 'Dock Restoration III',
+        description: 'Install lanterns and stabilize supports.',
+        objectives: [
+            { type: 'contribute_gold', required: 500, description: 'Contribute 500 gold' },
+            { type: 'contribute_item', target: 'oak_log', required: 20, description: 'Contribute 20 Oak Logs' },
+            { type: 'contribute_item', target: 'iron_bar', required: 20, description: 'Contribute 20 Iron Bars' }
+        ],
+        rewards: {
+            xp: { fishing: 120 }
+        },
+        prerequisites: ['dock_repair_stage_2'],
+        giver: 'harborwright',
+        location: 'BrokenDock',
+        handInNpc: 'harborwright'
+    },
+    dock_repair_stage_4: {
+        id: 'dock_repair_stage_4',
+        name: 'Dock Restoration IV',
+        description: 'Finalize the dock restoration to its finest condition.',
+        objectives: [
+            { type: 'contribute_gold', required: 1000, description: 'Contribute 1000 gold' },
+            { type: 'contribute_item', target: 'oak_log', required: 35, description: 'Contribute 35 Oak Logs' },
+            { type: 'contribute_item', target: 'iron_bar', required: 35, description: 'Contribute 35 Iron Bars' }
+        ],
+        rewards: {
+            xp: { fishing: 200 },
+            items: [{ id: 'sea_rod', qty: 1 }]
+        },
+        prerequisites: ['dock_repair_stage_3'],
+        giver: 'harborwright',
+        location: 'BrokenDock',
+        handInNpc: 'harborwright'
+    }
 };
 
 // Helper functions for quest management

@@ -1592,6 +1592,12 @@ const ITEM_DEFS = {
         "statBonus": {
             "luk": 2
         },
+        "fishingStats": {
+            "control": 2,
+            "sensitivity": 2,
+            "precision": 1,
+            "stability": 1
+        },
         "fishingBonus": {
             "skill": 4,
             "speedReductionMs": 150
@@ -2464,6 +2470,12 @@ const ITEM_DEFS = {
         "statBonus": {
             "luk": 1
         },
+        "fishingStats": {
+            "control": 1,
+            "sensitivity": 1,
+            "precision": 0,
+            "stability": 0
+        },
         "fishingBonus": {
             "skill": 2,
             "speedReductionMs": 50
@@ -2481,6 +2493,12 @@ const ITEM_DEFS = {
         "description": "A salvaged rod from old docks. A usable starter rod.",
         "statBonus": {
             "luk": 1
+        },
+        "fishingStats": {
+            "control": 0,
+            "sensitivity": 1,
+            "precision": 0,
+            "stability": 0
         },
         "fishingBonus": {
             "skill": 1,
@@ -2500,6 +2518,12 @@ const ITEM_DEFS = {
         "statBonus": {
             "luk": 2
         },
+        "fishingStats": {
+            "control": 3,
+            "sensitivity": 2,
+            "precision": 2,
+            "stability": 1
+        },
         "fishingBonus": {
             "skill": 6,
             "speedReductionMs": 210
@@ -2518,6 +2542,12 @@ const ITEM_DEFS = {
         "statBonus": {
             "luk": 3
         },
+        "fishingStats": {
+            "control": 4,
+            "sensitivity": 3,
+            "precision": 3,
+            "stability": 2
+        },
         "fishingBonus": {
             "skill": 10,
             "speedReductionMs": 340
@@ -2535,6 +2565,12 @@ const ITEM_DEFS = {
         "description": "Professional-grade rod used by serious fishers. Greatly improves rare catch odds.",
         "statBonus": {
             "luk": 6
+        },
+        "fishingStats": {
+            "control": 5,
+            "sensitivity": 4,
+            "precision": 4,
+            "stability": 3
         },
         "fishingBonus": {
             "skill": 18,
