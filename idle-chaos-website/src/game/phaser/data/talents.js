@@ -101,8 +101,8 @@ const horrorTalents = [
         tags: ['combat', 'horror', 'offensive'],
         kind: 'active',
         activeType: 'offensive',
-        cooldownSeconds: 12,
-        manaCost: 20
+        cooldownSeconds: 8,
+        manaCost: 40
     }),
     makeTalent('rupture_form', 'Rupture Form', {
         description: 'Rip armor off like skin from a corpse. Armor shred effectiveness +{value}%.',
@@ -115,7 +115,7 @@ const horrorTalents = [
     }),
     makeTalent('ghastly_drive', 'Ghastly Drive', {
         description: 'Dash through foes, leaving ghosts in your wake. Dash damage +{value}%.',
-        scaling: { type: 'percent', target: 'dashDamage', base: 40, perRank: 5 },
+        scaling: { type: 'percent', target: 'dashDamage', base: 60, perRank: 5 },
         tags: ['mobility', 'damage'],
         kind: 'active',
         activeType: 'offensive',
@@ -133,9 +133,9 @@ const horrorTalents = [
         scaling: { type: 'flat', target: 'damageReduction', base: 1, perRank: 0.6 },
         tags: ['survivability']
     }),
-    makeTalent('terror_form', 'Terror Form', {
-        description: 'Wear fear like a crown. Melee attackers take damage equal to {value}% of their max HP over 3 seconds if they get too close. Costs {secondValue} mana per second to maintain.',
-        scaling: { type: 'percent', target: 'terrorAuraDamage', base: 5, perRank: 0.15 },
+    makeTalent('terror_form', 'Terror Form', { // reworked. needs wiring check.
+        description: 'Wear fear like a crown. Melee attackers take damage equal to {value}% of their max HP if they get too close. Costs {secondValue} mana per second to maintain.',
+        scaling: { type: 'percent', target: 'terrorAuraDamage', base: 15, perRank: 0.15 },
         secondScaling: { type: 'flat', target: 'manaCostPerSec', base: 5, perRank: 0.35 },
         tags: ['damage', 'aura'],
         kind: 'active',
@@ -158,15 +158,19 @@ const horrorTalents = [
         scaling: { type: 'flat', target: 'str', base: 1, perRank: 1 },
         tags: ['utility', 'combat']
     }),
-    makeTalent('mining_madness', 'Mining Madness', {
-        description: 'Mine like your life depends on it. Mining speed +{value}%.',
-        scaling: { type: 'percent', target: 'miningSpeed', base: 4, perRank: 0.9 },
-        tags: ['skills']
+    makeTalent('savage_swing', 'Savage Swing', { //needs wiring
+        description: 'Swing your weapon in a 360° arc, hitting all nearby enemies for {value}% damage. Cannot miss. Applies all weapon on‑hit effects.',
+        scaling: { type: 'percent', target: 'savageSwingDamage', base: 111, perRank: 0.95 },
+        tags: ['combat', 'aoe', 'horror', 'offensive'],
+        kind: 'active',
+        activeType: 'offensive',
+        cooldownSeconds: 8,
+        manaCost: 60
     }),
-    makeTalent('mining_exp_gain', 'Mining Expertise', {
-        description: 'Gain mining expertise faster. Mining experience gain +{value}%.',
-        scaling: { type: 'percent', target: 'miningXpGain', base: 5, perRank: 1.2 },
-        tags: ['progression', 'skills']
+    makeTalent('dark_thorns', 'Dark Thorns', { //needs wiring
+        description: 'Spiky shadows that punish attackers. Melee attackers take {value}% of their attack damage as shadow damage.',
+        scaling: { type: 'percent', target: 'darkThornsDamage', base: 50, perRank: 1.2 },
+        tags: ['survivability', 'damage']
     }),
     makeTalent('cleave_mastery', 'Cleave Mastery', {
         description: 'Your auto-attacks hit multiple enemies. Melee attacks gain additional targets ({secondValue} extra targets at current rank, max 6). Cleave does {value}% damage to secondary targets.',
@@ -272,11 +276,10 @@ const occultistTalents = [
         scaling: { type: 'percent', target: 'spellDuplicate', base: 3, perRank: 0.6 },
         tags: ['combat', 'occultist']
     }),
-    makeTalent('glyphic_anchor', 'Glyphic Anchor', {
-        description: 'Stand still, embrace the void. Standing damage reduction +{value}% (stacks to 3).',
-        scaling: { type: 'percent', target: 'standingDR', base: 3, perRank: 0.7 },
-        tags: ['survivability', 'occultist'],
-        kind: 'passive'
+    makeTalent('sinister_wisdom', 'Sinister Wisdom', { // reworked. needs wiring check.
+        description: 'Unleash dark intelligence to crush your foes. Intellect +{value}.',
+        scaling: { type: 'flat', target: 'int', base: 1, perRank: 1 },
+        tags: ['utility', 'combat']
     }),
     makeTalent('forbidden_balls', 'Forbidden Balls', {//works
         description: 'Set hungry stars loose. Launch homing void orbs that seek the nearest enemy and explode on impact. Orbs spawn one every 0.2s. Fires {value} orb(s). Each orb deals {secondValue}% of your Spell DMG on hit, then crits and enemy reductions apply.',
@@ -375,10 +378,10 @@ const stalkerTalents = [
         secondScaling: { type: 'percent', target: 'stealthCritDmg', base: 15, perRank: 1.5 },
         tags: ['stalker', 'combat', 'stealth']
     }),
-    makeTalent('toxic_precision', 'Toxic Precision', {//added
-        description: 'Aim for the vein. Chance to apply poison +{value}%.',
-        scaling: { type: 'percent', target: 'poisonApplyChance', base: 12, perRank: 1.8 },
-        tags: ['combat', 'poison']
+    makeTalent('sinister_mobility', 'Sinister Mobility', { // reworked. needs wiring check.
+        description: 'Unleash dark motion to crush your foes. Agility +{value}.',
+        scaling: { type: 'flat', target: 'agi', base: 1, perRank: 1 },
+        tags: ['utility', 'combat']
     }),
     makeTalent('marksman_focus', 'Marksman Focus', {//added
         description: 'Focus your aim for deadlier shots. Eagle Shot gains +{value}% crit chance and +{secondValue}% critical damage while standing still for 1s.',
