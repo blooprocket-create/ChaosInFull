@@ -80,8 +80,16 @@ export class FishingController {
         this.failCount = 0;
         this._scheduleNextFocus();
         const masterySummary = mastery;
-        this._emitTelemetry('cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, mastery: masterySummary });
-        this._emitTelemetry('fishing_cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, timeOfDay: this._activeTimeOfDay, mastery: masterySummary });
+        const rodSnapshot = {
+            name: rod.name,
+            controlZoneMult: rod.controlZoneMult,
+            sensitivityWaitMult: rod.sensitivityWaitMult,
+            precisionGainMult: rod.precisionGainMult,
+            zoneShrinkMult: rod.zoneShrinkMult,
+            maxFails: (typeof rod.maxFails==='number'?rod.maxFails:6)
+        };
+        this._emitTelemetry('cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, mastery: masterySummary, rodStats: rodSnapshot });
+        this._emitTelemetry('fishing_cast', { baitId, fishId: this.activeFish.id, rod: rod.name, hotspot: !!options.hotspot, timeOfDay: this._activeTimeOfDay, mastery: masterySummary, rodStats: rodSnapshot });
         this.lastCastAt = performance.now ? performance.now() : Date.now();
         this._showMessage(`Casting... (${this.activeFish.name})`);
     }
@@ -220,8 +228,11 @@ export class FishingController {
         if (this.scene && typeof this.scene._grantFishingXp === 'function') this.scene._grantFishingXp(xp);
         if (this.scene && typeof this.scene._addItemToInventory === 'function') this.scene._addItemToInventory(fish.id, 1);
     const mastery = this._getMastery();
-    this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp, mastery });
-    this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay, mastery });
+    // Include rod snapshot on catch as well for balance analysis
+    const rod = this._getRodStats();
+    const rodSnapshot = { name: rod.name, controlZoneMult: rod.controlZoneMult, sensitivityWaitMult: rod.sensitivityWaitMult, precisionGainMult: rod.precisionGainMult, zoneShrinkMult: rod.zoneShrinkMult, maxFails: (typeof rod.maxFails==='number'?rod.maxFails:6) };
+    this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp, mastery, rodStats: rodSnapshot });
+    this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay, mastery, rodStats: rodSnapshot });
         this._toast(`Caught ${fish.name}! +${xp}xp`);
         this._showMessage('Catch successful!');
         setTimeout(() => this._reset(), 1200);

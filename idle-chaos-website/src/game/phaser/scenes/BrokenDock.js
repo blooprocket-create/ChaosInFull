@@ -569,10 +569,16 @@ export class BrokenDock extends Phaser.Scene {
         let tries = 0;
         while (x > dockX - dockW/2 - 32 && x < dockX + dockW/2 + 32 && tries < 8) { x = Phaser.Math.Between(32, this.scale.width - 32); tries++; }
         const y = Phaser.Math.Between(waterTop + 24, waterBottom - 24);
-        const radius = Phaser.Math.Between(42, 68);
+    // Base radius and adjust via mastery hotspotInsight (each rank +6% radius)
+    const mastery = this._getFishingMastery && this._getFishingMastery();
+    const insight = mastery && mastery.hotspotInsight ? mastery.hotspotInsight : 0;
+    const radiusBase = Phaser.Math.Between(42, 68);
+    const radius = Math.round(radiusBase * (1 + 0.06 * insight));
         const tagRoll = Math.random();
         const tag = tagRoll < 0.65 ? 'common_school' : (tagRoll < 0.9 ? 'mixed_swirl' : 'deep_epic');
-        const lifespan = Phaser.Math.Between(12000, 22000);
+        // Lifespan extended by hotspotInsight (each rank +10%)
+        const lifespanBase = Phaser.Math.Between(12000, 22000);
+        const lifespan = Math.round(lifespanBase * (1 + 0.10 * insight));
         const expiresAt = performance.now() + lifespan;
         const gfx = this.add.circle(x, y, radius, 0x6fb1ff, 0.18).setDepth(0.8);
         gfx.setStrokeStyle(2, 0x9dd6ff, 0.85);
@@ -597,6 +603,12 @@ export class BrokenDock extends Phaser.Scene {
             if (stage >= 2) { minDelay = 7000; maxDelay = 12000; }
             if (stage >= 3) { minDelay = 5000; maxDelay = 10000; }
             if (stage >= 4) { minDelay = 4000; maxDelay = 8000; }
+            // Mastery hotspotInsight also speeds spawn cadence slightly (each rank -6% delay)
+            const mastery = this._getFishingMastery && this._getFishingMastery();
+            const insight = mastery && mastery.hotspotInsight ? mastery.hotspotInsight : 0;
+            const cadenceMult = Math.max(0.6, 1 - 0.06 * insight);
+            minDelay = Math.round(minDelay * cadenceMult);
+            maxDelay = Math.round(maxDelay * cadenceMult);
             this._nextHotspotAt = now + Phaser.Math.Between(minDelay, maxDelay);
         }
         // cleanup expired
@@ -1369,6 +1381,7 @@ export class BrokenDock extends Phaser.Scene {
                     <div class="bdock-metric-value" data-role="rod-name">None Equipped</div>
                     <div class="bdock-progress-meta" data-role="rod-meta"></div>
                     <div class="bdock-progress-meta" data-role="rod-warning"></div>
+                    <div class="bdock-progress-meta" data-role="rod-stats"></div>
                 </div>
                 <div class="bdock-metric">
                     <label>Tempo</label>
@@ -1438,6 +1451,7 @@ export class BrokenDock extends Phaser.Scene {
             rodNameEl: modal.querySelector('[data-role="rod-name"]'),
             rodMetaEl: modal.querySelector('[data-role="rod-meta"]'),
             rodWarningEl: modal.querySelector('[data-role="rod-warning"]'),
+            rodStatsEl: modal.querySelector('[data-role="rod-stats"]'),
             speedEl: modal.querySelector('[data-role="speed"]'),
             hookEl: modal.querySelector('[data-role="hook"]'),
             skillEl: modal.querySelector('[data-role="skill"]'),
@@ -1610,6 +1624,18 @@ export class BrokenDock extends Phaser.Scene {
 
         if (ui.rodNameEl) ui.rodNameEl.textContent = context.rodName || 'None Equipped';
         if (ui.rodMetaEl) ui.rodMetaEl.textContent = context.rodMeta || '';
+        if (ui.rodStatsEl) {
+            const stats = context.rodStats || {};
+            const ft = context.derivedFailTol != null ? context.derivedFailTol : 6;
+            const hasAny = (stats.control||stats.sensitivity||stats.precision||stats.stability);
+            ui.rodStatsEl.innerHTML = hasAny ? `
+                <span style="display:inline-block;margin-right:8px;">Ctrl: <strong>${stats.control||0}</strong></span>
+                <span style="display:inline-block;margin-right:8px;">Sens: <strong>${stats.sensitivity||0}</strong></span>
+                <span style="display:inline-block;margin-right:8px;">Prec: <strong>${stats.precision||0}</strong></span>
+                <span style="display:inline-block;margin-right:8px;">Stab: <strong>${stats.stability||0}</strong></span>
+                <span style="display:inline-block;">Fail Tol: <strong>${ft}</strong></span>
+            ` : '';
+        }
         if (ui.rodWarningEl) {
             ui.rodWarningEl.textContent = context.rodWarning || '';
             ui.rodWarningEl.style.color = context.rodWarning ? '#ff9d8c' : 'rgba(255,255,255,0.55)';
@@ -1772,8 +1798,18 @@ export class BrokenDock extends Phaser.Scene {
             ? rodDef.fishingBonus.speedReductionMs
             : ((rod && rod.fishingBonus && rod.fishingBonus.speedReductionMs) ? rod.fishingBonus.speedReductionMs : 0);
 
+        // New schema stats (control/sensitivity/precision/stability)
+        const rodStats = (rodDef && rodDef.fishingStats) || (rod && rod.fishingStats) || {};
+        const rsControl = Math.max(0, rodStats.control || 0);
+        const rsSensitivity = Math.max(0, rodStats.sensitivity || 0);
+        const rsPrecision = Math.max(0, rodStats.precision || 0);
+        const rsStability = Math.max(0, rodStats.stability || 0);
+        const sensitivityWaitMult = Math.max(0.6, 1 - 0.03 * rsSensitivity);
+        const derivedFailTol = 6 + Math.floor(rsStability / 2);
+
         const effectiveSkill = Math.max(0, Math.floor(baseFishingSkill + rodSkillBonus + Math.floor(luk * 0.2)));
-        let intervalMs = Math.max(600, Math.round(this.fishingIntervalMs - (luk * 8) - rodSpeedReduction));
+        // Interval: base reduced by luck, scaled by sensitivity, then apply legacy speed reduction
+        let intervalMs = Math.max(600, Math.round((this.fishingIntervalMs - (luk * 8)) * sensitivityWaitMult - rodSpeedReduction));
         // Apply gatherSpeed talent modifiers
         try {
             if (eff && (eff.gatherSpeedBonusPercent || eff.gatherSpeedFlatBonus)) {
@@ -1838,8 +1874,11 @@ export class BrokenDock extends Phaser.Scene {
         }));
         const totalBaitCount = baitCatalog.reduce((sum, entry) => sum + (entry.count || 0), 0);
 
+        const statsSnippet = rsControl+rsSensitivity+rsPrecision+rsStability > 0
+            ? ` · C${rsControl}/S${rsSensitivity}/P${rsPrecision}/St${rsStability} · FT ${derivedFailTol}`
+            : '';
         const rodMeta = rodDef
-            ? `${(rodDef.rarity || 'common').toUpperCase()} · +${rodSkillBonus} skill`
+            ? `${(rodDef.rarity || 'common').toUpperCase()} · +${rodSkillBonus} skill${statsSnippet}`
             : 'Equip a rod to catch anything here.';
         const rodWarning = rodDef || rod ? '' : 'No rod equipped.';
 
@@ -1855,6 +1894,9 @@ export class BrokenDock extends Phaser.Scene {
             rodRarity,
             rodRank,
             rodSpeedReduction,
+            rodStats,
+            sensitivityWaitMult,
+            derivedFailTol,
             effectiveSkill,
             intervalMs,
             luk,
