@@ -28,6 +28,13 @@ export class FishingController {
         this.lastInputTime = 0;
         this.failCount = 0;
         this.maxFails = 6;
+        // Segment performance tracking for XP formula
+        this.totalSegments = 0; // number of reel attempts (successful or failed)
+        this.perfectSegments = 0; // subset counted as "perfect" (pointer centered)
+        // Rarity multipliers (tunable): Common 1, Uncommon 1.25, Rare 1.7, Epic 3.4, Legendary 6.5
+        this._rarityXpMult = { common: 1, uncommon: 1.25, rare: 1.7, epic: 3.4, legendary: 6.5 };
+        // Center tolerance ratio for a perfect segment (portion of zone width allowed from center)
+        this._perfectToleranceRatio = 0.30;
         // Focus pulse (anti-bot micro-check)
         this.focusIntervalMs = 3500;
         this._nextFocusAt = 0;
@@ -78,6 +85,8 @@ export class FishingController {
         this.tension = 0.5;
         this.state = 'waiting';
         this.failCount = 0;
+        this.totalSegments = 0;
+        this.perfectSegments = 0;
         this._scheduleNextFocus();
         const masterySummary = mastery;
         const rodSnapshot = {
@@ -175,6 +184,10 @@ export class FishingController {
                 const masteryPrecision = this._getMastery();
                 const gain = gainBase * (rod.precisionGainMult || 1.0) * (1 + 0.05 * (masteryPrecision.precision || 0));
                 this.progress = Math.min(1, this.progress + gain);
+                this.totalSegments++;
+                // Perfect segment: pointer within a tighter center band (tolerance fraction of width)
+                const tolerance = width * this._perfectToleranceRatio;
+                if (Math.abs(this.tension - zoneCenter) <= tolerance * 0.5) this.perfectSegments++;
                 this._showMessage(`Reeling ${Math.round(this.progress * 100)}%`);
                 // Shrink zone gradually (harder over time)
                 const shrink = 0.0025 * (rod.zoneShrinkMult || 1.0);
@@ -187,6 +200,7 @@ export class FishingController {
                 if (this.progress >= 1) this._completeCatch();
             } else {
                 this.failCount++;
+                this.totalSegments++;
                 this._showMessage(`Line strain! (${this.failCount}/${this.maxFails})`);
                 // Increase tension random penalty
                 this.tension += (Math.random() * 0.4 - 0.2);
@@ -202,6 +216,8 @@ export class FishingController {
                 zoneMin: this.targetMin,
                 zoneMax: this.targetMax,
                 progress: this.progress,
+                totalSegments: this.totalSegments,
+                perfectSegments: this.perfectSegments,
             });
             this._emitTelemetry('fishing_tension_tick', {
                 pos: this.tension,
@@ -210,6 +226,8 @@ export class FishingController {
                 progress: this.progress,
                 fishId: this.activeFish && this.activeFish.id,
                 timeOfDay: this._activeTimeOfDay,
+                totalSegments: this.totalSegments,
+                perfectSegments: this.perfectSegments,
             });
             this._lastTickTelemetryAt = nowMs;
         }
@@ -218,7 +236,22 @@ export class FishingController {
     _completeCatch() {
         this.state = 'resolve';
         const fish = this.activeFish;
-        const xp = Math.max(4, Math.round(((fish.difficulty || 10) + (fish.baseValue || fish.value || 0)) * 1.6));
+        // --- XP Formula ---
+        // baseXP = difficulty * rarityMultiplier
+        // performanceMultiplier = 0.6 + (perfectSegments/totalSegments) * 0.8 (bounded 0.6..1.4)
+        // totalXP = baseXP * performanceMultiplier * (1 + masteryPrecisionBonus + gearSkillBonus)
+        const difficulty = (fish.difficulty || 10);
+        const rarityMult = this._rarityXpMult[fish.rarity] || 1;
+        const baseXP = difficulty * rarityMult;
+        const segs = Math.max(1, this.totalSegments); // avoid div by zero
+        const perfRatio = this.perfectSegments / segs;
+        const performanceMultiplier = Math.min(1.4, 0.6 + perfRatio * 0.8);
+        const mastery = this._getMastery();
+        const masteryPrecisionBonus = 0.02 * (mastery.precision || 0); // tunable
+        const rod = this._getRodStats();
+        const gearSkillBonus = 0.01 * (rod.skillBonus || 0); // each skill point +1%
+        const xpRaw = baseXP * performanceMultiplier * (1 + masteryPrecisionBonus + gearSkillBonus);
+        const xp = Math.max(4, Math.round(xpRaw));
         // Consume one bait on successful catch
         if (this.baitId) {
             const m = this._getMastery();
@@ -227,12 +260,10 @@ export class FishingController {
         }
         if (this.scene && typeof this.scene._grantFishingXp === 'function') this.scene._grantFishingXp(xp);
         if (this.scene && typeof this.scene._addItemToInventory === 'function') this.scene._addItemToInventory(fish.id, 1);
-    const mastery = this._getMastery();
-    // Include rod snapshot on catch as well for balance analysis
-    const rod = this._getRodStats();
-    const rodSnapshot = { name: rod.name, controlZoneMult: rod.controlZoneMult, sensitivityWaitMult: rod.sensitivityWaitMult, precisionGainMult: rod.precisionGainMult, zoneShrinkMult: rod.zoneShrinkMult, maxFails: (typeof rod.maxFails==='number'?rod.maxFails:6) };
-    this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp, mastery, rodStats: rodSnapshot });
-    this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay, mastery, rodStats: rodSnapshot });
+        // Include rod snapshot on catch as well for balance analysis (mastery & rod already fetched above)
+        const rodSnapshot = { name: rod.name, controlZoneMult: rod.controlZoneMult, sensitivityWaitMult: rod.sensitivityWaitMult, precisionGainMult: rod.precisionGainMult, zoneShrinkMult: rod.zoneShrinkMult, maxFails: (typeof rod.maxFails==='number'?rod.maxFails:6) };
+        this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp, mastery, rodStats: rodSnapshot, totalSegments: this.totalSegments, perfectSegments: this.perfectSegments, performanceMultiplier });
+        this._emitTelemetry('fishing_catch', { fishId: fish.id, rarity: fish.rarity, xp, timeOfDay: this._activeTimeOfDay, mastery, rodStats: rodSnapshot, totalSegments: this.totalSegments, perfectSegments: this.perfectSegments, performanceMultiplier });
         this._toast(`Caught ${fish.name}! +${xp}xp`);
         this._showMessage('Catch successful!');
         setTimeout(() => this._reset(), 1200);
@@ -252,6 +283,8 @@ export class FishingController {
         this.baitId = null;
         this.progress = 0;
         this.tension = 0.5;
+        this.totalSegments = 0;
+        this.perfectSegments = 0;
         this._showMessage('Idle');
     }
 
@@ -392,6 +425,7 @@ export class FishingController {
         if (typeof bonus.precisionGainMult === 'number') precisionGainMult = bonus.precisionGainMult;
         if (typeof bonus.zoneShrinkMult === 'number') zoneShrinkMult = bonus.zoneShrinkMult;
         if (typeof bonus.maxFails === 'number') maxFails = bonus.maxFails;
+    const skillBonus = (typeof bonus.skill === 'number') ? bonus.skill : 0;
 
         // Map to controller knobs with safe defaults
         return {
@@ -401,6 +435,7 @@ export class FishingController {
             precisionGainMult,
             zoneShrinkMult,
             maxFails,
+            skillBonus,
         };
     }
 

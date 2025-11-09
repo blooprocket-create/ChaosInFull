@@ -1,4 +1,5 @@
 import { createPortal } from './shared/portal.js';
+import '../shared/telemetryBridge.js';
 import { persistCharacter } from './shared/persistence.js';
 import { createPlayer } from '../shared/playerFactory.js';
 import { onSkillLevelUp, ensureCharTalents } from '../data/talents.js';
@@ -2011,6 +2012,14 @@ export class BrokenDock extends Phaser.Scene {
     _grantFishingXp(amount) {
         if (!amount) return;
         const fishing = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
+        // Ensure expToLevel follows design curve: requiredXP = 100 * level^1.6
+        try {
+            const lvl = Math.max(1, Math.floor(fishing.level || 1));
+            const required = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
+            if (typeof fishing.expToLevel !== 'number' || Math.abs(fishing.expToLevel - required) > 2) {
+                fishing.expToLevel = required;
+            }
+        } catch (e) {}
         // Apply skillXpGain talent modifiers
         let finalAmount = amount;
         try {
@@ -2028,7 +2037,11 @@ export class BrokenDock extends Phaser.Scene {
         while (fishing.exp >= fishing.expToLevel) {
             fishing.exp -= fishing.expToLevel;
             fishing.level = (fishing.level || 1) + 1;
-            fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25);
+            // Recompute next level requirement using curve
+            try {
+                const lvl = Math.max(1, Math.floor(fishing.level || 1));
+                fishing.expToLevel = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
+            } catch (e) { fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); }
             leveled = true;
             try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
             try { if (window && window.grantMasteryPointsIfNeeded) window.grantMasteryPointsIfNeeded(this.char); } catch (e) {}
