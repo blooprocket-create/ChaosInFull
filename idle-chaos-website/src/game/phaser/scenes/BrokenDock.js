@@ -502,6 +502,17 @@ export class BrokenDock extends Phaser.Scene {
 
     update(time, delta) {
         if (!this.player || !this.keys) return;
+        // Reconcile dock stage if character switched without scene reload (stage may decrease)
+        try {
+            const currentStage = (this.char && this.char.flags && typeof this.char.flags.dockStage === 'number') ? this.char.flags.dockStage : 0;
+            if (this._lastAppliedDockStage == null) this._lastAppliedDockStage = currentStage;
+            if (currentStage !== this._lastAppliedDockStage) {
+                // Refresh visuals & decorations to match new character's progression
+                if (this._refreshDockVisual) this._refreshDockVisual(currentStage);
+                if (this._refreshDecorations) this._refreshDecorations(currentStage);
+                this._lastAppliedDockStage = currentStage;
+            }
+        } catch (e) { /* ignore stage reconciliation errors */ }
         const movement = updateSmoothPlayerMovement(this, { baseSpeed: 180, runMultiplier: 1.6, smoothing: 0.2 });
         if (!movement) return;
         if (!this.fishingActive && !this._attacking) playDirectionalAnimation(this, movement);
