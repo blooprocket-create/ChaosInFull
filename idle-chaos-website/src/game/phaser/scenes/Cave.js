@@ -164,38 +164,36 @@ export class Cave extends Phaser.Scene {
     this._smeltingEvent = null;
     this.smeltingInterval = 2800;
 
-    // Procedural mining node generation: match GraveForest's clustered distribution.
-    // Prefer reading ore definitions from `src/data/ores.js` if available (window.ORE_DEFS or import)
-    let oreConfigs = [];
-    try {
-        const defs = (typeof ORE_DEFS !== 'undefined') ? ORE_DEFS : (window && window.ORE_DEFS) ? window.ORE_DEFS : null;
-        if (defs) {
-            for (const k of Object.keys(defs)) {
-                const d = defs[k]; if (!d) continue;
-                oreConfigs.push({ type: k, clusters: d.clusters || 2, perCluster: d.perCluster || 3, clusterRadius: d.clusterRadius || 96 });
-            }
-        }
-    } catch (e) { /* fallback to hardcoded */ }
-    if (!oreConfigs.length) {
-        oreConfigs = [ { type: 'tin', clusters: 3, perCluster: 4, clusterRadius: 96 }, { type: 'copper', clusters: 2, perCluster: 3, clusterRadius: 110 } ];
-    }
+    // Static mining node layout: hardcoded positions relative to scene bounds
+    // Keep nodes away from furnace (center) and portal (right) and provide a balanced spread.
     const placedNodes = [];
     const margin = 96;
-    // Node and walkway sizing
     const NODE_RADIUS = 28; // matches node.r default
-    const WALKWAY_BUFFER = 24; // extra space so player can pass between nodes
-    const MIN_CENTER_SEPARATION = (NODE_RADIUS * 2) + WALKWAY_BUFFER; // 28*2 + 24 = 80
-    // logical bounds where nodes and decorations may be placed
+    const WALKWAY_BUFFER = 24;
     const bounds = { x1: margin, x2: this.scale.width - margin, y1: 120, y2: this.scale.height - 120 };
 
-    // Note: We intentionally removed blocking cave walls for a more open look.
-    // Players can traverse the whole area; node placement simply respects margins.
+    const pick = (px, py) => ({
+        x: Math.round(bounds.x1 + (bounds.x2 - bounds.x1) * px),
+        y: Math.round(bounds.y1 + (bounds.y2 - bounds.y1) * py)
+    });
+
+    // Preselected coordinates (percent-based) for a consistent layout across resolutions
+    const staticNodes = [
+        { ...pick(0.18, 0.30), type: 'tin' },
+        { ...pick(0.12, 0.55), type: 'tin' },
+        { ...pick(0.28, 0.68), type: 'tin' },
+        { ...pick(0.35, 0.38), type: 'copper' },
+        { ...pick(0.55, 0.70), type: 'copper' },
+        { ...pick(0.65, 0.35), type: 'copper' },
+        { ...pick(0.42, 0.58), type: 'tin' },
+        { ...pick(0.26, 0.46), type: 'copper' }
+    ];
 
     const isTooClose = (x, y) => {
         // avoid furnace and portal
         try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 120) return true; } catch (e) {}
         try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
-        // avoid player spawn and Wayne NPC (tutorial mining guide)
+        // avoid Wayne NPC and immediate player spawn
         try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
         try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 110) return true; } catch (e) {}
         for (const p of placedNodes) {
@@ -206,42 +204,13 @@ export class Cave extends Phaser.Scene {
         return false;
     };
 
-    // Clustered placement per ore type, mirroring GraveForest's tree placement
-    for (const cfg of oreConfigs) {
-        const clusters = Math.max(1, cfg.clusters || 1);
-        const perCluster = Math.max(1, cfg.perCluster || 3);
-        const clusterRadius = Math.max(40, cfg.clusterRadius || 96);
-        for (let c = 0; c < clusters; c++) {
-            let cx = 0, cy = 0, attempts = 0;
-            do {
-                cx = Phaser.Math.Between(bounds.x1, bounds.x2);
-                cy = Phaser.Math.Between(bounds.y1, bounds.y2);
-                attempts++;
-            } while (isTooClose(cx, cy) && attempts < 30);
-            if (isTooClose(cx, cy)) continue;
-            for (let i = 0; i < perCluster; i++) {
-                let angle = Math.random() * Math.PI * 2;
-                let rad = Math.random() * clusterRadius;
-                let nx = Math.round(cx + Math.cos(angle) * rad);
-                let ny = Math.round(cy + Math.sin(angle) * rad);
-                // clamp to bounds
-                nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                let innerAttempts = 0;
-                while (isTooClose(nx, ny) && innerAttempts < 20) {
-                    angle = Math.random() * Math.PI * 2; rad = Math.random() * clusterRadius;
-                    nx = Math.round(cx + Math.cos(angle) * rad);
-                    ny = Math.round(cy + Math.sin(angle) * rad);
-                    nx = Phaser.Math.Clamp(nx, bounds.x1, bounds.x2);
-                    ny = Phaser.Math.Clamp(ny, bounds.y1, bounds.y2);
-                    innerAttempts++;
-                }
-                if (!isTooClose(nx, ny)) {
-                    try { this._createMiningNode(nx, ny, cfg.type); } catch (e) {}
-                    placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type: cfg.type });
-                }
-            }
-        }
+    for (const def of staticNodes) {
+        // clamp to bounds and skip if conflicts with critical objects
+        const nx = Phaser.Math.Clamp(def.x, bounds.x1, bounds.x2);
+        const ny = Phaser.Math.Clamp(def.y, bounds.y1, bounds.y2);
+        if (isTooClose(nx, ny)) continue;
+        try { this._createMiningNode(nx, ny, def.type); } catch (e) {}
+        placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type: def.type });
     }
 
     // Cave decorations: rocks and stalactites
