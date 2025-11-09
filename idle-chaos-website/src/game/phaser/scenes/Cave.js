@@ -164,54 +164,54 @@ export class Cave extends Phaser.Scene {
     this._smeltingEvent = null;
     this.smeltingInterval = 2800;
 
-    // Hardcoded mining node positions (absolute coordinates, manually placed)
-    // Furnace is at center (~400,300 for 800x600), portal at right (~680, 330)
-    // Left/top area for early ores, deeper areas for late ores, right side for gold
+    // Hardcoded mining node positions with proper spacing (70px minimum between nodes)
+    // Node radius: 28px. Canvas: 1280x720. Furnace at center (~640,360), portal at right (~1100,400)
+    // Spread across full cave area with proper distribution
     
-    // TIN (5 nodes) - left side, various depths
-    try { this._createMiningNode(180, 220, 'tin'); } catch (e) {}
-    try { this._createMiningNode(220, 280, 'tin'); } catch (e) {}
-    try { this._createMiningNode(160, 350, 'tin'); } catch (e) {}
-    try { this._createMiningNode(200, 420, 'tin'); } catch (e) {}
-    try { this._createMiningNode(170, 480, 'tin'); } catch (e) {}
+    // TIN (5 nodes) - left side, well-spaced vertically
+    try { this._createMiningNode(150, 150, 'tin'); } catch (e) {}
+    try { this._createMiningNode(150, 280, 'tin'); } catch (e) {}
+    try { this._createMiningNode(150, 410, 'tin'); } catch (e) {}
+    try { this._createMiningNode(150, 540, 'tin'); } catch (e) {}
+    try { this._createMiningNode(150, 650, 'tin'); } catch (e) {}
     
-    // COPPER (4 nodes) - mid-left area
-    try { this._createMiningNode(320, 210, 'copper'); } catch (e) {}
-    try { this._createMiningNode(360, 280, 'copper'); } catch (e) {}
-    try { this._createMiningNode(380, 360, 'copper'); } catch (e) {}
-    try { this._createMiningNode(340, 450, 'copper'); } catch (e) {}
+    // COPPER (4 nodes) - left-center column
+    try { this._createMiningNode(280, 180, 'copper'); } catch (e) {}
+    try { this._createMiningNode(280, 340, 'copper'); } catch (e) {}
+    try { this._createMiningNode(280, 500, 'copper'); } catch (e) {}
+    try { this._createMiningNode(280, 640, 'copper'); } catch (e) {}
     
-    // IRON (5 nodes) - upper-left cluster
-    try { this._createMiningNode(140, 160, 'iron'); } catch (e) {}
-    try { this._createMiningNode(200, 170, 'iron'); } catch (e) {}
-    try { this._createMiningNode(120, 230, 'iron'); } catch (e) {}
-    try { this._createMiningNode(180, 240, 'iron'); } catch (e) {}
-    try { this._createMiningNode(160, 300, 'iron'); } catch (e) {}
+    // IRON (5 nodes) - center-left area, avoiding furnace
+    try { this._createMiningNode(420, 140, 'iron'); } catch (e) {}
+    try { this._createMiningNode(420, 260, 'iron'); } catch (e) {}
+    try { this._createMiningNode(380, 500, 'iron'); } catch (e) {}
+    try { this._createMiningNode(380, 630, 'iron'); } catch (e) {}
+    try { this._createMiningNode(750, 140, 'iron'); } catch (e) {}
     
-    // COAL (7 nodes) - mid band left-to-center
-    try { this._createMiningNode(260, 200, 'coal'); } catch (e) {}
-    try { this._createMiningNode(300, 240, 'coal'); } catch (e) {}
-    try { this._createMiningNode(240, 280, 'coal'); } catch (e) {}
-    try { this._createMiningNode(280, 320, 'coal'); } catch (e) {}
-    try { this._createMiningNode(220, 360, 'coal'); } catch (e) {}
-    try { this._createMiningNode(260, 400, 'coal'); } catch (e) {}
-    try { this._createMiningNode(200, 500, 'coal'); } catch (e) {}
+    // COAL (7 nodes) - distributed across top, center, and bottom
+    try { this._createMiningNode(550, 140, 'coal'); } catch (e) {}
+    try { this._createMiningNode(550, 260, 'coal'); } catch (e) {}
+    try { this._createMiningNode(880, 140, 'coal'); } catch (e) {}
+    try { this._createMiningNode(520, 500, 'coal'); } catch (e) {}
+    try { this._createMiningNode(520, 630, 'coal'); } catch (e) {}
+    try { this._createMiningNode(750, 500, 'coal'); } catch (e) {}
+    try { this._createMiningNode(750, 630, 'coal'); } catch (e) {}
     
-    // MYTHRIL (3 nodes) - bottom-left (deeper progression)
-    try { this._createMiningNode(180, 520, 'mythril'); } catch (e) {}
-    try { this._createMiningNode(220, 540, 'mythril'); } catch (e) {}
-    try { this._createMiningNode(260, 560, 'mythril'); } catch (e) {}
+    // MYTHRIL (3 nodes) - right and bottom area
+    try { this._createMiningNode(880, 500, 'mythril'); } catch (e) {}
+    try { this._createMiningNode(880, 630, 'mythril'); } catch (e) {}
+    try { this._createMiningNode(650, 630, 'mythril'); } catch (e) {}
     
-    // GOLD (2 nodes) - right side (avoid portal at ~680,330)
-    try { this._createMiningNode(580, 180, 'gold'); } catch (e) {}
-    try { this._createMiningNode(600, 500, 'gold'); } catch (e) {}
+    // GOLD (2 nodes) - far right, avoiding portal at ~1100,400
+    try { this._createMiningNode(1000, 180, 'gold'); } catch (e) {}
+    try { this._createMiningNode(1000, 600, 'gold'); } catch (e) {}
     
-    // GEMS (5 nodes) - edge positions
-    try { this._createMiningNode(120, 320, 'emerald'); } catch (e) {}     // left edge
-    try { this._createMiningNode(400, 140, 'ruby'); } catch (e) {}        // top edge
-    try { this._createMiningNode(680, 320, 'sapphire'); } catch (e) {}    // right edge (near portal)
-    try { this._createMiningNode(400, 560, 'opal'); } catch (e) {}        // bottom edge
-    try { this._createMiningNode(660, 160, 'diamond'); } catch (e) {}     // top-right corner
+    // GEMS (5 nodes) - spread across edges and corners
+    try { this._createMiningNode(250, 650, 'emerald'); } catch (e) {}
+    try { this._createMiningNode(640, 100, 'ruby'); } catch (e) {}
+    try { this._createMiningNode(1120, 260, 'sapphire'); } catch (e) {}
+    try { this._createMiningNode(520, 100, 'opal'); } catch (e) {}
+    try { this._createMiningNode(1120, 600, 'diamond'); } catch (e) {}
     
     // Debug: report counts actually placed
     try {
