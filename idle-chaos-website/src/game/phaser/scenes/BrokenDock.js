@@ -163,6 +163,8 @@ export class BrokenDock extends Phaser.Scene {
     this.char = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.character) || {};
     try { ensureCharTalents && ensureCharTalents(this.char); } catch (e) {}
     try { if (window && window.ensureFishingMastery) window.ensureFishingMastery(this.char); } catch (e) {}
+    // Ensure mastery globals (nodes, helpers) exist so the Mastery UI isn't empty
+    try { this._ensureFishingMasteryGlobals && this._ensureFishingMasteryGlobals(); } catch (e) {}
         // Ensure dock questline flag exists
         try { if (!this.char.flags) this.char.flags = {}; if (typeof this.char.flags.dockStage !== 'number') this.char.flags.dockStage = 0; } catch(e) {}
     // Migrate existing dockStage into quest completions (if any) to keep systems in sync
@@ -2112,14 +2114,7 @@ export class BrokenDock extends Phaser.Scene {
     _grantFishingXp(amount) {
         if (!amount) return;
         const fishing = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
-        // Retroactive mastery backfill (Option A): ensure masteryPoints >= level-1
-        try {
-            if (!fishing._masteryBackfilled) {
-                const expected = Math.max(0, (fishing.level || 1) - 1); // level 1 => 0 points, each additional level +1
-                fishing.masteryPoints = Math.max(expected, fishing.masteryPoints || 0);
-                fishing._masteryBackfilled = true;
-            }
-        } catch (e) {}
+        // No retroactive backfill; points are awarded only on level-up
         // Ensure expToLevel follows design curve: requiredXP = 100 * level^1.6
         try {
             const lvl = Math.max(1, Math.floor(fishing.level || 1));
@@ -2160,9 +2155,6 @@ export class BrokenDock extends Phaser.Scene {
             } else {
                 try {
                     fishing.masteryPoints = fishing.masteryPoints || 0;
-                    // Ensure retroactive backfill stays consistent if external grant is added later
-                    const expectedBefore = Math.max(0, (fishing.level - 1));
-                    if (fishing.masteryPoints < expectedBefore) fishing.masteryPoints = expectedBefore;
                     if (fishing.level >= 2) { fishing.masteryPoints += 1; masteryAwarded += 1; }
                 } catch (e) {}
             }
@@ -2819,7 +2811,7 @@ export class BrokenDock extends Phaser.Scene {
                 <button class="bdock-btn ghost" type="button" data-role="close">Close</button>
             </header>
             <section class="bdock-metrics">
-                <div class="bdock-metric"><label>Mastery Points</label><div class="bdock-metric-value" data-role="points">0</div><div class="bdock-progress-meta" data-role="points-note">Earn 1 per 5 fishing levels.</div></div>
+                <div class="bdock-metric"><label>Mastery Points</label><div class="bdock-metric-value" data-role="points">0</div><div class="bdock-progress-meta" data-role="points-note">+1 per fishing level (starting at L2)</div></div>
                 <div class="bdock-metric"><label>Fishing Level</label><div class="bdock-metric-value" data-role="level">Lv 1</div><div class="bdock-progress-meta" data-role="level-note">Level drives point supply.</div></div>
             </section>
             <div class="bdock-content" style="grid-template-columns:1fr;">
