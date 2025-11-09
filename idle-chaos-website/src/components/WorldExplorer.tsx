@@ -2,7 +2,9 @@
 import React, { useMemo, useState } from "react";
 import { zones, ZoneDefinition } from "@/src/data/zones";
 import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
-import type { EnemyDef, EnemyDrop, EnemyGoldDrop } from "@/src/types/phaser-data";
+import ORE_DEFS from "@/src/game/phaser/data/ores.js";
+import LOG_DEFS from "@/src/game/phaser/data/logs.js";
+import type { EnemyDef, EnemyDrop, EnemyGoldDrop, OreDef, LogDef } from "@/src/types/phaser-data";
 import { itemByKey } from "@/src/data/items";
 // Use dynamic enemy stat formulas from the original scene data (pure math, safe for client)
 import { computeEnemyStats, type ScaledEnemy } from "@/src/lib/statFormulas";
@@ -18,6 +20,19 @@ export default function WorldExplorer() {
     return ids
       .map((id) => enemyMap[id])
       .filter((e): e is EnemyDef => Boolean(e));
+  }, [active]);
+  
+  // Dynamically load resources for Cave zone from ORE_DEFS
+  const resourcesForZone = useMemo<string[]>(() => {
+    if (active.key === 'cave' && ORE_DEFS) {
+      const ores = Object.values(ORE_DEFS as Record<string, OreDef>);
+      return ores.map((ore) => ore.label || ore.id).filter(Boolean) as string[];
+    }
+    if (active.key === 'grave-forest' && LOG_DEFS) {
+      const logs = Object.values(LOG_DEFS as Record<string, LogDef>);
+      return logs.map((log) => log.label || log.id).filter(Boolean) as string[];
+    }
+    return active.resources || [];
   }, [active]);
 
   // Human-friendly item name resolution for loot tables
@@ -108,8 +123,8 @@ export default function WorldExplorer() {
           <div className="rounded-lg bg-black/30 border border-white/10 p-4">
             <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Resources</div>
             <ul className="space-y-1 text-sm text-gray-200 list-disc pl-5">
-              {active.resources.map(r => <li key={r}>{r}</li>)}
-              {active.resources.length === 0 && <li className="italic text-gray-400">None</li>}
+              {resourcesForZone.map(r => <li key={r}>{r}</li>)}
+              {resourcesForZone.length === 0 && <li className="italic text-gray-400">None</li>}
             </ul>
           </div>
         </div>

@@ -122,7 +122,7 @@ export const zones: ZoneDefinition[] = [
     features: ["Elite goblins", "Choke points", "Harder patrol loops"],
     mobs: [],
     resources: [],
-    connections: ["goblin-camp"],
+    connections: ["goblin-camp", "gloamway-swamp", "flame-road"],
     // Tougher goblin set lives here
     enemyIds: [
       "goblin_epic",
@@ -130,6 +130,26 @@ export const zones: ZoneDefinition[] = [
       "goblin_ironhowl",
       "goblin_boss"
     ],
+  },
+  {
+    key: "gloamway-swamp",
+    name: "Gloamway Swamp",
+    description: "Rotting marsh with toxic variants. Attrition pacing and undead pressure.",
+    features: ["Undead and rats", "Poison threats"],
+    mobs: [],
+    resources: [],
+    connections: ["gloamway-bastion"],
+    enemyIds: ["rat_uncommon", "rat_rare", "rat_epic", "rat_legendary", "rat_boss"],
+  },
+  {
+    key: "flame-road",
+    name: "Flame Road",
+    description: "Ash winds and fire-aspected foes with mobility tests.",
+    features: ["Fire variants", "Mobility checks"],
+    mobs: [],
+    resources: [],
+    connections: ["gloamway-bastion"],
+    enemyIds: ["goblin_flamebinder"],
   },
   {
     key: "broken-dock",

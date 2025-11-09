@@ -6,6 +6,11 @@ import FlickerOnView from "@/src/components/FlickerOnView";
 import EventsCarousel from "@/src/components/EventsCarousel";
 import ParallaxHero from "@/src/components/ParallaxHero";
 import JsonLd from "@/src/components/JsonLd";
+// Dynamic game data imports
+import { CLASS_DEFS } from "@/src/game/phaser/data/classes.js";
+import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
+import { zones } from "@/src/data/zones";
+import type { GameClassDef, EnemyDef } from "@/src/types/phaser-data";
 export const metadata = { title: "Veil Keeper • Action RPG", description: "A dark, fast, and slightly unhinged browser ARPG.", openGraph: { title: "Veil Keeper", description: "A dark, fast, and slightly unhinged browser ARPG", images: ["/og/home.png"] } };
 
 export default async function Home() {
@@ -21,6 +26,15 @@ export default async function Home() {
       latest = { date: rows[0].date, version: rows[0].version, title: rows[0].title, highlights: [], notes: [] };
     }
   } catch {}
+  
+  // Compute live game stats
+  const classDefs = CLASS_DEFS as Record<string, GameClassDef>;
+  // Cast via unknown first because some enemy damage arrays are plain number[] but logically [min,max]
+  const enemyDefs = ENEMY_DEFS as unknown as Record<string, EnemyDef>;
+  const classCount = Object.keys(classDefs).length;
+  const enemyCount = Object.keys(enemyDefs).length;
+  const zoneCount = zones.length;
+  const tier1Classes = Object.values(classDefs).filter((c) => c.requiredClass === "beginner").length;
   return (
     <>
       <JsonLd data={{
@@ -64,20 +78,20 @@ export default async function Home() {
         </div>
         <div className="mt-12 grid md:grid-cols-3 gap-6">
           {[{
-            title: "Evolve Your Build",
-            text: "Begin humbly and branch into specialized archetypes. Synergize stats, talents, and gear to bend the Veil.",
+            title: `${classCount} Classes`,
+            text: `Begin humbly and branch into ${tier1Classes} specialized archetypes. Synergize stats, talents, and gear to bend the Veil.`,
           },{
             title: "Offline Progress",
             text: "Leave characters in safe pockets and return to rewards. Time advances—even when you don’t.",
           },{
-            title: "Portals & Regions",
-            text: "Town, Cave, Slime Meadows, Goblin Camp and beyond—each region with resources, threats, and secrets.",
+            title: `${zoneCount} Regions`,
+            text: `Town, Cave, Slime Meadows, Goblin Camp and beyond—each region with resources, threats, and secrets.`,
           },{
             title: "Crafting, Refined",
             text: "Smelt, forge, and assemble. Furnaces and benches keep ticking while you’re away.",
           },{
-            title: "Shared Stash",
-            text: "Move resources and gear across characters. Plan builds; gear them fast.",
+            title: `${enemyCount}+ Enemies`,
+            text: "Battle slimes, goblins, rats, and variants. Each with unique loot tables and scaling stats.",
           },{
             title: "Talents That Matter",
             text: "Active and passive choices that meaningfully change moment-to-moment play and long-term scaling.",

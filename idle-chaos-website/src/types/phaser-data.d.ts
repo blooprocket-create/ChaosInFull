@@ -100,3 +100,49 @@ declare module "@/src/game/phaser/data/enemies.js" {
   export const ENEMY_DEFS: Record<string, EnemyDef>;
   export default ENEMY_DEFS;
 }
+
+// Ores (Cave resources)
+export interface OreDef {
+  id: string;
+  label: string;
+  sprite?: string;
+  color?: number;
+  itemId?: string;
+  reqLevel?: number;
+  maxHealth?: number;
+  yieldPerHit?: number;
+  xpPerHit?: number;
+  baseSpeed?: number;
+  respawnTime?: number;
+  clusters?: number;
+  perCluster?: number;
+  clusterRadius?: number;
+}
+
+declare module "@/src/game/phaser/data/ores.js" {
+  import type { OreDef } from "@/src/types/phaser-data";
+  const ORE_DEFS: Record<string, OreDef>;
+  export default ORE_DEFS;
+}
+
+// Logs (Grave Forest resources)
+export interface LogDef {
+  id: string;
+  label: string;
+  sprite?: string;
+  color?: number;
+  baseChance?: number;
+  minEfficiency?: number;
+  baseExp?: number;
+  baseYield?: number;
+  itemId?: string;
+  clusters?: number;
+  perCluster?: number;
+  clusterRadius?: number;
+}
+
+declare module "@/src/game/phaser/data/logs.js" {
+  import type { LogDef } from "@/src/types/phaser-data";
+  const LOG_DEFS: Record<string, LogDef>;
+  export default LOG_DEFS;
+}
