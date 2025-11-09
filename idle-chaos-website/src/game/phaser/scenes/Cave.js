@@ -200,9 +200,10 @@ export class Cave extends Phaser.Scene {
     const pushNode = (x, y, type) => {
         const nx = Phaser.Math.Clamp(x, bounds.x1, bounds.x2);
         const ny = Phaser.Math.Clamp(y, bounds.y1, bounds.y2);
+        // Only record into staticNodes here; defer placedNodes until after we actually create sprites
+        // so the final creation pass doesn't see each node as colliding with itself.
         if (!isTooClose(nx, ny)) {
             staticNodes.push({ x: nx, y: ny, type });
-            placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type });
         }
     };
 
@@ -268,11 +269,12 @@ export class Cave extends Phaser.Scene {
     
 
     for (const def of staticNodes) {
-        // clamp to bounds and skip if conflicts with critical objects
         const nx = Phaser.Math.Clamp(def.x, bounds.x1, bounds.x2);
         const ny = Phaser.Math.Clamp(def.y, bounds.y1, bounds.y2);
+        // Re-check proximity (in case bounds clamp changed position)
         if (isTooClose(nx, ny)) continue;
         try { this._createMiningNode(nx, ny, def.type); } catch (e) {}
+        // Now that it exists, register in placedNodes so later deco generation avoids it
         placedNodes.push({ x: nx, y: ny, r: NODE_RADIUS, type: def.type });
     }
 
