@@ -3324,21 +3324,21 @@ export class BrokenDock extends Phaser.Scene {
         const renderMeta = (meta) => {
             if (!metaEl) return;
             const active = meta && meta.key === EVENT_KEY;
-            metaEl.innerHTML = `<h3>Active Event</h3>${active ? `<div class=\"bdock-progress-meta\"><strong>${'${'}meta.name{'}'}</strong> · Ends ${'${'}new Date(meta.end).toLocaleDateString(){'}'}<br/>${'${'}meta.description{'}'}</div>` : '<div class=\"bdock-forecast-empty\">No active event.</div>'}`;
+            metaEl.innerHTML = `<h3>Active Event</h3>${active ? `<div class="bdock-progress-meta"><strong>${meta.name}</strong> · Ends ${new Date(meta.end).toLocaleDateString()}<br/>${meta.description}</div>` : '<div class="bdock-forecast-empty">No active event.</div>'}`;
         };
         const renderLeaderboard = (leaders) => {
             if (!lbEl) return;
             lbEl.innerHTML = '<h3>Leaderboard</h3>';
             if (!leaders || !leaders.length) {
-                lbEl.innerHTML += '<div class=\"bdock-forecast-empty\">No catches yet.</div>';
+                lbEl.innerHTML += '<div class="bdock-forecast-empty">No catches yet.</div>';
                 return;
             }
             const list = document.createElement('ol');
             list.style.margin = '0'; list.style.padding = '0 0 0 20px'; list.style.fontSize = '13px';
             leaders.forEach((row, idx) => {
                 const li = document.createElement('li');
-                const name = row.username || `Anon ${'${'}row.userid?.slice(0,6) || '??'{'}'}`;
-                li.textContent = `${'${'}idx+1{'}'}. ${'${'}name{'}'} — ${'${'}row.total{'}'} fish`;
+                const name = row.username || `Anon ${row.userid?.slice(0,6) || '??'}`;
+                li.textContent = `${idx+1}. ${name} — ${row.total} fish`;
                 list.appendChild(li);
             });
             lbEl.appendChild(list);
@@ -3347,7 +3347,7 @@ export class BrokenDock extends Phaser.Scene {
             if (!fishEl) return;
             fishEl.innerHTML = '<h3>Global Catch Totals</h3>';
             if (!totals || !totals.length) {
-                fishEl.innerHTML += '<div class=\"bdock-forecast-empty\">No data yet.</div>';
+                fishEl.innerHTML += '<div class="bdock-forecast-empty">No data yet.</div>';
                 return;
             }
             const wrap = document.createElement('div');
@@ -3360,13 +3360,13 @@ export class BrokenDock extends Phaser.Scene {
                 card.style.border = '1px solid rgba(118,190,255,0.12)';
                 card.style.borderRadius = '8px';
                 card.style.padding = '6px 8px';
-                card.innerHTML = `<strong>${'${'}(t.fishname || t.fishid){'}'}</strong><br/><span style=\"opacity:.7;font-size:12px;\">${'${'}t.total{'}'} caught</span>`;
+                card.innerHTML = `<strong>${(t.fishname || t.fishid)}</strong><br/><span style="opacity:.7;font-size:12px;">${t.total} caught</span>`;
                 wrap.appendChild(card);
             });
             fishEl.appendChild(wrap);
         };
         const fetchAndRender = () => {
-            fetch(`/api/events/${'${'}EVENT_KEY{'}'}`)
+            fetch(`/api/events/${EVENT_KEY}`)
               .then(r => r.json())
               .then(data => {
                 renderMeta(data.meta);
@@ -3374,7 +3374,7 @@ export class BrokenDock extends Phaser.Scene {
                 renderFishTotals(data.fishTotals);
               })
               .catch(() => {
-                if (metaEl) metaEl.innerHTML = '<h3>Active Event</h3><div class=\"bdock-forecast-empty\">Failed to load.</div>';
+                if (metaEl) metaEl.innerHTML = '<h3>Active Event</h3><div class="bdock-forecast-empty">Failed to load.</div>';
               });
         };
         fetchAndRender();
