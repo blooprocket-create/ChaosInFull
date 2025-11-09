@@ -164,6 +164,9 @@ export class Cave extends Phaser.Scene {
     this._smeltingEvent = null;
     this.smeltingInterval = 2800;
 
+    // Reset mining nodes array to prevent duplicates on scene re-entry
+    this.miningNodes = [];
+
     // Hardcoded mining node positions with proper spacing (70px minimum between nodes)
     // Node radius: 28px. Canvas: 1280x720. Furnace at center (~640,360), portal at right (~1100,400)
     // Spread across full cave area with proper distribution
@@ -318,8 +321,13 @@ export class Cave extends Phaser.Scene {
                 if (this.miningNodes && Array.isArray(this.miningNodes)) {
                     for (const n of this.miningNodes) {
                         try { if (n && n.colliderZone && n.colliderZone.destroy) n.colliderZone.destroy(); } catch (e) {}
-                        // don't destroy n.collider if it's the sprite itself - sprite cleanup is handled elsewhere
+                        // destroy node sprites and UI elements
+                        try { if (n && n.sprite && n.sprite.destroy) n.sprite.destroy(); } catch (e) {}
+                        try { if (n && n.healthBarBg && n.healthBarBg.destroy) n.healthBarBg.destroy(); } catch (e) {}
+                        try { if (n && n.healthBarFg && n.healthBarFg.destroy) n.healthBarFg.destroy(); } catch (e) {}
+                        try { if (n && n.prompt && n.prompt.destroy) n.prompt.destroy(); } catch (e) {}
                     }
+                    this.miningNodes = [];
                 }
                 if (this._decorColliders && Array.isArray(this._decorColliders)) {
                     for (const d of this._decorColliders) {
