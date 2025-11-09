@@ -507,6 +507,27 @@ export class BrokenDock extends Phaser.Scene {
 
         // Update new fishing controller
         try { if (this.fishingController && typeof this.fishingController.update === 'function') this.fishingController.update(time, delta); } catch(e) {}
+        // Update persistent cast line to follow rod and shrink with progress
+        try {
+            if (this._castLineGfx && this.fishingController && this.fishingController.state && this.fishingController.state !== 'idle' && this.player && this._castLand) {
+                const startX = this.player.x;
+                const startY = this.player.y - 10;
+                const p = Math.max(0, Math.min(1, Number(this.fishingController.progress || 0)));
+                const landX = this._castLand.x;
+                const landY = this._castLand.y;
+                // Reeling effect: do not pull line all the way to player. At full progress (p=1) we stop at 25% of original length.
+                // Factor f scales from 1 (no progress) to 0.25 (full progress).
+                const f = 1 - 0.75 * p; // p=0 -> 1, p=1 -> 0.25
+                const endX = startX + (landX - startX) * f;
+                const endY = startY + (landY - startY) * f;
+                this._castLineGfx.clear();
+                this._castLineGfx.lineStyle(2, 0xbcd8ff, 0.92);
+                this._castLineGfx.strokeLineShape(new Phaser.Geom.Line(startX, startY, endX, endY));
+                if (this._castBobber) {
+                    this._castBobber.setPosition(endX, endY);
+                }
+            }
+        } catch(e) {}
     // Hotspot lifecycle update
     try { this._updateHotspots(delta); } catch(e) {}
 
@@ -516,11 +537,13 @@ export class BrokenDock extends Phaser.Scene {
     _enableClickCast() {
         if (!this.input) return;
         if (this._clickCastEnabled) return;
-        const handler = (pointer) => {
+    const handler = (pointer) => {
             try {
                 if (!this.player || !this.fishingController) return;
                 // Ignore if overlays open
                 if (this._activeOverlays && this._activeOverlays.length) return;
+        // Ignore if already fishing
+        if (this.fishingController && this.fishingController.state && this.fishingController.state !== 'idle') return;
                 // Only left button
                 if (pointer && pointer.button != null && pointer.button !== 0) return;
                 const rodStats = (this.fishingController && this.fishingController._getRodStats) ? this.fishingController._getRodStats() : { castMaxDist: 160 };
@@ -537,11 +560,19 @@ export class BrokenDock extends Phaser.Scene {
                     this._showToast && this._showToast('Cast must land in water');
                     return;
                 }
-                // Optional: brief cast line visual
+                // Persist cast line visual until fishing ends; store landing point
                 try {
-                    const g = this.add.graphics({ lineStyle: { width: 2, color: 0xbcd8ff, alpha: 0.9 } }).setDepth(2.2);
+                    // cleanup previous
+                    this._clearCastLine();
+                    // create line graphics and bobber shape separately for animation
+                    const g = this.add.graphics({}).setDepth(2.2);
+                    this._castLineGfx = g;
+                    this._castLand = { x: landX, y: landY };
+                    // initial draw full length
+                    g.lineStyle(2, 0xbcd8ff, 0.92);
                     g.strokeLineShape(new Phaser.Geom.Line(from.x, from.y - 10, landX, landY));
-                    this.tweens.add({ targets: g, alpha: { from: 1, to: 0 }, duration: 380, onComplete: () => { try { g.destroy(); } catch (e) {} } });
+                    // bobber
+                    this._castBobber = this.add.circle(landX, landY, 3, 0xffd27d, 1).setDepth(2.3);
                 } catch (e) {}
                 // Hotspot detection at landing point
                 const hotspot = this._resolveNearbyHotspot(landX, landY);
@@ -565,6 +596,29 @@ export class BrokenDock extends Phaser.Scene {
         const dockLeft = b.dockX - Math.round((b.dockWidth || 0) / 2) - b.waterPad;
         const dockRight = b.dockX + Math.round((b.dockWidth || 0) / 2) + b.waterPad;
         return (x <= dockLeft) || (x >= dockRight);
+    }
+
+    _clearCastLine() {
+        try { if (this._castLineGfx && this._castLineGfx.destroy) this._castLineGfx.destroy(); } catch (e) {}
+        try { if (this._castBobber && this._castBobber.destroy) this._castBobber.destroy(); } catch (e) {}
+        this._castLineGfx = null;
+        this._castBobber = null;
+        this._castLand = null;
+    }
+
+    _animateBobBite() {
+        try {
+            if (!this._castBobber) return;
+            const bob = this._castBobber;
+            // pulse scale
+            this.tweens.add({ targets: bob, scale: { from: 1, to: 1.35 }, duration: 120, yoyo: true, repeat: 2, ease: 'Sine.easeOut' });
+            // quick color flash
+            try { bob.setFillStyle(0xff9e5e, 1); this.time.delayedCall(280, () => { try { bob.setFillStyle(0xffd27d, 1); } catch(e){} }); } catch(e){}
+            // ripple ring
+            const ring = this.add.circle(bob.x, bob.y, 4, 0x6fb1ff, 0.12).setDepth(2.0);
+            ring.setStrokeStyle(1.5, 0x9dd6ff, 0.8);
+            this.tweens.add({ targets: ring, scale: { from: 1, to: 2.2 }, alpha: { from: 0.5, to: 0 }, duration: 420, ease: 'Sine.easeOut', onComplete: () => { try { ring.destroy(); } catch(e){} } });
+        } catch(e) {}
     }
 
     _openBucketShop() {

@@ -151,6 +151,8 @@ export class FishingController {
                     this._showMessage('Bite! Hold click/Space to reel →');
                     this._emitTelemetry('bite', { fishId: this.activeFish && this.activeFish.id });
                     this._emitTelemetry('fishing_bite', { fishId: this.activeFish && this.activeFish.id, timeOfDay: this._activeTimeOfDay });
+                    // Notify scene to animate bob on bite
+                    try { if (this.scene && typeof this.scene._animateBobBite === 'function') this.scene._animateBobBite(); } catch(e){}
                     // Immediately enter tension for hold-to-reel controls
                     this.state = 'tension';
                     this._showMessage('Reel! Hold pushes right, release drifts left');
@@ -335,6 +337,8 @@ export class FishingController {
         this._showMessage('Idle');
         // Remove HUD entirely when done
         this._removeHud();
+        // Clear persisted cast line if scene exposes helper
+        try { if (this.scene && typeof this.scene._clearCastLine === 'function') this.scene._clearCastLine(); } catch(e) {}
     }
 
     _initTensionZone() {
@@ -622,6 +626,7 @@ export class FishingController {
         // Silently abort when moving far from fishing spot; remove the HUD
         this._emitTelemetry('abort_distance', { fishId: this.activeFish ? this.activeFish.id : null, dx: Math.abs(this.scene.player.x - this.scene._fishingStartPos.x), dy: Math.abs(this.scene.player.y - this.scene._fishingStartPos.y) });
         this._removeHud();
+        try { if (this.scene && typeof this.scene._clearCastLine === 'function') this.scene._clearCastLine(); } catch(e) {}
         this._reset();
     }
 }
