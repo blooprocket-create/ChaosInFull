@@ -85,6 +85,8 @@ export class FishingController {
             this._toast('Catching your breath...');
             return;
         }
+        // Set the fishing start position so movement-abort works for click-casts
+        try { if (this.scene && this.scene.player) this.scene._fishingStartPos = { x: this.scene.player.x, y: this.scene.player.y }; } catch (e) {}
         // Simple default bait selection: pick first *_bait in inventory with qty > 0.
         const bait = this._pickDefaultBait();
         if (!bait) {
@@ -448,7 +450,8 @@ export class FishingController {
         let sensitivityWaitMult = 1.0;
         let precisionGainMult = 1.0;
         let zoneShrinkMult = 1.0;
-        let maxFails = 6;
+    let maxFails = 6;
+    let castMaxDist = 160; // default casting distance in pixels
 
         if (stats) {
             const ctrl = Math.max(0, stats.control || 0);
@@ -473,6 +476,17 @@ export class FishingController {
         if (typeof bonus.precisionGainMult === 'number') precisionGainMult = bonus.precisionGainMult;
         if (typeof bonus.zoneShrinkMult === 'number') zoneShrinkMult = bonus.zoneShrinkMult;
         if (typeof bonus.maxFails === 'number') maxFails = bonus.maxFails;
+        if (typeof bonus.castMaxDist === 'number') castMaxDist = bonus.castMaxDist;
+
+        // Distance from new schema if present
+        if (stats && typeof stats.distance === 'number') castMaxDist = stats.distance;
+
+        // Derive a sensible default by rarity if we still have no explicit value
+        if ((!stats || typeof stats.distance !== 'number') && (def && def.rarity)) {
+            const r = (def.rarity || 'common');
+            const byRarity = { common: 140, uncommon: 170, rare: 210, epic: 250, legendary: 290 };
+            if (byRarity[r] != null) castMaxDist = byRarity[r];
+        }
     const skillBonus = (typeof bonus.skill === 'number') ? bonus.skill : 0;
 
         // Map to controller knobs with safe defaults
@@ -484,6 +498,7 @@ export class FishingController {
             zoneShrinkMult,
             maxFails,
             skillBonus,
+            castMaxDist,
         };
     }
 

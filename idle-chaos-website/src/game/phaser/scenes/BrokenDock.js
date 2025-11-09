@@ -106,6 +106,8 @@ export class BrokenDock extends Phaser.Scene {
                 const wRect2 = this.add.rectangle(rx, ry, rightWidth, waterBottom - waterTop, 0x2266aa, 0.85).setDepth(0.7);
                 try { if (this.physics && this.physics.add) { this.physics.add.existing(wRect2, true); this._waterColliders.push(wRect2); if (this.player && this.player.body) this.physics.add.collider(this.player, wRect2); } } catch (e) {}
             }
+            // Save water bounds for click-cast tests
+            this._waterBounds = { top: waterTop, bottom: waterBottom, dockX, dockWidth, waterPad };
         } catch (e) {}
 
         // create the dock (visual) but do NOT add a physics collider so the player can walk onto it freely
@@ -117,14 +119,8 @@ export class BrokenDock extends Phaser.Scene {
         // Apply initial dock visual based on current repair stage
         try { this._refreshDockVisual && this._refreshDockVisual((this.char && this.char.flags && this.char.flags.dockStage) || 0); } catch (e) {}
 
-        // Place the fishing node at the top end of the dock (over water visually)
-        try {
-            const nodeX = dockX;
-            const nodeY = dockY - Math.round(dockLength / 2) - 12;
-            this.fishingNode = this._createFishingNode(nodeX, nodeY);
-            // ensure fishing node prompt depth is above dock
-            try { if (this.fishingNode && this.fishingNode.prompt) this.fishingNode.prompt.setDepth(1.9); } catch (e) {}
-        } catch (e) {}
+        // Deprecated: fishing node prompt replaced by click-to-cast on water
+        this.fishingNode = null;
 
         // Bait bucket (shop) positioned on the ground near the dock (left side)
         try {
@@ -186,8 +182,10 @@ export class BrokenDock extends Phaser.Scene {
         setSceneKey('BrokenDock');
         setSceneActivity(this, 'idle', { silent: true, source: 'scene-init' });
         try { if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses(this); } catch (e) {}
-        if (window && window.__hud_shared && window.__hud_shared.createHUD) window.__hud_shared.createHUD(this); else this._createHUD();
+    if (window && window.__hud_shared && window.__hud_shared.createHUD) window.__hud_shared.createHUD(this); else this._createHUD();
         this._startSafeZoneRegen();
+    // Enable click-to-cast fishing on water
+    try { this._enableClickCast(); } catch (e) {}
         // Schedule mastery keybinding (M) slightly after create to ensure input keyboard ready
         try {
             if (!this._masteryKeyInitScheduled) {
@@ -456,19 +454,9 @@ export class BrokenDock extends Phaser.Scene {
         if (!this.fishingActive && !this._attacking) playDirectionalAnimation(this, movement);
         updateDepthForTopDown(this, { min: 0.9, max: 2.4 });
 
-        // show prompts for fishing node and bucket
+        // show prompt for bucket only (casting is click-to-cast on water now)
         const px = this.player.x; const py = this.player.y;
-        const fn = this.fishingNode; if (fn) {
-            const castDist = this._getCastInteractDistance();
-            const d = Phaser.Math.Distance.Between(px, py, fn.x, fn.y);
-            fn.prompt.setVisible(d <= castDist);
-            if (d <= castDist && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                // Use new active controller with hotspot context if present
-                const hotspot = this._resolveNearbyHotspot(fn.x, fn.y);
-                const timeOfDay = this._getTimeOfDay();
-                if (this.fishingController) this.fishingController.tryInteract(fn, { hotspot, timeOfDay }); else this._openFishingModal();
-            }
-        }
+        // (legacy node removed)
         const b = this.baitBucket; if (b) {
             const d2 = Phaser.Math.Distance.Between(px, py, b.x, b.y);
             b.prompt.setVisible(d2 <= 56);
@@ -522,6 +510,61 @@ export class BrokenDock extends Phaser.Scene {
     // Hotspot lifecycle update
     try { this._updateHotspots(delta); } catch(e) {}
 
+    }
+
+    // Click-to-cast: allow casting toward mouse if landing point is water and within rod range
+    _enableClickCast() {
+        if (!this.input) return;
+        if (this._clickCastEnabled) return;
+        const handler = (pointer) => {
+            try {
+                if (!this.player || !this.fishingController) return;
+                // Ignore if overlays open
+                if (this._activeOverlays && this._activeOverlays.length) return;
+                // Only left button
+                if (pointer && pointer.button != null && pointer.button !== 0) return;
+                const rodStats = (this.fishingController && this.fishingController._getRodStats) ? this.fishingController._getRodStats() : { castMaxDist: 160 };
+                const maxDist = Math.max(60, Number(rodStats.castMaxDist || 160));
+                const from = new Phaser.Math.Vector2(this.player.x, this.player.y);
+                const to = new Phaser.Math.Vector2(pointer.worldX || pointer.x, pointer.worldY || pointer.y);
+                const dir = to.clone().subtract(from);
+                const dist = dir.length();
+                if (dist < 16) return; // too short
+                const clamped = dir.clone().normalize().scale(Math.min(dist, maxDist));
+                const landX = from.x + clamped.x;
+                const landY = from.y + clamped.y;
+                if (!this._isPointInWater(landX, landY)) {
+                    this._showToast && this._showToast('Cast must land in water');
+                    return;
+                }
+                // Optional: brief cast line visual
+                try {
+                    const g = this.add.graphics({ lineStyle: { width: 2, color: 0xbcd8ff, alpha: 0.9 } }).setDepth(2.2);
+                    g.strokeLineShape(new Phaser.Geom.Line(from.x, from.y - 10, landX, landY));
+                    this.tweens.add({ targets: g, alpha: { from: 1, to: 0 }, duration: 380, onComplete: () => { try { g.destroy(); } catch (e) {} } });
+                } catch (e) {}
+                // Hotspot detection at landing point
+                const hotspot = this._resolveNearbyHotspot(landX, landY);
+                const timeOfDay = this._getTimeOfDay();
+                // Set start pos for abort-on-move
+                this._fishingStartPos = { x: this.player.x, y: this.player.y };
+                this.fishingController.tryInteract(null, { hotspot, timeOfDay });
+            } catch (e) { /* swallow */ }
+        };
+        this.input.on('pointerdown', handler);
+        this._clickCastEnabled = true;
+        // Cleanup on shutdown
+        this.events.once('shutdown', () => { try { this.input.off('pointerdown', handler); } catch (e) {} this._clickCastEnabled = false; });
+    }
+
+    _isPointInWater(x, y) {
+        const b = this._waterBounds;
+        if (!b) return false;
+        if (y < b.top + 2 || y > b.bottom - 2) return false;
+        // Consider dock walkable strip as not-water; allow water left or right of dock with small pad
+        const dockLeft = b.dockX - Math.round((b.dockWidth || 0) / 2) - b.waterPad;
+        const dockRight = b.dockX + Math.round((b.dockWidth || 0) / 2) + b.waterPad;
+        return (x <= dockLeft) || (x >= dockRight);
     }
 
     _openBucketShop() {
@@ -2541,9 +2584,14 @@ export class BrokenDock extends Phaser.Scene {
             return;
         }
 
-        const qid = this._getCurrentDockQuestId();
-        const isCompleted = qid ? this._isDockQuestCompleted(qid) : false;
-        const isActive = qid ? this._isDockQuestActive(qid) : false;
+    const qid = this._getCurrentDockQuestId();
+    // A quest is "ready to turn in" when all objectives are satisfied (checkQuestCompletion)
+    // It is "completed" only AFTER the player presses Turn In and the quest is moved to completedQuests.
+    // Previous logic incorrectly gated the Turn In button on _isDockQuestCompleted (already turned in),
+    // which left the button disabled even when all materials were contributed. We now split the concepts.
+    const isTurnInReady = qid ? checkQuestCompletion(this.char, qid) : false; // progress satisfied
+    const isCompleted = qid ? this._isDockQuestCompleted(qid) : false;        // already turned in
+    const isActive = qid ? this._isDockQuestActive(qid) : false;
 
         if (!qid) return; // defensive
         const q = getQuestById(qid);
@@ -2563,14 +2611,24 @@ export class BrokenDock extends Phaser.Scene {
         const canAny = canGold || canItems;
 
         if (ui.statusEl) {
-            if (isCompleted) { ui.statusEl.textContent = 'Ready to turn in'; ui.statusEl.dataset.tone = 'ready'; }
-            else if (isActive) { ui.statusEl.textContent = canAny ? 'Ready to contribute' : 'Gather materials'; ui.statusEl.dataset.tone = canAny ? 'active' : 'warn'; }
-            else { ui.statusEl.textContent = 'Accept the stage to begin'; ui.statusEl.dataset.tone = 'idle'; }
+            if (isCompleted) {
+                ui.statusEl.textContent = 'Stage already turned in';
+                ui.statusEl.dataset.tone = 'ready';
+            } else if (isTurnInReady) {
+                ui.statusEl.textContent = 'Ready to turn in';
+                ui.statusEl.dataset.tone = 'ready';
+            } else if (isActive) {
+                ui.statusEl.textContent = canAny ? 'Ready to contribute' : 'Gather materials';
+                ui.statusEl.dataset.tone = canAny ? 'active' : 'warn';
+            } else {
+                ui.statusEl.textContent = 'Accept the stage to begin';
+                ui.statusEl.dataset.tone = 'idle';
+            }
         }
 
         if (ui.acceptBtn) ui.acceptBtn.disabled = isActive || isCompleted;
-        if (ui.contributeBtn) ui.contributeBtn.disabled = !isActive || !canAny;
-        if (ui.turnInBtn) ui.turnInBtn.disabled = !isCompleted;
+        if (ui.contributeBtn) ui.contributeBtn.disabled = !isActive || !canAny || isTurnInReady; // hide contrib once ready
+        if (ui.turnInBtn) ui.turnInBtn.disabled = !isTurnInReady;
 
         if (ui.nextEl) {
             const toStage = stage + 1;
