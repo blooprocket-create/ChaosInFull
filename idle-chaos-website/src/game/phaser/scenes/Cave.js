@@ -211,45 +211,35 @@ export class Cave extends Phaser.Scene {
         }
     };
 
-    // Base existing layout (tin/copper spread)
-    const base = [
-        { ...pick(0.18, 0.30), type: 'tin' },
-        { ...pick(0.12, 0.55), type: 'tin' },
-        { ...pick(0.28, 0.68), type: 'tin' },
-        { ...pick(0.35, 0.38), type: 'copper' },
-        { ...pick(0.55, 0.70), type: 'copper' },
-        { ...pick(0.65, 0.35), type: 'copper' },
-        { ...pick(0.42, 0.58), type: 'tin' },
-        { ...pick(0.26, 0.46), type: 'copper' }
-    ];
-    for (const n of base) pushNode(n.x, n.y, n.type);
+    // Deterministic explicit layout to guarantee counts
+    const layout = {
+        tin: [pick(0.14,0.30), pick(0.20,0.42), pick(0.10,0.55), pick(0.26,0.60), pick(0.18,0.68)],
+        copper: [pick(0.44,0.30), pick(0.50,0.42), pick(0.56,0.55), pick(0.42,0.68)],
+        iron: [pick(0.08,0.22), pick(0.16,0.24), pick(0.06,0.32), pick(0.14,0.34), pick(0.10,0.40)],
+        coal: [pick(0.24,0.26), pick(0.30,0.32), pick(0.22,0.38), pick(0.28,0.44), pick(0.20,0.50), pick(0.26,0.56), pick(0.18,0.62)],
+        mythril: [pick(0.14,0.74), pick(0.20,0.80), pick(0.26,0.86)],
+        gold: [pick(0.66,0.22), pick(0.70,0.78)]
+    };
 
-    // Note: copper target total is 4; base already places 4 copper nodes. No additional copper nodes added.
-
-    // Add 1 more tin near the existing tin cluster (use the lower-left tin as anchor)
-    const tinAnchor = base[2]; // {0.28,0.68}
-    if (tinAnchor) {
-        pushNode(tinAnchor.x + 36, tinAnchor.y - 20, 'tin');
-    }
-
-    // Add a cluster of 5 iron ore nodes (top-left quadrant)
-    const ironCenter = pick(0.20, 0.22);
-    // Use wider spacing to avoid proximity rejection (min ~80px apart considering radii+buffer)
-    const ironOffsets = [ {x:0,y:0}, {x:84,y:0}, {x:-84,y:0}, {x:0,y:84}, {x:0,y:-84} ];
-    for (const o of ironOffsets) pushNode(ironCenter.x + o.x, ironCenter.y + o.y, 'iron');
-
-    // Add a cluster of 7 coal ore nodes (mid-left)
-    const coalCenter = pick(0.18, 0.48);
-    // Spread offsets to satisfy spacing constraints
-    const coalOffsets = [
-        {x:0,y:0}, {x:84,y:0}, {x:-84,y:0}, {x:0,y:84}, {x:0,y:-84}, {x:84,y:84}, {x:-84,y:-84}
-    ];
-    for (const o of coalOffsets) pushNode(coalCenter.x + o.x, coalCenter.y + o.y, 'coal');
-
-    // Add a cluster of 3 mythril ore nodes (bottom-left quadrant)
-    const mythCenter = pick(0.24, 0.78);
-    const mythOffsets = [ {x:0,y:0}, {x:28,y:-16}, {x:-24,y:14} ];
-    for (const o of mythOffsets) pushNode(mythCenter.x + o.x, mythCenter.y + o.y, 'mythril');
+    const ensureSpacing = (pt, type) => {
+        let x = pt.x, y = pt.y; let tries = 0;
+        while (tries < 12) {
+            let clash = false;
+            for (const p of placedNodes) {
+                const dist = Phaser.Math.Distance.Between(x,y,p.x,p.y);
+                if (dist < (NODE_RADIUS*2 + 10)) { clash = true; break; }
+            }
+            if (!clash) break;
+            x += 10; y += 10; tries++;
+        }
+        return { x, y, type };
+    };
+    Object.keys(layout).forEach(type => {
+        for (const pt of layout[type]) {
+            const adj = ensureSpacing(pt, type);
+            pushNode(adj.x, adj.y, adj.type);
+        }
+    });
 
     // Add 1 of each gem near the edges (emerald, ruby, sapphire, opal, diamond)
     const edgePad = 24;
@@ -262,11 +252,7 @@ export class Cave extends Phaser.Scene {
     ];
     for (const g of edges) pushNode(g.x, g.y, g.type);
 
-    // Add 2 gold ore nodes (upper-right quadrant but offset to avoid portal proximity)
-    const gold1 = pick(0.58, 0.22);
-    const gold2 = pick(0.62, 0.78);
-    pushNode(gold1.x, gold1.y, 'gold');
-    pushNode(gold2.x, gold2.y, 'gold');
+    // Gold nodes already included in deterministic layout.
 
     
 
