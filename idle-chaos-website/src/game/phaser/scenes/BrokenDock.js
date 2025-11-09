@@ -540,21 +540,28 @@ export class BrokenDock extends Phaser.Scene {
         }
 
         // Event board (Stage >= 4)
-        if (this.eventBoard) {
-            const dE = Phaser.Math.Distance.Between(px, py, this.eventBoard.x, this.eventBoard.y);
-            const showE = (this.char?.flags?.dockStage || 0) >= 4;
-            // Toggle all board pieces together
-            const toggle = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
-            toggle(this.eventBoardShadow, showE);
-            toggle(this.eventBoardPost, showE);
-            toggle(this.eventBoard, showE);
-            toggle(this.eventBoardHeader, showE);
-            toggle(this.eventBoardNotice, showE);
-            toggle(this.eventBoardNotice2, showE);
-            if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) toggle(n, showE);
-            if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(showE && dE <= 56);
-            if (showE && dE <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
-                try { this._openEventBoard(); } catch (e) { console.warn('event board failed', e); }
+        {
+            const stage = (this.char?.flags?.dockStage || 0);
+            const showE = stage >= 4;
+            // If any critical piece is missing and should show, recreate via _refreshDockVisual
+            const missing = showE && !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2);
+            if (missing && this._refreshDockVisual) {
+                try { this._refreshDockVisual(stage); } catch (e) {}
+            }
+            if (this.eventBoard) {
+                const dE = Phaser.Math.Distance.Between(px, py, this.eventBoard.x, this.eventBoard.y);
+                const toggle = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
+                toggle(this.eventBoardShadow, showE);
+                toggle(this.eventBoardPost, showE);
+                toggle(this.eventBoard, showE);
+                toggle(this.eventBoardHeader, showE);
+                toggle(this.eventBoardNotice, showE);
+                toggle(this.eventBoardNotice2, showE);
+                if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) toggle(n, showE);
+                if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(showE && dE <= 56);
+                if (showE && dE <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+                    try { this._openEventBoard(); } catch (e) { console.warn('event board failed', e); }
+                }
             }
         }
 
@@ -3162,41 +3169,33 @@ export class BrokenDock extends Phaser.Scene {
             } catch (e) {}
 
             try {
-                if (!this.eventBoard) {
-                    // Position on the ground to the left of dock, standing upright like a bulletin board
+                // Ensure event board exists when needed
+                const ensureBoard = () => {
                     const ex = dock.x - Math.round((dock.width || 80) / 2) - 80;
                     const groundY = this.scale.height - 60; // ground reference point
-                    // Slight horizontal offset wiggle (makes board feel hand-built)
                     const wobbleX = ex + Phaser.Math.Between(-2, 2);
+                    const boardY = groundY - 72;
 
-                    // Shadow/backer behind the post & board for depth
+                    // Shadow/backer
                     this.eventBoardShadow = this.add.rectangle(wobbleX + 3, groundY - 44, 50, 92, 0x000000, 0.14).setDepth(1.26);
                     this.eventBoardShadow.setOrigin(0.5, 0.5);
-
-                    // Pole/post (tall, from ground up to board - behind board) - CREATE FIRST
+                    // Post
                     this.eventBoardPost = this.add.rectangle(wobbleX, groundY - 40, 8, 80, 0x3a2a1a, 1).setDepth(1.27);
                     this.eventBoardPost.setStrokeStyle(2, 0x2a1a0a, 1);
-
-                    // Board frame at top of pole
-                    const boardY = groundY - 72; // board sits above pole
+                    // Board
                     this.eventBoard = this.add.rectangle(wobbleX, boardY, 46, 60, 0x6a4a2a, 1).setDepth(1.28);
                     this.eventBoard.setStrokeStyle(4, 0x4a3a1a, 1);
-
-                    // Header plank across top (darker)
+                    // Header
                     this.eventBoardHeader = this.add.rectangle(wobbleX, boardY - 30, 46, 10, 0x54371e, 1).setDepth(1.285);
                     this.eventBoardHeader.setStrokeStyle(2, 0x3a2714, 0.95);
-
-                    // Main notice paper (slightly rotated)
+                    // Notices
                     this.eventBoardNotice = this.add.rectangle(wobbleX - 2, boardY - 2, 30, 44, 0xfff8e0, 1).setDepth(1.29);
                     this.eventBoardNotice.setStrokeStyle(2, 0xc0b090, 1);
                     this.eventBoardNotice.setAngle(Phaser.Math.Between(-2, 2));
-
-                    // Secondary paper (smaller, offset & rotated) for visual interest
                     this.eventBoardNotice2 = this.add.rectangle(wobbleX + 10, boardY + 6, 18, 22, 0xfdf2d4, 1).setDepth(1.295);
                     this.eventBoardNotice2.setStrokeStyle(2, 0xbcae8c, 1);
                     this.eventBoardNotice2.setAngle(Phaser.Math.Between(-7, 7));
-
-                    // Nails at the corners of main board
+                    // Nails
                     const nailColor = 0xdedede;
                     this.eventBoardNails = [
                         this.add.circle(wobbleX - 20, boardY - 28, 2, nailColor, 1).setDepth(1.30),
@@ -3205,24 +3204,22 @@ export class BrokenDock extends Phaser.Scene {
                         this.add.circle(wobbleX + 20, boardY + 28, 2, nailColor, 1).setDepth(1.30)
                     ];
                     try { for (const n of this.eventBoardNails) n.setStrokeStyle(1, 0x999999, 1); } catch (e) {}
-
-                    // Prompt (hidden until player near)
+                    // Prompt
                     this.eventBoardPrompt = this.add.text(wobbleX, boardY - 62, '[E] Event Board', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-
-                    // Gentle pulse on main notice for attention
-                    try {
-                        this.tweens.add({ targets: this.eventBoardNotice, alpha: { from: 1, to: 0.82 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-                    } catch (e) {}
-                }
+                    // Pulse on main notice
+                    try { this.tweens.add({ targets: this.eventBoardNotice, alpha: { from: 1, to: 0.82 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); } catch (e) {}
+                };
+                const anyMissing = !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2);
+                if (stage >= 4 && anyMissing) ensureBoard();
                 const boardVisible = stage >= 4;
-                const toggle = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
-                toggle(this.eventBoardShadow, boardVisible);
-                toggle(this.eventBoardPost, boardVisible);
-                toggle(this.eventBoard, boardVisible);
-                toggle(this.eventBoardHeader, boardVisible);
-                toggle(this.eventBoardNotice, boardVisible);
-                toggle(this.eventBoardNotice2, boardVisible);
-                if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) toggle(n, boardVisible);
+                const setVis = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
+                setVis(this.eventBoardShadow, boardVisible);
+                setVis(this.eventBoardPost, boardVisible);
+                setVis(this.eventBoard, boardVisible);
+                setVis(this.eventBoardHeader, boardVisible);
+                setVis(this.eventBoardNotice, boardVisible);
+                setVis(this.eventBoardNotice2, boardVisible);
+                if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) setVis(n, boardVisible);
                 if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(false);
             } catch (e) {}
         } catch (e) { /* no-op */ }
