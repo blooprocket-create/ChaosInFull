@@ -9,6 +9,46 @@ export type PatchNote = {
 export const patchNotes: PatchNote[] = [
   {
     date: "2025-11-08",
+    version: "0.0.21",
+    title: "Harborwright Finn, Fishing Mastery Tree, Dock Repair Questline & Hotspot Economy",
+    highlights: [
+      "New NPC: Harborwright Finn (Broken Dock) with branching dialogue for repairs, bait shop, and fishing advice",
+      "Four-stage Dock Repair questline unlocking fishing hotspots and visual dock upgrades",
+      "Fishing Mastery system added (node-based progression with retroactive point backfill and mastery overlay UI)",
+      "Click-to-cast fishing revamp: directional line, bobber animation, bite tension model, abort on distance",
+      "Dynamic fishing hotspots spawn post Stage 1 — higher bite rates and rarity weighting",
+      "Bait shop integrated into Finn's dialogue (replaces legacy ground bucket prompt)",
+      "Telemetry bridge added for granular fishing events (cast, bite, catch, rod stats, tension outcomes)",
+      "Event Board structure appears after dock fully repaired (stage ≥4) with layered art & subtle notice pulse",
+      "Rowan sprite reused/tinted for Finn with idle/walk animations and fallback circle if assets missing",
+      "Quest/dialogue UI extended: multi-page NPC dialogue with themed color (#6fa9ff) and objective lists"
+    ],
+    notes: [
+      "Harborwright Finn uses window.__shared_ui.renderDialogue flow similar to Steward; supports pages: root, repairs, bait_shop, advice.",
+      "Dock Repair Questline: 4 stages; each stage unlocks incremental fishing perks (hotspots on stage 1, board visibility on stage 4). Completion increments char.flags.dockStage and triggers visual refresh + hotspots warmup.",
+      "Fishing Mastery: Added data/fishingMastery.ts; mastery nodes grant bonuses (e.g., improved bite frequency, tension forgiveness). Retroactive point backfill routine awards unclaimed points on first load post-change.",
+      "Casting Revamp: Replaced node-interact E-based fishing with click-to-cast anywhere on water. Line tension model tracks bite windows; abort triggers when player moves outside distance or cancels. Persistent cast line visuals retained between updates.",
+      "Bobber Animation: Bite events animate bobber + tension feedback; catching logic now factors rod stats piped via telemetryBridge for balance analytics.",
+      "Telemetry Bridge: shared/telemetryBridge.js funnels structured events (fishing_cast, fishing_bite, fishing_catch) including rod power, range, and modifiers. Enables external performance dashboards.",
+      "Hotspot Spawning: On first stage completion, schedule initial hotspot + delayed second spawn (2s). _spawnHotspot sets _nextHotspotAt for periodic respawn logic and rarity weighting adjustments.",
+      "Dialogue-Shop Integration: Finn's 'Open Bait Shop' route calls the existing _openBucketShop logic; legacy ground-based bait bucket prompt removed for cleaner UX.",
+      "Event Board Art: Rebuilt from simple rectangle to multi-layer structure (shadow, post, framed board, header plank, notices, nails) with depth layering and subtle alpha tween pulse.",
+      "NPC Animation Helper: _playNpcAnimation selects rowan_idle vs rowan_walk if spritesheets loaded; falls back gracefully if missing.",
+      "Quest Objective Lists: Repairs page dynamically builds objective list via ui.buildObjectiveList using questDef + current state to show materials / tasks.",
+      "Character State Persistence: Completing a repair stage updates dockStage, persists character, refreshes quest log modal, triggers toast messaging (stage-specific).",
+      "Safety / Error Guards: Extensive try/catch blocks ensure missing textures or UI modules don't break scene initialization (e.g., harborwright sprite fallback).",
+      "Visual Prompt Adjust: Finn's interact prompt elevated to account for sprite origin shift (from circle baseline).",
+      "Cleanup: Removed legacy fishingNode & baitBucket prompt logic; replaced with centralized interaction via Finn dialogue tree.",
+      "Performance Considerations: Depth updates constrained; hotspot scheduling avoids redundant timers; NPC animation creation guarded by this.textures.exists checks.",
+      "Tooling: Added FishingController system file orchestrating active fishing states (casting, waiting, tension) and integrating mastery bonuses.",
+      "Analytics Prep: Rod stats integrated into telemetry to support later balancing (distance cast, bite latency, catch success).",
+      "User Feedback: Toasts for quest accept, repair completion, hotspot unlock; dialogue variants update contextually based on dockStage.",
+      "Fallback Behavior: If quest already fully complete (stage ≥4), repairs page shows completion messaging; bait shop and advice remain accessible.",
+      "Board Visibility Toggle: Event board objects group toggled visible only when dockStage ≥4; nails, notices, shadow all share unified visibility state." 
+    ]
+  },
+  {
+    date: "2025-11-08",
     version: "0.0.20",
     title: "Click-to-Strike Combat, Directional Skill Brain, Percent Potions & Armor That Actually Matters",
     highlights: [
