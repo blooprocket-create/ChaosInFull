@@ -19,6 +19,8 @@ export class FishingController {
         this.lastCastAt = 0;
         this.waitTimer = 0;
         this.waitDuration = 0;
+    this.biteTimer = 0; // time spent in 'bite' state waiting for player hook
+    this.biteWindowMs = 2500; // how long the bite lasts before fish gets away
         this.progress = 0; // capture progress 0..1
         this.tension = 0.5; // current tension pointer 0..1
         this.targetMin = 0.4; // moving safe zone
@@ -148,19 +150,25 @@ export class FishingController {
                 this.waitTimer += delta;
                 if (this.waitTimer >= this.waitDuration) {
                     this.state = 'bite';
-                    this._showMessage('Bite! Hold click/Space to reel →');
+                    this.biteTimer = 0;
+                    this._showMessage('Bite! Click/Space to hook');
                     this._emitTelemetry('bite', { fishId: this.activeFish && this.activeFish.id });
                     this._emitTelemetry('fishing_bite', { fishId: this.activeFish && this.activeFish.id, timeOfDay: this._activeTimeOfDay });
                     // Notify scene to animate bob on bite
                     try { if (this.scene && typeof this.scene._animateBobBite === 'function') this.scene._animateBobBite(); } catch(e){}
-                    // Immediately enter tension for hold-to-reel controls
-                    this.state = 'tension';
-                    this._showMessage('Reel! Hold pushes right, release drifts left');
-                    this._initTensionZone();
                 }
                 break;
             case 'bite':
-                // Unused, we auto-enter tension above
+                // Wait for a click/Space press to set the hook, or the fish gets away
+                this.biteTimer += delta;
+                if (this._inputJustPressed()) {
+                    this.state = 'tension';
+                    this._showMessage('Reel! Hold pushes right, release drifts left');
+                    this._emitTelemetry('hook', { fishId: this.activeFish && this.activeFish.id });
+                    this._initTensionZone();
+                } else if (this.biteTimer >= this.biteWindowMs) {
+                    this._fail('The fish got away');
+                }
                 break;
             case 'tension':
                 this._updateTension(delta);
@@ -604,6 +612,18 @@ export class FishingController {
         const p = this.scene && this.scene.input && this.scene.input.activePointer;
         const pointerDown = !!(p && p.isDown);
         return spaceDown || pointerDown;
+    }
+
+    _inputJustPressed() {
+        const kb = this.scene && this.scene.input && this.scene.input.keyboard;
+        let spaceJust = false;
+        if (kb) {
+            const space = kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            spaceJust = Phaser.Input.Keyboard.JustDown(space);
+        }
+        const p = this.scene && this.scene.input && this.scene.input.activePointer;
+        const pointerJust = !!(p && p.justDown);
+        return spaceJust || pointerJust;
     }
 
     _showMessage(msg) {

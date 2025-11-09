@@ -623,6 +623,75 @@ export class BrokenDock extends Phaser.Scene {
         } catch(e) {}
     }
 
+    _ensureFishingMasteryGlobals() {
+        try {
+            const w = typeof window !== 'undefined' ? window : {};
+            // Ensure character fields shape
+            if (!w.ensureFishingMastery) {
+                w.ensureFishingMastery = (char) => {
+                    if (!char.fishing) char.fishing = { level: 1, masteryPoints: 0, masteryNodes: [], exp: 0, expToLevel: 100 };
+                    if (!Array.isArray(char.fishing.masteryNodes)) char.fishing.masteryNodes = [];
+                    if (typeof char.fishing.masteryPoints !== 'number') char.fishing.masteryPoints = 0;
+                };
+            }
+            // Provide a minimal starter node catalog if missing
+            if (!Array.isArray(w.FISHING_MASTERY_NODES) || w.FISHING_MASTERY_NODES.length === 0) {
+                w.FISHING_MASTERY_NODES = [
+                    { id:'stability_1', name:'Steady Hands I', description:'- Pointer drift (Stability +1)', tier:1, cost:1, grants:{ stability:1 }, requires:[] },
+                    { id:'control_1', name:'Wider Zone I', description:'- Wider safe zone (Control +1)', tier:1, cost:1, grants:{ control:1 }, requires:[] },
+                    { id:'precision_1', name:'Sharp Focus I', description:'- Faster progress (Precision +1)', tier:1, cost:1, grants:{ precision:1 }, requires:[] },
+                    { id:'sensitivity_1', name:'Quicker Bites I', description:'- Shorter wait (Sensitivity +1)', tier:1, cost:1, grants:{ sensitivity:1 }, requires:[] },
+                    { id:'stability_2', name:'Steady Hands II', description:'- Pointer drift (Stability +1)', tier:2, cost:2, grants:{ stability:1 }, requires:['stability_1'] },
+                    { id:'rarity_1', name:"Hunter's Instinct", description:'- Slightly rarer fish (Rarity Boost +1)', tier:2, cost:2, grants:{ rarityBoost:1 }, requires:['precision_1'] },
+                    { id:'bait_eff_1', name:'Careful Baiting', description:'- Chance to preserve bait (Bait Efficiency +1)', tier:2, cost:2, grants:{ baitEfficiency:1 }, requires:['sensitivity_1'] },
+                    { id:'hotspot_1', name:'Hotspot Insight', description:'- Larger/longer hotspots (Insight +1)', tier:3, cost:3, grants:{ hotspotInsight:1 }, requires:['rarity_1'] },
+                ];
+            }
+            if (!w.fishingMasteryById) {
+                w.fishingMasteryById = {};
+                for (const n of w.FISHING_MASTERY_NODES) w.fishingMasteryById[n.id] = n;
+            }
+            if (!w.computeFishingMasteryBonuses) {
+                w.computeFishingMasteryBonuses = (char) => {
+                    const totals = { stability:0, control:0, sensitivity:0, precision:0, baitEfficiency:0, rarityBoost:0, hotspotInsight:0 };
+                    const taken = (char && char.fishing && Array.isArray(char.fishing.masteryNodes)) ? char.fishing.masteryNodes : [];
+                    for (const id of taken) {
+                        const node = w.fishingMasteryById && w.fishingMasteryById[id];
+                        if (!node || !node.grants) continue;
+                        for (const k of Object.keys(node.grants)) totals[k] = (totals[k] || 0) + (node.grants[k] || 0);
+                    }
+                    return { ...totals, takenNodes: taken.slice(), pointsSpent: taken.length };
+                };
+            }
+            if (!w.canUnlockMasteryNode) {
+                w.canUnlockMasteryNode = (char, id) => {
+                    const node = w.fishingMasteryById && w.fishingMasteryById[id];
+                    if (!node) return false;
+                    const lvl = (char && char.fishing && char.fishing.level) || 1;
+                    // Require fishing level >= node.tier
+                    return lvl >= (node.tier || 1);
+                };
+            }
+            if (!w.unlockMasteryNode) {
+                w.unlockMasteryNode = (char, id) => {
+                    try { if (w.ensureFishingMastery) w.ensureFishingMastery(char); } catch (e) {}
+                    const node = w.fishingMasteryById && w.fishingMasteryById[id];
+                    if (!node) return false;
+                    const taken = char.fishing.masteryNodes || (char.fishing.masteryNodes = []);
+                    if (taken.includes(id)) return false;
+                    const prereqs = Array.isArray(node.requires) ? node.requires : [];
+                    if (prereqs.some(r => !taken.includes(r))) return false;
+                    if (!w.canUnlockMasteryNode || !w.canUnlockMasteryNode(char, id)) return false;
+                    const pts = Number(char.fishing.masteryPoints || 0);
+                    if (pts < (node.cost || 1)) return false;
+                    char.fishing.masteryPoints = pts - (node.cost || 1);
+                    taken.push(id);
+                    return true;
+                };
+            }
+        } catch (e) {}
+    }
+
     _openBucketShop() {
         if (typeof document === 'undefined') return;
         this._ensureFishingUiStyles();

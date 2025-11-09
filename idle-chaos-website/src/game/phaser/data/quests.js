@@ -453,7 +453,8 @@ export const QUEST_DEFS = {
             { type: 'contribute_item', target: 'iron_bar', required: 35, description: 'Contribute 35 Iron Bars' }
         ],
         rewards: {
-            xp: { fishing: 200 }
+            xp: { fishing: 200 },
+            items: [{ id: 'sea_rod', qty: 1 }]
         },
         prerequisites: ['dock_repair_stage_3'],
         giver: 'harborwright',
