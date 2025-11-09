@@ -4785,7 +4785,8 @@ export function registerTalentHandlers(scene) {
                                             // Update invert circle shader each frame for smooth tracking (exclude player)
                                             try {
                                                 const hole = Math.max(12, Math.min(28, (scene.player?.displayWidth || 32) * 0.35));
-                                                updateInvertCircle(scene, auraRadius, 22, 1.0, hole);
+                                                // Increase softness for a more blurred donut post FX
+                                                updateInvertCircle(scene, auraRadius, 36, 1.0, hole);
                                             } catch (e) {}
                                         } catch (e) {}
                                     };
@@ -4797,8 +4798,9 @@ export function registerTalentHandlers(scene) {
                                 // Ensure the invert circle effect is enabled and synced immediately
                                 try {
                                     const hole = Math.max(12, Math.min(28, (scene.player?.displayWidth || 32) * 0.35));
-                                    enableInvertCircle(scene, auraRadius, 22, 1.0, hole);
-                                    updateInvertCircle(scene, auraRadius, 22, 1.0, hole);
+                                    // Increase softness for a more blurred donut post FX
+                                    enableInvertCircle(scene, auraRadius, 36, 1.0, hole);
+                                    updateInvertCircle(scene, auraRadius, 36, 1.0, hole);
                                 } catch (e) {}
                             } catch (e) {}
                         } catch (e) {}
