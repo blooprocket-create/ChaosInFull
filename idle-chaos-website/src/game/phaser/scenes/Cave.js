@@ -220,13 +220,7 @@ export class Cave extends Phaser.Scene {
     ];
     for (const n of base) pushNode(n.x, n.y, n.type);
 
-    // Add 2 more copper near an existing copper node (use the mid-left copper as anchor)
-    const copperAnchor = base[3]; // {0.35,0.38}
-    if (copperAnchor) {
-        const ca = { x: copperAnchor.x, y: copperAnchor.y };
-        pushNode(ca.x + 48, ca.y + 22, 'copper');
-        pushNode(ca.x - 52, ca.y - 18, 'copper');
-    }
+    // Note: copper target total is 4; base already places 4 copper nodes. No additional copper nodes added.
 
     // Add 1 more tin near the existing tin cluster (use the lower-left tin as anchor)
     const tinAnchor = base[2]; // {0.28,0.68}
@@ -234,14 +228,18 @@ export class Cave extends Phaser.Scene {
         pushNode(tinAnchor.x + 36, tinAnchor.y - 20, 'tin');
     }
 
-    // Add a cluster of 4 iron ore nodes (top-left quadrant)
+    // Add a cluster of 5 iron ore nodes (top-left quadrant)
     const ironCenter = pick(0.20, 0.22);
-    const ironOffsets = [ {x:0,y:0}, {x:36,y:18}, {x:-32,y:14}, {x:10,y:-28} ];
+    // Use wider spacing to avoid proximity rejection (min ~80px apart considering radii+buffer)
+    const ironOffsets = [ {x:0,y:0}, {x:84,y:0}, {x:-84,y:0}, {x:0,y:84}, {x:0,y:-84} ];
     for (const o of ironOffsets) pushNode(ironCenter.x + o.x, ironCenter.y + o.y, 'iron');
 
-    // Add a cluster of 5 coal ore nodes (mid-left)
+    // Add a cluster of 7 coal ore nodes (mid-left)
     const coalCenter = pick(0.18, 0.48);
-    const coalOffsets = [ {x:0,y:0}, {x:30,y:-18}, {x:-28,y:12}, {x:12,y:26}, {x:-16,y:-22} ];
+    // Spread offsets to satisfy spacing constraints
+    const coalOffsets = [
+        {x:0,y:0}, {x:84,y:0}, {x:-84,y:0}, {x:0,y:84}, {x:0,y:-84}, {x:84,y:84}, {x:-84,y:-84}
+    ];
     for (const o of coalOffsets) pushNode(coalCenter.x + o.x, coalCenter.y + o.y, 'coal');
 
     // Add a cluster of 3 mythril ore nodes (bottom-left quadrant)
