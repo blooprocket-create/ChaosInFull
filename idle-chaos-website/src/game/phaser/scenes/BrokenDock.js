@@ -509,7 +509,7 @@ export class BrokenDock extends Phaser.Scene {
 
         // Update new fishing controller
         try { if (this.fishingController && typeof this.fishingController.update === 'function') this.fishingController.update(time, delta); } catch(e) {}
-        // Update persistent cast line to follow rod and shrink with progress
+        // Update persistent cast line to follow rod and shrink with progress; also cancel pending line if no bait interaction started
         try {
             if (this._castLineGfx && this.fishingController && this.fishingController.state && this.fishingController.state !== 'idle' && this.player && this._castLand) {
                 const startX = this.player.x;
@@ -527,6 +527,14 @@ export class BrokenDock extends Phaser.Scene {
                 this._castLineGfx.strokeLineShape(new Phaser.Geom.Line(startX, startY, endX, endY));
                 if (this._castBobber) {
                     this._castBobber.setPosition(endX, endY);
+                }
+            } else if (this._castLineGfx && this.fishingController && this.fishingController.state === 'idle' && this._castLand && this._fishingStartPos && this.player) {
+                // Player cast a line but fishing didn't start (likely no bait). Clear when they move away from initial position.
+                const dx = Math.abs(this.player.x - this._fishingStartPos.x);
+                const dy = Math.abs(this.player.y - this._fishingStartPos.y);
+                if (dx > 12 || dy > 12) {
+                    this._clearCastLine();
+                    this._fishingStartPos = null;
                 }
             }
         } catch(e) {}
@@ -562,7 +570,7 @@ export class BrokenDock extends Phaser.Scene {
                     this._showToast && this._showToast('Cast must land in water');
                     return;
                 }
-                // Persist cast line visual until fishing ends; store landing point
+                // Persist cast line visual until fishing ends; store landing point (even if interaction fails, will auto-clear on move)
                 try {
                     // cleanup previous
                     this._clearCastLine();
@@ -2869,6 +2877,18 @@ export class BrokenDock extends Phaser.Scene {
         if (typeof document === 'undefined') return;
         this._ensureFishingUiStyles && this._ensureFishingUiStyles();
         this._ensureMasteryUiStyles();
+        // Toggle behavior: if an existing mastery overlay is open, close it instead of creating a new one
+        try {
+            if (this._activeOverlays && this._activeOverlays.length) {
+                for (let i = this._activeOverlays.length - 1; i >= 0; i--) {
+                    const node = this._activeOverlays[i];
+                    if (node && node.querySelector && node.querySelector('.bdock-title') && node.querySelector('.bdock-title').textContent.includes('Fishing Mastery')) {
+                        this._removeOverlay(node);
+                        return;
+                    }
+                }
+            }
+        } catch (e) {}
         const overlay = document.createElement('div'); overlay.className='bdock-overlay';
         const modal = document.createElement('section'); modal.className='bdock-modal';
         modal.innerHTML = `
