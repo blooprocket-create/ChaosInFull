@@ -4532,9 +4532,9 @@ function _talentActivatedHandler(payload) {
                 } catch (e) {}
                 break;
             }
-            case 'savage_swing': { // wiring: 360 melee cleave
+            case 'savage_swing': { // wiring: 360 melee cleave (true damage with on-hit effects)
                 // Perform a radial melee attack around the player, hitting all nearby enemies once.
-                // Requirements: can crit, lifesteal, and apply all on-hit effects; also treat damage as "true" with respect to defense (we do not apply enemy defense in our pipeline anyway).
+                // True damage: ignores enemy defense but applies all on-hit effects (crits, lifesteal, bleed, poison, etc.)
                 try {
                     const eff = (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) ? window.__shared_ui.stats.effectiveStats(scene.char) : {};
                     const tmods = (scene.char && scene.char._talentModifiers) ? scene.char._talentModifiers : {};
@@ -4580,8 +4580,8 @@ function _talentActivatedHandler(payload) {
                         const dx = e.x - scene.player.x;
                         const dy = e.y - scene.player.y;
                         if ((dx*dx + dy*dy) <= radius*radius) {
-                            // Use the standard player damage pipeline so crit/lifesteal/bleed/etc. apply; defense is not considered in this path.
-                            try { _dealPlayerDamage(scene, e, dmgEach, '#ffaacc'); } catch (ee) {}
+                            // Use standard damage pipeline with ignoreDefense flag so all on-hit effects apply but defense is bypassed
+                            try { _dealPlayerDamage(scene, e, dmgEach, '#ffaacc', { ignoreDefense: true }); } catch (ee) {}
                             hits++;
                         }
                     }
