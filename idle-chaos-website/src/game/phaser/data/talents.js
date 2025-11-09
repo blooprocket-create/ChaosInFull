@@ -48,7 +48,7 @@ const beginnerTalents = [
         tags: ['survivability']
     }),
     makeTalent('work_ethic', 'Work Ethic', {
-        description: 'Mine like the night never ends. Gathering speed +{value}%.',
+        description: 'Mine like the night never ends. Gathering XP +{value}%.',
         scaling: { type: 'percent', target: 'skillXpGain', base: 4, perRank: 1.25 },
         tags: ['progression', 'skills']
     }),
