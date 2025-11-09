@@ -199,9 +199,15 @@ export class BrokenDock extends Phaser.Scene {
     // Ensure mastery globals (nodes, helpers) exist so the Mastery UI isn't empty
     try { this._ensureFishingMasteryGlobals && this._ensureFishingMasteryGlobals(); } catch (e) {}
         // Ensure dock questline flag exists
-        try { if (!this.char.flags) this.char.flags = {}; if (typeof this.char.flags.dockStage !== 'number') this.char.flags.dockStage = 0; } catch(e) {}
-    // Migrate existing dockStage into quest completions (if any) to keep systems in sync
-    try { this._migrateDockQuestsFromStage && this._migrateDockQuestsFromStage(); } catch (e) {}
+            try { if (!this.char.flags) this.char.flags = {}; if (typeof this.char.flags.dockStage !== 'number') this.char.flags.dockStage = 0; } catch(e) {}
+        // Migrate existing dockStage into quest completions (if any) to keep systems in sync
+        try { this._migrateDockQuestsFromStage && this._migrateDockQuestsFromStage(); } catch (e) {}
+            // Refresh visuals now that character flags are initialized (important for returning players)
+            try {
+                const stageNow = (this.char && this.char.flags && this.char.flags.dockStage) || 0;
+                if (this._refreshDockVisual) this._refreshDockVisual(stageNow);
+                if (this._refreshDecorations) this._refreshDecorations(stageNow);
+            } catch (e) {}
             // Ensure a portable _persistCharacter helper is available early so code in create()
             // that conditionally calls it (if present) will work even before the end-of-create wiring.
             try {
@@ -523,11 +529,19 @@ export class BrokenDock extends Phaser.Scene {
         }
 
         // Event board (Stage >= 4)
-        if (this.eventBoard && this.eventBoardPrompt) {
+        if (this.eventBoard) {
             const dE = Phaser.Math.Distance.Between(px, py, this.eventBoard.x, this.eventBoard.y);
             const showE = (this.char?.flags?.dockStage || 0) >= 4;
-            this.eventBoard.setVisible(showE);
-            this.eventBoardPrompt.setVisible(showE && dE <= 56);
+            // Toggle all board pieces together
+            const toggle = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
+            toggle(this.eventBoardShadow, showE);
+            toggle(this.eventBoardPost, showE);
+            toggle(this.eventBoard, showE);
+            toggle(this.eventBoardHeader, showE);
+            toggle(this.eventBoardNotice, showE);
+            toggle(this.eventBoardNotice2, showE);
+            if (this.eventBoardNails && Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) toggle(n, showE);
+            if (this.eventBoardPrompt) this.eventBoardPrompt.setVisible(showE && dE <= 56);
             if (showE && dE <= 56 && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                 try { this._openEventBoard(); } catch (e) { console.warn('event board failed', e); }
             }
