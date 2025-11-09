@@ -66,3 +66,95 @@ export async function ensureBugReportTable() {
     bugTableChecked = true;
   }
 }
+
+// Fishing Event Stats table (for limited-time events like Intro to Fishing)
+let fishingEventTableChecked = false;
+export async function ensureFishingEventTable() {
+  if (fishingEventTableChecked) return;
+  try {
+    await sql`
+      create table if not exists "FishingEventStat" (
+        eventkey text not null,
+        userid text references "User"(id) on delete set null,
+        username text,
+        fishid text not null,
+        fishname text,
+        count int not null default 0,
+        updatedat timestamptz not null default now(),
+        primary key (eventkey, userid, fishid)
+      )
+    `;
+    await sql`create index if not exists fish_event_key_idx on "FishingEventStat"(eventkey)`;
+  } catch {
+    // ignore table creation errors
+  } finally {
+    fishingEventTableChecked = true;
+  }
+}
+
+// Increment catch count for a user & fish under an event
+export async function incrementFishingEventCatch(params: {
+  eventKey: string;
+  userId?: string | null;
+  username?: string | null;
+  fishId: string;
+  fishName?: string | null;
+}) {
+  const { eventKey, userId, username, fishId, fishName } = params;
+  if (!eventKey || !fishId) return;
+  await ensureFishingEventTable();
+  // Upsert via insert-on-conflict style (Neon Postgres supports ON CONFLICT)
+  try {
+    await sql`
+      insert into "FishingEventStat" (eventkey, userid, username, fishid, fishname, count, updatedat)
+      values (${eventKey}, ${userId || null}, ${username || null}, ${fishId}, ${fishName || null}, 1, now())
+      on conflict (eventkey, userid, fishid)
+      do update set count = "FishingEventStat".count + 1, updatedat = now()
+    `;
+  } catch {
+    // swallow
+  }
+}
+
+export type FishingEventLeaderboardRow = {
+  username: string | null;
+  userid: string | null;
+  total: number;
+};
+
+// Fetch leaderboard aggregated per user for an event (top N by total count)
+export async function getFishingEventLeaderboard(eventKey: string, limit = 25) {
+  if (!eventKey) return [] as FishingEventLeaderboardRow[];
+  await ensureFishingEventTable();
+  try {
+    const rows = await q<FishingEventLeaderboardRow>`
+      select username, userid, sum(count)::int as total
+      from "FishingEventStat"
+      where eventkey = ${eventKey}
+      group by username, userid
+      order by total desc nulls last
+      limit ${limit}
+    `;
+    return rows;
+  } catch {
+    return [] as FishingEventLeaderboardRow[];
+  }
+}
+
+// Per-fish totals across all users for an event
+export async function getFishingEventFishTotals(eventKey: string) {
+  if (!eventKey) return [] as { fishid: string; fishname: string | null; total: number }[];
+  await ensureFishingEventTable();
+  try {
+    const rows = await q<{ fishid: string; fishname: string | null; total: number }>`
+      select fishid, max(fishname) as fishname, sum(count)::int as total
+      from "FishingEventStat"
+      where eventkey = ${eventKey}
+      group by fishid
+      order by total desc
+    `;
+    return rows;
+  } catch {
+    return [] as { fishid: string; fishname: string | null; total: number }[];
+  }
+}

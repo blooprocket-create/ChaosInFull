@@ -58,6 +58,71 @@ export class BrokenDock extends Phaser.Scene {
             if (!this.anims.exists('right')) this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
         } catch (e) { console.warn('Failed to create player animations in BrokenDock', e); }
 
+
+        // Fetch event data & populate
+        const metaEl = modal.querySelector('[data-role="event-meta"]');
+        const lbEl = modal.querySelector('[data-role="leaderboard"]');
+        const fishEl = modal.querySelector('[data-role="fish-totals"]');
+        const EVENT_KEY = 'intro_to_fishing';
+        const renderMeta = (meta) => {
+            if (!metaEl) return;
+            const active = meta && meta.key === EVENT_KEY;
+            metaEl.innerHTML = `<h3>Active Event</h3>${active ? `<div class="bdock-progress-meta"><strong>${meta.name}</strong> · Ends ${new Date(meta.end).toLocaleDateString()}<br/>${meta.description}</div>` : '<div class="bdock-forecast-empty">No active event.</div>'}`;
+        };
+        const renderLeaderboard = (leaders) => {
+            if (!lbEl) return;
+            lbEl.innerHTML = '<h3>Leaderboard</h3>';
+            if (!leaders || !leaders.length) {
+                lbEl.innerHTML += '<div class="bdock-forecast-empty">No catches yet.</div>';
+                return;
+            }
+            const list = document.createElement('ol');
+            list.style.margin = '0'; list.style.padding = '0 0 0 20px'; list.style.fontSize = '13px';
+            leaders.forEach((row, idx) => {
+                const li = document.createElement('li');
+                const name = row.username || `Anon ${row.userid?.slice(0,6) || '??'}`;
+                li.textContent = `${idx+1}. ${name} — ${row.total} fish`;
+                list.appendChild(li);
+            });
+            lbEl.appendChild(list);
+        };
+        const renderFishTotals = (totals) => {
+            if (!fishEl) return;
+            fishEl.innerHTML = '<h3>Global Catch Totals</h3>';
+            if (!totals || !totals.length) {
+                fishEl.innerHTML += '<div class="bdock-forecast-empty">No data yet.</div>';
+                return;
+            }
+            const wrap = document.createElement('div');
+            wrap.style.display = 'grid';
+            wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(140px, 1fr))';
+            wrap.style.gap = '8px';
+            totals.forEach(t => {
+                const card = document.createElement('div');
+                card.style.background = 'rgba(14,22,34,0.85)';
+                card.style.border = '1px solid rgba(118,190,255,0.12)';
+                card.style.borderRadius = '8px';
+                card.style.padding = '6px 8px';
+                card.innerHTML = `<strong>${(t.fishname || t.fishid)}</strong><br/><span style="opacity:.7;font-size:12px;">${t.total} caught</span>`;
+                wrap.appendChild(card);
+            });
+            fishEl.appendChild(wrap);
+        };
+        const fetchAndRender = () => {
+            fetch(`/api/events/${EVENT_KEY}`)
+              .then(r => r.json())
+              .then(data => {
+                renderMeta(data.meta);
+                renderLeaderboard(data.leaders);
+                renderFishTotals(data.fishTotals);
+              })
+              .catch(() => {
+                if (metaEl) metaEl.innerHTML = '<h3>Active Event</h3><div class="bdock-forecast-empty">Failed to load.</div>';
+              });
+        };
+        fetchAndRender();
+        // Periodic refresh every 15s while overlay open
+        const interval = setInterval(() => { if (document.body.contains(overlay)) fetchAndRender(); else clearInterval(interval); }, 15000);
         // Create Rowan (Harborwright) NPC animations if sprites available
         try {
             if (this.textures && this.textures.exists('rowan_idle') && !this.anims.exists('rowan_idle')) {
@@ -2238,6 +2303,32 @@ export class BrokenDock extends Phaser.Scene {
             this._addItemToInventory(chosen.id, 1);
             this._refreshSharedUi();
             this._showToast && this._showToast(`Caught ${chosen.name}! +${xpGain} fishing XP`, 2000);
+
+            // Report catch to active event (Intro to Fishing) with best-effort POST + small retry queue
+            try {
+                const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+                const payload = { fishId: chosen.id, fishName: chosen.name, username };
+                this._eventCatchQueue = this._eventCatchQueue || [];
+                const send = () => {
+                    fetch('/api/events/intro_to_fishing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+                        .then(r => { if (!r.ok) throw new Error('bad status'); })
+                        .catch(() => { this._eventCatchQueue.push(payload); });
+                };
+                send();
+                // Background flush every 10s (set up once)
+                if (!this._eventFlushScheduled) {
+                    this._eventFlushScheduled = true;
+                    addTimeEvent(this, { delay: 10000, loop: true, callback: () => {
+                        if (!this._eventCatchQueue.length) return;
+                        const next = this._eventCatchQueue.splice(0, 3); // batch a few
+                        for (const p of next) {
+                            fetch('/api/events/intro_to_fishing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+                                .then(r => { if (!r.ok) throw new Error('retry failed'); })
+                                .catch(() => { this._eventCatchQueue.push(p); });
+                        }
+                    }});
+                }
+            } catch (e) { /* ignore network errors */ }
 
             const contextAfter = this._calculateFishingContext();
             hooks.onCatch && hooks.onCatch({ fish: chosen, xpGain, remainingBait: remainingAfterConsume, hookChance: math.hookChance, contextBefore, contextAfter });
