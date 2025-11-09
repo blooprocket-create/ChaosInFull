@@ -180,6 +180,22 @@ export class Cave extends Phaser.Scene {
     // Preselected coordinates (percent-based) for a consistent layout across resolutions
     const staticNodes = [];
 
+    // Proximity check helper must be defined before first use (avoids TDZ errors)
+    const isTooClose = (x, y) => {
+        // avoid furnace and portal
+        try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 120) return true; } catch (e) {}
+        try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
+        // avoid Wayne NPC and immediate player spawn
+        try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
+        try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 110) return true; } catch (e) {}
+        for (const p of placedNodes) {
+            const pr = (typeof p.r === 'number') ? p.r : NODE_RADIUS;
+            const req = pr + NODE_RADIUS + WALKWAY_BUFFER;
+            if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < req) return true;
+        }
+        return false;
+    };
+
     // Helper to push nodes if not conflicting
     const pushNode = (x, y, type) => {
         const nx = Phaser.Math.Clamp(x, bounds.x1, bounds.x2);
@@ -243,20 +259,13 @@ export class Cave extends Phaser.Scene {
     ];
     for (const g of edges) pushNode(g.x, g.y, g.type);
 
-    const isTooClose = (x, y) => {
-        // avoid furnace and portal
-        try { if (this.furnace && Phaser.Math.Distance.Between(x, y, this.furnace.x, this.furnace.y) < 120) return true; } catch (e) {}
-        try { if (this.portal && Phaser.Math.Distance.Between(x, y, this.portal.x, this.portal.y) < 120) return true; } catch (e) {}
-        // avoid Wayne NPC and immediate player spawn
-        try { if (this.player && Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 80) return true; } catch (e) {}
-        try { if (this._wayne && Phaser.Math.Distance.Between(x, y, this._wayne.x, this._wayne.y) < 110) return true; } catch (e) {}
-        for (const p of placedNodes) {
-            const pr = (typeof p.r === 'number') ? p.r : NODE_RADIUS;
-            const req = pr + NODE_RADIUS + WALKWAY_BUFFER;
-            if (Phaser.Math.Distance.Between(x, y, p.x, p.y) < req) return true;
-        }
-        return false;
-    };
+    // Add 2 gold ore nodes (upper-right quadrant but offset to avoid portal proximity)
+    const gold1 = pick(0.58, 0.22);
+    const gold2 = pick(0.62, 0.78);
+    pushNode(gold1.x, gold1.y, 'gold');
+    pushNode(gold2.x, gold2.y, 'gold');
+
+    
 
     for (const def of staticNodes) {
         // clamp to bounds and skip if conflicts with critical objects
