@@ -15,16 +15,17 @@ export async function POST(req: Request) {
   if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const entries = Object.entries(items);
   try {
+    // IMPORTANT: Full replacement - delete all existing items first, then insert new state
+    // This ensures sold/removed items are actually deleted from the database
+    await q`delete from "ItemStack" where characterid = ${characterId}`;
+    
+    // Insert all items from the current inventory state
     for (const [itemKey, count] of entries) {
       const safe = Math.max(0, Math.floor(count));
-      if (safe <= 0) {
-        // Delete stack when zero to keep DB clean
-        await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`.catch(() => {});
-      } else {
+      if (safe > 0) {
         await q`
           insert into "ItemStack" (characterid, itemkey, count)
           values (${characterId}, ${itemKey}, ${safe})
-          on conflict (characterid, itemkey) do update set count = excluded.count
         `;
       }
     }

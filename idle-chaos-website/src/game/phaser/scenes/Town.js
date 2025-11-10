@@ -662,8 +662,34 @@ export class Town extends Phaser.Scene {
                 localStorage.setItem(key, JSON.stringify(userObj));
             }
         } catch (e) { console.warn('Could not persist character', e); }
-        // Async remote persistence (inventory handled elsewhere)
-        try { if (window.__cif_persist) window.__cif_persist.saveCharacter(username, this.char); } catch (e) { /* ignore */ }
+        
+        // Async remote persistence - save character AND inventory to database
+        try { 
+            if (window.__cif_persist) {
+                window.__cif_persist.saveCharacter(username, this.char);
+                
+                // IMPORTANT: Also sync inventory to ItemStack table
+                if (this.char.id && window.__cif_persist.saveInventory) {
+                    const invMap = {};
+                    const inv = this.char.inventory || [];
+                    for (const slot of inv) {
+                        // Skip null/undefined slots
+                        if (!slot) continue;
+                        // Use slot.id as the item key
+                        const itemKey = slot.id;
+                        if (!itemKey) continue;
+                        // Accumulate quantities for the same item key
+                        const qty = slot.qty || 1;
+                        invMap[itemKey] = (invMap[itemKey] || 0) + qty;
+                    }
+                    console.log('[Town] Syncing inventory to database:', invMap);
+                    window.__cif_persist.saveInventory(this.char.id, invMap).catch((err) => {
+                        console.warn('[Town] Failed to sync inventory:', err);
+                    });
+                }
+            }
+        } catch (e) { /* ignore */ }
+        
         // If the inventory modal is open, refresh it so UI updates live after changes
         try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }
@@ -833,25 +859,29 @@ export class Town extends Phaser.Scene {
     _buyFromShop(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-    const def = defs && defs[itemId];
-    // Charge 110% of the item's defined value when buying from the shop.
-    const baseValue = (def && typeof def.value === 'number') ? def.value : (def && def.buyPrice ? def.buyPrice : 100);
-    const price = Math.floor(baseValue * 1.1);
-    const total = price * qty;
+        const def = defs && defs[itemId];
+        // Charge 110% of the item's defined value when buying from the shop.
+        const baseValue = (def && typeof def.value === 'number') ? def.value : (def && def.buyPrice ? def.buyPrice : 100);
+        const price = Math.floor(baseValue * 1.1);
+        const total = price * qty;
+        
         if ((this.char.gold || 0) < total) { this._showToast('Not enough gold'); return; }
         this.char.gold -= total;
-        // add to inventory
+        
+        // Add to inventory
         this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
         const added = (window && window.__shared_ui && window.__shared_ui.addItemToSlots) ? window.__shared_ui.addItemToSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){ if(!slots[i]){ slots[i]={id:id,name:id,qty:1}; q--; } } return q<=0; })(this.char.inventory,itemId,qty);
         if (!added) { this._showToast('Not enough inventory space'); this.char.gold += total; return; }
+        
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        this._persistCharacter(username);
+        this._persistCharacter(username); // This now automatically syncs inventory to database
+        
         this._showToast('Bought ' + qty + 'x ' + ((def && def.name) || itemId) + ' for ' + total + ' gold');
         if (this._shopModal) this._refreshShopModal();
         if (this._inventoryModal) this._refreshInventoryModal();
         try { this._updateHUD(); } catch(e) {}
     }
-    async _sellToShop(itemId, qty = 1) {
+    _sellToShop(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
         const def = defs && defs[itemId];
@@ -867,22 +897,7 @@ export class Town extends Phaser.Scene {
         
         this.char.gold = (this.char.gold || 0) + total;
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        this._persistCharacter(username);
-        
-        // Sync inventory to database (ItemStack table)
-        if (this.char.id && window.__cif_persist && window.__cif_persist.saveInventory) {
-            try {
-                const invMap = {};
-                for (const slot of this.char.inventory || []) {
-                    if (slot && slot.id) {
-                        invMap[slot.id] = (invMap[slot.id] || 0) + (slot.qty || 1);
-                    }
-                }
-                await window.__cif_persist.saveInventory(this.char.id, invMap);
-            } catch (err) {
-                console.warn('Failed to sync inventory to database after selling:', err);
-            }
-        }
+        this._persistCharacter(username); // This now automatically syncs inventory to database
         
         this._showToast('Sold ' + qty + 'x ' + ((def && def.name) || itemId) + ' for ' + total + ' gold');
         if (this._shopModal) this._refreshShopModal();
@@ -1002,6 +1017,25 @@ export class Town extends Phaser.Scene {
                         this.char.inventory.push({ id: key, name: key, qty: count });
                     }
                 }
+                
+                // Update localStorage to keep it in sync (without triggering another database save)
+                const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+                if (username) {
+                    try {
+                        const key = 'cif_user_' + username;
+                        const userObj = JSON.parse(localStorage.getItem(key) || '{}');
+                        if (userObj && userObj.characters) {
+                            for (let i = 0; i < userObj.characters.length; i++) {
+                                const uc = userObj.characters[i];
+                                if (uc && uc.id === this.char.id) {
+                                    userObj.characters[i] = this.char;
+                                    localStorage.setItem(key, JSON.stringify(userObj));
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) { /* ignore */ }
+                }
             }
             
             this._showToast('Deposited ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
@@ -1041,6 +1075,25 @@ export class Town extends Phaser.Scene {
                     if (count > 0) {
                         this.char.inventory.push({ id: key, name: key, qty: count });
                     }
+                }
+                
+                // Update localStorage to keep it in sync (without triggering another database save)
+                const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
+                if (username) {
+                    try {
+                        const key = 'cif_user_' + username;
+                        const userObj = JSON.parse(localStorage.getItem(key) || '{}');
+                        if (userObj && userObj.characters) {
+                            for (let i = 0; i < userObj.characters.length; i++) {
+                                const uc = userObj.characters[i];
+                                if (uc && uc.id === this.char.id) {
+                                    userObj.characters[i] = this.char;
+                                    localStorage.setItem(key, JSON.stringify(userObj));
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) { /* ignore */ }
                 }
             }
             
