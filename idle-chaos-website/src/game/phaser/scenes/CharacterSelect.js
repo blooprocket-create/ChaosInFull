@@ -372,16 +372,18 @@ export class CharacterSelect extends Phaser.Scene {
             const char = selectedChar;
             closeCreateModal();
             
-            // Migrate localStorage character to database if needed
+            // Sync localStorage character to database on every play
             if (char.id) {
                 try {
                     // Check if character exists in database
                     const checkRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`);
                     const checkData = await checkRes.json();
                     
+                    let charId = char.id;
+                    
                     if (!checkData.ok || !checkData.character) {
-                        // Character doesn't exist in DB - create it with all localStorage data
-                        console.log('Migrating localStorage character to database:', char.name);
+                        // Character doesn't exist in DB - create it first
+                        console.log('Creating character in database:', char.name);
                         const formData = new FormData();
                         formData.set('name', char.name || 'Unnamed');
                         formData.set('gender', char.gender || 'Male');
@@ -396,74 +398,123 @@ export class CharacterSelect extends Phaser.Scene {
                         const createData = await createRes.json();
                         
                         if (createData.ok && createData.character) {
-                            // Update character with DB ID
-                            const newId = createData.character.id;
-                            char.id = newId;
-                            
-                            // Sync all character data to the new DB record
-                            const patchData = {
-                                characterId: newId,
-                                gold: char.gold || 0,
-                                level: char.level || 1,
-                                flags: char.flags || {},
-                                equipment: char.equipment || {},
-                                talents: char.talents || {},
-                                stats: char.stats || {},
-                                mining: char.mining || { level: 1, exp: 0 },
-                                woodcutting: char.woodcutting || { level: 1, exp: 0 },
-                                crafting: char.crafting || { level: 1, exp: 0 },
-                                fishing: char.fishing || { level: 1, exp: 0 },
-                                lastLocation: char.lastLocation || null
-                            };
-                            
-                            await fetch('/api/account/characters/patch', {
+                            charId = createData.character.id;
+                            char.id = charId;
+                            console.log('Character created in database with ID:', charId);
+                        }
+                    }
+                    
+                    // ALWAYS sync localStorage data to database on play (even if character already exists)
+                    // This ensures database has the latest state from localStorage
+                    console.log('Syncing localStorage data to database for:', char.name);
+                    
+                    const patchData = {
+                        characterId: charId,
+                        // Core progression
+                        ...(char.gold !== undefined && { gold: char.gold }),
+                        ...(char.level !== undefined && { level: char.level }),
+                        ...(char.exp !== undefined && { exp: char.exp }),
+                        ...(char.expToLevel !== undefined && { expToLevel: char.expToLevel }),
+                        // Character appearance/setup
+                        ...(char.gender && { gender: char.gender }),
+                        ...(char.hat && { hat: char.hat }),
+                        ...(char.race && { race: char.race }),
+                        ...(char.weapon && { weapon: char.weapon }),
+                        // Game state objects
+                        ...(char.flags && { flags: char.flags }),
+                        ...(char.equipment && { equipment: char.equipment }),
+                        ...(char.talents && { talents: char.talents }),
+                        ...(char.stats && { stats: char.stats }),
+                        // Skills - only include if they exist (have been used)
+                        ...(char.mining && { mining: char.mining }),
+                        ...(char.woodcutting && { woodcutting: char.woodcutting }),
+                        ...(char.crafting && { crafting: char.crafting }),
+                        ...(char.fishing && { fishing: char.fishing }),
+                        ...(char.smithing && { smithing: char.smithing }),
+                        ...(char.cooking && { cooking: char.cooking }),
+                        // Other game state
+                        ...(char.lastLocation && { lastLocation: char.lastLocation }),
+                        ...(char.tutorialCompleted !== undefined && { tutorialCompleted: char.tutorialCompleted }),
+                        ...(char.activeQuests && { activeQuests: char.activeQuests }),
+                        ...(char.completedQuests && { completedQuests: char.completedQuests }),
+                        ...(char.lastPlayed && { lastPlayed: char.lastPlayed })
+                    };
+                    
+                    console.log('Patch data includes smithing:', !!char.smithing, char.smithing);
+                    
+                    await fetch('/api/account/characters/patch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patchData)
+                    });
+                    
+                    // Sync inventory if present
+                    if (Array.isArray(char.inventory) && char.inventory.length > 0) {
+                        const invMap = {};
+                        for (const slot of char.inventory) {
+                            if (slot && slot.id) {
+                                invMap[slot.id] = (invMap[slot.id] || 0) + (slot.qty || 1);
+                            }
+                        }
+                        if (Object.keys(invMap).length > 0) {
+                            await fetch('/api/account/characters/inventory', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(patchData)
+                                body: JSON.stringify({ characterId: charId, items: invMap })
                             });
-                            
-                            // Sync inventory if present
-                            if (Array.isArray(char.inventory) && char.inventory.length > 0) {
-                                const invMap = {};
-                                for (const slot of char.inventory) {
-                                    if (slot && slot.id) {
-                                        invMap[slot.id] = (invMap[slot.id] || 0) + (slot.qty || 1);
+                        }
+                    }
+                    
+                    // Sync quests if present
+                    if ((Array.isArray(char.activeQuests) && char.activeQuests.length > 0) || 
+                        (Array.isArray(char.completedQuests) && char.completedQuests.length > 0)) {
+                        await fetch('/api/account/characters/quests', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                characterId: charId,
+                                active: char.activeQuests || [],
+                                completed: char.completedQuests || []
+                            })
+                        });
+                    }
+                    
+                    // Update localStorage
+                    if (userObj && userObj.characters && selectedIdx !== null) {
+                        userObj.characters[selectedIdx] = char;
+                        saveUser(username, userObj);
+                    }
+                    
+                    console.log('Successfully synced character data to database!');
+                    
+                    // IMPORTANT: Reload character from database to get fresh state (including quests from CharacterQuest table)
+                    if (charId) {
+                        try {
+                            const freshRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(charId)}`);
+                            const freshData = await freshRes.json();
+                            if (freshData.ok && freshData.character) {
+                                const dbChar = freshData.character;
+                                // Convert quest format from API ({ quests: { active: [], completed: [] } })
+                                // to Phaser format ({ activeQuests: [], completedQuests: [] })
+                                if (dbChar.quests) {
+                                    if (Array.isArray(dbChar.quests.active)) {
+                                        dbChar.activeQuests = dbChar.quests.active;
                                     }
+                                    if (Array.isArray(dbChar.quests.completed)) {
+                                        dbChar.completedQuests = dbChar.quests.completed;
+                                    }
+                                    delete dbChar.quests; // Remove nested format
                                 }
-                                if (Object.keys(invMap).length > 0) {
-                                    await fetch('/api/account/characters/inventory', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ characterId: newId, items: invMap })
-                                    });
-                                }
+                                // Merge database state into character object
+                                Object.assign(char, dbChar);
+                                console.log('Loaded fresh character state from database (quests, inventory, skills)');
                             }
-                            
-                            // Sync quests if present
-                            if ((Array.isArray(char.activeQuests) && char.activeQuests.length > 0) || 
-                                (Array.isArray(char.completedQuests) && char.completedQuests.length > 0)) {
-                                await fetch('/api/account/characters/quests', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        characterId: newId,
-                                        active: char.activeQuests || [],
-                                        completed: char.completedQuests || []
-                                    })
-                                });
-                            }
-                            
-                            // Update localStorage with new ID
-                            if (userObj && userObj.characters && selectedIdx !== null) {
-                                userObj.characters[selectedIdx] = char;
-                                saveUser(username, userObj);
-                            }
-                            
-                            console.log('Successfully migrated character to database!');
+                        } catch (e) {
+                            console.warn('Failed to reload character from database, using localStorage:', e);
                         }
                     }
                 } catch (err) {
-                    console.warn('Character migration check/create failed (will use localStorage):', err);
+                    console.warn('Character sync failed (will use localStorage):', err);
                 }
             }
             
