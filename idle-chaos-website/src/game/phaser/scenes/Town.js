@@ -667,54 +667,34 @@ export class Town extends Phaser.Scene {
         // If the inventory modal is open, refresh it so UI updates live after changes
         try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }
-    // --- Shared account storage helpers ---
-    _getAccountStorage(username) {
-        if (!username) return [];
-        // Prefer server snapshot if bridge available
+    // --- Shared account storage helpers (database-backed) ---
+    async _getAccountStorage() {
         try {
-            if (window.__cif_persist) {
-                // Kick off migration in background (first run only)
-                const key = 'cif_user_' + username;
-                const blob = JSON.parse(localStorage.getItem(key) || 'null');
-                if (blob && !blob.migratedAt) { window.__cif_persist.migrateLocalStorageBlob(username).catch(()=>{}); }
-                return window.__cif_persist.getAccountStorage();
-            }
-        } catch (e) { /* ignore */ }
-        try {
-            const key = 'cif_user_' + username;
-            const userObj = JSON.parse(localStorage.getItem(key));
-            if (userObj && userObj.storage) return userObj.storage;
-        } catch (e) { /* ignore */ }
-        return Array.from({length:50}).map(_=>null);
-    }
-    _setAccountStorage(username, storageArr) {
-        if (!username) return;
-        try {
-            const key = 'cif_user_' + username;
-            const userObj = JSON.parse(localStorage.getItem(key)) || { characters: [] };
-            userObj.storage = storageArr || Array.from({length:50}).map(_=>null);
-            localStorage.setItem(key, JSON.stringify(userObj));
-        } catch (e) { console.warn('Could not set account storage', e); }
-        // Push merged storage to server if bridge available
-        try {
-            if (window.__cif_persist) {
-                const map = {};
-                for (const slot of storageArr || []) {
-                    if (!slot) continue;
-                    const { itemkey, count } = slot;
-                    if (!itemkey || typeof count !== 'number') continue;
-                    map[itemkey] = (map[itemkey] || 0) + count;
+            const res = await fetch('/api/account/storage', { cache: 'no-store' });
+            const data = await res.json();
+            if (data && data.items) {
+                // Convert map to slot array format
+                const slots = [];
+                for (const [itemkey, count] of Object.entries(data.items)) {
+                    if (count > 0) {
+                        slots.push({ id: itemkey, name: itemkey, qty: count });
+                    }
                 }
-                window.__cif_persist.upsertAccountStorage(map).catch(()=>{});
+                return slots;
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.warn('Failed to load account storage from database:', e);
+        }
+        return [];
+    }
+    
+    // Deprecated - storage updates now happen via transfer API
+    _setAccountStorage() {
+        // No-op: updates are handled by _depositToStorage and _withdrawFromStorage via API calls
     }
     // --- Storage chest modal ---
-    _openStorageModal() {
+    async _openStorageModal() {
         if (this._storageModal) return;
-        const inv = this.char.inventory || [];
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        const storage = this._getAccountStorage(username) || Array.from({length:50}).map(_=>null);
         const modal = document.createElement('div');
         modal.id = 'storage-modal';
         modal.style.position = 'fixed';
@@ -727,11 +707,11 @@ export class Town extends Phaser.Scene {
         modal.style.borderRadius = '12px';
         modal.style.color = '#fff';
         modal.style.minWidth = '420px';
-        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Account Storage</strong><button id='storage-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' class='grid-scroll'><div id='storage-inv-grid' class='slot-grid'></div></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' class='grid-scroll'><div id='storage-box-grid' class='slot-grid'></div></div></div></div>`;
+        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Account Storage</strong><button id='storage-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' class='grid-scroll'><div id='storage-inv-grid' class='slot-grid'></div></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' class='grid-scroll'><div id='storage-box-grid' class='slot-grid'>Loading...</div></div></div></div>`;
         document.body.appendChild(modal);
         this._storageModal = modal;
         document.getElementById('storage-close').onclick = () => this._closeStorageModal();
-        this._refreshStorageModal();
+        await this._refreshStorageModal();
     }
     _closeStorageModal() {
         if (this._storageModal && this._storageModal.parentNode) this._storageModal.parentNode.removeChild(this._storageModal);
@@ -871,35 +851,54 @@ export class Town extends Phaser.Scene {
         if (this._inventoryModal) this._refreshInventoryModal();
         try { this._updateHUD(); } catch(e) {}
     }
-    _sellToShop(itemId, qty = 1) {
+    async _sellToShop(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-    const def = defs && defs[itemId];
-    // Pay the player 80% of the item's defined value when selling to the shop.
-    const baseSellValue = (def && typeof def.value === 'number') ? def.value : (def && def.sellPrice ? def.sellPrice : 50);
-    const price = Math.floor(baseSellValue * 0.8);
-    const total = price * qty;
-        // remove from inventory
+        const def = defs && defs[itemId];
+        // Pay the player 80% of the item's defined value when selling to the shop.
+        const baseSellValue = (def && typeof def.value === 'number') ? def.value : (def && def.sellPrice ? def.sellPrice : 50);
+        const price = Math.floor(baseSellValue * 0.8);
+        const total = price * qty;
+        
+        // Remove from inventory
         this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
         const removed = (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) ? window.__shared_ui.removeItemFromSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){const s=slots[i]; if(!s) continue; if(s.id!==id) continue; if(s.qty&&s.qty>q){s.qty-=q; q=0; break;} q-=(s.qty||1); slots[i]=null;} return q<=0;})(this.char.inventory,itemId,qty);
         if (!removed) { this._showToast('Item not found'); return; }
+        
         this.char.gold = (this.char.gold || 0) + total;
         const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
         this._persistCharacter(username);
+        
+        // Sync inventory to database (ItemStack table)
+        if (this.char.id && window.__cif_persist && window.__cif_persist.saveInventory) {
+            try {
+                const invMap = {};
+                for (const slot of this.char.inventory || []) {
+                    if (slot && slot.id) {
+                        invMap[slot.id] = (invMap[slot.id] || 0) + (slot.qty || 1);
+                    }
+                }
+                await window.__cif_persist.saveInventory(this.char.id, invMap);
+            } catch (err) {
+                console.warn('Failed to sync inventory to database after selling:', err);
+            }
+        }
+        
         this._showToast('Sold ' + qty + 'x ' + ((def && def.name) || itemId) + ' for ' + total + ' gold');
         if (this._shopModal) this._refreshShopModal();
         if (this._inventoryModal) this._refreshInventoryModal();
         try { this._updateHUD(); } catch(e) {}
     }
-    _refreshStorageModal() {
+    async _refreshStorageModal() {
         if (!this._storageModal) return;
         const invGrid = this._storageModal.querySelector('#storage-inv-grid');
         const boxGrid = this._storageModal.querySelector('#storage-box-grid');
         invGrid.innerHTML = '';
-        boxGrid.innerHTML = '';
+        boxGrid.innerHTML = 'Loading...';
     const invSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-    const storageSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this._getAccountStorage(username) || []) : Array.from({length:50}).map(_=>null);
+        const storageData = await this._getAccountStorage();
+    const storageSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(storageData || []) : Array.from({length:50}).map(_=>null);
+        boxGrid.innerHTML = '';
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
         // render inventory slots — slots are clickable to Deposit
         for (let i = 0; i < invSlots.length; i++) {
@@ -973,37 +972,85 @@ export class Town extends Phaser.Scene {
             boxGrid.appendChild(el);
         }
     }
-    _depositToStorage(itemId, qty = 1) {
+    async _depositToStorage(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
-        // remove from inventory slots and add to storage slots
-    this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
-    const removed = (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) ? window.__shared_ui.removeItemFromSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){const s=slots[i]; if(!s) continue; if(s.id!==id) continue; if(s.qty&&s.qty>q){s.qty-=q; q=0; break;} q-=(s.qty||1); slots[i]=null;} return q<=0;})(this.char.inventory,itemId,qty);
-        if (!removed) { this._showToast('Item not found'); return; }
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-    const storage = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this._getAccountStorage(username) || []) : Array.from({length:50}).map(_=>null);
-    const added = (window && window.__shared_ui && window.__shared_ui.addItemToSlots) ? window.__shared_ui.addItemToSlots(storage, itemId, qty) : (function(slots,id,q){ while(q>0){ let placed=false; for(const s of slots){ if(s && s.id===id){ const can= (999999)-(s.qty||0); const take=Math.min(can,q); if(take>0){ s.qty=(s.qty||0)+take; q-=take; placed=true; if(q<=0) return true; } } } for(let i=0;i<slots.length&&q>0;i++){ if(!slots[i]){ const put=q; slots[i]={id:id,name:id,qty:put}; q-=put; placed=true; } } if(!placed) break; } return q<=0; })(storage,itemId,qty);
-        if (!added) { this._showToast('Not enough storage space'); return; }
-        this._setAccountStorage(username, storage);
-        this._persistCharacter(username);
-        this._showToast('Deposited ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
-        if (this._storageModal) this._refreshStorageModal();
-        if (this._inventoryModal) this._refreshInventoryModal();
+        if (!this.char.id) { this._showToast('Character ID missing'); return; }
+        
+        try {
+            const res = await fetch('/api/account/storage/transfer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    characterId: this.char.id,
+                    direction: 'toStorage',
+                    itemKey: itemId,
+                    count: qty
+                })
+            });
+            
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                this._showToast(data.error || 'Failed to deposit');
+                return;
+            }
+            
+            // Update character inventory from response
+            if (data.inventory) {
+                this.char.inventory = [];
+                for (const [key, count] of Object.entries(data.inventory)) {
+                    if (count > 0) {
+                        this.char.inventory.push({ id: key, name: key, qty: count });
+                    }
+                }
+            }
+            
+            this._showToast('Deposited ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
+            if (this._storageModal) await this._refreshStorageModal();
+            if (this._inventoryModal) this._refreshInventoryModal();
+        } catch (err) {
+            console.error('Deposit failed:', err);
+            this._showToast('Deposit failed');
+        }
     }
-    _withdrawFromStorage(itemId, qty = 1) {
+    async _withdrawFromStorage(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-    const storage = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this._getAccountStorage(username) || []) : Array.from({length:50}).map(_=>null);
-    const removed = (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) ? window.__shared_ui.removeItemFromSlots(storage, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){ const s=slots[i]; if(!s) continue; if(s.id!==id) continue; if(s.qty&&s.qty>q){ s.qty-=q; q=0; break;} q-=(s.qty||1); slots[i]=null;} return q<=0;})(storage,itemId,qty);
-        if (!removed) { this._showToast('Not enough in storage'); return; }
-        this._setAccountStorage(username, storage);
-        // add to inventory
-    this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
-    const added = (window && window.__shared_ui && window.__shared_ui.addItemToSlots) ? window.__shared_ui.addItemToSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){ if(!slots[i]){ slots[i]={id:id,name:id,qty:1}; q--; } } return q<=0; })(this.char.inventory,itemId,qty);
-        if (!added) { this._showToast('Not enough inventory space'); return; }
-        this._persistCharacter(username);
-        this._showToast('Withdrew ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
-        if (this._storageModal) this._refreshStorageModal();
-        if (this._inventoryModal) this._refreshInventoryModal();
+        if (!this.char.id) { this._showToast('Character ID missing'); return; }
+        
+        try {
+            const res = await fetch('/api/account/storage/transfer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    characterId: this.char.id,
+                    direction: 'toInventory',
+                    itemKey: itemId,
+                    count: qty
+                })
+            });
+            
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                this._showToast(data.error || 'Failed to withdraw');
+                return;
+            }
+            
+            // Update character inventory from response
+            if (data.inventory) {
+                this.char.inventory = [];
+                for (const [key, count] of Object.entries(data.inventory)) {
+                    if (count > 0) {
+                        this.char.inventory.push({ id: key, name: key, qty: count });
+                    }
+                }
+            }
+            
+            this._showToast('Withdrew ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
+            if (this._storageModal) await this._refreshStorageModal();
+            if (this._inventoryModal) this._refreshInventoryModal();
+        } catch (err) {
+            console.error('Withdraw failed:', err);
+            this._showToast('Withdraw failed');
+        }
     }
     // (Fog helpers removed – superseded by Phaser particle fog)
 
