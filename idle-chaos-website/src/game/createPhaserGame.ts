@@ -50,8 +50,9 @@ export async function createPhaserGame(opts: {
       const maybePendingDestroy = (existing as unknown as { pendingDestroy?: boolean }).pendingDestroy;
       const alive = 'systems' in existing && !maybePendingDestroy;
       if (alive) {
-        const currentParent = (existing as any).canvas?.parentElement || null;
-        const canvasEl = (existing as any).canvas as HTMLCanvasElement | undefined;
+        const existingWithCanvas = existing as unknown as { canvas?: HTMLCanvasElement };
+        const currentParent = existingWithCanvas.canvas?.parentElement || null;
+        const canvasEl = existingWithCanvas.canvas;
         if (currentParent !== parent && canvasEl) {
           try { parent.appendChild(canvasEl); } catch {}
         }
@@ -65,8 +66,9 @@ export async function createPhaserGame(opts: {
   if (w.__GAME_CREATING__) {
     const g = await w.__GAME_CREATING__;
     try {
-      const currentParent = (g as any).canvas?.parentElement || null;
-      const canvasEl = (g as any).canvas as HTMLCanvasElement | undefined;
+      const gWithCanvas = g as unknown as { canvas?: HTMLCanvasElement };
+      const currentParent = gWithCanvas.canvas?.parentElement || null;
+      const canvasEl = gWithCanvas.canvas;
       if (currentParent !== parent && canvasEl) {
         try { parent.appendChild(canvasEl); } catch {}
       }
@@ -77,7 +79,7 @@ export async function createPhaserGame(opts: {
 
   // Establish a single creation promise immediately to close race window
   w.__GAME_CREATING__ = (async () => {
-    const Phaser = (await import('phaser')) as unknown as typeof PhaserTypes;
+    const Phaser = (await import('phaser')) as typeof PhaserTypes;
 
     // Load scenes & data in parallel
     const [
@@ -132,6 +134,15 @@ export async function createPhaserGame(opts: {
       import('./phaser/data/plot.js'),
     ]);
 
+    type QuestModule = {
+      QUEST_DEFS: unknown;
+      getQuestById: unknown;
+      startQuest: unknown;
+      updateQuestProgress: unknown;
+      checkQuestCompletion: unknown;
+      completeQuest: unknown;
+      getQuestObjectiveState: unknown;
+    };
     const {
       QUEST_DEFS,
       getQuestById,
@@ -140,7 +151,7 @@ export async function createPhaserGame(opts: {
       checkQuestCompletion,
       completeQuest,
       getQuestObjectiveState,
-    } = questModule as any;
+    } = questModule as QuestModule;
 
     const [
       SharedUI,
@@ -176,17 +187,29 @@ export async function createPhaserGame(opts: {
     w.checkQuestCompletion = checkQuestCompletion;
     w.completeQuest = completeQuest;
     w.getQuestObjectiveState = getQuestObjectiveState;
-    w.__shared_ui = (SharedUI as any);
-    w.__furnace_shared = (furnaceShared as any).default || furnaceShared;
-    w.__hud_shared = (hudShared as any).default || hudShared;
-    w.__shared_keys = (keysShared as any).default || keysShared;
-    w.__overlays_shared = (overlaysShared as any).default || overlaysShared;
-    w.__portal_shared = (portalShared as any).default || portalShared;
-    w.__workbench_shared = (workbenchShared as any).default || workbenchShared;
-    try { if ((diagnostics as any) && typeof (diagnostics as any).installDiagnostics === 'function') (diagnostics as any).installDiagnostics(null); } catch {}
+    w.__shared_ui = SharedUI as unknown;
+    const pickDefault = (mod: unknown): unknown => {
+      if (mod && typeof mod === 'object' && 'default' in (mod as Record<string, unknown>)) {
+        const d = (mod as Record<string, unknown>).default;
+        return d ?? mod;
+      }
+      return mod;
+    };
+    w.__furnace_shared = pickDefault(furnaceShared);
+    w.__hud_shared = pickDefault(hudShared);
+    w.__shared_keys = pickDefault(keysShared);
+    w.__overlays_shared = pickDefault(overlaysShared);
+    w.__portal_shared = pickDefault(portalShared);
+    w.__workbench_shared = pickDefault(workbenchShared);
+    try {
+      const di = diagnostics as unknown;
+      if (di && typeof (di as { installDiagnostics?: (arg: unknown) => void }).installDiagnostics === 'function') {
+        (di as { installDiagnostics: (arg: unknown) => void }).installDiagnostics(null);
+      }
+    } catch {}
 
-    const config: PhaserTypes.Types.Core.GameConfig = {
-      type: (Phaser as any).AUTO,
+    const config: Phaser.Types.Core.GameConfig = {
+      type: Phaser.AUTO,
       title: 'Veil Keeper',
       width: 1280,
       height: 720,
@@ -211,11 +234,11 @@ export async function createPhaserGame(opts: {
         GraveForest,
         BrokenDock,
       ],
-      scale: { mode: (Phaser as any).Scale.FIT, autoCenter: (Phaser as any).Scale.CENTER_BOTH },
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
       loader: { baseURL: '/phaser-game/', path: '' },
     };
 
-    const game = new (Phaser as any).Game(config) as PhaserTypes.Game;
+    const game = new Phaser.Game(config);
     // Store character data if supplied
     if (character) {
       game.registry.set('characterId', character.id);
