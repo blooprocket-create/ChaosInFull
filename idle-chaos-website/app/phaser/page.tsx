@@ -43,17 +43,14 @@ export default async function PhaserGamePage({ searchParams }: { searchParams?: 
       <div className="mb-4">
         <PhaserGameCanvas 
           character={ch ? {
-            // Pass through the selected character id from the dashboard link.
-            // Scene code will fetch the full character state once the game boots.
             id: ch,
-            name: "",
-            class: "",
-            level: 0,
+            name: "Selected", // placeholder; scene will hydrate real name
+            class: "Unknown",
+            level: 1,
           } : (session ? {
-            // Fallback: logged-in session with no explicit character selection
             id: session.userId,
-            name: "Player",
-            class: "Beginner",
+            name: session.userId.slice(0, 6),
+            class: "Traveler",
             level: 1,
           } : undefined)}
           initialScene="Boot"

@@ -23,10 +23,10 @@ export default function PhaserGameCanvas({
     const initGame = async () => {
       try {
         // Creation is idempotent and will reuse the singleton or await in-flight creation
-        // Defensive: clean up any lingering global UI from a previous session before starting
+        // Defensive cleanup: only remove HUD/tooltips (NOT login/character select roots on mount to avoid blank screen)
         try {
           if (typeof document !== 'undefined') {
-            const ids = [
+            const transientIds = [
               'global-skill-bar',
               'shared-item-tooltip',
               'shared-skill-tooltip',
@@ -38,35 +38,16 @@ export default function PhaserGameCanvas({
               'furnace-modal',
               'storage-modal',
               'settings-modal',
-              // Login/Character Select scene roots
-              'login-container',
-              'character-select-root',
             ];
-            for (const id of ids) {
+            for (const id of transientIds) {
               const el = document.getElementById(id);
               if (el && el.parentNode) el.parentNode.removeChild(el);
             }
-            // Remove any HUD elements from previous sessions
             document.querySelectorAll('[id$="-hud"]').forEach((node) => {
-              try {
-                if (node.parentNode) {
-                  node.parentNode.removeChild(node);
-                }
-              } catch {}
+              try { if (node.parentNode) node.parentNode.removeChild(node); } catch {}
             });
-            // Remove any generic modal overlays left behind
             document.querySelectorAll('.modal-overlay').forEach((n) => {
-              try {
-                if (n.parentNode) {
-                  n.parentNode.removeChild(n);
-                }
-              } catch {}
-            });
-            // Remove atmospheric canvases created by Login/CharacterSelect (idPrefix: login/charselect)
-            document.querySelectorAll('[id^="login-"], [id^="charselect-"]').forEach((n) => {
-              try {
-                if (n.parentNode) n.parentNode.removeChild(n);
-              } catch {}
+              try { if (n.parentNode) n.parentNode.removeChild(n); } catch {}
             });
           }
         } catch {}
@@ -77,22 +58,69 @@ export default function PhaserGameCanvas({
           initialScene,
         });
         gameRef.current = game;
+        // Emit telemetry event if available
+        try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_game_created' } })); } catch {}
+        // Safety: ensure canvas is attached; if missing after creation, surface diagnostic
+        setTimeout(() => {
+          try {
+            if (ref.current && !ref.current.querySelector('canvas')) {
+              console.warn('[PhaserGameCanvas] Canvas not found after initialization; re-attaching.');
+              if (gameRef.current?.canvas && gameRef.current.canvas.parentElement !== ref.current) {
+                ref.current.appendChild(gameRef.current.canvas);
+              }
+              // Telemetry
+              try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_canvas_missing_repair' } })); } catch {}
+            }
+          } catch {}
+        }, 500);
       } catch (error) {
         console.error("Failed to initialize Phaser game:", error);
+        try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_game_init_error', props: { message: (error as Error)?.message } } })); } catch {}
       }
     };
 
     initGame();
 
     // Handle window resize
+    let resizeWarned = false;
     const onResize = () => {
-      if (!gameRef.current || !ref.current) return;
-      const w = ref.current.clientWidth;
-      const h = Math.max(360, Math.floor(w * 9 / 16));
-      gameRef.current.scale.resize(w, h);
+      try {
+        if (!gameRef.current || !ref.current) return;
+        // Skip if game hasn't fully booted yet
+        const g = gameRef.current as PhaserTypes.Game & { isBooted?: boolean };
+        if (g.isBooted === false) return;
+        // Compute target size; guard against zero/NaN
+        const cw = ref.current.clientWidth || 0;
+        if (!cw || cw <= 0 || Number.isNaN(cw)) {
+          if (!resizeWarned) {
+            console.warn('[PhaserGameCanvas] Resize skipped due to zero container width');
+            resizeWarned = true;
+          }
+          // Try again on next frame after layout settles
+          requestAnimationFrame(onResize);
+          return;
+        }
+        const w = Math.max(2, Math.floor(cw));
+        const h = Math.max(360, Math.floor(w * 9 / 16));
+        // Only resize if size actually changes
+        const currentW = (g.scale?.width as number) || 0;
+        const currentH = (g.scale?.height as number) || 0;
+        if (currentW === w && currentH === h) return;
+        g.scale.resize(w, h);
+      } catch (e) {
+        console.warn('[PhaserGameCanvas] Safe resize failed (likely during WebGL init). Will retry.', e);
+        try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_resize_error' } })); } catch {}
+        // Retry after a short delay to allow GL to settle
+        setTimeout(() => { try { requestAnimationFrame(onResize); } catch {} }, 100);
+      }
     };
 
-    window.addEventListener("resize", onResize);
+  window.addEventListener("resize", onResize);
+  // Kick a resize after creation to match container size
+  requestAnimationFrame(onResize);
+  // Also when tab becomes visible (layout may have changed)
+  const onVisibility = () => { if (document.visibilityState === 'visible') requestAnimationFrame(onResize); };
+  document.addEventListener('visibilitychange', onVisibility);
 
     // Prevent default Space bar scrolling
     const el = ref.current;
@@ -106,7 +134,8 @@ export default function PhaserGameCanvas({
     el.focus({ preventScroll: true });
 
     return () => {
-      window.removeEventListener("resize", onResize);
+  window.removeEventListener("resize", onResize);
+  document.removeEventListener('visibilitychange', onVisibility);
       if (el) {
         el.removeEventListener("keydown", onKeydown);
       }
@@ -128,9 +157,7 @@ export default function PhaserGameCanvas({
             'furnace-modal',
             'storage-modal',
             'settings-modal',
-            // Login/Character Select scene roots
-            'login-container',
-            'character-select-root',
+            // (Keep login/character-select roots for potential remount)
           ];
           for (const id of ids) {
             const node = document.getElementById(id);
@@ -151,12 +178,6 @@ export default function PhaserGameCanvas({
               }
             } catch {}
           });
-          // Remove atmospheric canvases created by Login/CharacterSelect (idPrefix: login/charselect)
-          document.querySelectorAll('[id^="login-"], [id^="charselect-"]').forEach((n) => {
-            try {
-              if (n.parentNode) n.parentNode.removeChild(n);
-            } catch {}
-          });
         }
       } catch {}
     };
@@ -172,6 +193,7 @@ export default function PhaserGameCanvas({
         maxWidth: "1280px", 
         aspectRatio: "16/9",
         margin: "0 auto",
+        minHeight: "360px",
       }}
     />
   );

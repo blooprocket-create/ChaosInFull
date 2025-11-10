@@ -123,6 +123,31 @@ export async function ensureCharacterTable() {
   }
 }
 
+// Add-on columns for migrating legacy localStorage fields to DB
+let characterExtrasChecked = false;
+export async function ensureCharacterExtraColumns() {
+  if (characterExtrasChecked) return;
+  try {
+    // Ensure base table exists first
+    await ensureCharacterTable();
+    // Add columns if missing; IF NOT EXISTS is supported on Postgres
+    await sql`
+      alter table "Character"
+      add column if not exists gold int not null default 0,
+      add column if not exists flags jsonb,
+      add column if not exists fishing jsonb,
+      add column if not exists equipment jsonb,
+      add column if not exists talents jsonb,
+      add column if not exists lastx double precision,
+      add column if not exists lasty double precision
+    `;
+  } catch {
+    // ignore
+  } finally {
+    characterExtrasChecked = true;
+  }
+}
+
 let itemStackTableChecked = false;
 export async function ensureItemStackTable() {
   if (itemStackTableChecked) return;

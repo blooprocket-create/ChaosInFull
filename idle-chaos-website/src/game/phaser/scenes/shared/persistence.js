@@ -88,6 +88,44 @@ export function persistCharacter(scene, username, options = {}) {
 
         localStorage.setItem(key, JSON.stringify(userObj));
 
+        // Also forward critical state to server if the client bridge is available
+        try {
+            const charId = (char && char.id) || null;
+            if (charId && typeof window !== 'undefined' && window.__cif_persist) {
+                // Patch core fields (gold/flags/fishing/equipment/talents + last location/scene)
+                const patch = {};
+                if (typeof char.gold === 'number') patch.gold = Math.max(0, Math.floor(char.gold));
+                if (char.flags) patch.flags = char.flags;
+                if (char.fishing) patch.fishing = char.fishing;
+                if (char.equipment) patch.equipment = char.equipment;
+                if (char.talents) patch.talents = char.talents;
+                if (char.lastLocation && typeof char.lastLocation === 'object') {
+                    patch.lastScene = char.lastLocation.scene || null;
+                    if (typeof char.lastLocation.x === 'number') patch.lastX = char.lastLocation.x;
+                    if (typeof char.lastLocation.y === 'number') patch.lastY = char.lastLocation.y;
+                } else if (cfg.includeLocation !== false && scene.player) {
+                    // Fallback: if location formatter above set char.lastLocation, otherwise derive now
+                    patch.lastScene = (scene.scene && scene.scene.key) || null;
+                    if (scene.player) { patch.lastX = scene.player.x || null; patch.lastY = scene.player.y || null; }
+                }
+                try { if (Object.keys(patch).length) window.__cif_persist.saveCharacterPatch(charId, patch); } catch (e) {}
+                // Inventory snapshot (slots -> map)
+                try {
+                    if (Array.isArray(char.inventory)) {
+                        const map = {};
+                        for (const s of char.inventory) { if (s && s.id) { map[s.id] = (map[s.id] || 0) + (s.qty || 1); } }
+                        window.__cif_persist.saveInventory(charId, map);
+                    }
+                } catch (e) {}
+                // Quests snapshot
+                try {
+                    const active = Array.isArray(char.activeQuests) ? char.activeQuests.map(q => ({ id: q && q.id, progress: q && q.progress })) : [];
+                    const completed = Array.isArray(char.completedQuests) ? char.completedQuests.slice() : [];
+                    if (active.length || completed.length) window.__cif_persist.saveQuests(charId, active, completed);
+                } catch (e) {}
+            }
+        } catch (e) { /* ignore server forward errors */ }
+
         if (typeof cfg.onAfterSave === 'function') {
             try { cfg.onAfterSave(scene, char, userObj); } catch (e) {}
         }
@@ -113,6 +151,30 @@ export function loadCharacter(username, characterId) {
                 if (!char.activeQuests) char.activeQuests = [];
                 if (!char.completedQuests) char.completedQuests = [];
                 if (!char.gold) char.gold = 0;
+                // Attempt server hydration asynchronously (non-breaking). Merge & persist when available.
+                try {
+                    if (typeof window !== 'undefined' && window.__cif_persist && window.__cif_persist.loadCharacterFull) {
+                        window.__cif_persist.loadCharacterFull(characterId).then(serverChar => {
+                            if (serverChar && typeof serverChar === 'object') {
+                                try {
+                                    // Merge shallow fields
+                                    Object.assign(char, serverChar);
+                                    // Persist merged snapshot back to localStorage for subsequent synchronous loads
+                                    const updatedBlob = JSON.parse(localStorage.getItem(key) || '{}');
+                                    if (updatedBlob && Array.isArray(updatedBlob.characters)) {
+                                        for (let i = 0; i < updatedBlob.characters.length; i++) {
+                                            if (updatedBlob.characters[i] && updatedBlob.characters[i].id === characterId) {
+                                                updatedBlob.characters[i] = char;
+                                                break;
+                                            }
+                                        }
+                                        localStorage.setItem(key, JSON.stringify(updatedBlob));
+                                    }
+                                } catch (e) { /* ignore merge errors */ }
+                            }
+                        }).catch(() => {});
+                    }
+                } catch (e) { /* ignore server load init errors */ }
                 return char;
             }
         }
