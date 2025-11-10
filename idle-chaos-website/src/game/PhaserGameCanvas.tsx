@@ -289,8 +289,8 @@ export default function PhaserGameCanvas({
     try {
       const csContainer = getComputedStyle(container);
       const csCanvas = getComputedStyle(canvas);
-      console.log('[PhaserCanvasDiag] container display:', csContainer.display, 'visibility:', csContainer.visibility, 'opacity:', csContainer.opacity, 'zIndex:', csContainer.zIndex, 'size:', container.clientWidth + 'x' + container.clientHeight);
-      console.log('[PhaserCanvasDiag] canvas display:', csCanvas.display, 'visibility:', csCanvas.visibility, 'opacity:', csCanvas.opacity, 'zIndex:', csCanvas.zIndex, 'pos:', csCanvas.position, 'size(px):', canvas.width + 'x' + canvas.height);
+      console.log('[PhaserCanvasDiag] container display:', csContainer.display, 'visibility:', csContainer.visibility, 'opacity:', csContainer.opacity, 'pointerEvents:', csContainer.pointerEvents, 'zIndex:', csContainer.zIndex, 'size:', container.clientWidth + 'x' + container.clientHeight);
+      console.log('[PhaserCanvasDiag] canvas display:', csCanvas.display, 'visibility:', csCanvas.visibility, 'opacity:', csCanvas.opacity, 'pointerEvents:', csCanvas.pointerEvents, 'zIndex:', csCanvas.zIndex, 'pos:', csCanvas.position, 'size(px):', canvas.width + 'x' + canvas.height);
     } catch {}
     // Clear any forced inline styles that might hide the canvas; let Phaser's FIT mode handle positioning
     try {
@@ -298,10 +298,12 @@ export default function PhaserGameCanvas({
       if (container.style.visibility === 'hidden') container.style.visibility = '';
       if (container.style.opacity === '0') container.style.opacity = '';
       if (container.style.display === 'none') container.style.display = '';
+      if (container.style.pointerEvents === 'none') container.style.pointerEvents = '';
       // Clear canvas inline overrides
       if (canvas.style.visibility === 'hidden') canvas.style.visibility = '';
       if (canvas.style.opacity === '0') canvas.style.opacity = '';
       if (canvas.style.display === 'none') canvas.style.display = '';
+      if (canvas.style.pointerEvents === 'none') canvas.style.pointerEvents = '';
       console.log('[PhaserCanvasDiag] Cleared hiding inline styles');
       // Force scale refresh
       try { if (game && game.scale) game.scale.refresh(); } catch {}
