@@ -49,17 +49,17 @@ const ZONE_METADATA: Record<string, ZoneMetadata> = {
   },
   GloamwayBastion: {
     features: ["Elite goblins", "Choke points", "Harder patrol loops"],
-    connections: ["GoblinCamp", "GloamwaySwamp", "FlameRoad"],
+    connections: ["GoblinCamp", "GloamwaySwamp" ],
     enemyIds: ["goblin_epic", "goblin_legendary", "goblin_flamebinder", "goblin_ironhowl", "goblin_boss"],
   },
   GloamwaySwamp: {
     features: ["Undead and rats", "Poison threats"],
-    connections: ["GloamwayBastion"],
+    connections: ["GloamwayBastion", "FlameRoad"],
     enemyIds: ["rat_uncommon", "rat_rare", "rat_epic", "rat_legendary", "rat_boss"],
   },
   FlameRoad: {
     features: ["Fire variants", "Mobility checks"],
-    connections: ["GloamwayBastion"],
+    connections: ["GloamwaySwamp"],
     enemyIds: ["goblin_flamebinder"],
   },
   BrokenDock: {
