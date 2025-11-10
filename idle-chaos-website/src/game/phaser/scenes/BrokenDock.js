@@ -2267,6 +2267,7 @@ export class BrokenDock extends Phaser.Scene {
             try {
                 const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
                 const payload = { fishId: chosen.id, fishName: chosen.name, username };
+                console.log("Reporting catch to event API", payload);
                 this._eventCatchQueue = this._eventCatchQueue || [];
                 const send = () => {
                     fetch('/api/events/intro_to_fishing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
