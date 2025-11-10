@@ -4,7 +4,7 @@ import { createPhaserGame, releasePhaserGame, type CharacterHUD } from "./create
 import type * as PhaserTypes from "phaser";
 
 // Augmented window type (declared globally in createPhaserGame, duplicated locally for type narrowing convenience)
-interface GameWindow extends Window { GAME?: PhaserTypes.Game }
+// (Removed unused GameWindow interface; we rely on global augmentation.)
 
 export default function PhaserGameCanvas({ 
   character, 
@@ -58,6 +58,28 @@ export default function PhaserGameCanvas({
           initialScene,
         });
         gameRef.current = game;
+        // Fallback: if the internal game size is 0x0 (parent not yet laid out under RESIZE), force a sane initial size.
+        try {
+          const gScale = (game as unknown as { scale?: PhaserTypes.Scale.ScaleManager }).scale;
+          const gw = (gScale && (gScale.gameSize?.width || gScale.width)) || (game as any).config?.width || 0;
+          const gh = (gScale && (gScale.gameSize?.height || gScale.height)) || (game as any).config?.height || 0;
+          if ((!gw || !gh) && gScale) {
+            // Derive width from container or window; height via 16:9 ratio with min floor.
+            const containerWidth = ref.current?.getBoundingClientRect().width || window.innerWidth || 1280;
+            const targetW = Math.max(640, Math.round(containerWidth));
+            const targetH = Math.max(360, Math.round(targetW * 9 / 16));
+            try { gScale.resize(targetW, targetH); } catch {}
+            try { window.dispatchEvent(new CustomEvent('telemetry:event',{ detail:{ name:'phaser_zero_size_fix', props:{ w:targetW, h:targetH }}})); } catch {}
+            // Ensure canvas CSS matches
+            try {
+              const c = (game as unknown as { canvas?: HTMLCanvasElement }).canvas;
+              if (c) {
+                c.style.width = '100%';
+                c.style.height = '100%';
+              }
+            } catch {}
+          }
+        } catch {}
         // Emit telemetry event if available
         try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_game_created' } })); } catch {}
         // Safety: ensure canvas is attached; if missing after creation, surface diagnostic
@@ -80,6 +102,47 @@ export default function PhaserGameCanvas({
     };
 
     initGame();
+
+    // Dev-only debug overlay to inspect canvas visibility & attachment
+  const addDebugOverlay = () => {
+      if (process.env.NODE_ENV !== 'development') return;
+      if (!ref.current) return;
+      if (document.getElementById('phaser-debug-overlay')) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'phaser-debug-overlay';
+      overlay.style.position = 'absolute';
+      overlay.style.top = '4px';
+      overlay.style.right = '4px';
+      overlay.style.zIndex = '9999';
+      overlay.style.fontSize = '10px';
+      overlay.style.padding = '4px 6px';
+      overlay.style.background = 'rgba(0,0,0,0.55)';
+      overlay.style.color = '#fff';
+      overlay.style.border = '1px solid rgba(255,255,255,0.15)';
+      overlay.style.borderRadius = '4px';
+      let prevLine = '';
+      const update = () => {
+  const g = (window as unknown as { GAME?: PhaserTypes.Game }).GAME;
+  const canvas = g && (g as unknown as { canvas?: HTMLCanvasElement }).canvas;
+        const attached = !!(canvas && canvas.parentElement === ref.current);
+        const styleInfo = canvas ? {
+          display: canvas.style.display || 'auto',
+          visibility: canvas.style.visibility || 'auto',
+          opacity: canvas.style.opacity || 'auto'
+        } : null;
+        const line = `GAME:${!!g} Canvas:${!!canvas} Attached:${attached} ${styleInfo ? `disp:${styleInfo.display} vis:${styleInfo.visibility} op:${styleInfo.opacity}` : 'no-canvas'} size:${canvas ? canvas.width + 'x' + canvas.height : 'n/a'}`;
+        overlay.textContent = ` ${line} `;
+        if (line !== prevLine) {
+          prevLine = line;
+          try { console.log('[PhaserDebug]', line); } catch {}
+        }
+      };
+      update();
+      ref.current.appendChild(overlay);
+      const interval = setInterval(update, 500);
+      return () => { clearInterval(interval); try { overlay.remove(); } catch {} };
+    };
+    const removeOverlay = addDebugOverlay();
 
     // Handle window resize
     let resizeWarned = false;
@@ -116,11 +179,19 @@ export default function PhaserGameCanvas({
         }
         const w = Math.max(2, Math.floor(cw));
         const h = Math.max(360, Math.floor(w * 9 / 16));
-        // Only resize if size actually changes
-        const currentW = (g.scale?.width as number) || 0;
-        const currentH = (g.scale?.height as number) || 0;
-        if (currentW === w && currentH === h) return;
-        g.scale.resize(w, h);
+        // In RESIZE mode, let Phaser determine final size from parent; just refresh
+        try { g.scale.refresh(); } catch {}
+        // Ensure the canvas fills the container without double-scaling (CSS side)
+        try {
+          const c = (g as unknown as { canvas?: HTMLCanvasElement }).canvas;
+          if (c) {
+            c.style.position = c.style.position || 'absolute';
+            c.style.top = '0';
+            c.style.left = '0';
+            c.style.width = '100%';
+            c.style.height = '100%';
+          }
+        } catch {}
       } catch (e) {
         console.warn('[PhaserGameCanvas] Safe resize failed (likely during WebGL init). Will retry.', e);
         try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_resize_error' } })); } catch {}
@@ -163,6 +234,7 @@ export default function PhaserGameCanvas({
       // Release a reference to the singleton; destroy when no more holders remain
       try { releasePhaserGame(); } catch {}
       gameRef.current = null;
+  if (removeOverlay) removeOverlay();
       // Aggressively clean up any DOM UI created outside the canvas (HUD, modals, tooltips, skill bar)
       try {
         if (typeof document !== 'undefined') {
@@ -204,11 +276,101 @@ export default function PhaserGameCanvas({
     };
   }, [character, initialScene]);
 
+  // When a character is selected (transitioning out of login / character select), force-unhide the canvas.
+  useEffect(() => {
+    if (!character) return; // Only act once a character is actually chosen
+    let attempts = 0;
+    const maxAttempts = 12; // ~1.2s total with 100ms cadence
+    const ensureVisible = () => {
+      attempts += 1;
+      const container = ref.current;
+      // Prefer the singleton's canvas to avoid stale DOM lookups
+  const game = (window as unknown as { GAME?: PhaserTypes.Game }).GAME;
+  const canvas = game ? (game as unknown as { canvas?: HTMLCanvasElement }).canvas : container?.querySelector('canvas');
+      if (canvas) {
+        let changed = false;
+        const hiddenByDisplay = canvas.style.display === 'none';
+        const hiddenByVisibility = canvas.style.visibility === 'hidden';
+        const hiddenByOpacity = canvas.style.opacity === '0';
+        if (hiddenByDisplay) { canvas.style.display = 'block'; changed = true; try { console.log('[PhaserCanvas] display set to block'); } catch {} }
+        if (hiddenByVisibility) { canvas.style.visibility = 'visible'; changed = true; try { console.log('[PhaserCanvas] visibility set to visible'); } catch {} }
+        if (hiddenByOpacity) { canvas.style.opacity = '1'; changed = true; try { console.log('[PhaserCanvas] opacity set to 1'); } catch {} }
+        if (canvas.classList.contains('hidden')) { canvas.classList.remove('hidden'); changed = true; try { console.log('[PhaserCanvas] removed class "hidden"'); } catch {} }
+        // Remove any tailwind-style utility that might keep it invisible
+        if (canvas.classList.contains('invisible')) { canvas.classList.remove('invisible'); changed = true; try { console.log('[PhaserCanvas] removed class "invisible"'); } catch {} }
+        // If not attached, attach
+        if (container && canvas.parentElement !== container) { try { container.appendChild(canvas); changed = true; console.log('[PhaserCanvas] re-attached canvas to container'); } catch {} }
+        if (changed) {
+          try { window.dispatchEvent(new CustomEvent('telemetry:event', { detail: { name: 'phaser_canvas_force_shown' } })); } catch {}
+        }
+        // Also ensure container itself is visible (and clear scene's hidden flag)
+        if (container) {
+          const cs = getComputedStyle(container);
+          if (cs.display === 'none') { container.style.display = 'block'; changed = true; try { console.log('[PhaserCanvas] container display set to block'); } catch {} }
+          if (cs.visibility === 'hidden') { container.style.visibility = 'visible'; changed = true; try { console.log('[PhaserCanvas] container visibility set to visible'); } catch {} }
+          if (container.style.opacity === '0') { container.style.opacity = '1'; changed = true; try { console.log('[PhaserCanvas] container opacity set to 1'); } catch {} }
+          if (container.getAttribute('data-phaser-hidden') === 'true') { container.removeAttribute('data-phaser-hidden'); changed = true; try { console.log('[PhaserCanvas] removed data-phaser-hidden'); } catch {} }
+          // Remove any lingering full-screen overlays from login/char-select
+          try {
+            const csRoot = document.getElementById('character-select-root');
+            if (csRoot && csRoot.parentNode) { csRoot.parentNode.removeChild(csRoot); console.log('[PhaserCanvas] removed character-select-root'); }
+          } catch {}
+        }
+        if (!hiddenByDisplay && !hiddenByVisibility && !hiddenByOpacity) {
+          // Done; stop early
+          clearInterval(intervalId);
+        }
+      }
+      if (attempts >= maxAttempts) clearInterval(intervalId);
+    };
+    const intervalId = setInterval(ensureVisible, 100);
+    // Run once immediately for responsiveness
+    ensureVisible();
+    return () => clearInterval(intervalId);
+  }, [character]);
+
+  // Deep diagnostics + hard style enforcement after character selection to surface a hidden canvas
+  useEffect(() => {
+    if (!character) return;
+    const container = ref.current;
+  const game = (window as unknown as { GAME?: PhaserTypes.Game }).GAME;
+  const canvas = game ? (game as unknown as { canvas?: HTMLCanvasElement }).canvas : null;
+    if (!container || !canvas) return;
+    try {
+      const csContainer = getComputedStyle(container);
+      const csCanvas = getComputedStyle(canvas);
+      console.log('[PhaserCanvasDiag] container display:', csContainer.display, 'visibility:', csContainer.visibility, 'opacity:', csContainer.opacity, 'zIndex:', csContainer.zIndex, 'size:', container.clientWidth + 'x' + container.clientHeight);
+      console.log('[PhaserCanvasDiag] canvas display:', csCanvas.display, 'visibility:', csCanvas.visibility, 'opacity:', csCanvas.opacity, 'zIndex:', csCanvas.zIndex, 'pos:', csCanvas.position, 'size(px):', canvas.width + 'x' + canvas.height);
+    } catch {}
+    // Force sane styles and high z-index so canvas can't be buried
+    try {
+      container.style.position = container.style.position || 'relative';
+      container.style.zIndex = '20';
+      container.style.visibility = 'visible';
+      container.style.opacity = '1';
+      if (getComputedStyle(container).display === 'none') container.style.display = 'block';
+  canvas.style.position = canvas.style.position || 'absolute';
+      canvas.style.zIndex = '21';
+      canvas.style.visibility = 'visible';
+      canvas.style.opacity = '1';
+      if (getComputedStyle(canvas).display === 'none') canvas.style.display = 'block';
+      // Add temporary outline and background to visually confirm
+      canvas.style.outline = '2px solid #ff00ff';
+      canvas.style.backgroundColor = canvas.style.backgroundColor || '#000';
+      console.log('[PhaserCanvasDiag] Hard styles enforced');
+    } catch (e) {
+      console.warn('[PhaserCanvasDiag] Failed to enforce styles', e);
+    }
+    // Remove outline after short delay (visual cue only)
+    const to = setTimeout(() => { try { if (canvas.style.outline) canvas.style.outline = 'none'; } catch {} }, 2500);
+    return () => clearTimeout(to);
+  }, [character]);
+
   return (
     <div 
       ref={ref}
       id="game-container"
-      className="relative rounded-xl border border-white/10 overflow-hidden"
+      className="relative rounded-xl border border-white/10 overflow-hidden bg-black"
       style={{ 
         width: "100%", 
         maxWidth: "1280px", 
@@ -217,6 +379,8 @@ export default function PhaserGameCanvas({
         minHeight: "360px",
         display: "block",
         flex: "1 1 auto",
+        position: 'relative',
+        zIndex: 20,
       }}
     />
   );

@@ -234,7 +234,16 @@ export async function createPhaserGame(opts: {
         GraveForest,
         BrokenDock,
       ],
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        parent: parent,
+        width: '100%',
+        height: '100%',
+        autoCenter: Phaser.Scale.NO_CENTER,
+        expandParent: true
+      },
+      // Disable automatic CSS scaling so our React wrapper + resize observer controls size
+      canvasStyle: 'position:absolute;top:0;left:0;width:100%;height:100%;',
       loader: { baseURL: '/phaser-game/', path: '' },
     };
 

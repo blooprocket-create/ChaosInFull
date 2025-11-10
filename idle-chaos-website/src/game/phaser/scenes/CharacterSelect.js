@@ -37,12 +37,28 @@ export class CharacterSelect extends Phaser.Scene {
         this._previousBodyStyle = captureBodyStyle();
         applyDefaultBackground();
 
-        // Hide Phaser canvas while character select is active
+        // Hide Phaser canvas while character select is active (but add a data flag instead of display:none so flex/size is preserved)
         const gameContainer = document.getElementById('game-container');
         if (gameContainer) {
             this._previousGameDisplay = gameContainer.style.display;
-            gameContainer.style.display = 'none';
+            gameContainer.setAttribute('data-phaser-hidden', 'true');
+            // Use visibility hidden instead of display none so layout sizing stays stable
+            gameContainer.style.visibility = 'hidden';
+            gameContainer.style.opacity = '0';
         }
+
+        // Explicit unhide helper to ensure canvas becomes visible before next scene renders
+        const unhideGameContainer = () => {
+            try {
+                const gc = document.getElementById('game-container');
+                if (!gc) return;
+                gc.style.display = this._previousGameDisplay || '';
+                gc.style.visibility = 'visible';
+                gc.style.opacity = '1';
+                gc.removeAttribute('data-phaser-hidden');
+                gc.classList.remove('hidden','invisible','opacity-0');
+            } catch (e) { /* ignore */ }
+        };
 
 
                 // Load account details
@@ -333,6 +349,8 @@ export class CharacterSelect extends Phaser.Scene {
             if (!selectedChar) return;
             const char = selectedChar;
             closeCreateModal();
+            // Make sure the game container is visible before switching scenes
+            unhideGameContainer();
             if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
             try { ensureCharTalents && ensureCharTalents(char); } catch (e) { }
             char.lastPlayed = Date.now();
@@ -472,7 +490,11 @@ export class CharacterSelect extends Phaser.Scene {
         }
         this._container = null;
         if (this._gameContainer) {
+            // Restore visibility and remove hidden flag
             this._gameContainer.style.display = this._previousGameDisplay || '';
+            this._gameContainer.style.visibility = 'visible';
+            this._gameContainer.style.opacity = '1';
+            this._gameContainer.removeAttribute('data-phaser-hidden');
             this._gameContainer = null;
         }
         this._previousGameDisplay = undefined;
