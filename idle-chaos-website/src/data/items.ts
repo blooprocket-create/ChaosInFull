@@ -10,7 +10,7 @@ export type ItemDef = {
 };
 
 // NOTE: Prices & categories are placeholder; adjust for balancing.
-export const items: ItemDef[] = [
+export const items: ItemDef[] = [ 
   { key: 'slime_goop', name: 'Slime Goop', buy: 12, sell: 2, category: 'material' },
   { key: 'slime_gel', name: 'Slime Gel', buy: 14, sell: 3, category: 'material' },
   { key: 'slime_core', name: 'Slime Core', buy: 75, sell: 15, category: 'material' },
