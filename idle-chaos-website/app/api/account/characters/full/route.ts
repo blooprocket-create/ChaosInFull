@@ -18,19 +18,21 @@ export async function GET(req: Request) {
   await ensureItemStackTable();
   await ensureCharacterQuestTable();
 
-  // Ownership & core row
+  // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
     id: string; name: string; class: string; level: number;
-    gold: number | null; flags: unknown; fishing: unknown; equipment: unknown; talents: unknown;
-    lastscene: string | null; lastx: number | null; lasty: number | null;
+    data: Record<string, unknown>;
   }>`
-    select id, name, class, level, gold, flags, fishing, equipment, talents, lastscene, lastx, lasty
+    select id, name, class, level, data
     from "Character"
     where id = ${characterId} and userid = ${session.userId}
     limit 1
   `;
   if (!rows.length) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   const c = rows[0];
+  
+  // All character state comes from the flexible JSONB data column
+  const characterData = c.data || {};
 
   // Inventory stacks
   const stacks = await q<{ itemkey: string; count: number }>`
@@ -57,14 +59,9 @@ export async function GET(req: Request) {
       name: c.name,
       class: c.class,
       level: c.level,
-      gold: c.gold ?? 0,
-      flags: c.flags || null,
-      fishing: c.fishing || null,
-      equipment: c.equipment || null,
-      talents: c.talents || null,
-      lastScene: c.lastscene || null,
-      lastX: c.lastx ?? null,
-      lastY: c.lasty ?? null,
+      // Spread ALL data from JSONB column - includes everything your JS sent!
+      ...characterData,
+      // Add inventory and quests from their dedicated tables
       inventory,
       quests: { active, completed }
     }

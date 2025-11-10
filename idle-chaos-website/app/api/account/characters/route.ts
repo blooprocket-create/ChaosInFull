@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensurePgcrypto, ensureCharacterTable, ensurePlayerStatTable } from "@/src/lib/db";
+import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterExtraColumns, ensurePlayerStatTable, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
 
 export async function GET() {
   try {
@@ -27,7 +27,10 @@ export async function POST(req: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     await ensurePgcrypto();
   await ensureCharacterTable();
+  await ensureCharacterExtraColumns();
   await ensurePlayerStatTable();
+  await ensureItemStackTable();
+  await ensureCharacterQuestTable();
     const owners = await q<{ id: string }>`select id from "User" where id = ${session.userId} limit 1`;
     if (!owners[0]) {
       return NextResponse.json({ error: "Account not found. Please log out and log back in." }, { status: 409 });
@@ -36,16 +39,48 @@ export async function POST(req: Request) {
     const name = String(form.get("name") || "").trim();
     const gender = String(form.get("gender") || "Male");
     const hat = String(form.get("hat") || "STR");
+    // Optional Phaser scene fields (race, weapon)
+    const race = String(form.get("race") || "");
+    const weapon = String(form.get("weapon") || "");
     const klass = "Beginner"; // Always start as Beginner
     if (name.length < 3 || name.length > 20) return NextResponse.json({ error: "Name must be 3-20 chars" }, { status: 400 });
-    if (!["Male","Female","Nonbinary"].includes(gender)) return NextResponse.json({ error: "Invalid gender" }, { status: 400 });
-    if (!["STR","INT","AGI","LUK"].includes(hat)) return NextResponse.json({ error: "Invalid hat" }, { status: 400 });
+    if (gender && !["Male","Female","Nonbinary"].includes(gender)) return NextResponse.json({ error: "Invalid gender" }, { status: 400 });
+    if (hat && !["STR","INT","AGI","LUK"].includes(hat)) return NextResponse.json({ error: "Invalid hat" }, { status: 400 });
 
-    // Create character
+    // Create character with default values
+    // Use 'data' JSONB column for flexible storage of any character fields
     type Created = { id: string; name: string; class: string; level: number };
+    const initialData: Record<string, unknown> = {
+      gender,
+      hat,
+      gold: 0,
+      flags: {},
+      inventory: [],
+      activeQuests: [],
+      completedQuests: [],
+      equipment: {},
+      stats: {},
+      mining: { level: 1, exp: 0 },
+      woodcutting: { level: 1, exp: 0 },
+      crafting: { level: 1, exp: 0 },
+      fishing: { level: 1, exp: 0 }
+    };
+    
+    // Add Phaser scene fields if provided
+    if (race) initialData.race = race;
+    if (weapon) {
+      initialData.weapon = weapon;
+      initialData.startingEquipment = [{ id: weapon, qty: 1 }];
+    }
+    
     const createdRows = await q<Created>`
-      insert into "Character" (id, userid, name, class, gender, hat)
-      values (gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${gender}, ${hat})
+      insert into "Character" (
+        id, userid, name, class, data
+      )
+      values (
+        gen_random_uuid()::text, ${session.userId}, ${name}, ${klass},
+        ${JSON.stringify(initialData)}::jsonb
+      )
       returning id, name, class, level
     `;
     const created = createdRows[0];
@@ -66,5 +101,38 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : String(err);
     // Unique constraint or other errors
     return NextResponse.json({ error: message || "Could not create character (maybe name is taken?)" }, { status: 400 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    
+    const { searchParams } = new URL(req.url);
+    const characterId = searchParams.get("id");
+    
+    if (!characterId) return NextResponse.json({ error: "Character ID required" }, { status: 400 });
+    
+    await ensureCharacterTable();
+    
+    // Verify ownership before deleting
+    const owned = await q<{ id: string }>`
+      select id from "Character" 
+      where id = ${characterId} and userid = ${session.userId}
+      limit 1
+    `;
+    
+    if (!owned.length) {
+      return NextResponse.json({ error: "Character not found or you don't own it" }, { status: 404 });
+    }
+    
+    // Delete the character (cascade will delete related records)
+    await q`delete from "Character" where id = ${characterId} and userid = ${session.userId}`;
+    
+    return NextResponse.json({ ok: true, message: "Character deleted" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message || "Failed to delete character" }, { status: 500 });
   }
 }

@@ -22,8 +22,8 @@ export async function POST(req: Request) {
         await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`.catch(() => {});
       } else {
         await q`
-          insert into "ItemStack" (id, characterid, itemkey, count)
-          values (concat('is_', substr(md5(random()::text), 1, 16)), ${characterId}, ${itemKey}, ${safe})
+          insert into "ItemStack" (characterid, itemkey, count)
+          values (${characterId}, ${itemKey}, ${safe})
           on conflict (characterid, itemkey) do update set count = excluded.count
         `;
       }

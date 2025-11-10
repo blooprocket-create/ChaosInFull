@@ -27,9 +27,10 @@ export async function POST(req: Request) {
     if (Array.isArray(active)) {
       for (const a of active) {
         if (!a || !a.id) continue;
+        const progressJson = a.progress ? JSON.stringify(a.progress) : null;
         await q`
           insert into "CharacterQuest" (characterid, questid, status, progress, updatedat)
-          values (${characterId}, ${a.id}, 'active', ${a.progress ?? null}, now())
+          values (${characterId}, ${a.id}, 'active', ${progressJson}::jsonb, now())
           on conflict (characterid, questid) do update set status = excluded.status, progress = excluded.progress, updatedat = now()
         `;
       }

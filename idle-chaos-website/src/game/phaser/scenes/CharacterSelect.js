@@ -367,10 +367,106 @@ export class CharacterSelect extends Phaser.Scene {
 
         if (createBtn) createBtn.onclick = () => openCreateModal(null);
 
-        if (playBtn) playBtn.onclick = () => {
+        if (playBtn) playBtn.onclick = async () => {
             if (!selectedChar) return;
             const char = selectedChar;
             closeCreateModal();
+            
+            // Migrate localStorage character to database if needed
+            if (char.id) {
+                try {
+                    // Check if character exists in database
+                    const checkRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`);
+                    const checkData = await checkRes.json();
+                    
+                    if (!checkData.ok || !checkData.character) {
+                        // Character doesn't exist in DB - create it with all localStorage data
+                        console.log('Migrating localStorage character to database:', char.name);
+                        const formData = new FormData();
+                        formData.set('name', char.name || 'Unnamed');
+                        formData.set('gender', char.gender || 'Male');
+                        formData.set('hat', char.hat || 'STR');
+                        if (char.race) formData.set('race', char.race);
+                        if (char.weapon) formData.set('weapon', char.weapon);
+                        
+                        const createRes = await fetch('/api/account/characters', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const createData = await createRes.json();
+                        
+                        if (createData.ok && createData.character) {
+                            // Update character with DB ID
+                            const newId = createData.character.id;
+                            char.id = newId;
+                            
+                            // Sync all character data to the new DB record
+                            const patchData = {
+                                characterId: newId,
+                                gold: char.gold || 0,
+                                level: char.level || 1,
+                                flags: char.flags || {},
+                                equipment: char.equipment || {},
+                                talents: char.talents || {},
+                                stats: char.stats || {},
+                                mining: char.mining || { level: 1, exp: 0 },
+                                woodcutting: char.woodcutting || { level: 1, exp: 0 },
+                                crafting: char.crafting || { level: 1, exp: 0 },
+                                fishing: char.fishing || { level: 1, exp: 0 },
+                                lastLocation: char.lastLocation || null
+                            };
+                            
+                            await fetch('/api/account/characters/patch', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(patchData)
+                            });
+                            
+                            // Sync inventory if present
+                            if (Array.isArray(char.inventory) && char.inventory.length > 0) {
+                                const invMap = {};
+                                for (const slot of char.inventory) {
+                                    if (slot && slot.id) {
+                                        invMap[slot.id] = (invMap[slot.id] || 0) + (slot.qty || 1);
+                                    }
+                                }
+                                if (Object.keys(invMap).length > 0) {
+                                    await fetch('/api/account/characters/inventory', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ characterId: newId, items: invMap })
+                                    });
+                                }
+                            }
+                            
+                            // Sync quests if present
+                            if ((Array.isArray(char.activeQuests) && char.activeQuests.length > 0) || 
+                                (Array.isArray(char.completedQuests) && char.completedQuests.length > 0)) {
+                                await fetch('/api/account/characters/quests', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        characterId: newId,
+                                        active: char.activeQuests || [],
+                                        completed: char.completedQuests || []
+                                    })
+                                });
+                            }
+                            
+                            // Update localStorage with new ID
+                            if (userObj && userObj.characters && selectedIdx !== null) {
+                                userObj.characters[selectedIdx] = char;
+                                saveUser(username, userObj);
+                            }
+                            
+                            console.log('Successfully migrated character to database!');
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Character migration check/create failed (will use localStorage):', err);
+                }
+            }
+            
             // Make sure the game container is visible before switching scenes
             unhideGameContainer();
             if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
@@ -399,11 +495,34 @@ export class CharacterSelect extends Phaser.Scene {
         };
 
         if (delBtn) delBtn.onclick = () => {
-            if (selectedIdx === null) return;
+            if (selectedIdx === null || !selectedChar) return;
+            
+            const confirmDelete = confirm(`Delete ${selectedChar.name}? This cannot be undone.`);
+            if (!confirmDelete) return;
+            
+            const charId = selectedChar.id;
+            
+            // Delete from database
+            if (charId) {
+                fetch(`/api/account/characters?id=${encodeURIComponent(charId)}`, {
+                    method: 'DELETE'
+                }).then(res => res.json()).then(data => {
+                    if (data.ok) {
+                        console.log('Character deleted from database:', charId);
+                    } else {
+                        console.warn('Failed to delete character from database:', data.error);
+                    }
+                }).catch(err => {
+                    console.warn('Error deleting character from database:', err);
+                });
+            }
+            
+            // Delete from localStorage
             if (userObj && Array.isArray(userObj.characters)) {
                 userObj.characters[selectedIdx] = undefined;
                 saveUser(username, userObj);
             }
+            
             // refresh UI in-place
             try { renderCharacterList(); updatePreview(null, null); } catch(e) {}
         };
@@ -461,6 +580,37 @@ export class CharacterSelect extends Phaser.Scene {
                     const newChar = { id: uuidv4(), name, race: raceVal, weapon: weaponVal, stats, level:1, class:'beginner' };
                     try { ensureCharTalents && ensureCharTalents(newChar); } catch(e){}
                     if (weaponVal) newChar.startingEquipment = [{ id: weaponVal, qty: 1 }];
+                    
+                    // Save character to database via API (NEW!)
+                    try {
+                        const formData = new FormData();
+                        formData.set('name', name);
+                        formData.set('gender', 'Male'); // Default gender for Phaser scene
+                        formData.set('hat', 'STR'); // Default hat for Phaser scene
+                        formData.set('race', raceVal); // Race from Phaser scene
+                        formData.set('weapon', weaponVal); // Starting weapon from Phaser scene
+                        fetch('/api/account/characters', { 
+                            method: 'POST', 
+                            body: formData 
+                        }).then(res => res.json()).then(data => {
+                            if (data.ok && data.character && data.character.id) {
+                                // Update local character with DB-generated ID
+                                newChar.id = data.character.id;
+                                // Re-save to localStorage with the correct ID
+                                if (typeof placedIndex === 'number' && placedIndex >= 0) {
+                                    userObj.characters[placedIndex] = newChar;
+                                    saveUser(username, userObj);
+                                }
+                                console.log('Character created in database:', data.character.id);
+                            }
+                        }).catch(err => {
+                            console.warn('Failed to save character to database:', err);
+                            // Continue anyway - character is saved in localStorage
+                        });
+                    } catch (e) {
+                        console.warn('Character DB save error:', e);
+                    }
+                    
                     // place into target slot or first empty
                     let placedIndex = -1;
                     if (typeof targetIdx === 'number') { userObj.characters[targetIdx] = newChar; placedIndex = targetIdx; }

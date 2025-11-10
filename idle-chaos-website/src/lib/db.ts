@@ -123,24 +123,22 @@ export async function ensureCharacterTable() {
   }
 }
 
-// Add-on columns for migrating legacy localStorage fields to DB
+// Pure JSONB approach - store ALL character state in a single flexible column
 let characterExtrasChecked = false;
 export async function ensureCharacterExtraColumns() {
   if (characterExtrasChecked) return;
   try {
     // Ensure base table exists first
     await ensureCharacterTable();
-    // Add columns if missing; IF NOT EXISTS is supported on Postgres
+    // Add a flexible 'data' JSONB column to store ALL character state
+    // This allows JS to dynamically add any fields without schema changes
     await sql`
       alter table "Character"
-      add column if not exists gold int not null default 0,
-      add column if not exists flags jsonb,
-      add column if not exists fishing jsonb,
-      add column if not exists equipment jsonb,
-      add column if not exists talents jsonb,
-      add column if not exists lastx double precision,
-      add column if not exists lasty double precision
+      add column if not exists data jsonb not null default '{}'::jsonb
     `;
+    // Create indexes for common queries inside JSONB
+    await sql`create index if not exists character_level_idx on "Character" ((data->>'level'))`.catch(() => {});
+    await sql`create index if not exists character_lastscene_idx on "Character" ((data->>'lastScene'))`.catch(() => {});
   } catch {
     // ignore
   } finally {
