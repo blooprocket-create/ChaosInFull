@@ -9,6 +9,7 @@ import { setCircleCentered } from '../shared/physicsHelpers.js';
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { applyCombatMixin } from './shared/combat.js';
 import { attach as attachCleanup, addTimeEvent } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 // Cave scene: HUD similar to Town, WASD+E controls, right-side portal, one mining node for testing
 export class Cave extends Phaser.Scene {
     constructor() {
@@ -29,6 +30,8 @@ export class Cave extends Phaser.Scene {
     create() {
         // Ensure cleanup manager is attached early to track disposables in this scene
         try { attachCleanup(this); } catch (e) {}
+        // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+        try { ensureGameCanvasVisible(this); } catch (e) {}
         this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
         // responsive centers
         const centerX = this.scale.width / 2;

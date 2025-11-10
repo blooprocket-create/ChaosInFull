@@ -2,6 +2,7 @@ import { createPlayer } from '../shared/playerFactory.js';
 import { attachCommonKeys } from './shared/keys.js';
 import { loadUser, saveUser } from './shared/storage.js';
 import { attach, addTimeEvent, registerDisposer } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 
 export class Tutorial extends Phaser.Scene {
     constructor() { super('Tutorial'); }
@@ -17,7 +18,7 @@ export class Tutorial extends Phaser.Scene {
         // attach cleanup manager early
         try { attach(this); } catch (e) {}
         // Show the game canvas (CharacterSelect hid it)
-        try { const gc = document.getElementById('game-container'); if (gc) gc.style.display = ''; } catch (e) {}
+        try { ensureGameCanvasVisible(this); } catch (e) {}
 
         // Simple world layout: small flat area with a few markers
         this.cameras.main.setBackgroundColor('#203040');

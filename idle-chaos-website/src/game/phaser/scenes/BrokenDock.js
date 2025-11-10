@@ -11,6 +11,7 @@ import { updateSmoothPlayerMovement, playDirectionalAnimation, updateDepthForTop
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { applyCombatMixin } from './shared/combat.js';
 import { attach as attachCleanup, addTimeEvent, addDocumentListener } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 import { getQuestById, getQuestObjectiveState, startQuest, checkQuestCompletion, completeQuest, updateQuestProgress } from '../data/quests.js';
 
 const FISHING_RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
@@ -36,6 +37,8 @@ export class BrokenDock extends Phaser.Scene {
     create() {
         // Attach cleanup manager early to ensure timers/colliders/listeners are auto-cleaned
         try { attachCleanup(this); } catch (e) {}
+        // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+        try { ensureGameCanvasVisible(this); } catch (e) {}
         this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
         const centerX = this.scale.width / 2;
         const centerY = this.scale.height / 2;

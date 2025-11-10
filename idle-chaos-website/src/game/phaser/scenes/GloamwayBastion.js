@@ -8,6 +8,7 @@ import { getQuestById, getQuestObjectiveState, startQuest, checkQuestCompletion,
 import { CLASS_DEFS } from '../data/classes.js';
 import { RACE_DEFS } from '../data/races.js';
 import { attach as attachCleanup, addTimeEvent, registerDisposer } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
@@ -33,6 +34,8 @@ export class GloamwayBastion extends Phaser.Scene {
     create(sceneData = {}) {
         // Attach cleanup manager early to auto-clean disposables on shutdown/destroy
         try { attachCleanup(this); } catch (e) {}
+        // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+        try { ensureGameCanvasVisible(this); } catch (e) {}
         const dataFromSettings = (this.sys && this.sys.settings && this.sys.settings.data) || {};
         const incoming = (sceneData && typeof sceneData === 'object') ? sceneData : {};
         const data = { ...dataFromSettings, ...incoming };

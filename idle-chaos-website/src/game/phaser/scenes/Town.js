@@ -8,6 +8,7 @@ import { onSkillLevelUp, ensureCharTalents } from '../data/talents.js';
 import { applySafeZoneRegen } from './shared/stats.js';
 import { applyCombatMixin } from './shared/combat.js';
 import { attach, addTimeEvent } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 
 // Clean Town scene implementation
 export class Town extends Phaser.Scene {
@@ -24,6 +25,8 @@ export class Town extends Phaser.Scene {
     create() {
     // Ensure cleanup manager is attached early for this scene
     try { attach(this); } catch (e) {}
+    // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+    try { ensureGameCanvasVisible(this); } catch (e) {}
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
     // Atmospheric overlays disabled in Town (remove fog overlay)
     this._overlays = null;

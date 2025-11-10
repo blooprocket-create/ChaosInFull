@@ -57,6 +57,23 @@ export class CharacterSelect extends Phaser.Scene {
                 gc.style.opacity = '1';
                 gc.removeAttribute('data-phaser-hidden');
                 gc.classList.remove('hidden','invisible','opacity-0');
+                // Also unhide the canvas itself
+                const canvas = this.game.canvas;
+                if (canvas) {
+                    canvas.style.display = 'block';
+                    canvas.style.visibility = 'visible';
+                    canvas.style.opacity = '1';
+                    canvas.classList.remove('hidden','invisible','opacity-0');
+                }
+                // Force scale manager to refresh after unhiding
+                try {
+                    if (this.scale) {
+                        // Small delay to ensure DOM has settled
+                        setTimeout(() => {
+                            try { this.scale.refresh(); } catch (e) {}
+                        }, 50);
+                    }
+                } catch (e) {}
             } catch (e) { /* ignore */ }
         };
 

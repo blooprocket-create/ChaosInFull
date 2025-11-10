@@ -235,15 +235,13 @@ export async function createPhaserGame(opts: {
         BrokenDock,
       ],
       scale: {
-        mode: Phaser.Scale.RESIZE,
+        mode: Phaser.Scale.FIT,
         parent: parent,
-        width: '100%',
-        height: '100%',
-        autoCenter: Phaser.Scale.NO_CENTER,
-        expandParent: true
+        width: 1280,
+        height: 720,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
       },
-      // Disable automatic CSS scaling so our React wrapper + resize observer controls size
-      canvasStyle: 'position:absolute;top:0;left:0;width:100%;height:100%;',
+      // Let Phaser handle canvas styling with FIT mode
       loader: { baseURL: '/phaser-game/', path: '' },
     };
 

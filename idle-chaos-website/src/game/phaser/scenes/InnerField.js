@@ -6,6 +6,7 @@ import { setCircleCentered } from '../shared/physicsHelpers.js';
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { attach } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
@@ -23,6 +24,8 @@ export class InnerField extends Phaser.Scene {
     create() {
         // Ensure cleanup manager is attached early for this scene
         try { attach(this); } catch (e) {}
+        // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+        try { ensureGameCanvasVisible(this); } catch (e) {}
         this.enemyDefs = (window && window.ENEMY_DEFS) ? window.ENEMY_DEFS : {};
         const sceneData = (this.sys && this.sys.settings && this.sys.settings.data) || {};
         this.username = sceneData.username || null;

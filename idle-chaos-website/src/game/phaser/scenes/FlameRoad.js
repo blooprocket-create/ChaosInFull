@@ -5,6 +5,7 @@ import { updateSmoothPlayerMovement, playDirectionalAnimation, updateDepthForTop
 import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState.js';
 import { computeEnemyStats } from '../data/statFormulas.js';
 import { attach as attachCleanup } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
@@ -19,6 +20,8 @@ export class FlameRoad extends Phaser.Scene {
 
     create(sceneData = {}) {
         try { attachCleanup(this); } catch (e) {}
+        // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+        try { ensureGameCanvasVisible(this); } catch (e) {}
         const dataFromSettings = (this.sys && this.sys.settings && this.sys.settings.data) || {};
         const incoming = (sceneData && typeof sceneData === 'object') ? sceneData : {};
         const data = { ...dataFromSettings, ...incoming };

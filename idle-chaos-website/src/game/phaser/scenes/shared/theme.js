@@ -31,9 +31,43 @@ export function restoreBodyStyle(previous) {
     style.overflow = previous.overflow || '';
 }
 
+/**
+ * Ensures the Phaser game container and canvas are visible.
+ * Call this at the start of any gameplay scene to undo visibility hiding from Login/CharacterSelect.
+ * @param {Phaser.Scene} scene - The scene instance (used to access game.scale for refresh)
+ */
+export function ensureGameCanvasVisible(scene) {
+    try {
+        const gc = document.getElementById('game-container');
+        if (gc) {
+            // Clear any hiding styles
+            gc.style.display = gc.style.display === 'none' ? '' : gc.style.display;
+            gc.style.visibility = gc.style.visibility === 'hidden' ? '' : gc.style.visibility;
+            gc.style.opacity = gc.style.opacity === '0' ? '' : gc.style.opacity;
+            gc.removeAttribute('data-phaser-hidden');
+            gc.classList.remove('hidden', 'invisible', 'opacity-0');
+        }
+        // Also ensure canvas itself is visible
+        if (scene && scene.game && scene.game.canvas) {
+            const canvas = scene.game.canvas;
+            canvas.style.display = canvas.style.display === 'none' ? '' : canvas.style.display;
+            canvas.style.visibility = canvas.style.visibility === 'hidden' ? '' : canvas.style.visibility;
+            canvas.style.opacity = canvas.style.opacity === '0' ? '' : canvas.style.opacity;
+            canvas.classList.remove('hidden', 'invisible', 'opacity-0');
+        }
+        // Force scale refresh after visibility change
+        if (scene && scene.scale) {
+            setTimeout(() => { try { scene.scale.refresh(); } catch (e) {} }, 50);
+        }
+    } catch (e) {
+        console.warn('[ensureGameCanvasVisible] Failed to unhide canvas', e);
+    }
+}
+
 export default {
     DEFAULT_BACKGROUND_STYLE,
     captureBodyStyle,
     applyDefaultBackground,
     restoreBodyStyle,
+    ensureGameCanvasVisible,
 };

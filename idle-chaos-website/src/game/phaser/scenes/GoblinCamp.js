@@ -7,6 +7,7 @@ import { computeEnemyStats } from '../data/statFormulas.js';
 import { setCircleCentered } from '../shared/physicsHelpers.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { attach } from '../shared/cleanupManager.js';
+import { ensureGameCanvasVisible } from './shared/theme.js';
 import { getAreaEnemyLevel } from './shared/levelRanges.js';
 
 export class GoblinCamp extends Phaser.Scene {
@@ -84,6 +85,8 @@ export class GoblinCamp extends Phaser.Scene {
     create(sceneData = {}) {
         // Ensure cleanup manager is attached early for this scene
         try { attach(this); } catch (e) {}
+        // Ensure canvas is visible (undo Login/CharacterSelect hiding)
+        try { ensureGameCanvasVisible(this); } catch (e) {}
         const dataFromSettings = (this.sys && this.sys.settings && this.sys.settings.data) || {};
         const incoming = (sceneData && typeof sceneData === 'object') ? sceneData : {};
         const data = { ...dataFromSettings, ...incoming };
