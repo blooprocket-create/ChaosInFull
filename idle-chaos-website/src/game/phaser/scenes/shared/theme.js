@@ -32,7 +32,7 @@ export function restoreBodyStyle(previous) {
 }
 
 /**
- * Ensures the Phaser game container and canvas are visible.
+ * Ensures the Phaser game container and canvas are visible and interactive.
  * Call this at the start of any gameplay scene to undo visibility hiding from Login/CharacterSelect.
  * @param {Phaser.Scene} scene - The scene instance (used to access game.scale for refresh)
  */
@@ -44,15 +44,17 @@ export function ensureGameCanvasVisible(scene) {
             gc.style.display = gc.style.display === 'none' ? '' : gc.style.display;
             gc.style.visibility = gc.style.visibility === 'hidden' ? '' : gc.style.visibility;
             gc.style.opacity = gc.style.opacity === '0' ? '' : gc.style.opacity;
+            gc.style.pointerEvents = gc.style.pointerEvents === 'none' ? '' : gc.style.pointerEvents;
             gc.removeAttribute('data-phaser-hidden');
             gc.classList.remove('hidden', 'invisible', 'opacity-0');
         }
-        // Also ensure canvas itself is visible
+        // Also ensure canvas itself is visible and interactive
         if (scene && scene.game && scene.game.canvas) {
             const canvas = scene.game.canvas;
             canvas.style.display = canvas.style.display === 'none' ? '' : canvas.style.display;
             canvas.style.visibility = canvas.style.visibility === 'hidden' ? '' : canvas.style.visibility;
             canvas.style.opacity = canvas.style.opacity === '0' ? '' : canvas.style.opacity;
+            canvas.style.pointerEvents = canvas.style.pointerEvents === 'none' ? '' : canvas.style.pointerEvents;
             canvas.classList.remove('hidden', 'invisible', 'opacity-0');
         }
         // Force scale refresh after visibility change

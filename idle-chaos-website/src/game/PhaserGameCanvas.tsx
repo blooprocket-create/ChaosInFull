@@ -237,9 +237,11 @@ export default function PhaserGameCanvas({
         const hiddenByDisplay = canvas.style.display === 'none';
         const hiddenByVisibility = canvas.style.visibility === 'hidden';
         const hiddenByOpacity = canvas.style.opacity === '0';
+        const hiddenByPointerEvents = canvas.style.pointerEvents === 'none';
         if (hiddenByDisplay) { canvas.style.display = ''; changed = true; try { console.log('[PhaserCanvas] cleared display style'); } catch {} }
         if (hiddenByVisibility) { canvas.style.visibility = ''; changed = true; try { console.log('[PhaserCanvas] cleared visibility style'); } catch {} }
         if (hiddenByOpacity) { canvas.style.opacity = ''; changed = true; try { console.log('[PhaserCanvas] cleared opacity style'); } catch {} }
+        if (hiddenByPointerEvents) { canvas.style.pointerEvents = ''; changed = true; try { console.log('[PhaserCanvas] cleared pointerEvents style'); } catch {} }
         if (canvas.classList.contains('hidden')) { canvas.classList.remove('hidden'); changed = true; try { console.log('[PhaserCanvas] removed class "hidden"'); } catch {} }
         // Remove any tailwind-style utility that might keep it invisible
         if (canvas.classList.contains('invisible')) { canvas.classList.remove('invisible'); changed = true; try { console.log('[PhaserCanvas] removed class "invisible"'); } catch {} }
@@ -250,12 +252,13 @@ export default function PhaserGameCanvas({
           // Force scale refresh after unhiding
           try { if (game && game.scale) game.scale.refresh(); } catch {}
         }
-        // Also ensure container itself is visible (and clear scene's hidden flag)
+        // Also ensure container itself is visible and interactive (clear scene's hidden flag)
         if (container) {
           const cs = getComputedStyle(container);
           if (cs.display === 'none') { container.style.display = ''; changed = true; try { console.log('[PhaserCanvas] cleared container display'); } catch {} }
           if (cs.visibility === 'hidden') { container.style.visibility = ''; changed = true; try { console.log('[PhaserCanvas] cleared container visibility'); } catch {} }
           if (container.style.opacity === '0') { container.style.opacity = ''; changed = true; try { console.log('[PhaserCanvas] cleared container opacity'); } catch {} }
+          if (container.style.pointerEvents === 'none') { container.style.pointerEvents = ''; changed = true; try { console.log('[PhaserCanvas] cleared container pointerEvents'); } catch {} }
           if (container.getAttribute('data-phaser-hidden') === 'true') { container.removeAttribute('data-phaser-hidden'); changed = true; try { console.log('[PhaserCanvas] removed data-phaser-hidden'); } catch {} }
           // Remove any lingering full-screen overlays from login/char-select
           try {

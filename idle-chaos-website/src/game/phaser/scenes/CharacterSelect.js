@@ -41,10 +41,13 @@ export class CharacterSelect extends Phaser.Scene {
         const gameContainer = document.getElementById('game-container');
         if (gameContainer) {
             this._previousGameDisplay = gameContainer.style.display;
+            this._previousPointerEvents = gameContainer.style.pointerEvents;
             gameContainer.setAttribute('data-phaser-hidden', 'true');
             // Use visibility hidden instead of display none so layout sizing stays stable
             gameContainer.style.visibility = 'hidden';
             gameContainer.style.opacity = '0';
+            // Disable pointer events so clicks pass through to the character select UI below
+            gameContainer.style.pointerEvents = 'none';
         }
 
         // Explicit unhide helper to ensure canvas becomes visible before next scene renders
@@ -55,6 +58,7 @@ export class CharacterSelect extends Phaser.Scene {
                 gc.style.display = this._previousGameDisplay || '';
                 gc.style.visibility = 'visible';
                 gc.style.opacity = '1';
+                gc.style.pointerEvents = this._previousPointerEvents || '';
                 gc.removeAttribute('data-phaser-hidden');
                 gc.classList.remove('hidden','invisible','opacity-0');
                 // Also unhide the canvas itself
@@ -63,6 +67,7 @@ export class CharacterSelect extends Phaser.Scene {
                     canvas.style.display = 'block';
                     canvas.style.visibility = 'visible';
                     canvas.style.opacity = '1';
+                    canvas.style.pointerEvents = '';
                     canvas.classList.remove('hidden','invisible','opacity-0');
                 }
                 // Force scale manager to refresh after unhiding
@@ -511,10 +516,12 @@ export class CharacterSelect extends Phaser.Scene {
             this._gameContainer.style.display = this._previousGameDisplay || '';
             this._gameContainer.style.visibility = 'visible';
             this._gameContainer.style.opacity = '1';
+            this._gameContainer.style.pointerEvents = this._previousPointerEvents || '';
             this._gameContainer.removeAttribute('data-phaser-hidden');
             this._gameContainer = null;
         }
         this._previousGameDisplay = undefined;
+        this._previousPointerEvents = undefined;
         if (this._previousBodyStyle) {
             restoreBodyStyle(this._previousBodyStyle);
             this._previousBodyStyle = null;
