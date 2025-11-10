@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { q } from "@/src/lib/db";
+import { q, ensureAccountItemStackTable, ensureItemStackTable, ensureCharacterTable } from "@/src/lib/db";
 import { getSession } from "@/src/lib/auth";
 
 /*
@@ -20,6 +20,9 @@ Atomic behavior:
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureCharacterTable();
+  await ensureItemStackTable();
+  await ensureAccountItemStackTable();
   const body = await req.json().catch(() => null) as {
     characterId?: string;
     direction?: "toStorage" | "toInventory";

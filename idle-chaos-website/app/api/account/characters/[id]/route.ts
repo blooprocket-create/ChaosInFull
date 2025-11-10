@@ -12,7 +12,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   // Delete dependents and character
   await q`delete from "ItemStack" where characterid = ${id}`;
-  await q`delete from "CraftQueue" where characterid = ${id}`;
   await q`delete from "CharacterQuest" where characterid = ${id}`;
   await q`update "ChatMessage" set characterid = null where characterid = ${id}`;
   const res = await q<{ count: number }>`

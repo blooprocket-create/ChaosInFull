@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q } from "@/src/lib/db";
+import { q, ensureItemStackTable, ensureCharacterTable } from "@/src/lib/db";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -8,6 +8,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const { characterId, items } = body as { characterId?: string; items?: Record<string, number> };
   if (!characterId || !items) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+  await ensureCharacterTable();
+  await ensureItemStackTable();
   // Verify ownership
   const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId} limit 1`;
   if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
@@ -43,6 +45,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const characterId = searchParams.get("characterId") || undefined;
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+  await ensureCharacterTable();
+  await ensureItemStackTable();
   const owner = await q<{ id: string }>`select id from "Character" where id = ${characterId} and userid = ${session.userId} limit 1`;
   if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const rows = await q<{ itemkey: string; count: number }>`select itemkey, count from "ItemStack" where characterid = ${characterId}`;

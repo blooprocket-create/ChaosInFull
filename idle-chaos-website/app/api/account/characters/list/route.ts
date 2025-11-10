@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q } from "@/src/lib/db";
+import { q, ensureCharacterTable } from "@/src/lib/db";
 
 // Returns summary of all characters for the logged in user including skill levels and last scene/AFK duration basis
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureCharacterTable();
   const rows = await q<{
     id: string; name: string; class: string; level: number;
     mininglevel: number; woodcuttinglevel: number; craftinglevel: number; fishinglevel: number;

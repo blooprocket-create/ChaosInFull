@@ -42,7 +42,6 @@ export async function POST(req: Request) {
   // Cascade delete everything related to this user inside a single transaction
   // Delete related rows; FK constraints may cascade for some tables, but we clear explicitly.
   await q`delete from "ItemStack" where characterid in (select id from "Character" where userid = ${user.id})`;
-  await q`delete from "CraftQueue" where characterid in (select id from "Character" where userid = ${user.id})`;
   await q`delete from "CharacterQuest" where characterid in (select id from "Character" where userid = ${user.id})`;
   await q`update "ChatMessage" set characterid = null where characterid in (select id from "Character" where userid = ${user.id})`;
   await q`delete from "Character" where userid = ${user.id}`;

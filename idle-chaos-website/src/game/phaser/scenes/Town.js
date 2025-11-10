@@ -659,18 +659,29 @@ export class Town extends Phaser.Scene {
                 localStorage.setItem(key, JSON.stringify(userObj));
             }
         } catch (e) { console.warn('Could not persist character', e); }
+        // Async remote persistence (inventory handled elsewhere)
+        try { if (window.__cif_persist) window.__cif_persist.saveCharacter(username, this.char); } catch (e) { /* ignore */ }
         // If the inventory modal is open, refresh it so UI updates live after changes
         try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }
     // --- Shared account storage helpers ---
     _getAccountStorage(username) {
         if (!username) return [];
+        // Prefer server snapshot if bridge available
+        try {
+            if (window.__cif_persist) {
+                // Kick off migration in background (first run only)
+                const key = 'cif_user_' + username;
+                const blob = JSON.parse(localStorage.getItem(key) || 'null');
+                if (blob && !blob.migratedAt) { window.__cif_persist.migrateLocalStorageBlob(username).catch(()=>{}); }
+                return window.__cif_persist.getAccountStorage();
+            }
+        } catch (e) { /* ignore */ }
         try {
             const key = 'cif_user_' + username;
             const userObj = JSON.parse(localStorage.getItem(key));
             if (userObj && userObj.storage) return userObj.storage;
         } catch (e) { /* ignore */ }
-        // default: return empty slot array
         return Array.from({length:50}).map(_=>null);
     }
     _setAccountStorage(username, storageArr) {
@@ -681,6 +692,19 @@ export class Town extends Phaser.Scene {
             userObj.storage = storageArr || Array.from({length:50}).map(_=>null);
             localStorage.setItem(key, JSON.stringify(userObj));
         } catch (e) { console.warn('Could not set account storage', e); }
+        // Push merged storage to server if bridge available
+        try {
+            if (window.__cif_persist) {
+                const map = {};
+                for (const slot of storageArr || []) {
+                    if (!slot) continue;
+                    const { itemkey, count } = slot;
+                    if (!itemkey || typeof count !== 'number') continue;
+                    map[itemkey] = (map[itemkey] || 0) + count;
+                }
+                window.__cif_persist.upsertAccountStorage(map).catch(()=>{});
+            }
+        } catch (e) { /* ignore */ }
     }
     // --- Storage chest modal ---
     _openStorageModal() {

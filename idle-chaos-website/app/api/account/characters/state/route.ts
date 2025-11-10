@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q } from "@/src/lib/db";
+import { q, ensureCharacterTable } from "@/src/lib/db";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -8,6 +8,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const { characterId, scene } = body as { characterId?: string; scene?: string };
   if (!characterId || !scene) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
+  await ensureCharacterTable();
   const res = await q<{ count: number }>`
     with upd as (
       update "Character" set lastscene = ${scene}, lastseenat = now()

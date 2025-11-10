@@ -92,6 +92,117 @@ export async function ensureFishingEventTable() {
   }
 }
 
+// --- Game data tables (auto-provision if missing) ---
+let characterTableChecked = false;
+export async function ensureCharacterTable() {
+  if (characterTableChecked) return;
+  try {
+    await sql`
+      create table if not exists "Character" (
+        id text primary key,
+        userid text references "User"(id) on delete cascade,
+        name text not null,
+        class text not null,
+        gender text,
+        hat text,
+        level int not null default 1,
+        mininglevel int not null default 1,
+        woodcuttinglevel int not null default 1,
+        craftinglevel int not null default 1,
+        fishinglevel int not null default 1,
+        lastscene text,
+        lastseenat timestamptz default now(),
+        createdat timestamptz not null default now()
+      )
+    `;
+    await sql`create index if not exists character_user_idx on "Character"(userid)`;
+  } catch {
+    // ignore
+  } finally {
+    characterTableChecked = true;
+  }
+}
+
+let itemStackTableChecked = false;
+export async function ensureItemStackTable() {
+  if (itemStackTableChecked) return;
+  try {
+    await sql`
+      create table if not exists "ItemStack" (
+        characterid text references "Character"(id) on delete cascade,
+        itemkey text not null,
+        count int not null default 0,
+        primary key (characterid, itemkey)
+      )
+    `;
+  } catch {
+    // ignore
+  } finally {
+    itemStackTableChecked = true;
+  }
+}
+
+let accountItemStackTableChecked = false;
+export async function ensureAccountItemStackTable() {
+  if (accountItemStackTableChecked) return;
+  try {
+    await sql`
+      create table if not exists "AccountItemStack" (
+        userid text references "User"(id) on delete cascade,
+        itemkey text not null,
+        count int not null default 0,
+        primary key (userid, itemkey)
+      )
+    `;
+  } catch {
+    // ignore
+  } finally {
+    accountItemStackTableChecked = true;
+  }
+}
+
+let playerStatTableChecked = false;
+export async function ensurePlayerStatTable() {
+  if (playerStatTableChecked) return;
+  try {
+    await sql`
+      create table if not exists "PlayerStat" (
+        userid text primary key references "User"(id) on delete cascade,
+        strength int not null default 1,
+        intellect int not null default 1,
+        agility int not null default 1,
+        luck int not null default 1
+      )
+    `;
+  } catch {
+    // ignore
+  } finally {
+    playerStatTableChecked = true;
+  }
+}
+
+let characterQuestTableChecked = false;
+export async function ensureCharacterQuestTable() {
+  if (characterQuestTableChecked) return;
+  try {
+    await sql`
+      create table if not exists "CharacterQuest" (
+        characterid text references "Character"(id) on delete cascade,
+        questid text not null,
+        status text not null,
+        progress jsonb,
+        updatedat timestamptz not null default now(),
+        primary key (characterid, questid)
+      )
+    `;
+    await sql`create index if not exists characterquest_status_idx on "CharacterQuest"(status)`;
+  } catch {
+    // ignore
+  } finally {
+    characterQuestTableChecked = true;
+  }
+}
+
 // Increment catch count for a user & fish under an event
 export async function incrementFishingEventCatch(params: {
   eventKey: string;

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensurePgcrypto } from "@/src/lib/db";
+import { q, ensurePgcrypto, ensureCharacterTable, ensurePlayerStatTable } from "@/src/lib/db";
 
 export async function GET() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureCharacterTable();
     type Row = { id: string; name: string; class: string; level: number };
     const rows = await q<Row>`
       select id, name, class, level
@@ -25,6 +26,8 @@ export async function POST(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     await ensurePgcrypto();
+  await ensureCharacterTable();
+  await ensurePlayerStatTable();
     const owners = await q<{ id: string }>`select id from "User" where id = ${session.userId} limit 1`;
     if (!owners[0]) {
       return NextResponse.json({ error: "Account not found. Please log out and log back in." }, { status: 409 });
