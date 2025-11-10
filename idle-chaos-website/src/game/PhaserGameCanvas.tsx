@@ -83,6 +83,19 @@ export default function PhaserGameCanvas({
 
     // Handle window resize
     let resizeWarned = false;
+    // Find a non-zero width by walking up ancestors; fallback to window width
+    const getUsableWidth = (el: HTMLElement | null): number => {
+      try {
+        let node: HTMLElement | null = el;
+        while (node) {
+          const w = node.clientWidth || Math.floor(node.getBoundingClientRect?.().width || 0);
+          if (w && w > 0) return w;
+          node = node.parentElement;
+        }
+      } catch {}
+      if (typeof window !== 'undefined') return Math.floor(window.innerWidth || 0);
+      return 0;
+    };
     const onResize = () => {
       try {
         if (!gameRef.current || !ref.current) return;
@@ -90,7 +103,8 @@ export default function PhaserGameCanvas({
         const g = gameRef.current as PhaserTypes.Game & { isBooted?: boolean };
         if (g.isBooted === false) return;
         // Compute target size; guard against zero/NaN
-        const cw = ref.current.clientWidth || 0;
+        // Prefer container width; if zero, walk up the tree or fallback to window width
+        const cw = getUsableWidth(ref.current);
         if (!cw || cw <= 0 || Number.isNaN(cw)) {
           if (!resizeWarned) {
             console.warn('[PhaserGameCanvas] Resize skipped due to zero container width');
@@ -115,12 +129,18 @@ export default function PhaserGameCanvas({
       }
     };
 
-  window.addEventListener("resize", onResize);
+    window.addEventListener("resize", onResize);
   // Kick a resize after creation to match container size
   requestAnimationFrame(onResize);
   // Also when tab becomes visible (layout may have changed)
   const onVisibility = () => { if (document.visibilityState === 'visible') requestAnimationFrame(onResize); };
   document.addEventListener('visibilitychange', onVisibility);
+    // Observe container size changes to react to layout shifts quickly
+    let ro: ResizeObserver | null = null;
+    try {
+      ro = new ResizeObserver(() => { requestAnimationFrame(onResize); });
+      ro.observe(ref.current!);
+    } catch {}
 
     // Prevent default Space bar scrolling
     const el = ref.current;
@@ -136,6 +156,7 @@ export default function PhaserGameCanvas({
     return () => {
   window.removeEventListener("resize", onResize);
   document.removeEventListener('visibilitychange', onVisibility);
+  try { ro?.disconnect(); } catch {}
       if (el) {
         el.removeEventListener("keydown", onKeydown);
       }
@@ -194,6 +215,8 @@ export default function PhaserGameCanvas({
         aspectRatio: "16/9",
         margin: "0 auto",
         minHeight: "360px",
+        display: "block",
+        flex: "1 1 auto",
       }}
     />
   );

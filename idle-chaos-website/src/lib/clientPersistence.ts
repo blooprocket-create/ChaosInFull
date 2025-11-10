@@ -15,7 +15,7 @@ declare global {
   interface Window {
     __cif_persist?: {
       saveCharacter: (username: string | null, char: SaveCharacterPayload | null) => Promise<void>;
-      saveInventory: (characterId: string, items: Record<string, number>) => Promise<Record<string, number>>;
+  saveInventory: (characterId: string | null | undefined, items: Record<string, number>) => Promise<Record<string, number>>;
       getAccountStorage: () => Promise<Array<{ itemkey: string; count: number } | null>>;
       upsertAccountStorage: (items: Record<string, number>) => Promise<void>;
       saveCharacterPatch: (characterId: string, patch: Record<string, unknown>) => Promise<void>;
@@ -105,7 +105,7 @@ function installPersistenceBridge() {
       }
     },
     async saveInventory(characterId, items) {
-      if (!characterId) return {};
+      if (!characterId) return items; // no character context yet (login / character select scenes)
       if (window.__persistFlags?.disableServerWrites) return items;
       // POST inventory snapshot
       const res = await fetchJSON<{ ok: boolean; items?: Record<string, number> }>(
@@ -117,7 +117,7 @@ function installPersistenceBridge() {
       return res?.items || items;
     },
     async saveCharacterPatch(characterId, patch) {
-      if (!characterId) return;
+      if (!characterId) return; // ignore until a real character id is known
       if (window.__persistFlags?.disableServerWrites) return;
       try {
         const res = await fetch('/api/account/characters/patch', {
@@ -132,7 +132,7 @@ function installPersistenceBridge() {
       }
     },
     async saveQuests(characterId, active, completed) {
-      if (!characterId) return;
+      if (!characterId) return; // ignore quest sync before character selection
       if (window.__persistFlags?.disableServerWrites) return;
       try {
         const res = await fetch('/api/account/characters/quests', {
