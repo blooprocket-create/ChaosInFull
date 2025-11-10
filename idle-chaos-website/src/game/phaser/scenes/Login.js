@@ -1,7 +1,7 @@
 // Phaser is loaded globally from CDN
 
 import { createAtmosphericOverlays } from './shared/overlays.js';
-import { loadUser, saveUser, iterUsers } from './shared/storage.js';
+import { iterUsers } from './shared/storage.js';
 import { applyDefaultBackground, captureBodyStyle, restoreBodyStyle } from './shared/theme.js';
 import { applyCombatMixin } from './shared/combat.js';
 
@@ -25,6 +25,32 @@ export class Login extends Phaser.Scene {
         this._previousBodyStyle = captureBodyStyle();
         applyDefaultBackground();
 
+        // First: check if a web session already exists (server-issued auth cookie)
+        try {
+            (async () => {
+                try {
+                    const resp = await fetch('/api/auth/me', { credentials: 'include' });
+                    if (resp.ok) {
+                        const data = await resp.json().catch(() => null);
+                        if (data && data.ok && data.user) {
+                            // Derive a display username (prefer email local-part)
+                            const email = data.user.email || '';
+                            const derived = email.includes('@') ? email.split('@')[0] : (data.user.username || 'Player');
+                            // Pass username forward so downstream scenes (event board, etc.) can use it
+                            this.scene.start('CharacterSelect', { username: derived, userId: data.user.userId });
+                            return; // Skip building legacy localStorage login UI entirely
+                        }
+                    }
+                } catch (e) { /* ignore network/auth errors; fallback to legacy UI */ }
+                // If we reach here: no active session; continue with legacy UI creation below
+                try { buildLegacyLoginUI.call(this); } catch (e) { console.error('Failed to build login UI', e); }
+            })();
+            return; // Defer rest of create() until async check runs
+        } catch (e) { /* fallback to legacy UI if fetch wrapper fails synchronously */ }
+
+        // Fallback legacy UI builder (used when no session is present)
+
+        function buildLegacyLoginUI() {
         const container = document.createElement('div');
         container.id = 'login-container';
         container.style.position = 'fixed';
@@ -38,9 +64,7 @@ export class Login extends Phaser.Scene {
         container.style.alignItems = 'center';
         container.style.background = 'transparent';
         container.style.backdropFilter = 'none';
-    // Container should also sit below the navbar to keep header links clickable
-    container.style.zIndex = '10';
-
+        container.style.zIndex = '10';
         container.innerHTML = `
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Metal+Mania&family=Share+Tech+Mono&display=swap');
@@ -184,12 +208,7 @@ export class Login extends Phaser.Scene {
             <div id="login-box">
                 <h1>Veil Keeper</h1>
                 <div class="subtitle">Enter the void</div>
-                <label class="field">Username
-                    <input id="login-username" data-login-username="true" type="text" autocomplete="username">
-                </label>
-                <label class="field">Password
-                    <input id="login-password" data-login-password="true" type="password" autocomplete="current-password">
-                </label>
+                <div style="font-size:0.85rem;color:#bbb;line-height:1.4;margin-top:4px;">You are not logged in.<br/>Use site authentication.</div>
                 <div class="actions">
                     <div style="flex:1; display:flex; gap:8px;">
                         <button id="login-btn" class="cta">Log In</button>
@@ -216,64 +235,11 @@ export class Login extends Phaser.Scene {
         } catch (e) {}
 
     // Query by data-* attributes to avoid duplicate id collisions if scene reboots in dev/StrictMode
-    const usernameInput = document.querySelector('input[data-login-username="true"]');
-    const passwordInput = document.querySelector('input[data-login-password="true"]');
         const errorDiv = document.getElementById('login-error');
-
-        const lastSession = this._findLastLoggedInUser();
-        if (lastSession && usernameInput) usernameInput.value = lastSession.username;
-
-        const attemptLogin = () => {
-            const username = (usernameInput?.value || '').trim();
-            const password = passwordInput?.value || '';
-            if (!username || !password) {
-                errorDiv.textContent = 'Please enter both username and password.';
-                return;
-            }
-            const userObj = loadUser(username, null);
-            if (!userObj) {
-                errorDiv.textContent = 'User does not exist.';
-                return;
-            }
-            if (userObj.password !== password) {
-                errorDiv.textContent = 'Incorrect password.';
-                return;
-            }
-            userObj.loggedIn = true;
-            if (!userObj.username) userObj.username = username;
-            saveUser(username, userObj);
-            errorDiv.textContent = '';
-            this.scene.start('CharacterSelect');
-            this._cleanupDom();
-        };
-
-        const attemptSignup = () => {
-            const username = (usernameInput?.value || '').trim();
-            const password = passwordInput?.value || '';
-            if (!username || !password) {
-                errorDiv.textContent = 'Please enter both username and password.';
-                return;
-            }
-            if (loadUser(username, null)) {
-                errorDiv.textContent = 'User already exists.';
-                return;
-            }
-            const newUser = { username, password, loggedIn: true, characters: [] };
-            saveUser(username, newUser);
-            errorDiv.textContent = '';
-            this.scene.start('CharacterSelect');
-            this._cleanupDom();
-        };
-
         const loginBtn = document.getElementById('login-btn');
         const signupBtn = document.getElementById('signup-btn');
-        if (loginBtn) loginBtn.onclick = attemptLogin;
-        if (signupBtn) signupBtn.onclick = attemptSignup;
-        if (passwordInput) {
-            passwordInput.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter') attemptLogin();
-            });
-        }
+        if (loginBtn) loginBtn.onclick = () => { window.location.href = '/login'; };
+        if (signupBtn) signupBtn.onclick = () => { window.location.href = '/signup'; };
 
         this.events.once('shutdown', () => {
             // Do not stop shared background music here (shared manager controls lifecycle).
@@ -285,6 +251,8 @@ export class Login extends Phaser.Scene {
                 this._cleanupDom();
             });
         } catch (e) { /* ignore */ }
+    }
+
     }
 
     _findLastLoggedInUser() {
