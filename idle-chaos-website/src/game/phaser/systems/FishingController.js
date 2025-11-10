@@ -317,6 +317,34 @@ export class FishingController {
         }
         if (this.scene && typeof this.scene._grantFishingXp === 'function') this.scene._grantFishingXp(xp);
         if (this.scene && typeof this.scene._addItemToInventory === 'function') this.scene._addItemToInventory(fish.id, 1);
+        // Best-effort: report catch to active Intro to Fishing event API with small retry queue
+        try {
+            const username = (this.scene && this.scene.sys && this.scene.sys.settings && this.scene.sys.settings.data && this.scene.sys.settings.data.username) || null;
+            const payload = { fishId: fish.id, fishName: fish.name, username };
+            console.log('[fishing] Reporting catch to event API', payload);
+            // Use scene-scoped queue/timer to avoid duplicates across controllers
+            this.scene._eventCatchQueue = this.scene._eventCatchQueue || [];
+            const send = (p) => {
+                fetch('/api/events/intro_to_fishing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(p)
+                }).then(r => { if (!r.ok) throw new Error('bad status'); })
+                  .catch(() => { try { this.scene._eventCatchQueue.push(p); } catch(e) {} });
+            };
+            send(payload);
+            if (!this.scene._eventFlushTimer) {
+                // Flush queued catches every 10s
+                this.scene._eventFlushTimer = setInterval(() => {
+                    try {
+                        const q = this.scene._eventCatchQueue || [];
+                        if (!q.length) return;
+                        const batch = q.splice(0, 3);
+                        for (const p of batch) send(p);
+                    } catch(e) {}
+                }, 10000);
+            }
+        } catch (e) { /* ignore */ }
         // Include rod snapshot on catch as well for balance analysis (mastery & rod already fetched above)
         const rodSnapshot = { name: rod.name, controlZoneMult: rod.controlZoneMult, sensitivityWaitMult: rod.sensitivityWaitMult, precisionGainMult: rod.precisionGainMult, zoneShrinkMult: rod.zoneShrinkMult, maxFails: (typeof rod.maxFails==='number'?rod.maxFails:6) };
         this._emitTelemetry('catch', { fishId: fish.id, rarity: fish.rarity, xp, mastery, rodStats: rodSnapshot, totalSegments: this.totalSegments, perfectSegments: this.perfectSegments, performanceMultiplier });
