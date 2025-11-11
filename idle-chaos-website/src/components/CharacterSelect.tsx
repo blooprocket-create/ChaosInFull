@@ -8,8 +8,7 @@ export default function CharacterSelect() {
   const [chars, setChars] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
-  const [gender, setGender] = useState("Male");
-  const [hat, setHat] = useState("STR");
+  // gender/hat removed from creation flow
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const search = useSearchParams();
@@ -41,8 +40,6 @@ export default function CharacterSelect() {
     setError(null);
     const fd = new FormData();
     fd.set("name", name);
-  fd.set("gender", gender);
-  fd.set("hat", hat);
     const res = await fetch("/api/account/characters", { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) { setError(data.error || "Create failed"); return; }
@@ -81,19 +78,7 @@ export default function CharacterSelect() {
         <h2 className="text-lg font-semibold">Create Character</h2>
         <form onSubmit={createChar} className="mt-3 space-y-3">
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="Name" className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500" />
-          <div className="grid sm:grid-cols-2 gap-3">
-            <select value={gender} onChange={e=>setGender(e.target.value)} className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500">
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Nonbinary">Nonbinary</option>
-            </select>
-            <select value={hat} onChange={e=>setHat(e.target.value)} className="w-full rounded bg-black/40 border border-white/10 px-4 py-3 outline-none focus:border-purple-500">
-              <option value="STR">Hat of Strength (+3 STR)</option>
-              <option value="INT">Hat of Intellect (+3 INT)</option>
-              <option value="AGI">Hat of Agility (+3 AGI)</option>
-              <option value="LUK">Hat of Luck (+3 LUK)</option>
-            </select>
-          </div>
+          {/* Removed gender/hat selectors */}
           <p className="text-xs text-gray-400">Class: Beginner (advanced class chosen later via quest)</p>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button className="btn">Create</button>

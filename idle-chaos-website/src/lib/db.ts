@@ -146,6 +146,25 @@ export async function ensureCharacterExtraColumns() {
   }
 }
 
+// Ensure dedicated base stat columns (str,int,agi,luk) for characters.
+// These complement or replace any stats stored in JSONB 'data'.
+let characterStatColsChecked = false;
+export async function ensureCharacterStatColumns() {
+  if (characterStatColsChecked) return;
+  try {
+    await ensureCharacterTable();
+    // Add columns if not exists (lowercase names; Postgres folds identifiers)
+    await sql`alter table "Character" add column if not exists str int not null default 1`;
+    await sql`alter table "Character" add column if not exists int int not null default 1`;
+    await sql`alter table "Character" add column if not exists agi int not null default 1`;
+    await sql`alter table "Character" add column if not exists luk int not null default 1`;
+  } catch {
+    // ignore
+  } finally {
+    characterStatColsChecked = true;
+  }
+}
+
 let itemStackTableChecked = false;
 export async function ensureItemStackTable() {
   if (itemStackTableChecked) return;

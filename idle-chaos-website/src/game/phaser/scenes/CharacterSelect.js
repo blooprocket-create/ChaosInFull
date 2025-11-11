@@ -487,8 +487,12 @@ export class CharacterSelect extends Phaser.Scene {
                 const confirm = document.getElementById('confirm-create'); if (confirm) confirm.onclick = () => {
                     const name = (document.getElementById('new-char-name').value||'').trim(); const raceVal = document.getElementById('new-char-race').value; const weaponVal = document.getElementById('new-char-weapon').value; const err = document.getElementById('char-create-error');
                     if (!name) { if (err) err.textContent='Enter a name.'; return; }
-                    const lc = name.toLowerCase(); let nameTaken = false; iterUsers((key,obj)=>{ if (nameTaken||!obj||!Array.isArray(obj.characters)) return; for (const c of obj.characters){ if (c&&c.name&&c.name.toLowerCase()===lc){ nameTaken=true; break; } } });
-                    if (nameTaken) { if (err) err.textContent='That name is already taken.'; return; }
+                    // Check against server-fetched list for this account only (do not scan localStorage)
+                    try {
+                        const lc = name.toLowerCase();
+                        const nameTaken = Array.isArray(characters) && characters.some(c => c && c.name && String(c.name).toLowerCase() === lc);
+                        if (nameTaken) { if (err) err.textContent='That name is already taken.'; return; }
+                    } catch (e) { /* ignore preflight errors; server will validate as needed */ }
                     if (!raceVal) { if (err) err.textContent='Select a race.'; return; }
                     if (!weaponVal) { if (err) err.textContent='Select a starting weapon.'; return; }
                     let stats = { str:0,int:0,agi:0,luk:0 };
@@ -501,8 +505,6 @@ export class CharacterSelect extends Phaser.Scene {
                     try {
                         const formData = new FormData();
                         formData.set('name', name);
-                        formData.set('gender', 'Male'); // Default gender for Phaser scene
-                        formData.set('hat', 'STR'); // Default hat for Phaser scene
                         formData.set('race', raceVal); // Race from Phaser scene
                         formData.set('weapon', weaponVal); // Starting weapon from Phaser scene
                         fetch('/api/account/characters', { 

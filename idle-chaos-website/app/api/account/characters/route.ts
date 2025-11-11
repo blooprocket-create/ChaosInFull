@@ -1,20 +1,34 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterExtraColumns, ensurePlayerStatTable, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
+import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterStatColumns, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
+import { computeInitialCharacterData } from "@/src/lib/characterInit";
 
 export async function GET() {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureCharacterTable();
-    type Row = { id: string; name: string; class: string; level: number };
+    type Row = { id: string; name: string; class: string; level: number; str?: number; int?: number; agi?: number; luk?: number };
     const rows = await q<Row>`
-      select id, name, class, level
+      select id, name, class, level,
+        /* Include stat columns if they exist; ignored if not present */
+        (select column_name from information_schema.columns where table_name='Character' and column_name='str' limit 1) is not null as dummy,
+        str, int, agi, luk
       from "Character"
       where userid = ${session.userId}
       order by name asc
     `;
-    return NextResponse.json({ ok: true, characters: rows });
+    // Map rows to include stats only if defined numbers
+    const characters = rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      class: r.class,
+      level: r.level,
+      ...(typeof r.str === 'number' && typeof r.int === 'number' && typeof r.agi === 'number' && typeof r.luk === 'number'
+        ? { stats: { str: r.str, int: r.int, agi: r.agi, luk: r.luk } }
+        : {})
+    }));
+    return NextResponse.json({ ok: true, characters });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message || "Failed to load characters" }, { status: 500 });
@@ -28,7 +42,7 @@ export async function POST(req: Request) {
     await ensurePgcrypto();
   await ensureCharacterTable();
   await ensureCharacterExtraColumns();
-  await ensurePlayerStatTable();
+  await ensureCharacterStatColumns();
   await ensureItemStackTable();
   await ensureCharacterQuestTable();
     const owners = await q<{ id: string }>`select id from "User" where id = ${session.userId} limit 1`;
@@ -36,65 +50,78 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Account not found. Please log out and log back in." }, { status: 409 });
     }
     const form = await req.formData();
-    const name = String(form.get("name") || "").trim();
-    const gender = String(form.get("gender") || "Male");
-    const hat = String(form.get("hat") || "STR");
+  const name = String(form.get("name") || "").trim();
     // Optional Phaser scene fields (race, weapon)
-    const race = String(form.get("race") || "");
-    const weapon = String(form.get("weapon") || "");
+  const race = String(form.get("race") || "");
+  const weapon = String(form.get("weapon") || "");
     const klass = "Beginner"; // Always start as Beginner
     if (name.length < 3 || name.length > 20) return NextResponse.json({ error: "Name must be 3-20 chars" }, { status: 400 });
-    if (gender && !["Male","Female","Nonbinary"].includes(gender)) return NextResponse.json({ error: "Invalid gender" }, { status: 400 });
-    if (hat && !["STR","INT","AGI","LUK"].includes(hat)) return NextResponse.json({ error: "Invalid hat" }, { status: 400 });
 
-    // Create character with default values
-    // Use 'data' JSONB column for flexible storage of any character fields
-    type Created = { id: string; name: string; class: string; level: number };
-    const initialData: Record<string, unknown> = {
-      gender,
-      hat,
-      gold: 0,
-      flags: {},
-      inventory: [],
-      activeQuests: [],
-      completedQuests: [],
-      equipment: {},
-      stats: {},
-      mining: { level: 1, exp: 0 },
-      woodcutting: { level: 1, exp: 0 },
-      crafting: { level: 1, exp: 0 },
-      fishing: { level: 1, exp: 0 }
-    };
+  // Create character with default values
+  // Use 'data' JSONB column for flexible storage of any character fields
+  type Created = { id: string; name: string; class: string; level: number };
+    const initialData = computeInitialCharacterData({ race, weapon });
     
-    // Add Phaser scene fields if provided
-    if (race) initialData.race = race;
-    if (weapon) {
-      initialData.weapon = weapon;
-      initialData.startingEquipment = [{ id: weapon, qty: 1 }];
-    }
-    
-    const createdRows = await q<Created>`
-      insert into "Character" (
-        id, userid, name, class, data
-      )
-      values (
-        gen_random_uuid()::text, ${session.userId}, ${name}, ${klass},
-        ${JSON.stringify(initialData)}::jsonb
-      )
-      returning id, name, class, level
+    // Detect presence of legacy columns and insert accordingly to avoid "column does not exist" or NOT NULL violations
+    const presentCols = await q<{ column_name: string }>`
+      select column_name from information_schema.columns
+      where table_schema = 'public' and table_name = 'Character' and column_name = any(${['race','str','int','agi','luk']})
     `;
-    const created = createdRows[0];
+    const hasRace = presentCols.some(c => c.column_name === 'race');
+    const hasStats = ['str','int','agi','luk'].every(col => presentCols.some(c => c.column_name === col));
 
-    // Apply starting bonus to account stats (+3 to selected stat); ignore errors
-    await q`
-      update "PlayerStat"
-      set
-        strength = strength + case when ${hat} = 'STR' then 3 else 0 end,
-        intellect = intellect + case when ${hat} = 'INT' then 3 else 0 end,
-        agility  = agility  + case when ${hat} = 'AGI' then 3 else 0 end,
-        luck     = luck     + case when ${hat} = 'LUK' then 3 else 0 end
-      where userid = ${session.userId}
-    `.catch(() => {});
+    let created: Created;
+    const stats = (initialData as any).stats || { str:1,int:1,agi:1,luk:1 };
+    // Remove stats from JSONB to avoid duplication now that columns exist.
+    delete (initialData as any).stats;
+
+    if (hasRace && hasStats) {
+      const createdRows = await q<Created>`
+        insert into "Character" (
+          id, userid, name, class, race, str, int, agi, luk, data
+        ) values (
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk},
+          ${JSON.stringify(initialData)}::jsonb
+        )
+        returning id, name, class, level
+      `;
+      created = createdRows[0];
+    } else if (hasStats && !hasRace) {
+      const createdRows = await q<Created>`
+        insert into "Character" (
+          id, userid, name, class, str, int, agi, luk, data
+        ) values (
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk},
+          ${JSON.stringify(initialData)}::jsonb
+        )
+        returning id, name, class, level
+      `;
+      created = createdRows[0];
+    } else if (hasRace && !hasStats) {
+      const createdRows = await q<Created>`
+        insert into "Character" (
+          id, userid, name, class, race, data
+        ) values (
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race},
+          ${JSON.stringify(initialData)}::jsonb
+        )
+        returning id, name, class, level
+      `;
+      created = createdRows[0];
+    } else {
+      const createdRows = await q<Created>`
+        insert into "Character" (
+          id, userid, name, class, data
+        ) values (
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass},
+          ${JSON.stringify(initialData)}::jsonb
+        )
+        returning id, name, class, level
+      `;
+      created = createdRows[0];
+    }
+
+    // No gender/hat usage anymore; no account stat bonus on create.
 
     return NextResponse.json({ ok: true, character: created });
   } catch (err: unknown) {
