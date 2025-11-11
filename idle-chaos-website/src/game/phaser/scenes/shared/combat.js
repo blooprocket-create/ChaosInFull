@@ -1406,6 +1406,25 @@ function sharedRollDrops(def) {
             const min = Math.max(0, Math.floor(def.gold.min || 0));
             const max = Math.max(min, Math.floor(def.gold.max || min));
             goldAwarded = Phaser.Math.Between(min, max);
+            // Enemy gold scaling by level + rarity (tier)
+            // Assumptions: Existing min/max are baseline; we gently scale
+            // level contribution (up to +150%) and apply modest rarity multipliers.
+            try {
+                const lvl = Number(def.level || 1);
+                const tier = String(def.tier || 'common').toLowerCase();
+                const rarityMultipliers = {
+                    common: 1.0,
+                    uncommon: 1.08,
+                    rare: 1.18,
+                    epic: 1.32,
+                    legendary: 1.55,
+                    boss: 1.9
+                };
+                const rarityMult = rarityMultipliers[tier] || 1.0;
+                // Linear level scaling: +3% per level above 1, capped at +150%
+                const levelScale = 1 + Math.min(Math.max(lvl - 1, 0) * 0.03, 1.5);
+                goldAwarded = Math.max(0, Math.round(goldAwarded * rarityMult * levelScale));
+            } catch (e) { /* ignore scaling errors */ }
             // apply gold drop rate talent (percent)
             if (goldAwarded > 0 && goldDropRatePct) {
                 goldAwarded = Math.max(0, Math.round(goldAwarded * (1 + (goldDropRatePct / 100))));
