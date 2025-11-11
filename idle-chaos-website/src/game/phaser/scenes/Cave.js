@@ -235,18 +235,19 @@ export class Cave extends Phaser.Scene {
     
     // Create clusters with guaranteed counts
     // TIN cluster (5 nodes) - left side
-    createCluster(200, 350, 'tin', 5, 120);
+    createCluster(180, 380, 'tin', 5, 120);
     
     // COPPER cluster (4 nodes) - left-center
-    createCluster(350, 250, 'copper', 4, 100);
+    createCluster(350, 320, 'copper', 4, 100);
     
     // IRON cluster (5 nodes) - split into two mini-clusters
     createCluster(450, 180, 'iron', 3, 80);
     createCluster(400, 550, 'iron', 2, 60);
     
     // COAL cluster (7 nodes) - large spread across center
-    createCluster(550, 200, 'coal', 4, 90);
-    createCluster(700, 550, 'coal', 3, 80);
+    // COAL cluster (7 nodes) - shift ~60px to the right for better spacing from iron/gold
+    createCluster(610, 200, 'coal', 4, 90);
+    createCluster(690, 550, 'coal', 3, 80);
     
     // MYTHRIL cluster (3 nodes) - bottom-right
     createCluster(850, 600, 'mythril', 3, 70);

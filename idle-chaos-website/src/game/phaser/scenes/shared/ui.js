@@ -3653,6 +3653,14 @@ export function assignActiveToNextSlot(scene, talentId) {
         for (let i = 0; i < 9; i++) {
             if (!char.talents.skillBar[i]) {
                 char.talents.skillBar[i] = talentId;
+                // Persist via server talents API when available so assignment survives reloads
+                try {
+                    const cid = (char && char.id) ? String(char.id) : null;
+                    if (cid && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                        window.__cif_persist.saveTalents(cid, char.talents || {});
+                    }
+                } catch (e) { /* ignore persistence errors */ }
+                // Fallback: also persist full character snapshot locally for offline/local sessions
                 if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
                 try { refreshSkillBarHUD(scene); } catch (e) {}
                 return;
@@ -3669,6 +3677,14 @@ export function unassignSkillBarSlot(scene, slotIndex) {
         if (!char.talents || !Array.isArray(char.talents.skillBar)) return;
         if (slotIndex < 0 || slotIndex >= char.talents.skillBar.length) return;
         char.talents.skillBar[slotIndex] = null;
+        // Persist via server talents API when available so unassignment survives reloads
+        try {
+            const cid = (char && char.id) ? String(char.id) : null;
+            if (cid && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                window.__cif_persist.saveTalents(cid, char.talents || {});
+            }
+        } catch (e) { /* ignore persistence errors */ }
+        // Fallback: also persist full character snapshot locally for offline/local sessions
         if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null);
         try { refreshSkillBarHUD(scene); } catch (e) {}
     } catch (e) {}
