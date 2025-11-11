@@ -126,6 +126,19 @@ export function createPortal(scene, x, y, opts = {}) {
                                     }
                                 } catch (e) { /* ignore persist errors */ }
 
+                                // Server-authoritative scene/position persistence: update currentscene, lastX, lastY.
+                                try {
+                                    if (scene.char && scene.char.id && typeof window !== 'undefined' && window.__cif_persist && window.__cif_persist.saveCharacterPatch) {
+                                        // Update in-memory character snapshot so subsequent systems reflect new location immediately.
+                                        try { scene.char.lastLocation = { scene: opts.targetScene, x: scene.player.x, y: py }; } catch (e) {}
+                                        window.__cif_persist.saveCharacterPatch(String(scene.char.id), {
+                                            currentScene: opts.targetScene,
+                                            lastX: Math.floor(scene.player.x || 0),
+                                            lastY: Math.floor(py || 0)
+                                        });
+                                    }
+                                } catch (e) { /* ignore server patch errors */ }
+
                                 const spawnX = (opts.spawnX !== undefined) ? opts.spawnX : (scene.scale && Math.max(80, scene.scale.width * 0.12));
                                 const spawnY = (opts.spawnY !== undefined) ? opts.spawnY : py;
                                 // include origin scene key so the target scene can locate the

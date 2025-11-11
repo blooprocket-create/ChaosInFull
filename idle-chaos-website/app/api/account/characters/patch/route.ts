@@ -68,7 +68,10 @@ export async function POST(req: Request) {
     delete mergedPatch.gold;
   }
   // Update positional and scene fields if provided (currentScene, lastX, lastY)
-  const currentScene = typeof mergedPatch.currentScene === 'string' ? mergedPatch.currentScene : undefined;
+  // Accept both currentScene (preferred) and lastScene (legacy) from clients
+  const currentScene = typeof mergedPatch.currentScene === 'string'
+    ? (mergedPatch.currentScene as string)
+    : (typeof (mergedPatch as Record<string, unknown>).lastScene === 'string' ? ((mergedPatch as Record<string, unknown>).lastScene as string) : undefined);
   const lastX = typeof mergedPatch.lastX === 'number' && Number.isFinite(mergedPatch.lastX as number) ? (mergedPatch.lastX as number) : undefined;
   const lastY = typeof mergedPatch.lastY === 'number' && Number.isFinite(mergedPatch.lastY as number) ? (mergedPatch.lastY as number) : undefined;
   if (currentScene !== undefined || lastX !== undefined || lastY !== undefined) {
@@ -84,17 +87,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
     }
     delete mergedPatch.currentScene;
+    delete (mergedPatch as Record<string, unknown>).lastScene;
     delete (mergedPatch as Record<string, unknown>).lastX;
     delete (mergedPatch as Record<string, unknown>).lastY;
   }
 
   // Update flags JSONB if provided (merge shallow by replacement for now)
+  // Flags merge: support a shallow merge when an object is provided instead of wholesale replacement
   const incomingFlags = mergedPatch.flags as unknown;
   if (incomingFlags && typeof incomingFlags === 'object') {
     try {
+      // Fetch existing flags to merge (avoid overwriting other progression markers inadvertently)
+      const existing = await q<{ flags: Record<string, unknown> | null }>`
+        select flags from "Character" where id = ${characterId} and userid = ${session.userId} limit 1
+      `;
+      const prev = (existing.length && existing[0].flags && typeof existing[0].flags === 'object') ? existing[0].flags : {};
+      const merged = { ...prev, ...(incomingFlags as Record<string, unknown>) };
       await q`
         update "Character"
-        set flags = ${JSON.stringify(incomingFlags as Record<string, unknown>)}::jsonb, lastseenat = now()
+        set flags = ${JSON.stringify(merged)}::jsonb, lastseenat = now()
         where id = ${characterId} and userid = ${session.userId}
       `;
     } catch (err: unknown) {

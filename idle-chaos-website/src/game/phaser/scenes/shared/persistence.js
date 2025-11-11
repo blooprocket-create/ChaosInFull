@@ -102,12 +102,14 @@ export function persistCharacter(scene, username, options = {}) {
                 // Include tutorial completion flag so routine saves capture it
                 if (char.tutorialCompleted === true) patch.tutorialCompleted = true;
                 if (char.lastLocation && typeof char.lastLocation === 'object') {
-                    patch.lastScene = char.lastLocation.scene || null;
+                    // Use currentScene (preferred) for server column; keep lastScene only for legacy UIs
+                    patch.currentScene = char.lastLocation.scene || null;
                     if (typeof char.lastLocation.x === 'number') patch.lastX = char.lastLocation.x;
                     if (typeof char.lastLocation.y === 'number') patch.lastY = char.lastLocation.y;
                 } else if (cfg.includeLocation !== false && scene.player) {
-                    // Fallback: if location formatter above set char.lastLocation, otherwise derive now
-                    patch.lastScene = (scene.scene && scene.scene.key) || null;
+                    // Fallback: derive from active scene + player position
+                    const sc = (scene.scene && scene.scene.key) || null;
+                    patch.currentScene = sc;
                     if (scene.player) { patch.lastX = scene.player.x || null; patch.lastY = scene.player.y || null; }
                 }
                 try { if (Object.keys(patch).length) window.__cif_persist.saveCharacterPatch(charId, patch); } catch (e) {}

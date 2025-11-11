@@ -256,11 +256,19 @@ export class Tutorial extends Phaser.Scene {
         try { if (this.player && this.player.destroy) this.player.destroy(); } catch (e) {}
         // mark character as having completed the tutorial so we skip it next time
         try {
-            if (this._character) this._character.tutorialCompleted = true;
+            if (this._character) {
+                this._character.tutorialCompleted = true;
+                // Also mirror into flags JSON so it's persisted server-side explicitly
+                try {
+                    this._character.flags = this._character.flags || {};
+                    this._character.flags.tutorialCompleted = true;
+                } catch (e) {}
+            }
             // Persist to server immediately so the next Play skips the tutorial without relying on localStorage
             try {
                 if (typeof window !== 'undefined' && window.__cif_persist && this._character && this._character.id) {
-                    window.__cif_persist.saveCharacterPatch(this._character.id, { tutorialCompleted: true });
+                    // Use flags merge to avoid overwriting other flags
+                    window.__cif_persist.saveCharacterPatch(this._character.id, { flags: { tutorialCompleted: true } });
                 }
             } catch (e) { /* ignore network errors; local state still updated */ }
             if (this._username) {

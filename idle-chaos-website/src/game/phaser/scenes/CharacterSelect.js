@@ -379,7 +379,7 @@ export class CharacterSelect extends Phaser.Scene {
             if (!selectedChar) return;
             const char = selectedChar;
             closeCreateModal();
-            // Fetch fresh full character record before entering game
+            // Fetch fresh full character record before entering game (hydrate currentScene & lastX/lastY)
             if (char.id) {
                 try {
                     const freshRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`);
@@ -392,6 +392,20 @@ export class CharacterSelect extends Phaser.Scene {
                             delete dbChar.quests;
                         }
                         Object.assign(char, dbChar);
+                        // Derive lastLocation from authoritative currentScene/lastX/lastY columns
+                        try {
+                            if (typeof dbChar.currentScene === 'string') {
+                                const lx = (typeof dbChar.lastX === 'number') ? dbChar.lastX : null;
+                                const ly = (typeof dbChar.lastY === 'number') ? dbChar.lastY : null;
+                                char.lastLocation = { scene: dbChar.currentScene, x: lx, y: ly };
+                            }
+                        } catch (e) {}
+                        // Normalize tutorial flag from flags JSONB if present
+                        try {
+                            if (dbChar.flags && dbChar.flags.tutorialCompleted === true) {
+                                char.tutorialCompleted = true;
+                            }
+                        } catch (e) {}
                     }
                 } catch (e) { console.warn('Could not load full character', e); }
             }
@@ -402,13 +416,23 @@ export class CharacterSelect extends Phaser.Scene {
             try { ensureCharTalents && ensureCharTalents(char); } catch (e) { }
             char.lastPlayed = Date.now();
             // No localStorage persistence; server is authoritative.
-            const last = (char && char.lastLocation) ? char.lastLocation : null;
+            const last = (char && char.lastLocation && char.lastLocation.scene) ? char.lastLocation : null;
             const payload = { character: char, username };
-            if (last && last.scene) payload.lastLocation = last;
-            if (char && char.tutorialCompleted) {
-                if (last && last.scene) { this.scene.start(last.scene, { character: char, username }); }
-                else { this.scene.start('Town', { character: char, username }); }
-            } else { this.scene.start('Tutorial', payload); }
+            // If we have a valid lastLocation, prefer its coordinates as spawn
+            if (last) payload.lastLocation = last;
+            const shouldSkipTutorial = !!(char && (char.tutorialCompleted || (char.flags && char.flags.tutorialCompleted === true)));
+            if (!shouldSkipTutorial) {
+                this.scene.start('Tutorial', payload);
+                return;
+            }
+            // Start at stored scene & coordinates if available, otherwise Town fallback
+            if (last && last.scene) {
+                const spawnX = (typeof last.x === 'number') ? last.x : undefined;
+                const spawnY = (typeof last.y === 'number') ? last.y : undefined;
+                this.scene.start(last.scene, { character: char, username, spawnX, spawnY });
+            } else {
+                this.scene.start('Town', { character: char, username });
+            }
         };
 
         if (delBtn) delBtn.onclick = () => {
