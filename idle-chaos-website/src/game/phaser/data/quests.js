@@ -829,7 +829,32 @@ export function completeQuest(character, questId) {
 
     if (quest.rewards.gold) {
         character.gold = (character.gold || 0) + quest.rewards.gold;
+        // Persist gold to server if possible
+        try {
+            if (character.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                window.__cif_persist.saveCharacterPatch(character.id, { gold: Math.max(0, Math.floor(character.gold)) });
+            }
+        } catch (e) { /* ignore network errors */ }
     }
+
+    // Persist quests (active removed, completed added)
+    try {
+        if (character.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveQuests === 'function') {
+            const active = Array.isArray(character.activeQuests) ? character.activeQuests.map(q => ({ id: q && q.id, progress: q && q.progress })) : [];
+            const completed = Array.isArray(character.completedQuests) ? character.completedQuests.slice() : [];
+            window.__cif_persist.saveQuests(character.id, active, completed);
+        }
+    } catch (e) { /* ignore */ }
+
+    // Persist inventory changes from item rewards to ItemStack table
+    try {
+        if (character.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveInventory === 'function') {
+            const map = {};
+            const inv = Array.isArray(character.inventory) ? character.inventory : [];
+            for (const s of inv) { if (s && s.id) map[s.id] = (map[s.id] || 0) + (s.qty || 1); }
+            window.__cif_persist.saveInventory(character.id, map);
+        }
+    } catch (e) { /* ignore */ }
 
     // Do NOT auto-start follow-up quests automatically; the player should accept
     // new quests from the NPC as usual. We only refresh the quest UI so any newly
