@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterLastSeenColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn, ensureCharacterEquipmentColumn, ensureCharacterSceneColumns, ensureCharacterFlagsColumn } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterLastSeenColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn, ensureCharacterEquipmentColumn, ensureCharacterSceneColumns, ensureCharacterFlagsColumn, ensureCharacterStatColumns, ensureCharacterRaceColumn } from "@/src/lib/db";
+import { computeRaceStats } from "@/src/lib/races";
+import { computeClassStats, combineRaceClass } from "@/src/lib/classes";
 
 // Flexible patch update for character fields
 // Accepts ANY fields from the client and merges them into the JSONB 'data' column
@@ -20,6 +22,8 @@ export async function POST(req: Request) {
   await ensureCharacterTalentsColumn();
   await ensureCharacterGoldColumn();
   await ensureCharacterEquipmentColumn();
+  await ensureCharacterStatColumns();
+  await ensureCharacterRaceColumn();
 
   // Ownership check
   const owned = await q<{ id: string }>`
@@ -136,6 +140,67 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
     }
     delete mergedPatch.equipment;
+  }
+
+  // Handle class + stat updates (class change triggers recompute client-side; allow direct persistence of class & stats)
+  const incomingClass = typeof mergedPatch.class === 'string' ? String(mergedPatch.class).trim() : undefined;
+  const incomingStats = mergedPatch.stats as unknown;
+  if (incomingClass) {
+    try {
+      // Fetch current level and race for server-side stat recompute
+      const rows = await q<{ level: number; race: string | null }>`
+        select level, race from "Character" where id = ${characterId} and userid = ${session.userId} limit 1
+      `;
+      const level = rows.length ? Math.max(1, Number(rows[0].level || 1)) : 1;
+      const race = rows.length ? (rows[0].race || null) : null;
+      const raceStats = computeRaceStats(race, level);
+      const classStats = computeClassStats(incomingClass, level);
+      const combined = combineRaceClass(raceStats, classStats);
+      const stats = {
+        str: Math.floor(combined.str || 0),
+        int: Math.floor(combined.int || 0),
+        agi: Math.floor(combined.agi || 0),
+        luk: Math.floor(combined.luk || 0)
+      };
+      await q`
+        update "Character"
+        set class = ${incomingClass},
+            str = ${stats.str},
+            int = ${stats.int},
+            agi = ${stats.agi},
+            luk = ${stats.luk},
+            lastseenat = now()
+        where id = ${characterId} and userid = ${session.userId}
+      `;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Character class patch error:', message);
+    }
+    delete mergedPatch.class;
+    // If client also sent stats, drop them since we recomputed server-side
+    if (mergedPatch.stats) delete mergedPatch.stats;
+  }
+  if (incomingStats && typeof incomingStats === 'object') {
+    try {
+      const s = incomingStats as Record<string, unknown>;
+      const vStr = (typeof s.str === 'number' && Number.isFinite(s.str)) ? Math.max(0, Math.floor(s.str as number)) : null;
+      const vInt = (typeof s.int === 'number' && Number.isFinite(s.int)) ? Math.max(0, Math.floor(s.int as number)) : null;
+      const vAgi = (typeof s.agi === 'number' && Number.isFinite(s.agi)) ? Math.max(0, Math.floor(s.agi as number)) : null;
+      const vLuk = (typeof s.luk === 'number' && Number.isFinite(s.luk)) ? Math.max(0, Math.floor(s.luk as number)) : null;
+      await q`
+        update "Character"
+        set str = coalesce(${vStr}::int, str),
+            int = coalesce(${vInt}::int, int),
+            agi = coalesce(${vAgi}::int, agi),
+            luk = coalesce(${vLuk}::int, luk),
+            lastseenat = now()
+        where id = ${characterId} and userid = ${session.userId}
+      `;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Character stat patch error:', message);
+    }
+    delete mergedPatch.stats;
   }
 
   // Any leftover fields are currently ignored to keep server state explicit

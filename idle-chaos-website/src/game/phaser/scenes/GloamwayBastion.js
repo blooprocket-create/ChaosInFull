@@ -534,7 +534,8 @@ export class GloamwayBastion extends Phaser.Scene {
         // Align Mother Lumen quest flow with other NPCs by using centralized availability logic
         const completed = this.char.completedQuests || [];
         const allActive = Array.isArray(this.char.activeQuests) ? (this.char.activeQuests || []) : [];
-        const hasChosenClass = this.char.class && this.char.class !== 'beginner';
+    const classKey = (this.char && this.char.class) ? String(this.char.class).trim().toLowerCase() : '';
+    const hasChosenClass = !!classKey && classKey !== 'beginner';
         const hasCompletedGoblinCull = completed.includes('mother_lumen_goblin_cull');
 
         // Compute availability and active quests using shared quest module
@@ -608,6 +609,21 @@ export class GloamwayBastion extends Phaser.Scene {
             });
             optionConfigs.push({ label: 'I need more time.', onClick: () => {}, closeOnClick: true });
         } else if (nextAvailable) {
+            // Guard: don't offer Mother Lumen's follow-up request until class chosen
+            try {
+                if (hasCompletedGoblinCull && !hasChosenClass) {
+                    bodyNodes.length = 0;
+                    bodyNodes.push(ui.createDialogueParagraph('You have proven your resolve. Now you must choose the path that calls to you.'));
+                    optionConfigs.push({
+                        label: 'Show me the paths',
+                        onClick: () => this._openClassSelectionModal(),
+                        variant: 'success'
+                    });
+                    optionConfigs.push({ label: 'I need more time.', onClick: () => {}, closeOnClick: true });
+                    window.__shared_ui.renderDialogue('Mother Lumen, Keeper of Paths', '🔮', bodyNodes, optionConfigs, '#5c86ff');
+                    return;
+                }
+            } catch (e) {}
             const questDef = getQuestById(nextAvailable.id);
             bodyNodes.push(ui.createDialogueParagraph('Traveler, a fracture widens near the camp. Will you mend it for me?'));
             if (questDef && questDef.description) bodyNodes.push(ui.createDialogueParagraph(questDef.description));
@@ -803,6 +819,7 @@ export class GloamwayBastion extends Phaser.Scene {
         const classDef = CLASS_DEFS[newClassId];
         if (!classDef) return;
         if (!this.char) return;
+        // Update local class key immediately
         this.char.class = newClassId;
 
         const level = Math.max(1, this.char.level || 1);
@@ -829,7 +846,22 @@ export class GloamwayBastion extends Phaser.Scene {
         this._updateHUD();
         this._updatePlayerHealthBar();
 
+        // Persist full local snapshot (legacy/localStorage) if helper exists
         if (this._persistCharacter) this._persistCharacter(this.username);
+        // Server-authoritative persistence: write class + stat columns using patch endpoint
+        try {
+            if (window && window.__cif_persist && this.char && this.char.id) {
+                window.__cif_persist.saveCharacterPatch(String(this.char.id), {
+                    class: newClassId,
+                    stats: {
+                        str: stats.str,
+                        int: stats.int,
+                        agi: stats.agi,
+                        luk: stats.luk
+                    }
+                });
+            }
+        } catch (e) { /* ignore network errors */ }
         this._showToast(`You have embraced the path of the ${classDef.name}`, 2800);
     }
 
