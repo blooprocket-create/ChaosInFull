@@ -338,7 +338,7 @@ export const patchNotes: PatchNote[] = [
       "Character.gold is the single source of truth for gold changes from shop",
   "DB schema migrated: ItemDef.buy/sell are numeric to prevent overflow",
       "APIs serialize BigInt safely when returning JSON",
-      "Seed endpoint now sources items from src/data/items to keep prices consistent",
+  "Seed endpoint now sources items from Phaser ITEM_DEFS and derives buy/sell from value for consistency",
   "Serverless Postgres via Neon; removed legacy ORM runtime",
       "Added vercel.json and deployment docs; .env.example updated for Postgres",
       "General cleanup: removed any types in routes, corrected Next.js route params typing"
