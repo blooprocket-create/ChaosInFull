@@ -359,20 +359,21 @@ export class CharacterSelect extends Phaser.Scene {
             }
             portrait.textContent = `${char.name} — Lv ${char.level||1}`;
             nameEl.textContent = char.name || 'Unnamed';
-            // Prefer server-hydrated gold if available; otherwise try to fetch full record lazily
-            let goldVal = (typeof char.gold === 'number') ? char.gold : 0;
-            if (!goldVal && char.id && typeof fetch === 'function') {
+            // Ensure we have a fully hydrated character (skills/equipment/gold); fetch once per selection
+            if (char.id && typeof fetch === 'function' && !char._fullHydrated) {
                 try {
-                    // Non-blocking fetch; update the preview once resolved
-                    fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`).then(r=>r.json()).then(d=>{
-                        if (d && d.ok && d.character && typeof d.character.gold === 'number') {
-                            char.gold = d.character.gold;
-                            const metaNow = document.querySelector('#char-preview .preview-meta');
-                            if (metaNow) metaNow.textContent = `Level ${char.level||1} — ${char.class||char.race||'Unknown'} • Gold ${char.gold}`;
-                        }
-                    }).catch(()=>{});
+                    fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`)
+                        .then(r=>r.json()).then(d=>{
+                            if (d && d.ok && d.character) {
+                                Object.assign(char, d.character);
+                                char._fullHydrated = true;
+                                // Re-render preview with complete data
+                                updatePreview(char, idx);
+                            }
+                        }).catch(()=>{});
                 } catch (e) {}
             }
+            const goldVal = (typeof char.gold === 'number') ? char.gold : 0;
             metaEl.textContent = `Level ${char.level||1} — ${char.class||char.race||'Unknown'} • Gold ${goldVal}`;
             statsWrap.innerHTML = '';
             let eff = { str:0,int:0,agi:0,luk:0,maxhp:0,maxmana:0,attackSpeedMs:0,movementSpeed:0,critChance:0,critDmgPercent:0 };
@@ -406,15 +407,21 @@ export class CharacterSelect extends Phaser.Scene {
                 for (const g of gatherSkills) {
                     const obj = char[g];
                     const lvl = (obj && typeof obj.level === 'number') ? obj.level : 1;
-                    gatherItems.push([g.charAt(0).toUpperCase()+g.slice(1), lvl]);
+                    const label = g.charAt(0).toUpperCase()+g.slice(1);
+                    gatherItems.push([label, lvl, g]);
                 }
-                makeGroup('Gathering', gatherItems);
+                // Build group and tag pills for dynamic updates
+                const group = document.createElement('div'); group.className='pill-group';
+                const header = document.createElement('div'); header.className='pill-group-header'; header.textContent='Gathering'; group.appendChild(header);
+                const row = document.createElement('div'); row.className='pill-row';
+                gatherItems.forEach(([label,val,key])=>{ const p=document.createElement('div'); p.className='stat-pill'; p.setAttribute('data-gather', String(key)); p.textContent=`${label}: ${val}`; row.appendChild(p); });
+                group.appendChild(row); statsWrap.appendChild(group);
             } catch (e) {}
             // Equipment summary group
             try {
                 const eq = (char.equipment)||{};
                 let equippedCount = Object.values(eq).filter(v=>v && (v.id || v.itemKey)).length;
-                if (equippedCount === 0 && char.id && typeof fetch === 'function' && !char._equipmentHydrated) {
+                if (equippedCount === 0 && char.id && typeof fetch === 'function' && !char._equipmentHydrated && !char._fullHydrated) {
                     fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`)
                         .then(r=>r.json()).then(d=>{
                             if (d && d.ok && d.character && d.character.equipment) {
