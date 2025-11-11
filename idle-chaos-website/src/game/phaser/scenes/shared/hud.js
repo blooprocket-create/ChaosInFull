@@ -78,7 +78,7 @@ export function createHUD(scene) {
         <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:3px;">
             <span id="${hudId}-name" style="font-size:0.85em; font-weight:700; color:#e44; letter-spacing:0.5px;">${char.name || 'Character'} <span id="${hudId}-level" style='color:#fff; font-size:0.95em;'>- Lv ${char.level || 1}</span> <span id="${hudId}-class" style='color:#aaa; font-size:0.9em;'>(${char.class || 'Adventurer'})</span></span>
                 <div style="display:flex; gap:6px; align-items:center;">
-                <button id="${charBtnId}" title="Save character" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85;">💾</button>
+                <button id="${charBtnId}" title="Snapshot save (persist character)" style="pointer-events:auto; background:#222; color:#eee; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px #a00; cursor:pointer; font-family:inherit; opacity:0.85;">💾</button>
                 <button id="${settingsBtnId}" title="Settings" style="pointer-events:auto; background:#1b2430; color:#ffd27a; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:pointer; font-family:inherit; opacity:0.95;">⚙️</button>
                 <button id="${returnBtnId}" title="Return to character select" style="pointer-events:auto; background:#111; color:#fff; border:none; border-radius:6px; font-size:0.75em; padding:2px 6px; box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:pointer; font-family:inherit; opacity:0.95;">⤺</button>
             </div>
@@ -146,46 +146,14 @@ export function createHUD(scene) {
     } catch (e) {}
 
     setTimeout(() => {
-    const btn = document.getElementById(charBtnId);
+        const btn = document.getElementById(charBtnId);
         if (btn) {
-            btn.onclick = (e) => {
+            btn.onclick = async (e) => {
                 e.stopPropagation();
                 try {
-                    const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
-                    if (username && scene.char) {
-                        const key = 'cif_user_' + username;
-                        const userObj = JSON.parse(localStorage.getItem(key)) || { characters: [] };
-                        if (!Array.isArray(userObj.characters)) userObj.characters = [];
-                        let found = false;
-                        for (let i = 0; i < userObj.characters.length; i++) {
-                            const uc = userObj.characters[i];
-                            if (!uc) continue;
-                            if ((uc.id && scene.char.id && uc.id === scene.char.id) || (!uc.id && uc.name === scene.char.name)) {
-                                userObj.characters[i] = scene.char;
-                                userObj.characters[i].lastLocation = {
-                                    scene: (scene.scene && scene.scene.key) || null,
-                                    x: (scene.player && scene.player.x) || null,
-                                    y: (scene.player && scene.player.y) || null
-                                };
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                if (!userObj.characters[i]) {
-                                    userObj.characters[i] = scene.char;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!found) userObj.characters.push(scene.char);
-                        localStorage.setItem(key, JSON.stringify(userObj));
-                        scene._showToast && scene._showToast('Character saved.');
-                    }
+                    await performFullSnapshot(scene);
                 } catch (err) {
-                    console.warn('HUD save character error', err);
+                    console.warn('HUD snapshot error', err);
                 }
             };
         }
@@ -213,7 +181,7 @@ export function createHUD(scene) {
         try {
             const returnBtn = document.getElementById(returnBtnId);
             if (returnBtn) {
-                returnBtn.onclick = (ev) => {
+                returnBtn.onclick = async (ev) => {
                     ev.stopPropagation();
                     try {
                         // Save current character first (reuse same logic as save button)
@@ -267,6 +235,8 @@ export function createHUD(scene) {
                                 lastX: px,
                                 lastY: py
                             });
+                            // Opportunistically flush inventory/equipment/talents before leaving
+                            try { await performFullSnapshot(scene, { silentToast: true, skipLocation: true }); } catch (e) {}
                         }
                     } catch (bridgeErr) { /* ignore patch errors */ }
 
@@ -497,4 +467,111 @@ export function destroyHUD(scene) {
 }
 
 export default { createHUD, updateHUD, destroyHUD };
+
+// --- Snapshot Helper ---
+// Performs a comprehensive persistence operation for the current character:
+// 1. LocalStorage mirror (legacy compatibility)
+// 2. Inventory (saveInventory) – converts slot array to stacks map
+// 3. Equipment (saveEquipment)
+// 4. Talents (saveTalents)
+// 5. Quests (saveQuests)
+// 6. Character patch (saveCharacterPatch) – gold, flags, fishing, equipment, talents, scene+location
+// Options: { silentToast, skipLocation }
+async function performFullSnapshot(scene, options = {}) {
+    if (!scene || !scene.char) return;
+    const char = scene.char;
+    const charId = char.id ? String(char.id) : null;
+    const silent = !!options.silentToast;
+    const skipLocation = !!options.skipLocation;
+    const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
+    const toast = (msg, dur=1400) => { if (!silent && scene._showToast) try { scene._showToast(msg, dur); } catch (e) {} };
+
+    // 1) LocalStorage mirror for offline resilience
+    try {
+        if (username) {
+            const key = 'cif_user_' + username;
+            const blob = JSON.parse(localStorage.getItem(key) || '{"characters":[]}');
+            if (!Array.isArray(blob.characters)) blob.characters = [];
+            let replaced = false;
+            for (let i=0;i<blob.characters.length;i++) {
+                const c = blob.characters[i];
+                if (!c) continue;
+                if ((c.id && char.id && c.id === char.id) || (!c.id && c.name === char.name)) { blob.characters[i] = char; replaced = true; break; }
+            }
+            if (!replaced) blob.characters.push(char);
+            localStorage.setItem(key, JSON.stringify(blob));
+        }
+    } catch (e) { console.warn('[snapshot] localStorage mirror failed', e); }
+
+    if (!charId || typeof window === 'undefined' || !window.__cif_persist) { toast('Saved locally (offline).'); return; }
+
+    const persist = window.__cif_persist;
+    const flags = (char.flags && typeof char.flags === 'object') ? { ...char.flags } : {};
+
+    // Include inventory slot ordering hint if present (invOrder already tracked elsewhere)
+    try {
+        if (Array.isArray(char.inventory)) {
+            const order = [];
+            for (let i=0;i<char.inventory.length;i++) {
+                const slot = char.inventory[i];
+                if (slot && slot.id) order.push({ id: slot.id, qty: slot.qty || 1 });
+            }
+            flags.invOrder = order; // used by openInventoryModal to reconstruct ordering
+        }
+    } catch (e) {}
+
+    // Build character patch (excluding inventory/equipment/talents proper which have dedicated endpoints)
+    const patch = {};
+    try { if (typeof char.gold === 'number') patch.gold = Math.max(0, Math.floor(char.gold)); } catch (e) {}
+    try { if (char.fishing) patch.fishing = char.fishing; } catch (e) {}
+    try { if (Object.keys(flags).length) patch.flags = flags; } catch (e) {}
+    if (!skipLocation) {
+        try {
+            const currentSceneKey = (scene.scene && scene.scene.key) || null;
+            const px = (scene.player && typeof scene.player.x === 'number') ? Math.floor(scene.player.x) : null;
+            const py = (scene.player && typeof scene.player.y === 'number') ? Math.floor(scene.player.y) : null;
+            patch.currentScene = currentSceneKey;
+            if (px != null) patch.lastX = px;
+            if (py != null) patch.lastY = py;
+            try { char.lastLocation = { scene: currentSceneKey, x: px, y: py }; } catch (e) {}
+        } catch (e) {}
+    }
+
+    // Derive stacks map from slots for saveInventory
+    const invMap = {};
+    try {
+        for (const slot of (char.inventory || [])) {
+            if (!slot || !slot.id) continue;
+            const count = Math.max(1, Math.floor(slot.qty || 1));
+            invMap[slot.id] = (invMap[slot.id] || 0) + count;
+        }
+    } catch (e) {}
+
+    const equipment = (char.equipment && typeof char.equipment === 'object') ? { ...char.equipment } : {};
+    const talents = (char.talents && typeof char.talents === 'object') ? { ...char.talents } : {};
+    const activeQuests = Array.isArray(char.activeQuests) ? char.activeQuests.map(q => ({ id: q.id, progress: q.progress ?? null })) : [];
+    const completedQuests = Array.isArray(char.completedQuests) ? char.completedQuests.slice() : [];
+
+    const ops = [];
+    // inventory
+    if (Object.keys(invMap).length && typeof persist.saveInventory === 'function') {
+        ops.push(persist.saveInventory(charId, invMap).catch(e => { console.warn('[snapshot] inventory save failed', e); }));
+    }
+    if (Object.keys(equipment).length && typeof persist.saveEquipment === 'function') {
+        ops.push(persist.saveEquipment(charId, equipment).catch(e => { console.warn('[snapshot] equipment save failed', e); }));
+    }
+    if (Object.keys(talents).length && typeof persist.saveTalents === 'function') {
+        ops.push(persist.saveTalents(charId, talents).catch(e => { console.warn('[snapshot] talents save failed', e); }));
+    }
+    if ((activeQuests.length || completedQuests.length) && typeof persist.saveQuests === 'function') {
+        ops.push(persist.saveQuests(charId, activeQuests, completedQuests).catch(e => { console.warn('[snapshot] quests save failed', e); }));
+    }
+    if (Object.keys(patch).length && typeof persist.saveCharacterPatch === 'function') {
+        ops.push(persist.saveCharacterPatch(charId, patch).catch(e => { console.warn('[snapshot] character patch failed', e); }));
+    }
+
+    let ok = true;
+    try { await Promise.all(ops); } catch (e) { ok = false; }
+    toast(ok ? 'Snapshot saved.' : 'Snapshot partial (offline).');
+}
 

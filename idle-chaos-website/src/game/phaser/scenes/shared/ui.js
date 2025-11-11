@@ -175,7 +175,7 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
         .wb-cat-btn:hover { background:rgba(255,255,255,0.12); transform:translateX(2px); }
         .wb-cat-btn.is-active { background:#6b8f4a; color:#fff; box-shadow:0 8px 22px rgba(107,143,74,0.26); }
 
-        .workbench-recipes { display:flex; flex-direction:column; gap:10px; overflow-y:auto; background:rgba(0,0,0,0.18); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:12px; }
+    .workbench-recipes { display:flex; flex-direction:column; gap:10px; overflow-y:auto; overflow-x:hidden; background:rgba(0,0,0,0.18); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:12px; max-height:100%; }
         .wb-recipe-btn { border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:10px 12px; background:rgba(255,255,255,0.04); color:#f7f7f7; display:flex; flex-direction:column; align-items:flex-start; gap:4px; cursor:pointer; transition:border-color 140ms ease, background 140ms ease, transform 120ms ease; }
         .wb-recipe-btn:hover:not(:disabled) { border-color:rgba(255,210,122,0.35); background:rgba(255,210,122,0.12); transform:translateY(-1px); }
         .wb-recipe-btn.is-active { border-color:rgba(255,210,122,0.6); background:rgba(255,210,122,0.16); box-shadow:0 10px 26px rgba(255,210,122,0.18); }
@@ -209,7 +209,7 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
           /* Firefox fallback for modal elements */
           #stats-modal, .modal-card { scrollbar-width: thin; scrollbar-color: var(--theme-scroll-thumb) transparent; }
 
-        .workbench-details { gap:12px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:14px; overflow-y:auto; }
+    .workbench-details { gap:12px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:14px; overflow-y:auto; overflow-x:hidden; }
         .workbench-recipe-header { display:flex; flex-direction:column; gap:4px; }
         .workbench-recipe-header .workbench-recipe-title { font-size:18px; font-weight:800; color:#fff; }
         .workbench-recipe-header .workbench-recipe-sub { font-size:13px; color:rgba(255,255,255,0.72); display:flex; gap:10px; flex-wrap:wrap; }
@@ -1722,9 +1722,52 @@ export function openInventoryModal(scene) {
                         if (!loaded) return;
                         // Update gold from DB
                         if (typeof loaded.gold === 'number') scene.char.gold = loaded.gold;
-                        // Update inventory slots from DB snapshot
+                        // Update inventory slots from DB snapshot (ordered if flags.invOrder present)
                         if (Array.isArray(loaded.inventory)) {
-                            scene.char.inventory = initSlots(loaded.inventory.map(s => (s ? { id: s.id, qty: s.qty } : null)));
+                            const stacks = loaded.inventory.slice();
+                            const byId = new Map();
+                            for (const s of stacks) { if (!s) continue; const n = Math.max(1, Math.floor(s.qty||1)); byId.set(s.id, n); }
+                            const applyOrder = (invOrder) => {
+                                const slots = Array.from({ length: 50 }).map(() => null);
+                                let idx = 0;
+                                if (Array.isArray(invOrder) && invOrder.length) {
+                                    for (const entry of invOrder) {
+                                        if (!entry || !entry.id) continue;
+                                        const id = entry.id; let remaining = byId.get(id) || 0; if (!remaining) continue;
+                                        const stackable = (window && window.ITEM_DEFS && window.ITEM_DEFS[id] && window.ITEM_DEFS[id].stackable) !== false;
+                                        if (stackable) {
+                                            // place as single stack
+                                            while (idx < slots.length && slots[idx]) idx++;
+                                            if (idx < slots.length) { slots[idx++] = { id, qty: remaining }; byId.set(id, 0); }
+                                        } else {
+                                            while (remaining > 0 && idx < slots.length) {
+                                                while (idx < slots.length && slots[idx]) idx++;
+                                                if (idx < slots.length) { slots[idx++] = { id, qty: 1 }; remaining--; }
+                                            }
+                                            byId.set(id, remaining);
+                                        }
+                                    }
+                                }
+                                // place any leftover items not captured by order
+                                for (const [id, count] of byId.entries()) {
+                                    let remaining = count; if (!remaining) continue;
+                                    const stackable = (window && window.ITEM_DEFS && window.ITEM_DEFS[id] && window.ITEM_DEFS[id].stackable) !== false;
+                                    if (stackable) {
+                                        while (idx < slots.length && slots[idx]) idx++;
+                                        if (idx < slots.length) { slots[idx++] = { id, qty: remaining }; byId.set(id, 0); }
+                                    } else {
+                                        while (remaining > 0 && idx < slots.length) {
+                                            while (idx < slots.length && slots[idx]) idx++;
+                                            if (idx < slots.length) { slots[idx++] = { id, qty: 1 }; remaining--; }
+                                        }
+                                        byId.set(id, remaining);
+                                    }
+                                }
+                                return initSlots(slots);
+                            };
+                            const invOrder = loaded.flags && Array.isArray(loaded.flags.invOrder) ? loaded.flags.invOrder : null;
+                            scene.char.flags = loaded.flags || scene.char.flags || {};
+                            scene.char.inventory = applyOrder(invOrder);
                         }
                         refreshInventoryModal(scene);
                     } catch (e) { /* ignore refresh errors */ }
@@ -1859,6 +1902,19 @@ export function refreshInventoryModal(scene) {
             
             // Update the character's inventory
             scene.char.inventory = inv;
+
+            // Persist the new slot ordering hint to server flags (invOrder)
+            try {
+                const charId = scene && scene.char && scene.char.id ? String(scene.char.id) : null;
+                if (charId && window && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                    const order = [];
+                    for (let j=0;j<inv.length;j++) { const slot = inv[j]; if (slot && slot.id) order.push({ id: slot.id, qty: Math.max(1, Math.floor(slot.qty||1)) }); }
+                    const flags = (scene.char.flags && typeof scene.char.flags === 'object') ? { ...scene.char.flags } : {};
+                    flags.invOrder = order;
+                    scene.char.flags = flags;
+                    window.__cif_persist.saveCharacterPatch(charId, { flags }).catch(()=>{});
+                }
+            } catch (e) {}
             
             // Refresh the display
             refreshInventoryModal(scene);

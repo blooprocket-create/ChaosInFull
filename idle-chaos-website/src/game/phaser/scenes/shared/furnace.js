@@ -189,6 +189,12 @@ function renderRecipes(scene) {
     if (!scene._furnaceModal) return;
     const listEl = scene._furnaceModal.querySelector(`#${RECIPES_LIST_ID}`);
     if (!listEl) return;
+    // Ensure scrolling works for long recipe lists
+    try {
+        listEl.style.overflowY = 'auto';
+        listEl.style.overflowX = 'hidden';
+        listEl.style.maxHeight = '100%';
+    } catch (e) {}
     const state = getState(scene);
     const recipes = getFurnaceRecipes();
     listEl.innerHTML = '';

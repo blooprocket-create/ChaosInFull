@@ -717,8 +717,19 @@ export class Town extends Phaser.Scene {
         modal.style.padding = '14px';
         modal.style.borderRadius = '12px';
         modal.style.color = '#fff';
-        modal.style.minWidth = '420px';
-        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Account Storage</strong><button id='storage-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' class='grid-scroll'><div id='storage-inv-grid' class='slot-grid'></div></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' class='grid-scroll'><div id='storage-box-grid' class='slot-grid'>Loading...</div></div></div></div>`;
+    modal.style.minWidth = '420px';
+    // Style parity with Inventory/Equipment modals
+    modal.style.background = 'linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%)';
+    modal.style.border = '4px solid #111';
+    modal.style.borderLeft = '10px solid rgba(80,10,10,0.95)';
+    modal.style.borderRight = '2px solid #222';
+    modal.style.boxShadow = '0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02)';
+    modal.style.borderRadius = '6px';
+    modal.style.overflow = 'hidden';
+    modal.style.padding = '12px';
+    modal.style.color = '#f0c9b0';
+    modal.style.fontFamily = "'Share Tech Mono', monospace";
+    modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong style="font-weight:800; letter-spacing:0.02em;">Account Storage</strong><button id='storage-close' class='btn' style='padding:6px 10px; font-size:12px;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='storage-inv' class='grid-scroll'><div id='storage-inv-grid' class='slot-grid'></div></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shared Storage</div><div id='storage-box' class='grid-scroll'><div id='storage-box-grid' class='slot-grid'>Loading...</div></div></div></div>`;
         document.body.appendChild(modal);
         this._storageModal = modal;
         document.getElementById('storage-close').onclick = () => this._closeStorageModal();
@@ -739,12 +750,38 @@ export class Town extends Phaser.Scene {
         modal.style.top = '50%';
         modal.style.transform = 'translate(-50%,-50%)';
         modal.style.zIndex = '240';
-        modal.style.background = 'linear-gradient(135deg,#1b1624, #0b0810)';
-        modal.style.padding = '14px';
-        modal.style.borderRadius = '12px';
-        modal.style.color = '#fff';
+        // Style parity with Inventory/Equipment modals
+        modal.style.background = 'linear-gradient(180deg, rgba(12,12,14,0.98) 0%, rgba(18,18,20,0.96) 100%)';
+        modal.style.border = '4px solid #111';
+        modal.style.borderLeft = '10px solid rgba(80,10,10,0.95)';
+        modal.style.borderRight = '2px solid #222';
+        modal.style.boxShadow = '0 30px 80px rgba(0,0,0,0.9), inset 0 2px 0 rgba(255,255,255,0.02)';
+        modal.style.borderRadius = '6px';
+        modal.style.overflow = 'hidden';
+        modal.style.padding = '12px';
+        modal.style.color = '#f0c9b0';
+        modal.style.fontFamily = "'Share Tech Mono', monospace";
         modal.style.minWidth = '420px';
-        modal.innerHTML = `<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'><strong>Shop</strong><button id='shop-close' style='background:#222;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;'>Close</button></div><div style='display:flex;gap:12px;'><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Shop Items</div><div id='shop-shop' class='grid-scroll'><div id='shop-shop-grid' class='slot-grid'></div></div></div><div style='width:12px'></div><div style='flex:1;'><div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div><div id='shop-inv' class='grid-scroll'><div id='shop-inv-grid' class='slot-grid'></div></div></div></div>`;
+        const currentGold = (this.char && typeof this.char.gold === 'number') ? this.char.gold : 0;
+        modal.innerHTML = `
+            <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;'>
+                <div style='display:flex;align-items:center;gap:10px;'>
+                    <strong style="font-weight:800; letter-spacing:0.02em;">Shop</strong>
+                    <div style='display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.25);padding:6px 8px;border-radius:8px;font-weight:700;color:#ffd27a;border:1px solid rgba(255,255,255,0.08);'>💰<span id='shop-gold'>${currentGold}</span></div>
+                </div>
+                <button id='shop-close' class='btn' style='padding:6px 10px; font-size:12px;'>Close</button>
+            </div>
+            <div style='display:flex;gap:12px;'>
+                <div style='flex:1;'>
+                    <div style='font-size:0.9em;margin-bottom:6px;'>Shop Items</div>
+                    <div id='shop-shop' class='grid-scroll'><div id='shop-shop-grid' class='slot-grid'></div></div>
+                </div>
+                <div style='width:12px'></div>
+                <div style='flex:1;'>
+                    <div style='font-size:0.9em;margin-bottom:6px;'>Your Inventory</div>
+                    <div id='shop-inv' class='grid-scroll'><div id='shop-inv-grid' class='slot-grid'></div></div>
+                </div>
+            </div>`;
         document.body.appendChild(modal);
         this._shopModal = modal;
         document.getElementById('shop-close').onclick = () => this._closeShopModal();
@@ -759,6 +796,8 @@ export class Town extends Phaser.Scene {
         if (!this._shopModal) return;
         const shopGrid = this._shopModal.querySelector('#shop-shop-grid');
         const invGrid = this._shopModal.querySelector('#shop-inv-grid');
+        // update displayed gold
+        try { const goldEl = this._shopModal.querySelector('#shop-gold'); if (goldEl) goldEl.textContent = '' + ((this.char && this.char.gold) ? this.char.gold : 0); } catch (e) {}
         shopGrid.innerHTML = '';
         invGrid.innerHTML = '';
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
@@ -931,8 +970,8 @@ export class Town extends Phaser.Scene {
     }
     async _refreshStorageModal() {
         if (!this._storageModal) return;
-        const invGrid = this._storageModal.querySelector('#storage-inv-grid');
-        const boxGrid = this._storageModal.querySelector('#storage-box-grid');
+    const invGrid = this._storageModal.querySelector('#storage-inv-grid');
+    const boxGrid = this._storageModal.querySelector('#storage-box-grid');
         invGrid.innerHTML = '';
         boxGrid.innerHTML = 'Loading...';
     const invSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
@@ -940,7 +979,29 @@ export class Town extends Phaser.Scene {
     const storageSlots = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(storageData || []) : Array.from({length:50}).map(_=>null);
         boxGrid.innerHTML = '';
         const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-        // render inventory slots — slots are clickable to Deposit
+        // Enable drag-and-drop transfer between grids
+        try {
+            const attachDnDTargets = () => {
+                const acceptDrop = (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; };
+                invGrid.addEventListener('dragover', acceptDrop);
+                boxGrid.addEventListener('dragover', acceptDrop);
+                invGrid.addEventListener('drop', (ev) => {
+                    ev.preventDefault();
+                    const src = ev.dataTransfer.getData('source');
+                    const itemId = ev.dataTransfer.getData('itemId');
+                    if (src === 'box' && itemId) { this._withdrawFromStorage(itemId, 1); }
+                });
+                boxGrid.addEventListener('drop', (ev) => {
+                    ev.preventDefault();
+                    const src = ev.dataTransfer.getData('source');
+                    const itemId = ev.dataTransfer.getData('itemId');
+                    if (src === 'inv' && itemId) { this._depositToStorage(itemId, 1); }
+                });
+            };
+            attachDnDTargets();
+        } catch (e) {}
+
+        // render inventory slots — slots are clickable to Deposit and draggable to storage
         for (let i = 0; i < invSlots.length; i++) {
             const s = invSlots[i];
             const el = document.createElement('div'); el.className = 'slot';
@@ -959,6 +1020,17 @@ export class Town extends Phaser.Scene {
                 label.textContent = (def && def.name) || s.name || s.id;
                 el.appendChild(label);
                 el.style.cursor = 'pointer';
+                // drag support
+                try {
+                    el.draggable = true;
+                    el.addEventListener('dragstart', (ev) => {
+                        ev.dataTransfer.effectAllowed = 'move';
+                        ev.dataTransfer.setData('source', 'inv');
+                        ev.dataTransfer.setData('itemId', s.id);
+                        el.style.opacity = '0.5';
+                    });
+                    el.addEventListener('dragend', () => { el.style.opacity = '1'; });
+                } catch (e) {}
                 // click the slot to deposit one
                 try {
                     el.addEventListener('click', (ev) => {
@@ -976,7 +1048,7 @@ export class Town extends Phaser.Scene {
             }
             invGrid.appendChild(el);
         }
-        // render storage slots — slots are clickable to Withdraw
+        // render storage slots — slots are clickable to Withdraw and draggable to inventory
         for (let i = 0; i < storageSlots.length; i++) {
             const s = storageSlots[i];
             const el = document.createElement('div'); el.className = 'slot';
@@ -994,6 +1066,17 @@ export class Town extends Phaser.Scene {
                 label.textContent = (def && def.name) || s.name || s.id;
                 el.appendChild(label);
                 el.style.cursor = 'pointer';
+                // drag support
+                try {
+                    el.draggable = true;
+                    el.addEventListener('dragstart', (ev) => {
+                        ev.dataTransfer.effectAllowed = 'move';
+                        ev.dataTransfer.setData('source', 'box');
+                        ev.dataTransfer.setData('itemId', s.id);
+                        el.style.opacity = '0.5';
+                    });
+                    el.addEventListener('dragend', () => { el.style.opacity = '1'; });
+                } catch (e) {}
                 // click the slot to withdraw one
                 try {
                     el.addEventListener('click', (ev) => {
