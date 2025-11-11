@@ -165,6 +165,20 @@ export async function ensureCharacterStatColumns() {
   }
 }
 
+// Optional: ensure a dedicated defense column (default 0)
+let characterDefenseColChecked = false;
+export async function ensureCharacterDefenseColumn() {
+  if (characterDefenseColChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`alter table "Character" add column if not exists defense int not null default 0`;
+  } catch {
+    // ignore
+  } finally {
+    characterDefenseColChecked = true;
+  }
+}
+
 let itemStackTableChecked = false;
 export async function ensureItemStackTable() {
   if (itemStackTableChecked) return;

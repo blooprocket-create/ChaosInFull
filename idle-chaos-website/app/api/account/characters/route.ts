@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterStatColumns, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
+import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterStatColumns, ensureCharacterDefenseColumn, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
 import { computeInitialCharacterData } from "@/src/lib/characterInit";
 
 export async function GET() {
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   await ensureCharacterTable();
   await ensureCharacterExtraColumns();
   await ensureCharacterStatColumns();
+  await ensureCharacterDefenseColumn();
   await ensureItemStackTable();
   await ensureCharacterQuestTable();
     const owners = await q<{ id: string }>`select id from "User" where id = ${session.userId} limit 1`;
@@ -65,33 +66,34 @@ export async function POST(req: Request) {
     // Detect presence of legacy columns and insert accordingly to avoid "column does not exist" or NOT NULL violations
     const presentCols = await q<{ column_name: string }>`
       select column_name from information_schema.columns
-      where table_schema = 'public' and table_name = 'Character' and column_name = any(${['race','str','int','agi','luk']})
+      where table_schema = 'public' and table_name = 'Character' and column_name = any(${['race','str','int','agi','luk','defense']})
     `;
     const hasRace = presentCols.some(c => c.column_name === 'race');
     const hasStats = ['str','int','agi','luk'].every(col => presentCols.some(c => c.column_name === col));
+    const hasDefense = presentCols.some(c => c.column_name === 'defense');
 
     let created: Created;
     const stats = (initialData as any).stats || { str:1,int:1,agi:1,luk:1 };
     // Remove stats from JSONB to avoid duplication now that columns exist.
     delete (initialData as any).stats;
 
-    if (hasRace && hasStats) {
+    if (hasRace && hasStats && hasDefense) {
       const createdRows = await q<Created>`
         insert into "Character" (
-          id, userid, name, class, race, str, int, agi, luk, data
+          id, userid, name, class, race, str, int, agi, luk, defense, data
         ) values (
-          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk},
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0,
           ${JSON.stringify(initialData)}::jsonb
         )
         returning id, name, class, level
       `;
       created = createdRows[0];
-    } else if (hasStats && !hasRace) {
+    } else if (hasStats && hasDefense && !hasRace) {
       const createdRows = await q<Created>`
         insert into "Character" (
-          id, userid, name, class, str, int, agi, luk, data
+          id, userid, name, class, str, int, agi, luk, defense, data
         ) values (
-          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk},
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0,
           ${JSON.stringify(initialData)}::jsonb
         )
         returning id, name, class, level
@@ -119,6 +121,15 @@ export async function POST(req: Request) {
         returning id, name, class, level
       `;
       created = createdRows[0];
+    }
+
+    // If a starter weapon was chosen, ensure it's in the character's inventory as well.
+    if (weapon) {
+      await q`
+        insert into "ItemStack" (characterid, itemkey, count)
+        values (${(created as any).id}, ${weapon}, 1)
+        on conflict (characterid, itemkey) do update set count = "ItemStack".count + 1
+      `;
     }
 
     // No gender/hat usage anymore; no account stat bonus on create.

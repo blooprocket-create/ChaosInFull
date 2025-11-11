@@ -26,10 +26,13 @@ export function computeInitialCharacterData(params: {
   return {
     gold: 0,
     level: 1,
+    defense: 0,
     race: race || null,
     weapon: weapon || null,
+    // Seed inventory and equipment
     startingEquipment: weapon ? [{ id: weapon, qty: 1 }] : [],
-    stats, // str,int,agi,luk derived from race
+    equipment: weapon ? { weapon: { id: weapon, qty: 1 } } : {},
+    stats, // str,int,agi,luk derived from race (columns will store these when present)
     mining: { level: 1, exp: 0, expToLevel: 100 },
     woodcutting: { level: 1, exp: 0, expToLevel: 100 },
     smithing: { level: 1, exp: 0, expToLevel: 100 },
@@ -37,7 +40,6 @@ export function computeInitialCharacterData(params: {
     cooking: { level: 1, exp: 0, expToLevel: 100 },
     flags: {},
     inventory: [],
-    equipment: {},
     activeQuests: [],
     completedQuests: [],
   } as Record<string, unknown>;
