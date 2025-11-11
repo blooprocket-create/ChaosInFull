@@ -1680,6 +1680,20 @@ export function openInventoryModal(scene) {
     if (closeBtn) closeBtn.onclick = () => closeInventoryModal(scene);
     // Auto-clean on scene shutdown
     try { scene.events && scene.events.once && scene.events.once('shutdown', () => { try { closeInventoryModal(scene); } catch (e) {} }); } catch (e) {}
+    // Fetch latest inventory from server on open to ensure consistency with ItemStack table
+    try {
+        const charId = (scene && scene.char && scene.char.id) || (scene && scene._character && scene._character.id) || null;
+        if (charId && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.loadInventory === 'function') {
+            window.__cif_persist.loadInventory(String(charId)).then((slots) => {
+                try {
+                    if (!Array.isArray(slots)) return;
+                    // Assign directly; refresh will render names from defs
+                    scene.char.inventory = initSlots(slots.map(s => (s ? { id: s.id, qty: s.qty } : null)));
+                    refreshInventoryModal(scene);
+                } catch (e) { /* ignore refresh errors */ }
+            }).catch(() => { /* ignore fetch errors */ });
+        }
+    } catch (e) { /* silent */ }
     refreshInventoryModal(scene);
 }
 

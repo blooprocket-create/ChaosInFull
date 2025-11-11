@@ -31,6 +31,7 @@ declare global {
     __cif_persist?: {
       saveCharacter: (username: string | null, char: SaveCharacterPayload | null) => Promise<void>;
   saveInventory: (characterId: string | null | undefined, items: Record<string, number>) => Promise<Record<string, number>>;
+      loadInventory: (characterId: string | null | undefined) => Promise<Array<{ id: string; qty: number }>>;
       getAccountStorage: () => Promise<Array<{ itemkey: string; count: number } | null>>;
       upsertAccountStorage: (items: Record<string, number>) => Promise<void>;
       saveCharacterPatch: (characterId: string, patch: Record<string, unknown>) => Promise<void>;
@@ -263,6 +264,23 @@ function installPersistenceBridge() {
       if (res?.ok) emitTelemetry('inventory_sync_success', { characterId, itemCount: Object.keys(items).length });
       else emitTelemetry('inventory_sync_fail', { characterId });
       return res?.items || items;
+    },
+    async loadInventory(characterId) {
+      try {
+        if (!characterId) return [];
+        const data = await fetchJSON<{ ok: boolean; items?: Record<string, number> }>(
+          `/api/account/characters/inventory?characterId=${encodeURIComponent(String(characterId))}`
+        );
+        const slots: Array<{ id: string; qty: number }> = [];
+        const items = data?.items || {};
+        for (const [id, qty] of Object.entries(items)) {
+          const n = Math.max(0, Math.floor(Number(qty) || 0));
+          if (n > 0) slots.push({ id, qty: n });
+        }
+        return slots;
+      } catch {
+        return [];
+      }
     },
     async saveCharacterPatch(characterId, patch) {
       if (!characterId) return; // ignore until a real character id is known
