@@ -1162,6 +1162,24 @@ function ensureCharTalents(char) {
             if (char.talents.skillBar.length > 9) char.talents.skillBar.length = 9;
         }
         if (!Array.isArray(char.learnedActives)) char.learnedActives = [];
+        // Rebuild learnedActives from existing allocations if they were loaded without going
+        // through processTalentAllocation (e.g. full character load from server). This fixes
+        // the bug where allocated active talents show on the skill bar but activation says
+        // "Skill not learned" because learnedActives was never populated.
+        try {
+            for (const tabId of Object.keys(TALENT_TABS || {})) {
+                const tab = TALENT_TABS[tabId];
+                if (!tab || !Array.isArray(tab.talents)) continue;
+                const allocs = (char.talents.allocations && char.talents.allocations[tabId]) || {};
+                for (const t of tab.talents) {
+                    if (!t || t.kind !== 'active') continue;
+                    const alloc = Number(allocs[t.id] || 0);
+                    if (alloc > 0 && !char.learnedActives.find(x => x && x.id === t.id)) {
+                        char.learnedActives.push({ id: t.id, name: t.name || t.id, tab: tabId, activeType: t.activeType || null });
+                    }
+                }
+            }
+        } catch (e) { /* ignore rebuild errors */ }
         if (!char.talents.cooldowns || typeof char.talents.cooldowns !== 'object') char.talents.cooldowns = {};
         // keep track of which tabs we've synced retroactive points for (so we don't double-credit on repeated loads)
         if (!char.talents._tabSynced || typeof char.talents._tabSynced !== 'object') char.talents._tabSynced = {};
