@@ -2,7 +2,31 @@
 import { onCharacterLevelUp, computeTalentModifiers } from '../../data/talents.js';
 export function effectiveStats(char) {
     const base = Object.assign({}, (char.stats || { str:0, int:0, agi:0, luk:0 }));
-    const equip = char._equipBonuses || { str:0, int:0, agi:0, luk:0, defense:0 };
+    // Ensure equipment bonuses are reconciled; if not present, derive basic bonuses from equipped item definitions.
+    let equip = char._equipBonuses || { str:0, int:0, agi:0, luk:0, defense:0 };
+    try {
+        if ((!char._equipBonuses || typeof char._equipBonuses.defense !== 'number') && char.equipment) {
+            const defs = (typeof window !== 'undefined' && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
+            let derived = { str:0,int:0,agi:0,luk:0,defense:0, movementSpeed:0 };
+            for (const slot of Object.keys(char.equipment)) {
+                const item = char.equipment[slot];
+                if (!item || !item.id) continue;
+                const idef = defs[item.id];
+                if (!idef) continue;
+                if (idef.statBonus) {
+                    for (const k of Object.keys(idef.statBonus)) {
+                        derived[k] = (derived[k] || 0) + (idef.statBonus[k] || 0);
+                    }
+                }
+                const defVal = (typeof idef.defense === 'number') ? idef.defense : (typeof idef.def === 'number' ? idef.def : null);
+                if (typeof defVal === 'number') derived.defense += defVal;
+                if (typeof idef.movementSpeed === 'number') derived.movementSpeed += idef.movementSpeed;
+            }
+            // Merge with existing equip bonuses (prefer existing if already set)
+            equip = Object.assign({}, derived, equip);
+            char._equipBonuses = equip; // cache for subsequent calls
+        }
+    } catch (e) { /* ignore equipment derivation errors */ }
     // Temporary buffs (from consumables) may add stat bonuses or defense
     const buffs = Array.isArray(char._buffs) ? char._buffs : (Array.isArray(char.buffs) ? char.buffs : []);
     const buffTotals = { str:0, int:0, agi:0, luk:0, defense:0 };

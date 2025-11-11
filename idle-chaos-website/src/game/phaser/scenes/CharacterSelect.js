@@ -341,7 +341,21 @@ export class CharacterSelect extends Phaser.Scene {
             }
             portrait.textContent = `${char.name} — Lv ${char.level||1}`;
             nameEl.textContent = char.name || 'Unnamed';
-            metaEl.textContent = `Level ${char.level||1} — ${char.class||char.race||'Unknown'} • Gold ${char.gold||0}`;
+            // Prefer server-hydrated gold if available; otherwise try to fetch full record lazily
+            let goldVal = (typeof char.gold === 'number') ? char.gold : 0;
+            if (!goldVal && char.id && typeof fetch === 'function') {
+                try {
+                    // Non-blocking fetch; update the preview once resolved
+                    fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`).then(r=>r.json()).then(d=>{
+                        if (d && d.ok && d.character && typeof d.character.gold === 'number') {
+                            char.gold = d.character.gold;
+                            const metaNow = document.querySelector('#char-preview .preview-meta');
+                            if (metaNow) metaNow.textContent = `Level ${char.level||1} — ${char.class||char.race||'Unknown'} • Gold ${char.gold}`;
+                        }
+                    }).catch(()=>{});
+                } catch (e) {}
+            }
+            metaEl.textContent = `Level ${char.level||1} — ${char.class||char.race||'Unknown'} • Gold ${goldVal}`;
             statsWrap.innerHTML = '';
             let eff = { str:0,int:0,agi:0,luk:0,maxhp:0,maxmana:0,attackSpeedMs:0,movementSpeed:0,critChance:0,critDmgPercent:0 };
             try {
@@ -360,7 +374,8 @@ export class CharacterSelect extends Phaser.Scene {
             // Equipment summary line (simple icons or slot counts)
             try {
                 const eq = (char.equipment)||{};
-                const equippedCount = Object.values(eq).filter(v=>v && v.id).length;
+                // Count items by presence of .id or .itemKey (some sources may shape equipment differently)
+                const equippedCount = Object.values(eq).filter(v=>v && (v.id || v.itemKey)).length;
                 const eqDiv = document.createElement('div');
                 eqDiv.className='stat-pill';
                 eqDiv.textContent = `Equipped: ${equippedCount}`;
