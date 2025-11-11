@@ -4,13 +4,13 @@
 
 export const RARITY_MULTIPLIERS = {
     common: 1.0,
-    uncommon: 1.35,
-    rare: 1.95,
-    epic: 2.8,
-    legendary: 4.5,
-    boss: 8.0,
-    'world boss': 15.0,
-    world_boss: 15.0
+    uncommon: 1.5,
+    rare: 3.0,
+    epic: 9.0,
+    legendary: 15.0,
+    boss: 21.0,
+    'world boss': 30.0,
+    world_boss: 30.0
 };
 
 function clampInt(v, min = 0) { return Math.max(min, Math.floor(v)); }
