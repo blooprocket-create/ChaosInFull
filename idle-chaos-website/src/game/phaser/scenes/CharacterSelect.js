@@ -341,11 +341,31 @@ export class CharacterSelect extends Phaser.Scene {
             }
             portrait.textContent = `${char.name} — Lv ${char.level||1}`;
             nameEl.textContent = char.name || 'Unnamed';
-            metaEl.textContent = `Level ${char.level||1} — ${char.race||'Unknown'}`;
+            metaEl.textContent = `Level ${char.level||1} — ${char.class||char.race||'Unknown'} • Gold ${char.gold||0}`;
             statsWrap.innerHTML = '';
-            let eff = { str:0,int:0,agi:0,luk:0 };
-            try { const tmp = JSON.parse(JSON.stringify(char)); tmp.equipment = tmp.equipment||{}; tmp.stats = tmp.stats||{}; if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses({ char: tmp }); if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(tmp); } catch(e){ eff = char.stats||eff; }
-            ['STR','INT','AGI','LUK'].forEach(k=>{ const p = document.createElement('div'); p.className='stat-pill'; p.textContent = `${k}: ${eff[k.toLowerCase()]||0}`; statsWrap.appendChild(p); });
+            let eff = { str:0,int:0,agi:0,luk:0,maxhp:0,maxmana:0,attackSpeedMs:0,movementSpeed:0,critChance:0,critDmgPercent:0 };
+            try {
+                const tmp = JSON.parse(JSON.stringify(char));
+                tmp.equipment = tmp.equipment||{}; tmp.stats = tmp.stats||{};
+                if (window && window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) window.__shared_ui.reconcileEquipmentBonuses({ char: tmp });
+                if (window && window.__shared_ui && window.__shared_ui.stats && window.__shared_ui.stats.effectiveStats) eff = window.__shared_ui.stats.effectiveStats(tmp);
+            } catch(e){ eff = Object.assign(eff, char.stats||{}); }
+            const statOrder = [
+              ['STR', eff.str||0], ['INT', eff.int||0], ['AGI', eff.agi||0], ['LUK', eff.luk||0],
+              ['HP', eff.maxhp||0], ['MANA', eff.maxmana||0],
+              ['ATK SPD(ms)', eff.attackSpeedMs||0], ['MOVE', eff.movementSpeed||0],
+              ['CRIT%', eff.critChance||0], ['CRIT DMG%', eff.critDmgPercent||0]
+            ];
+            statOrder.forEach(([label,val])=>{ const p = document.createElement('div'); p.className='stat-pill'; p.textContent = `${label}: ${val}`; statsWrap.appendChild(p); });
+            // Equipment summary line (simple icons or slot counts)
+            try {
+                const eq = (char.equipment)||{};
+                const equippedCount = Object.values(eq).filter(v=>v && v.id).length;
+                const eqDiv = document.createElement('div');
+                eqDiv.className='stat-pill';
+                eqDiv.textContent = `Equipped: ${equippedCount}`;
+                statsWrap.appendChild(eqDiv);
+            } catch(e){}
             const playBtnLocal = document.getElementById('play-btn');
             const delBtnLocal = document.getElementById('delete-btn');
             if (playBtnLocal) playBtnLocal.disabled = false;

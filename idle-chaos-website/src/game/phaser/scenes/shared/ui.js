@@ -345,7 +345,7 @@ function showSkillTooltip(scene, skillName, lines, anchorEl) {
     const exp = (skillObj && typeof skillObj.exp === 'number') ? skillObj.exp : 0;
     const next = (skillObj && (skillObj.expToLevel || skillObj.next || skillObj.expToNext)) || null;
 
-    // Determine ms per attempt for this skill
+    // Determine ms per attempt for this skill using live effective stats (base + equipment + buffs + talents)
     const eff = effectiveStats(char);
     const miningMs = (typeof scene.miningInterval === 'number') ? scene.miningInterval : 2800;
     const smithingMs = (typeof scene.smeltingInterval === 'number') ? scene.smeltingInterval : 2800;
@@ -354,6 +354,9 @@ function showSkillTooltip(scene, skillName, lines, anchorEl) {
     const fishingMs = (eff && typeof eff.fishingSpeedMs === 'number') ? eff.fishingSpeedMs : 3000;
     const speedMap = { mining: miningMs, smithing: smithingMs, cooking: cookingMs, woodcutting: woodcuttingMs, fishing: fishingMs };
     const speedMs = speedMap[key] || 3000;
+
+    // Attack speed (for combat skills) derived from effectiveStats attackSpeedMs; include when relevant
+    const attackSpeedMs = eff && typeof eff.attackSpeedMs === 'number' ? eff.attackSpeedMs : null;
 
     // Tool/equipment bonuses
     let toolSkillBonus = 0;
@@ -380,7 +383,12 @@ function showSkillTooltip(scene, skillName, lines, anchorEl) {
         out.push(`ETA to next: ${next ? msToEta(totalMs) : 'N/A'}`);
         out.push(`Attempts ≈ ${isFinite(attemptsNeeded) ? attemptsNeeded : '∞'} (avg)`);
     }
-    out.push(`Speed: ${speedMs} ms (${msToEta(speedMs)})`);
+    // Gathering/crafting cycle speed
+    out.push(`Cycle Speed: ${speedMs} ms (${msToEta(speedMs)})`);
+    // Show distinct attack speed line only if different and relevant (e.g., not a gathering skill)
+    if (attackSpeedMs && (!key || (key !== 'mining' && key !== 'smithing' && key !== 'cooking' && key !== 'woodcutting' && key !== 'fishing'))) {
+        out.push(`Attack Speed: ${attackSpeedMs} ms (${msToEta(attackSpeedMs)})`);
+    }
     // Success chance / modifiers for gathering skills (not relevant for pure craft skills)
     if (key === 'fishing') {
         const chance = estimateSuccessChance(level + toolSkillBonus, toolSkillBonus, 12);
