@@ -551,13 +551,27 @@ export class GloamwayBastion extends Phaser.Scene {
         const nextAvailable = available[0] || null;
         const activeQuest = activeFromMother.find(entry => !checkQuestCompletion(this.char, entry.id)) || null;
 
-        // Check if this is the first time meeting Mother Lumen
-        const hasMetMotherLumen = this.char.hasMetMotherLumen || false;
-        
+        // Check if this is the first time meeting Mother Lumen (migrate legacy hasMetMotherLumen -> flags.motherLumenIntroSeen)
+        let hasMetMotherLumen = false;
+        try {
+            const legacy = !!this.char.hasMetMotherLumen;
+            const flagSeen = !!(this.char.flags && this.char.flags.motherLumenIntroSeen);
+            hasMetMotherLumen = legacy || flagSeen;
+        } catch (e) { hasMetMotherLumen = false; }
+
         if (!hasMetMotherLumen) {
-            // First visit: show introduction pages about class progression
-            this.char.hasMetMotherLumen = true;
-            if (this._persistCharacter) this._persistCharacter(this.username);
+            // First visit: set persistent flag and show introduction pages about class progression
+            try { this.char.flags = this.char.flags || {}; this.char.flags.motherLumenIntroSeen = true; } catch (e) {}
+            this.char.hasMetMotherLumen = true; // keep legacy field for any downstream checks
+            // Persist only the new flag (avoid sending entire character blob unnecessarily)
+            try {
+                if (window && window.__cif_persist && this.char && this.char.id) {
+                    window.__cif_persist.saveCharacterPatch(String(this.char.id), { flags: { motherLumenIntroSeen: true } });
+                } else if (this._persistCharacter) {
+                    // Fallback to broader persist helper
+                    this._persistCharacter(this.username);
+                }
+            } catch (e) { /* ignore persist errors */ }
             this._showMotherLumenIntroduction();
             return;
         }
@@ -581,6 +595,18 @@ export class GloamwayBastion extends Phaser.Scene {
                 variant: 'success'
             });
             optionConfigs.push({ label: 'Not yet', onClick: () => {}, closeOnClick: true });
+        // Priority: if player has finished the goblin cull but hasn't chosen a class, offer class selection BEFORE new quests
+        } else if (hasCompletedGoblinCull && !hasChosenClass) {
+            // Player finished goblin cull but hasn't chosen a class yet
+            bodyNodes.push(ui.createDialogueParagraph('You have proven your resolve. Now you must choose the path that calls to you.'));
+            optionConfigs.push({
+                label: 'Show me the paths',
+                onClick: () => {
+                    this._openClassSelectionModal();
+                },
+                variant: 'success'
+            });
+            optionConfigs.push({ label: 'I need more time.', onClick: () => {}, closeOnClick: true });
         } else if (nextAvailable) {
             const questDef = getQuestById(nextAvailable.id);
             bodyNodes.push(ui.createDialogueParagraph('Traveler, a fracture widens near the camp. Will you mend it for me?'));
@@ -603,17 +629,6 @@ export class GloamwayBastion extends Phaser.Scene {
             const list = ui.buildObjectiveList(questDef, states, '#5c86ff');
             if (list) bodyNodes.push(list);
             optionConfigs.push({ label: 'I will return soon.', onClick: () => {}, closeOnClick: true });
-        } else if (hasCompletedGoblinCull && !hasChosenClass) {
-            // Player finished goblin cull but hasn't chosen a class yet
-            bodyNodes.push(ui.createDialogueParagraph('You have proven your resolve. Now you must choose the path that calls to you.'));
-            optionConfigs.push({
-                label: 'Show me the paths',
-                onClick: () => {
-                    this._openClassSelectionModal();
-                },
-                variant: 'success'
-            });
-            optionConfigs.push({ label: 'I need more time.', onClick: () => {}, closeOnClick: true });
         } else {
             const ui = window.__shared_ui;
             bodyNodes.push(ui.createDialogueParagraph('You walk as one of the paths now. May your new mantle fit well.'));
