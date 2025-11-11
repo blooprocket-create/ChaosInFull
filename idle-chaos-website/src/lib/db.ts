@@ -110,7 +110,7 @@ export async function ensureCharacterTable() {
         woodcuttinglevel int not null default 1,
         craftinglevel int not null default 1,
         fishinglevel int not null default 1,
-        lastscene text,
+        currentscene text,
         lastseenat timestamptz default now(),
         createdat timestamptz not null default now()
       )
@@ -160,6 +160,40 @@ export async function ensureCharacterLastSeenColumn() {
     // ignore
   } finally {
     characterLastSeenChecked = true;
+  }
+}
+
+// Ensure currentScene, lastX, lastY positional columns exist (migrating from legacy lastscene)
+let characterSceneColsChecked = false;
+export async function ensureCharacterSceneColumns() {
+  if (characterSceneColsChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`alter table "Character" add column if not exists currentscene text`;
+    await sql`alter table "Character" add column if not exists lastx double precision`;
+    await sql`alter table "Character" add column if not exists lasty double precision`;
+    // If legacy lastscene column exists and currentscene is null, copy values
+    try {
+      await sql`update "Character" set currentscene = coalesce(currentscene, lastscene) where currentscene is null and lastscene is not null`;
+    } catch {}
+  } catch {
+    // ignore
+  } finally {
+    characterSceneColsChecked = true;
+  }
+}
+
+// Ensure flags JSONB column exists for misc toggles/progression markers
+let characterFlagsColChecked = false;
+export async function ensureCharacterFlagsColumn() {
+  if (characterFlagsColChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`alter table "Character" add column if not exists flags jsonb not null default '{}'::jsonb`;
+  } catch {
+    // ignore
+  } finally {
+    characterFlagsColChecked = true;
   }
 }
 

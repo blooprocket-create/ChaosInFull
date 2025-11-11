@@ -25,11 +25,12 @@ export async function GET(req: Request) {
   // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
     id: string; name: string; class: string; level: number; gold?: number;
+    currentscene?: string | null; lastx?: number | null; lasty?: number | null;
     mining_exp?: number; woodcutting_exp?: number; fishing_exp?: number; cooking_exp?: number; smithing_exp?: number;
     equipment?: Record<string, unknown>;
     talents?: Record<string, unknown>;
   }>`
-    select id, name, class, level, gold,
+    select id, name, class, level, gold, currentscene, lastx, lasty,
            coalesce(mining_exp, 0) as mining_exp,
            coalesce(woodcutting_exp, 0) as woodcutting_exp,
            coalesce(fishing_exp, 0) as fishing_exp,
@@ -78,6 +79,9 @@ export async function GET(req: Request) {
       class: c.class,
       level: c.level,
       gold: typeof c.gold === 'number' ? c.gold : 0,
+  ...(c.currentscene ? { currentScene: c.currentscene } : {}),
+  ...(typeof c.lastx === 'number' ? { lastX: c.lastx } : {}),
+  ...(typeof c.lasty === 'number' ? { lastY: c.lasty } : {}),
       // Prefer dedicated equipment column if present
       ...(equipment ? { equipment } : {}),
     // Prefer dedicated talents column if present

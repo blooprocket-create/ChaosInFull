@@ -433,7 +433,7 @@ function installPersistenceBridge() {
       if (!characterId) return null;
       const data = await fetchJSON<{ ok: boolean; character?: {
         id: string; name: string; class: string; level: number; gold: number; flags?: Record<string, unknown> | null;
-        fishing?: unknown; equipment?: unknown; talents?: unknown; lastScene?: string | null; lastX?: number | null; lastY?: number | null;
+  fishing?: unknown; equipment?: unknown; talents?: unknown; currentScene?: string | null; lastX?: number | null; lastY?: number | null;
         inventory?: Record<string, number>; quests?: { active?: Array<{ id: string; progress?: unknown }>; completed?: string[] };
       } }>(`/api/account/characters/full?characterId=${encodeURIComponent(characterId)}`);
       if (!data || !data.ok || !data.character) return null;
@@ -460,7 +460,7 @@ function installPersistenceBridge() {
         fishing: c.fishing || null,
         equipment: c.equipment || null,
         talents: c.talents || null,
-        lastLocation: c.lastScene ? { scene: c.lastScene, x: c.lastX || null, y: c.lastY || null } : null,
+  lastLocation: c.currentScene ? { scene: c.currentScene, x: c.lastX || null, y: c.lastY || null } : null,
         inventory: slots,
         activeQuests,
         completedQuests
@@ -528,7 +528,7 @@ function installPersistenceBridge() {
               const talents = (ch as { talents?: unknown }).talents; if (talents) patch.talents = talents;
               const lastLocation = (ch as { lastLocation?: { scene?: string; x?: number; y?: number } }).lastLocation;
               if (lastLocation) {
-                patch.lastScene = lastLocation.scene || null;
+                patch.currentScene = lastLocation.scene || null;
                 if (typeof lastLocation.x === 'number') patch.lastX = lastLocation.x;
                 if (typeof lastLocation.y === 'number') patch.lastY = lastLocation.y;
               }
