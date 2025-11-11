@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn, ensureCharacterFlagsColumn } from "@/src/lib/db";
 import { deriveSkillProgressFromExp } from "@/src/lib/skills";
 
 // Fetch a full hydrated character snapshot (core row + inventory stacks + quests).
@@ -21,23 +21,32 @@ export async function GET(req: Request) {
   await ensureCharacterEquipmentColumn();
   await ensureCharacterGoldColumn();
   await ensureCharacterTalentsColumn();
+  await ensureCharacterFlagsColumn();
 
   // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
     id: string; name: string; class: string; level: number; gold?: number;
+    // base stats persisted on the character row (server-authoritative)
+    str?: number | null; int?: number | null; agi?: number | null; luk?: number | null;
     currentscene?: string | null; lastx?: number | null; lasty?: number | null;
     mining_exp?: number; woodcutting_exp?: number; fishing_exp?: number; cooking_exp?: number; smithing_exp?: number;
     equipment?: Record<string, unknown>;
     talents?: Record<string, unknown>;
+    flags?: Record<string, unknown> | null;
   }>`
     select id, name, class, level, gold, currentscene, lastx, lasty,
+           coalesce(str, 0) as str,
+           coalesce(int, 0) as int,
+           coalesce(agi, 0) as agi,
+           coalesce(luk, 0) as luk,
            coalesce(mining_exp, 0) as mining_exp,
            coalesce(woodcutting_exp, 0) as woodcutting_exp,
            coalesce(fishing_exp, 0) as fishing_exp,
            coalesce(cooking_exp, 0) as cooking_exp,
            coalesce(smithing_exp, 0) as smithing_exp,
            equipment,
-           talents
+            talents,
+            flags
     from "Character"
     where id = ${characterId} and userid = ${session.userId}
     limit 1
@@ -79,6 +88,9 @@ export async function GET(req: Request) {
       class: c.class,
       level: c.level,
       gold: typeof c.gold === 'number' ? c.gold : 0,
+      flags: (c.flags && typeof c.flags === 'object') ? c.flags : {},
+      // expose server-authoritative base stats under a nested stats object the client UI expects
+      stats: { str: Number(c.str || 0), int: Number(c.int || 0), agi: Number(c.agi || 0), luk: Number(c.luk || 0) },
   ...(c.currentscene ? { currentScene: c.currentscene } : {}),
   ...(typeof c.lastx === 'number' ? { lastX: c.lastx } : {}),
   ...(typeof c.lasty === 'number' ? { lastY: c.lasty } : {}),

@@ -144,7 +144,7 @@ function installPersistenceBridge() {
           emitTelemetry('xp_grant_fail', { characterId, skill, amount, status: res.status });
           return null;
         }
-  const data = await res.json().catch(() => null) as { ok?: boolean; progress?: { level: number; exp: number; expToLevel: number } } | null;
+  const data = await res.json().catch(() => null) as { ok?: boolean; progress?: { level: number; exp: number; expToLevel: number }; stats?: { str: number; int: number; agi: number; luk: number } } | null;
   const progress = data?.progress;
         if (progress && typeof progress.level === 'number') {
           emitTelemetry('xp_grant_success', { characterId, skill, amount, level: progress.level, exp: progress.exp, expToLevel: progress.expToLevel });
@@ -174,6 +174,13 @@ function installPersistenceBridge() {
                   chCore.exp = progress.exp;
                   chCore.expToLevel = progress.expToLevel;
                   chCore.level = progress.level;
+                  // If server returned updated base stats, apply to the local character to keep Stats modal in sync immediately
+                  try {
+                    const s = (data && (data as { stats?: { str: number; int: number; agi: number; luk: number } }).stats) || null;
+                    if (s) {
+                      (ch as { stats?: { str: number; int: number; agi: number; luk: number } }).stats = { str: Math.floor(s.str||0), int: Math.floor(s.int||0), agi: Math.floor(s.agi||0), luk: Math.floor(s.luk||0) };
+                    }
+                  } catch {}
                 } else {
                   (ch as Record<string, unknown>)[skill] = { ...existing, ...progress } as SkillProgress;
                 }
