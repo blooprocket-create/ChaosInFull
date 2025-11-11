@@ -177,7 +177,11 @@ export class CharacterSelect extends Phaser.Scene {
                 .char-name { font-weight:700; color:#e6d7cf; }
                 .char-meta { color:#bfbfbf; font-size:0.85rem; }
                 .char-stats { display:flex; gap:6px; flex-wrap:wrap; }
-                .stat-pill { background:#111; color:#ffd27a; padding:6px 8px; border-radius:6px; font-weight:700; font-size:0.85rem; }
+                .pill-group { width:100%; margin-bottom:10px; }
+                .pill-group-header { font-size:0.7rem; letter-spacing:1px; text-transform:uppercase; color:#888; margin:2px 4px 4px; font-weight:600; }
+                .pill-row { display:flex; flex-wrap:wrap; gap:6px; }
+                .stat-pill { background:linear-gradient(180deg,#161616,#0d0d0d); color:#ffd27a; padding:6px 10px; border-radius:5px; font-weight:600; font-size:0.8rem; border:1px solid #272727; box-shadow:0 2px 4px rgba(0,0,0,0.5); }
+                .stat-pill:hover { border-color:#444; }
 
                 /* Center: preview */
                 #char-preview { flex:1; min-width:360px; max-width:520px; display:flex; flex-direction:column; align-items:center; }
@@ -204,7 +208,7 @@ export class CharacterSelect extends Phaser.Scene {
                         <div class="preview-name">Create Your Champion</div>
                         <div class="preview-meta">Select a character from the left to see details</div>
                         <div style="height:10px"></div>
-                        <div class="preview-stats" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+                        <div class="preview-stats" style="display:flex;flex-direction:column;gap:4px;width:100%;"></div>
                     </div>
                 </div>
                 <div id="char-actions">
@@ -260,8 +264,13 @@ export class CharacterSelect extends Phaser.Scene {
                     list.appendChild(errEl);
                     return;
                 }
+                // Sort by most recently played
+                const sorted = (characters || []).filter(c=>c).sort((a,b)=>Number(b.lastPlayed||0)-Number(a.lastPlayed||0));
+                const ordered = [];
+                for (let i=0; i<sorted.length && ordered.length<7; i++) ordered.push(sorted[i]);
+                while (ordered.length < 7) ordered.push(undefined);
                 for (let i = 0; i < 7; i++) {
-                    const slot = characters[i];
+                    const slot = ordered[i];
                     const tile = document.createElement('div');
                     tile.className = 'char-tile';
                     tile.dataset.idx = String(i);
@@ -272,6 +281,7 @@ export class CharacterSelect extends Phaser.Scene {
                         list.appendChild(tile);
                         continue;
                     }
+                    if (slot && slot.id) tile.dataset.cid = String(slot.id);
                     const name = document.createElement('div'); name.className = 'char-name'; name.textContent = slot.name || 'Unnamed';
                     const meta = document.createElement('div'); meta.className = 'char-meta'; meta.textContent = slot.race ? `${slot.race} · Lvl ${slot.level||1}` : `Lvl ${slot.level||1}`;
                     const statsRow = document.createElement('div'); statsRow.className = 'char-stats';
@@ -290,8 +300,13 @@ export class CharacterSelect extends Phaser.Scene {
                     } catch (e) { eff = slot.stats || eff; }
                     ['str','int','agi','luk'].forEach(k => { const p = document.createElement('div'); p.className='stat-pill'; p.textContent = `${k.toUpperCase()}: ${eff[k]||0}`; statsRow.appendChild(p); });
                     tile.appendChild(name); tile.appendChild(meta); tile.appendChild(statsRow);
-                    // Use index-based selection so preview and list reference the same authoritative object
-                    tile.onclick = () => updatePreview(null, i);
+                    // Click selects by character id to map back to original array index
+                    tile.onclick = () => {
+                        let idx = -1;
+                        if (slot && slot.id) idx = (characters||[]).findIndex(c=>c && c.id===slot.id);
+                        if (idx === -1) idx = (characters||[]).indexOf(slot);
+                        updatePreview(slot, idx);
+                    };
                     list.appendChild(tile);
                 }
             } catch (e) { /* ignore render errors */ }
@@ -303,10 +318,13 @@ export class CharacterSelect extends Phaser.Scene {
         // Initialize central preview with first available character or placeholder
         try {
             setTimeout(() => {
-                let firstIdx = -1;
-                for (let i = 0; i < characters.length; i++) { if (characters[i]) { firstIdx = i; break; } }
-                if (firstIdx === -1) updatePreview(null, null);
-                else updatePreview(characters[firstIdx], firstIdx);
+                if (!Array.isArray(characters) || characters.length === 0) { updatePreview(null, null); return; }
+                // pick most recently played
+                let best = null;
+                for (const c of characters) { if (!c) continue; if (!best || Number(c.lastPlayed||0) > Number(best.lastPlayed||0)) best = c; }
+                if (!best) { updatePreview(null, null); return; }
+                const idx = characters.findIndex(c=>c && ((best.id && c.id===best.id) || c===best));
+                updatePreview(best, idx);
             }, 80);
         } catch (e) { }
 
@@ -370,19 +388,38 @@ export class CharacterSelect extends Phaser.Scene {
               ['ATK SPD(ms)', eff.attackSpeedMs||0], ['MOVE', eff.movementSpeed||0],
               ['CRIT%', eff.critChance||0], ['CRIT DMG%', eff.critDmgPercent||0]
             ];
-            statOrder.forEach(([label,val])=>{ const p = document.createElement('div'); p.className='stat-pill'; p.textContent = `${label}: ${val}`; statsWrap.appendChild(p); });
-            // Equipment summary line (simple icons or slot counts)
+            // Build grouped pill layout
+            const makeGroup = (title, items) => {
+                const group = document.createElement('div'); group.className='pill-group';
+                const header = document.createElement('div'); header.className='pill-group-header'; header.textContent=title; group.appendChild(header);
+                const row = document.createElement('div'); row.className='pill-row';
+                items.forEach(([label,val])=>{ const p=document.createElement('div'); p.className='stat-pill'; p.textContent=`${label}: ${val}`; row.appendChild(p); });
+                group.appendChild(row); statsWrap.appendChild(group);
+            };
+            makeGroup('Core', statOrder.slice(0,4));
+            makeGroup('Vitals', statOrder.slice(4,6));
+            makeGroup('Combat', statOrder.slice(6));
+            // Gathering
+            try {
+                const gatherSkills = ['woodcutting','fishing','mining','smithing','cooking'];
+                const gatherItems = [];
+                for (const g of gatherSkills) {
+                    const obj = char[g];
+                    const lvl = (obj && typeof obj.level === 'number') ? obj.level : 1;
+                    gatherItems.push([g.charAt(0).toUpperCase()+g.slice(1), lvl]);
+                }
+                makeGroup('Gathering', gatherItems);
+            } catch (e) {}
+            // Equipment summary group
             try {
                 const eq = (char.equipment)||{};
                 let equippedCount = Object.values(eq).filter(v=>v && (v.id || v.itemKey)).length;
-                // If count is zero but we haven't hydrated full record yet, attempt a lazy full fetch
                 if (equippedCount === 0 && char.id && typeof fetch === 'function' && !char._equipmentHydrated) {
                     fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`)
                         .then(r=>r.json()).then(d=>{
                             if (d && d.ok && d.character && d.character.equipment) {
                                 char.equipment = d.character.equipment || char.equipment;
                                 char._equipmentHydrated = true;
-                                // Re-render equipment count without rebuilding entire preview card
                                 try {
                                     const freshEq = (char.equipment)||{};
                                     const newCount = Object.values(freshEq).filter(v=>v && (v.id || v.itemKey)).length;
@@ -392,19 +429,20 @@ export class CharacterSelect extends Phaser.Scene {
                             }
                         }).catch(()=>{});
                 }
-                const eqDiv = document.createElement('div');
-                eqDiv.className='stat-pill';
-                eqDiv.setAttribute('data-eq-pill','true');
-                eqDiv.textContent = `Equipped: ${equippedCount}`;
-                statsWrap.appendChild(eqDiv);
+                const equipGroup = document.createElement('div'); equipGroup.className='pill-group';
+                const header = document.createElement('div'); header.className='pill-group-header'; header.textContent='Equipment'; equipGroup.appendChild(header);
+                const row = document.createElement('div'); row.className='pill-row';
+                const eqDiv = document.createElement('div'); eqDiv.className='stat-pill'; eqDiv.setAttribute('data-eq-pill','true'); eqDiv.textContent = `Equipped: ${equippedCount}`; row.appendChild(eqDiv);
+                equipGroup.appendChild(row); statsWrap.appendChild(equipGroup);
             } catch(e){}
             const playBtnLocal = document.getElementById('play-btn');
             const delBtnLocal = document.getElementById('delete-btn');
             if (playBtnLocal) playBtnLocal.disabled = false;
             if (delBtnLocal) delBtnLocal.disabled = false;
             selectedIdx = idx; selectedChar = char;
-            // highlight selected tile
-            Array.from(document.querySelectorAll('.char-tile')).forEach(t=>{ t.classList.toggle('selected', parseInt(t.dataset.idx,10)===idx); });
+            // highlight selected tile by id
+            const cid = char && char.id ? String(char.id) : '';
+            Array.from(document.querySelectorAll('.char-tile')).forEach(t=>{ t.classList.toggle('selected', cid && t.dataset && t.dataset.cid === cid); });
         }
 
         // Attach click handlers to tiles
@@ -467,6 +505,12 @@ export class CharacterSelect extends Phaser.Scene {
             if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
             try { ensureCharTalents && ensureCharTalents(char); } catch (e) { }
             char.lastPlayed = Date.now();
+            // Persist lastPlayed to server so next open sorts correctly
+            try {
+                if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                    window.__cif_persist.saveCharacterPatch(String(char.id), { lastPlayed: char.lastPlayed });
+                }
+            } catch (e) { /* ignore */ }
             // No localStorage persistence; server is authoritative.
             const last = (char && char.lastLocation && char.lastLocation.scene) ? char.lastLocation : null;
             const payload = { character: char, username };
