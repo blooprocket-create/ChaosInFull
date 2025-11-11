@@ -33,6 +33,14 @@ export default function SuppressPreloadWarnings() {
         ) {
           return; // swallow this one
         }
+        // Filter noisy dev-only HMR warnings that are benign and confusing
+        const lower = msg.toLowerCase();
+        if (
+          msg.includes("[HMR]") &&
+          (lower.includes("unexpected require") || lower.includes("disposed"))
+        ) {
+          return; // swallow HMR churn noise
+        }
       } catch {}
       return originalWarn(...args);
     };

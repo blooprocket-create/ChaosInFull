@@ -23,10 +23,14 @@ export async function POST(req: Request) {
     if (safe > 0) sanitized.push({ key: String(itemKey), count: Math.min(safe, MAX_INT32) });
   }
   try {
-    const beginFn = (sql as any)?.begin as (cb: (tx: typeof sql) => Promise<void>) => Promise<void> | undefined;
+    // Type-safe access to optional Neon transaction helper
+    type SqlTag = (strings: TemplateStringsArray, ...params: unknown[]) => Promise<unknown>;
+    type SqlClient = SqlTag & { begin?: (cb: (tx: SqlTag) => Promise<void>) => Promise<void> };
+    const sqlClient = sql as unknown as SqlClient;
+    const beginFn = sqlClient.begin;
     if (typeof beginFn === 'function') {
       // Use Neon transaction to ensure BEGIN/COMMIT runs on the same connection
-      await beginFn(async (tx: typeof sql) => {
+      await beginFn(async (tx: SqlTag) => {
         // Lock the character row to serialize inventory writers
         await tx`select id from "Character" where id = ${characterId} and userid = ${session.userId} for update`;
         // Full replacement of stacks

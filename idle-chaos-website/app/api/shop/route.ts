@@ -39,11 +39,12 @@ export async function POST(req: Request) {
   const nextCount = Math.max(0, currentCount + (action === "buy" ? qty : -qty));
   // Apply updates atomically inside a transaction to avoid partial state on failure
   try {
-    const beginMaybe = (sql as any)?.begin;
-    const beginFn: ((cb: (tx: typeof sql) => Promise<void>) => Promise<void>) | undefined =
-      typeof beginMaybe === 'function' ? (beginMaybe as (cb: (tx: typeof sql) => Promise<void>) => Promise<void>) : undefined;
+    type SqlTag = (strings: TemplateStringsArray, ...params: unknown[]) => Promise<unknown>;
+    type SqlClient = SqlTag & { begin?: (cb: (tx: SqlTag) => Promise<void>) => Promise<void> };
+    const sqlClient = sql as unknown as SqlClient;
+    const beginFn = sqlClient.begin;
     if (beginFn) {
-      await beginFn(async (tx: typeof sql) => {
+      await beginFn(async (tx: SqlTag) => {
         await tx`update "Character" set gold = ${newGold} where id = ${characterId}`;
         if (nextCount <= 0) {
           await tx`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
