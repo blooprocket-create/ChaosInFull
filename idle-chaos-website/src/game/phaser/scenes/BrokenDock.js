@@ -2539,6 +2539,15 @@ export class BrokenDock extends Phaser.Scene {
         if (giveGold > 0) {
             this.char.gold = Math.max(0, haveGold - giveGold);
             updateQuestProgress(this.char, 'contribute_gold', null, giveGold);
+            // Immediate server-side gold persistence (quest progress alone was not persisting deduction reliably)
+            try {
+                const charId = (this.char && this.char.id) ? String(this.char.id) : null;
+                if (charId && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                    window.__cif_persist.saveCharacterPatch(charId, { gold: Math.max(0, Math.floor(this.char.gold || 0)) });
+                }
+            } catch (e) { /* ignore network errors */ }
+            // Refresh HUD gold display if available
+            try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
         }
         for (const [itemId, qty] of Object.entries(itemGives)) {
             if (qty > 0) {
@@ -2546,6 +2555,15 @@ export class BrokenDock extends Phaser.Scene {
                 updateQuestProgress(this.char, 'contribute_item', itemId, qty);
             }
         }
+        // Persist quest progress to server so remaining requirements survive reloads
+        try {
+            const charId = (this.char && this.char.id) ? String(this.char.id) : null;
+            if (charId && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveQuests === 'function') {
+                const active = Array.isArray(this.char.activeQuests) ? this.char.activeQuests.map(q => ({ id: q && q.id, progress: q && q.progress })) : [];
+                const completed = Array.isArray(this.char.completedQuests) ? this.char.completedQuests.slice() : [];
+                window.__cif_persist.saveQuests(charId, active, completed);
+            }
+        } catch (e) { /* ignore quest sync errors */ }
         this._persistCharacterState();
         // If complete, allow turn-in now
         if (checkQuestCompletion(this.char, qid)) {

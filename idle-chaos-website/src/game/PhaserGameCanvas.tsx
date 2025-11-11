@@ -201,6 +201,11 @@ export default function PhaserGameCanvas({
             const node = document.getElementById(id);
             if (node && node.parentNode) node.parentNode.removeChild(node);
           }
+          // Remove any globally injected shared styles so they don't bleed into non-Phaser pages
+          try {
+            const sharedStyles = document.getElementById('shared-ui-styles');
+            if (sharedStyles && sharedStyles.parentNode) sharedStyles.parentNode.removeChild(sharedStyles);
+          } catch {}
           // Remove HUD elements (they have dynamic IDs like 'town-hud', 'cave-hud', etc.)
           document.querySelectorAll('[id$="-hud"]').forEach((node) => {
             try {
@@ -216,6 +221,8 @@ export default function PhaserGameCanvas({
               }
             } catch {}
           });
+          // Remove any lingering debug overlays
+          try { document.getElementById('phaser-debug-overlay')?.remove(); } catch {}
         }
       } catch {}
     };
