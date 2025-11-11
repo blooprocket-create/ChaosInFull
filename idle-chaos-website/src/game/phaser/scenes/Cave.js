@@ -128,8 +128,11 @@ export class Cave extends Phaser.Scene {
     // furnace animation will indicate active state (no separate emoji indicator)
     // Wayne Mineson NPC (tutorial mining guide)
     try {
-        const wayneX = Math.max(80, Math.round(centerX - (this.scale.width * 0.18)));
-        const wayneY = Math.round(centerY * 0.9);
+        // Position Wayne between the furnace (scene center) and the portal (right-center),
+        // biased toward the portal so he's clearly closer to it.
+        const toward = 0.7; // 70% of the way from furnace to portal
+        const wayneX = Math.round(furnaceX + (portalX - furnaceX) * toward);
+        const wayneY = Math.round(furnaceY + (portalY - furnaceY) * toward);
         if (this.textures && this.textures.exists && this.textures.exists('rowan_idle')) {
             // ensure Wayne's animations (based on the rowan sheet) exist in this scene
             try { this._ensureWayneAnimations && this._ensureWayneAnimations(); } catch (e) {}
