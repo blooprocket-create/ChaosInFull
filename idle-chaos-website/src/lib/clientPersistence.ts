@@ -160,15 +160,20 @@ function installPersistenceBridge() {
                 if (!ch || (ch.id && ch.id !== characterId)) continue;
                 // Ensure skill container exists
                 const existing = (skill === 'character')
-                  ? ({ level: Number(ch.level || 1), exp: Number((ch as any).exp || 0), expToLevel: Number((ch as any).expToLevel || 100) } as SkillProgress)
+                  ? ({
+                      level: Number((ch as { level?: number }).level ?? 1),
+                      exp: Number((ch as { exp?: number }).exp ?? 0),
+                      expToLevel: Number((ch as { expToLevel?: number }).expToLevel ?? 100)
+                    } as SkillProgress)
                   : ((ch[skill as keyof CharacterLike] as SkillProgress | undefined) || { level: 1, exp: 0, expToLevel: 100 });
                 const oldLevel = Number(existing.level || 1);
                 // Merge server progress into local character skill
                 if (skill === 'character') {
                   // For core character XP, update top-level level and exp/expToLevel mirrors
-                  (ch as any).exp = progress.exp;
-                  (ch as any).expToLevel = progress.expToLevel;
-                  (ch as any).level = progress.level;
+                  const chCore = ch as { exp?: number; expToLevel?: number; level?: number };
+                  chCore.exp = progress.exp;
+                  chCore.expToLevel = progress.expToLevel;
+                  chCore.level = progress.level;
                 } else {
                   (ch as Record<string, unknown>)[skill] = { ...existing, ...progress } as SkillProgress;
                 }
