@@ -4,6 +4,17 @@ import { assertAdmin } from "@/src/lib/authz";
 import { q } from "@/src/lib/db";
 import ITEM_DEFS from "@/src/game/phaser/data/items.js";
 
+type PhaserItemDef = {
+  name?: string;
+  description?: string;
+  value?: number;
+  rarity?: string;
+  stackable?: boolean;
+  maxStack?: number;
+  buy?: number;
+  sell?: number;
+};
+
 const ENEMIES: Array<{ id: string; name: string; level: number; basehp: number; expbase: number; goldmin: number; goldmax: number }> = [
   { id: "slime", name: "Slime", level: 1, basehp: 30, expbase: 5, goldmin: 1, goldmax: 3 },
   { id: "slime_epic", name: "Slime (Epic)", level: 3, basehp: 80, expbase: 12, goldmin: 3, goldmax: 6 },
@@ -21,7 +32,7 @@ export async function POST() {
   await q`delete from "AfkCombatState"`;
 
   // Items
-  for (const [id, def] of Object.entries(ITEM_DEFS as Record<string, any>)) {
+  for (const [id, def] of Object.entries(ITEM_DEFS as Record<string, PhaserItemDef>)) {
     // Derive buy/sell values from base value if present
     const base = typeof def.value === 'number' && def.value >= 0 ? def.value : (typeof def.buy === 'number' ? def.buy : 0);
     const buy = Math.floor(base * 1.1);

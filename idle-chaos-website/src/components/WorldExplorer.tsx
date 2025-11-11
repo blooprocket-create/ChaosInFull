@@ -6,6 +6,16 @@ import ORE_DEFS from "@/src/game/phaser/data/ores.js";
 import LOG_DEFS from "@/src/game/phaser/data/logs.js";
 import type { EnemyDef, EnemyDrop, EnemyGoldDrop, OreDef, LogDef } from "@/src/types/phaser-data";
 import ITEM_DEFS from "@/src/game/phaser/data/items.js";
+
+type ItemDefLite = {
+  name?: string;
+  rarity?: string;
+  armor?: boolean;
+  weapon?: boolean;
+  tool?: boolean;
+  value?: number;
+  stackable?: boolean;
+};
 // Use dynamic enemy stat formulas from the original scene data (pure math, safe for client)
 import { computeEnemyStats, type ScaledEnemy } from "@/src/lib/statFormulas";
 
@@ -61,7 +71,7 @@ export default function WorldExplorer() {
   const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
   const friendlyItemName = (id?: string) => {
     if (!id) return "?";
-    const fromCatalog = (ITEM_DEFS as unknown as Record<string, { name?: string }>)[id]?.name;
+  const fromCatalog = (ITEM_DEFS as unknown as Record<string, ItemDefLite>)[id]?.name;
     if (fromCatalog) return fromCatalog;
     const alias = ITEM_NAME_ALIASES[id];
     if (alias) return alias;
@@ -69,7 +79,7 @@ export default function WorldExplorer() {
   };
   const itemCategoryBadge = (id?: string) => {
     if (!id) return null;
-    const def = (ITEM_DEFS as unknown as Record<string, any>)[id];
+  const def = (ITEM_DEFS as unknown as Record<string, ItemDefLite>)[id];
     if (!def) return null;
     // Derive a category string from Phaser defs
     const category = def.armor ? 'armor'

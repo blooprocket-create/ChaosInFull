@@ -42,7 +42,7 @@ export async function GET() {
     const rows = await q<{ settings: Record<string, unknown> | null }>`select settings from "User" where id = ${session.userId} limit 1`;
     const settings = rows[0]?.settings || {};
     return NextResponse.json({ ok: true, settings });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 });
   }
 }
@@ -61,7 +61,7 @@ export async function PATCH(req: Request) {
     const merged = { ...current, ...incoming };
     await q`update "User" set settings = ${JSON.stringify(merged)}::jsonb where id = ${session.userId}`;
     return NextResponse.json({ ok: true, settings: merged });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 });
   }
 }
@@ -77,7 +77,7 @@ export async function PUT(req: Request) {
   try {
     await q`update "User" set settings = ${JSON.stringify(sanitized)}::jsonb where id = ${session.userId}`;
     return NextResponse.json({ ok: true, settings: sanitized });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 });
   }
 }
