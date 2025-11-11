@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { q, sql, ensureCharacterTable, ensureItemStackTable, ensureCharacterGoldColumn } from "@/src/lib/db";
 import { getSession } from "@/src/lib/auth";
-import { itemByKey } from "../../../src/data/items";
+// Use Phaser's canonical item defs (with `value`) as source-of-truth for shop pricing
+import ITEM_DEFS from "@/src/game/phaser/data/items.js";
 
 type Action = "buy" | "sell";
 
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
   const { characterId, action, itemKey, quantity } = body as { characterId?: string; action?: Action; itemKey?: string; quantity?: number };
   if (!characterId || !action || !itemKey) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   const qty = Math.max(1, Math.min(999, Math.floor(Number.isFinite(Number(quantity)) ? Number(quantity) : 1)));
-  const item = itemByKey[itemKey];
+  const item = (ITEM_DEFS as unknown as Record<string, { value?: number; buy?: number; sell?: number }>)[itemKey];
   if (!item) return NextResponse.json({ ok: false, error: "unknown item" }, { status: 400 });
   const ownerRows = await q<{ id: string; gold: number }>`select id, gold from "Character" where id = ${characterId} and userid = ${session.userId}`;
   const owner = ownerRows[0];
