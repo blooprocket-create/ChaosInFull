@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterStatColumns, ensureCharacterDefenseColumn, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
+import { q, ensurePgcrypto, ensureCharacterTable, ensureCharacterStatColumns, ensureCharacterDefenseColumn, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterRaceColumn } from "@/src/lib/db";
 import { computeInitialCharacterData } from "@/src/lib/characterInit";
 
 export async function GET() {
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     await ensurePgcrypto();
   await ensureCharacterTable();
-  await ensureCharacterExtraColumns();
+  await ensureCharacterRaceColumn();
   await ensureCharacterStatColumns();
   await ensureCharacterDefenseColumn();
   await ensureItemStackTable();
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   // Create character with default values
   // Use 'data' JSONB column for flexible storage of any character fields
   type Created = { id: string; name: string; class: string; level: number };
-  const initialData = computeInitialCharacterData({ race, weapon });
+  const initialData = computeInitialCharacterData({ race, className: klass, weapon });
     
     // Detect presence of legacy columns and insert accordingly to avoid "column does not exist" or NOT NULL violations
     const presentCols = await q<{ column_name: string }>`
@@ -87,17 +87,14 @@ export async function POST(req: Request) {
       }
       return { str: 1, int: 1, agi: 1, luk: 1 };
     })();
-  // Build JSONB payload (optionally excluding stats if columns exist)
-  const dataWithoutStats: Record<string, unknown> = { ...initialData };
-  delete (dataWithoutStats as { stats?: unknown }).stats;
+  // Extract derived stats for insertion into dedicated columns
 
     if (hasRace && hasStats && hasDefense) {
       const createdRows = await q<Created>`
         insert into "Character" (
-          id, userid, name, class, race, str, int, agi, luk, defense, data
+          id, userid, name, class, race, str, int, agi, luk, defense
         ) values (
-          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0,
-          ${JSON.stringify(dataWithoutStats)}::jsonb
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0
         )
         returning id, name, class, level
       `;
@@ -105,10 +102,9 @@ export async function POST(req: Request) {
     } else if (hasStats && hasDefense && !hasRace) {
       const createdRows = await q<Created>`
         insert into "Character" (
-          id, userid, name, class, str, int, agi, luk, defense, data
+          id, userid, name, class, str, int, agi, luk, defense
         ) values (
-          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0,
-          ${JSON.stringify(dataWithoutStats)}::jsonb
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0
         )
         returning id, name, class, level
       `;
@@ -116,10 +112,9 @@ export async function POST(req: Request) {
     } else if (hasRace && !hasStats) {
       const createdRows = await q<Created>`
         insert into "Character" (
-          id, userid, name, class, race, data
+          id, userid, name, class, race
         ) values (
-          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race},
-          ${JSON.stringify(dataWithoutStats)}::jsonb
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}
         )
         returning id, name, class, level
       `;
@@ -127,10 +122,9 @@ export async function POST(req: Request) {
     } else {
       const createdRows = await q<Created>`
         insert into "Character" (
-          id, userid, name, class, data
+          id, userid, name, class
         ) values (
-          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass},
-          ${JSON.stringify(dataWithoutStats)}::jsonb
+          gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}
         )
         returning id, name, class, level
       `;

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterSkillExpColumns } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterSkillExpColumns, ensureCharacterRaceColumn, ensureCharacterStatColumns } from "@/src/lib/db";
 import { deriveSkillProgressFromExp } from "@/src/lib/skills";
+import { computeRaceStats } from "@/src/lib/races";
+import { computeClassStats, combineRaceClass } from "@/src/lib/classes";
 
 // Increment skill XP for a character. For now we support 'mining'.
 // POST { characterId: string, skill: 'mining', amount: number }
@@ -18,6 +20,8 @@ export async function POST(req: Request) {
 
   await ensureCharacterTable();
   await ensureCharacterSkillExpColumns();
+  await ensureCharacterRaceColumn();
+  await ensureCharacterStatColumns();
 
   // Ownership check and atomic increment
   try {
@@ -25,19 +29,32 @@ export async function POST(req: Request) {
     switch (skill) {
       case 'character':
       case 'char': {
-        // Update core character experience and derive new level; write both
-        const rows = await q<{ val: string }>`
+        // Atomically increment char_exp and fetch race for stat scaling
+        const rows = await q<{ val: string; race: string | null; class: string }>`
           update "Character"
           set char_exp = GREATEST(0, COALESCE(char_exp, 0) + ${amount})
           where id = ${characterId} and userid = ${session.userId}
-          returning char_exp::text as val
+          returning char_exp::text as val, race, class
         `;
         if (!rows.length) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
         const totalExp = Number(rows[0].val || 0);
         const prog = deriveSkillProgressFromExp(totalExp);
-        // Persist derived level to the level column
-        await q`update "Character" set level = ${prog.level} where id = ${characterId} and userid = ${session.userId}`;
-        return NextResponse.json({ ok: true, skill: 'character', progress: prog, level: prog.level });
+        // Derive new base stats from race definition (base + perLevel * (level-1))
+        const race = rows[0].race;
+        const klass = rows[0].class;
+        const raceStats = computeRaceStats(race, prog.level);
+        const classStats = computeClassStats(klass, prog.level);
+        const combined = combineRaceClass(raceStats, classStats);
+        // Round down to integers for DB columns
+        const stats = {
+          str: Math.floor(combined.str),
+          int: Math.floor(combined.int),
+          agi: Math.floor(combined.agi),
+          luk: Math.floor(combined.luk)
+        };
+        // Persist level and recalculated stats
+        await q`update "Character" set level = ${prog.level}, str = ${stats.str}, int = ${stats.int}, agi = ${stats.agi}, luk = ${stats.luk} where id = ${characterId} and userid = ${session.userId}`;
+        return NextResponse.json({ ok: true, skill: 'character', progress: prog, level: prog.level, stats });
       }
       case 'mining':
         updated = await q<{ val: number }>`

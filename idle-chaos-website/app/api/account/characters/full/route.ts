@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn } from "@/src/lib/db";
 import { deriveSkillProgressFromExp } from "@/src/lib/skills";
 
 // Fetch a full hydrated character snapshot (core row + inventory stacks + quests).
@@ -15,7 +15,6 @@ export async function GET(req: Request) {
   if (!characterId) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
 
   await ensureCharacterTable();
-  await ensureCharacterExtraColumns();
   await ensureItemStackTable();
   await ensureCharacterQuestTable();
   await ensureCharacterSkillExpColumns();
@@ -26,12 +25,11 @@ export async function GET(req: Request) {
   // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
     id: string; name: string; class: string; level: number; gold?: number;
-    data: Record<string, unknown>;
     mining_exp?: number; woodcutting_exp?: number; fishing_exp?: number; cooking_exp?: number; smithing_exp?: number;
     equipment?: Record<string, unknown>;
     talents?: Record<string, unknown>;
   }>`
-    select id, name, class, level, gold, data,
+    select id, name, class, level, gold,
            coalesce(mining_exp, 0) as mining_exp,
            coalesce(woodcutting_exp, 0) as woodcutting_exp,
            coalesce(fishing_exp, 0) as fishing_exp,
@@ -45,11 +43,8 @@ export async function GET(req: Request) {
   `;
   if (!rows.length) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   const c = rows[0];
-  
-  // All character state comes from the flexible JSONB data column
-  const characterData = c.data || {};
-  const equipment = (c.equipment && typeof c.equipment === 'object') ? c.equipment : ((characterData as Record<string, unknown>).equipment || null);
-  const talents = (c.talents && typeof c.talents === 'object') ? c.talents : ((characterData as Record<string, unknown>).talents || null);
+  const equipment = (c.equipment && typeof c.equipment === 'object') ? c.equipment : null;
+  const talents = (c.talents && typeof c.talents === 'object') ? c.talents : null;
   // Derive skill progress from raw exp columns (preferred over any JSONB blocks)
   const mining = deriveSkillProgressFromExp(Number(c.mining_exp || 0));
   const woodcutting = deriveSkillProgressFromExp(Number(c.woodcutting_exp || 0));
@@ -82,9 +77,7 @@ export async function GET(req: Request) {
       name: c.name,
       class: c.class,
       level: c.level,
-  // Spread ALL data from JSONB column - includes everything your JS sent (excluding server-authoritative columns)
-  ...characterData,
-  gold: typeof c.gold === 'number' ? c.gold : (typeof (characterData as Record<string,unknown>).gold === 'number' ? (characterData as Record<string,unknown>).gold : 0),
+      gold: typeof c.gold === 'number' ? c.gold : 0,
       // Prefer dedicated equipment column if present
       ...(equipment ? { equipment } : {}),
     // Prefer dedicated talents column if present

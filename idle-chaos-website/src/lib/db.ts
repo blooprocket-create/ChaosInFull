@@ -182,6 +182,20 @@ export async function ensureCharacterStatColumns() {
   }
 }
 
+// Ensure a dedicated race column (text) for characters
+let characterRaceColChecked = false;
+export async function ensureCharacterRaceColumn() {
+  if (characterRaceColChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`alter table "Character" add column if not exists race text`;
+  } catch {
+    // ignore
+  } finally {
+    characterRaceColChecked = true;
+  }
+}
+
 // Optional: ensure a dedicated defense column (default 0)
 let characterDefenseColChecked = false;
 export async function ensureCharacterDefenseColumn() {
