@@ -8,6 +8,33 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-11-11",
+    version: "0.0.22",
+    title: "Global User Settings: server-backed preferences, client hydration, and API",
+    highlights: [
+      "New API: /api/account/settings (GET/PATCH/PUT) to load and save user preferences",
+      "Schema auto-provision: 'User.settings' JSONB column ensured on demand (no manual migration)",
+      "Settings modal now persists globally across characters — saves to server and hydrates on boot",
+      "Client bridge gains loadUserSettings/saveUserSettingsPatch; window.__game_settings stays authoritative",
+      "'settings:changed' event broadcasts to scenes/UI for immediate re-apply (volumes, always run, range indicator)",
+      "Input sanitation + clamping: volumes 0..1, thresholds 1..99; unknown keys ignored",
+      "Character position persistence hardening: COALESCE protects lastX/lastY when only scene patches; portal and HUD 'Return' now persist scene + coords before switching",
+      "Quality: removed explicit any casts and fixed short-circuit call to satisfy lint rules; quick typecheck/lint pass"
+    ],
+    notes: [
+      "Allowed settings keys (extendable): musicVolume, sfxVolume, alwaysRun, showAtkRange, autoUseHP (+Threshold), autoUseMana (+Threshold).",
+      "PATCH shallow-merges sanitized values into existing settings; PUT replaces the entire object (sanitized).",
+      "On client boot, settings hydrate from server (if authenticated) and merge over localStorage; local remains an offline fallback.",
+      "Saving inside the Settings modal updates localStorage, posts a PATCH, updates window.__game_settings, and dispatches 'settings:changed'.",
+      "Scenes can listen for 'settings:changed' to re-apply volumes and toggles; background music volume is adjusted immediately.",
+      "DB helper: ensureUserSettingsColumn() adds the JSONB column with default '{}' — no separate migration step.",
+      "Character patch route: positional update preserves unspecified fields and avoids nulling coordinates during portal transitions.",
+      "HUD enhancement: 'Return to Character Select' patches current scene and coordinates prior to scene handover to prevent stale spawns.",
+      "Type/Lint: Extended Window typing with __game_settings to avoid any; replaced onSkillLevelUp short-circuit call with an if-guard.",
+      "Developer ergonomics: persistence bridge gains strongly-typed methods and telemetry events for settings and XP batching."
+    ]
+  },
+  {
     date: "2025-11-08",
     version: "0.0.21",
     title: "Harborwright Finn, Fishing Mastery Tree, Dock Repair Questline & Hotspot Economy",
