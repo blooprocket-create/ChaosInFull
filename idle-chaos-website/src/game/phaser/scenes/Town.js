@@ -857,7 +857,8 @@ export class Town extends Phaser.Scene {
         }
         window.__cif_persist.shopTransaction(String(charId), 'buy', itemId, qty).then((res) => {
             if (!res || !res.ok) {
-                this._showToast(res?.error === 'insufficient gold' ? 'Not enough gold' : 'Purchase failed');
+                const msg = (res && res.message) ? res.message : (res?.error === 'insufficient gold' ? 'Not enough gold' : 'Purchase failed');
+                this._showToast(msg);
                 return;
             }
             // Update local gold
@@ -900,7 +901,8 @@ export class Town extends Phaser.Scene {
         }
         window.__cif_persist.shopTransaction(String(charId), 'sell', itemId, qty).then((res) => {
             if (!res || !res.ok) {
-                this._showToast(res?.error === 'insufficient items' ? 'Not enough items' : 'Sell failed');
+                const msg = (res && res.message) ? res.message : (res?.error === 'insufficient items' ? 'Not enough items' : 'Sell failed');
+                this._showToast(msg);
                 return;
             }
             if (typeof res.gold === 'number') this.char.gold = res.gold;

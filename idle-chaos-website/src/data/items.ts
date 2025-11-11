@@ -4,13 +4,18 @@
 export type ItemDef = {
   key: string;
   name: string;
-  buy: number; // purchase price
-  sell: number; // sell price
+  // Canonical base value used for price derivation in UI and server.
+  // Buy price = floor(value * 1.1), Sell price = floor(value * 0.8)
+  value?: number;
+  // Legacy explicit prices. If provided and value is missing, server falls back to these.
+  buy?: number; // purchase price
+  sell?: number; // sell price
   category?: string; // optional categorization for UI badges
 };
 
 // NOTE: Prices & categories are placeholder; adjust for balancing.
 export const items: ItemDef[] = [ 
+  // Legacy items with explicit prices (no base value available at the time)
   { key: 'slime_goop', name: 'Slime Goop', buy: 12, sell: 2, category: 'material' },
   { key: 'slime_gel', name: 'Slime Gel', buy: 14, sell: 3, category: 'material' },
   { key: 'slime_core', name: 'Slime Core', buy: 75, sell: 15, category: 'material' },
@@ -32,6 +37,16 @@ export const items: ItemDef[] = [
   { key: 'shadow_essence', name: 'Shadow Essence', buy: 160, sell: 40, category: 'material' },
   { key: 'slime_crown_shard', name: 'Slime Crown Shard', buy: 300, sell: 75, category: 'material' },
   { key: 'strange_slime_egg', name: 'Strange Slime Egg', buy: 500, sell: 125, category: 'material' },
+
+  // Shop items used by Town scene — use value so UI/server derive the same price
+  { key: 'copper_pickaxe', name: 'Copper Pickaxe', value: 50, category: 'tool' }, // buy 143, sell 104
+  { key: 'copper_hatchet', name: 'Copper Hatchet', value: 50, category: 'tool' }, // buy 132, sell 96
+  { key: 'basic_rod', name: 'Basic Rod', value: 40, category: 'tool' }, // buy 110, sell 80
+  { key: 'rusty_rod', name: 'Rusty Rod', value: 20, category: 'tool' }, 
+  { key: 'good_rod', name: 'Good Rod', value: 120, category: 'tool' }, 
+  { key: 'twisted_dagger', name: 'Twisted Dagger', value: 2600, category: 'weapon' }, 
+  { key: 'bronze_polearm', name: 'Bronze Polearm', value: 350, category: 'weapon' }, 
+  { key: 'basic_bow', name: 'Basic Bow', value: 130, category: 'weapon' }, 
 ];
 
 export const itemByKey: Record<string, ItemDef> = Object.fromEntries(items.map(i => [i.key, i]));

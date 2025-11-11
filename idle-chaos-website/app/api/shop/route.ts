@@ -21,12 +21,21 @@ export async function POST(req: Request) {
   await ensureCharacterTable();
   await ensureCharacterGoldColumn();
   await ensureItemStackTable();
-  const rawPrice = action === "buy" ? item.buy : item.sell;
+  // Derive canonical price to match UI logic when base value is present
+  let rawPrice: number | undefined = undefined;
+  const baseValue = (item as unknown as { value?: number }).value;
+  if (typeof baseValue === 'number' && Number.isFinite(baseValue) && baseValue >= 0) {
+    rawPrice = action === 'buy' ? Math.floor(baseValue * 1.1) : Math.floor(baseValue * 0.8);
+  } else {
+    // Fallback to legacy explicit prices if no base value is defined
+    const explicit = action === 'buy' ? (item as unknown as { buy?: number }).buy : (item as unknown as { sell?: number }).sell;
+    if (typeof explicit === 'number' && Number.isFinite(explicit) && explicit >= 0) rawPrice = Math.floor(explicit);
+  }
   // Validate presence of price; guard against undefined leading to NaN math
   if (typeof rawPrice !== 'number' || !Number.isFinite(rawPrice) || rawPrice < 0) {
     return NextResponse.json({ ok: false, error: "unpriced item", message: `No ${action} price configured for ${itemKey}` }, { status: 400 });
   }
-  const price = Math.floor(rawPrice);
+  const price = rawPrice;
   const deltaGold = price * qty * (action === "buy" ? -1 : 1);
   // Pre-check current counts and gold
   const currentStacks = await q<{ count: number }>`
