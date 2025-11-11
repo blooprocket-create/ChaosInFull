@@ -311,6 +311,7 @@ export class Town extends Phaser.Scene {
         'twisted_dagger',
         'bronze_polearm',
         'basic_bow',
+        'iron_bar',
     ];
     // smithing skill on character
     if (!this.char.smithing) this.char.smithing = { level: 1, exp: 0, expToLevel: 100 };
