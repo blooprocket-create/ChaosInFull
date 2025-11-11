@@ -1,5 +1,5 @@
 import { checkClassLevelUps } from './stats.js';
-import { persistCharacter } from './persistence.js';
+import { persistCharacter, syncInventoryToServer } from './persistence.js';
 import { getTalentDefById, ensureCharTalents, computeTalentModifiers } from '../../data/talents.js';
 import { bindSkillBarKeys, unbindSkillBarKeys, bindTalentKey, unbindTalentKey, refreshSkillBarHUD, maybeAutoUsePotions } from './ui.js';
 import { setCircleCentered, setBodySizeCentered } from '../../shared/physicsHelpers.js';
@@ -1417,7 +1417,13 @@ function sharedRollDrops(def) {
                     goldAwarded = Math.max(0, Math.round(goldAwarded * (1 + (goldGainPct / 100))));
                 }
             } catch (e) {}
-            try { this.char.gold = (this.char.gold || 0) + goldAwarded; } catch (e) { /* ignore */ }
+            try {
+                // Update local value for immediate UI, then persist to DB via patch route
+                this.char.gold = (this.char.gold || 0) + goldAwarded;
+                if (this.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                    window.__cif_persist.saveCharacterPatch(String(this.char.id), { gold: Math.max(0, Math.floor(this.char.gold || 0)) });
+                }
+            } catch (e) { /* ignore */ }
         }
     }
 
@@ -1442,6 +1448,8 @@ function sharedAddItemToInventory(itemId, qty = 1) {
     if (window && window.__shared_ui && window.__shared_ui.addItemToInventory) {
         const added = window.__shared_ui.addItemToInventory(this, itemId, qty);
         if (!added && this._showToast) this._showToast('Inventory full');
+        // Persist inventory snapshot to DB (ItemStack) after successful add
+        try { if (added) syncInventoryToServer(this); } catch (e) {}
     } else {
         const inv = this.char.inventory = this.char.inventory || [];
         if (def && def.stackable) {
@@ -1451,6 +1459,8 @@ function sharedAddItemToInventory(itemId, qty = 1) {
         } else {
             for (let i = 0; i < qty; i++) inv.push({ id: itemId, name: (def && def.name) || itemId, qty: 1 });
         }
+        // Persist inventory snapshot when using local fallback path
+        try { syncInventoryToServer(this); } catch (e) {}
     }
 
     if (window && window.__shared_ui && window.__shared_ui.refreshInventoryModal && this._inventoryModal) {
@@ -1471,7 +1481,15 @@ function sharedGainExperience(amount) {
             finalAmount = amount * (1 + bonusPct / 100) + bonusFlat;
         }
     } catch (e) {}
-    this.char.exp = (this.char.exp || 0) + finalAmount;
+    // Send to server (authoritative). We'll also bump local exp for responsiveness; server sync will correct if needed.
+    try {
+        if (this.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+            window.__cif_persist.queueSkillXp(String(this.char.id), 'character', Math.max(1, Math.floor(finalAmount)));
+        }
+    } catch (e) {}
+    try {
+        this.char.exp = (this.char.exp || 0) + finalAmount;
+    } catch (e) {}
     const leveled = checkClassLevelUps(this);
     if (leveled && this._showToast) this._showToast('Level up!', 1800);
 }

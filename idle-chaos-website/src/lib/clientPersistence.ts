@@ -49,6 +49,7 @@ declare global {
     };
     __skillXpQueue?: Record<string, number>;
     __skillXpFlushTimer?: number | null;
+    __inventorySync?: Record<string, { inflight: Promise<Record<string, number>> | null; pending: Record<string, number> | null }>;
   }
 }
 
@@ -266,14 +267,68 @@ function installPersistenceBridge() {
     async saveInventory(characterId, items) {
       if (!characterId) return items; // no character context yet (login / character select scenes)
       if (window.__persistFlags?.disableServerWrites) return items;
-      // POST inventory snapshot
-      const res = await fetchJSON<{ ok: boolean; items?: Record<string, number> }>(
-        '/api/account/characters/inventory',
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ characterId, items }) }
-      );
-      if (res?.ok) emitTelemetry('inventory_sync_success', { characterId, itemCount: Object.keys(items).length });
-      else emitTelemetry('inventory_sync_fail', { characterId });
-      return res?.items || items;
+      // Sanitize counts to finite non-negative integers before sending
+      const sanitized: Record<string, number> = {};
+      try {
+        for (const [k, v] of Object.entries(items || {})) {
+          const n = Number(v);
+          if (!Number.isFinite(n)) continue;
+          const iv = Math.max(0, Math.floor(n));
+          if (iv > 0) sanitized[k] = iv;
+        }
+      } catch {}
+      // Coalesce concurrent saves per-character to reduce race conditions
+      window.__inventorySync = window.__inventorySync || {};
+      const state = window.__inventorySync[characterId] || { inflight: null, pending: null };
+      window.__inventorySync[characterId] = state;
+
+      // Helper to perform the POST
+      const doPost = async (payload: Record<string, number>): Promise<Record<string, number>> => {
+        try {
+          const res = await fetch('/api/account/characters/inventory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ characterId, items: payload })
+          });
+          const data = await res.json().catch(() => null) as { ok?: boolean; items?: Record<string, number>; error?: string; message?: string } | null;
+          if (res.ok && data?.ok) {
+            emitTelemetry('inventory_sync_success', { characterId, itemCount: Object.keys(payload).length });
+            return data.items || payload;
+          }
+          const errMsg = data?.message || `status_${res.status}`;
+          console.error('[inventory] sync failed', { characterId, err: errMsg, error: data?.error, items: Object.keys(payload).length });
+          emitTelemetry('inventory_sync_fail', { characterId, status: res.status, error: data?.error, message: data?.message });
+          return payload;
+        } catch {
+          console.error('[inventory] sync network error', { characterId });
+          emitTelemetry('inventory_sync_fail', { characterId, network: true });
+          return payload;
+        }
+      };
+
+      // If a request is inflight, queue the latest payload and wait, then send the queued one
+      if (state.inflight) {
+        state.pending = { ...sanitized };
+        try { await state.inflight; } catch {}
+        const pending = state.pending; state.pending = null;
+        state.inflight = doPost(pending || sanitized);
+        try { const result = await state.inflight; return result; } finally { state.inflight = null; }
+      }
+
+      // No inflight request: send now
+      state.inflight = doPost(sanitized);
+      try {
+        const result = await state.inflight;
+        // If something was queued during the request, send the final snapshot
+        if (state.pending) {
+          const pending = state.pending; state.pending = null;
+          state.inflight = doPost(pending);
+          const res2 = await state.inflight; return res2;
+        }
+        return result;
+      } finally {
+        state.inflight = null;
+      }
     },
     async loadInventory(characterId) {
       try {

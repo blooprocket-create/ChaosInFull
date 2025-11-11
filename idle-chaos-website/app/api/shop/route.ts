@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const { characterId, action, itemKey, quantity } = body as { characterId?: string; action?: Action; itemKey?: string; quantity?: number };
   if (!characterId || !action || !itemKey) return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
-  const qty = Math.max(1, Math.min(999, Math.floor(quantity ?? 1)));
+  const qty = Math.max(1, Math.min(999, Math.floor(Number.isFinite(Number(quantity)) ? Number(quantity) : 1)));
   const item = itemByKey[itemKey];
   if (!item) return NextResponse.json({ ok: false, error: "unknown item" }, { status: 400 });
   const ownerRows = await q<{ id: string; gold: number }>`select id, gold from "Character" where id = ${characterId} and userid = ${session.userId}`;
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const rawPrice = action === "buy" ? item.buy : item.sell;
   // Validate presence of price; guard against undefined leading to NaN math
   if (typeof rawPrice !== 'number' || !Number.isFinite(rawPrice) || rawPrice < 0) {
-    return NextResponse.json({ ok: false, error: "unpriced item" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "unpriced item", message: `No ${action} price configured for ${itemKey}` }, { status: 400 });
   }
   const price = Math.floor(rawPrice);
   const deltaGold = price * qty * (action === "buy" ? -1 : 1);
@@ -39,20 +39,38 @@ export async function POST(req: Request) {
   const nextCount = Math.max(0, currentCount + (action === "buy" ? qty : -qty));
   // Apply updates atomically inside a transaction to avoid partial state on failure
   try {
-    await (sql as any).begin(async (tx: typeof sql) => {
-      await tx`update "Character" set gold = ${newGold} where id = ${characterId}`;
+    const beginMaybe = (sql as any)?.begin;
+    const beginFn: ((cb: (tx: typeof sql) => Promise<void>) => Promise<void>) | undefined =
+      typeof beginMaybe === 'function' ? (beginMaybe as (cb: (tx: typeof sql) => Promise<void>) => Promise<void>) : undefined;
+    if (beginFn) {
+      await beginFn(async (tx: typeof sql) => {
+        await tx`update "Character" set gold = ${newGold} where id = ${characterId}`;
+        if (nextCount <= 0) {
+          await tx`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
+        } else {
+          await tx`
+            insert into "ItemStack" (characterid, itemkey, count)
+            values (${characterId}, ${itemKey}, ${nextCount})
+            on conflict (characterid, itemkey) do update set count = excluded.count
+          `;
+        }
+      });
+    } else {
+      // Fallback: best-effort non-transactional update
+      await q`update "Character" set gold = ${newGold} where id = ${characterId}`;
       if (nextCount <= 0) {
-        await tx`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
+        await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
       } else {
-        await tx`
+        await q`
           insert into "ItemStack" (characterid, itemkey, count)
           values (${characterId}, ${itemKey}, ${nextCount})
           on conflict (characterid, itemkey) do update set count = excluded.count
         `;
       }
-    });
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error('[shop] transaction failed', { characterId, action, itemKey, qty, error: message });
     return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
   }
   return NextResponse.json({ ok: true, gold: newGold, itemKey, count: nextCount, qty });

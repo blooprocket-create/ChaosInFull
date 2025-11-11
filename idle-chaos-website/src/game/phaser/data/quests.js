@@ -659,6 +659,14 @@ export function updateQuestProgress(character, type, target, amount = 1) {
 
 function applyCharacterExperience(character, amount) {
     if (!character || !amount) return false;
+    try {
+        if (typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function' && character.id) {
+            // Award server-authoritative character XP; server derives and persists level
+            window.__cif_persist.queueSkillXp(String(character.id), 'character', Math.max(1, Math.floor(amount)));
+            return true; // treat as leveled potentially; UI will refresh on progress event
+        }
+    } catch (e) { /* ignore */ }
+    // Fallback local progression if server bridge is unavailable
     let leveled = false;
     character.exp = (character.exp || 0) + amount;
     character.expToLevel = character.expToLevel || 100;
