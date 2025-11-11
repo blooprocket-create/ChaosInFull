@@ -716,7 +716,7 @@ export class GraveForest extends Phaser.Scene {
     _hideWoodcuttingIndicator() { if (this._woodcuttingIndicator) { this._woodcuttingIndicator.destroy(); this._woodcuttingIndicator = null; } }
 
     _getWoodcuttingSnapshot() {
-        const wood = this.char.woodcutting = this.char.woodcutting || { level: 1, exp: 0, expToLevel: 100 };
+    const wood = this.char.woodcutting = this.char.woodcutting || { level: 1, exp: 0, expToLevel: 100 };
         const statsHelper = (window && window.__shared_ui && window.__shared_ui.stats && typeof window.__shared_ui.stats.effectiveStats === 'function')
             ? window.__shared_ui.stats.effectiveStats
             : null;
@@ -1021,7 +1021,11 @@ export class GraveForest extends Phaser.Scene {
             } catch (e) {}
 
             const xpGain = Math.max(1, Math.round(baseExp * multiplier));
-            wood.exp = (wood.exp || 0) + xpGain;
+            if (this.char.id && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+                window.__cif_persist.queueSkillXp(this.char.id, 'woodcutting', xpGain);
+            } else {
+                wood.exp = (wood.exp || 0) + xpGain; // fallback local
+            }
             this._showToast(`You chopped ${quantity}x ${itemName}! (+${xpGain} woodcutting XP)`);
             this._playWoodSwingEffect(node, true);
             if (multiplier > 1 && node.sprite) {
@@ -1030,7 +1034,11 @@ export class GraveForest extends Phaser.Scene {
             try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
         } else {
             const failExp = (node.failExp != null) ? node.failExp : Math.max(1, Math.round(baseExp * 0.3));
-            wood.exp = (wood.exp || 0) + failExp;
+            if (this.char.id && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+                window.__cif_persist.queueSkillXp(this.char.id, 'woodcutting', failExp);
+            } else {
+                wood.exp = (wood.exp || 0) + failExp; // fallback
+            }
             const deficit = Math.max(0, Math.ceil(requiredEff - snapshot.efficiency));
             if (deficit > 0) this._showToast(`The trunk is too tough (need +${deficit} efficiency). (+${failExp} woodcutting XP)`);
             else this._showToast(`You swing and miss the sweet spot. (+${failExp} woodcutting XP)`);
@@ -1038,13 +1046,16 @@ export class GraveForest extends Phaser.Scene {
             try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
         }
 
-        while (wood.exp >= wood.expToLevel) {
-            wood.exp -= wood.expToLevel;
-            wood.level = (wood.level || 1) + 1;
-            wood.expToLevel = Math.floor(wood.expToLevel * 1.25);
-            this._showToast('Woodcutting level up! L' + wood.level, 2200);
-            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
-            try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'woodcutting', 1); } catch (e) {}
+        // Level progression handled server-side when queue flushes; fallback only if local exp mutated above
+        if (!this.char.id || !(window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function')) {
+            while (wood.exp >= wood.expToLevel) {
+                wood.exp -= wood.expToLevel;
+                wood.level = (wood.level || 1) + 1;
+                wood.expToLevel = Math.floor(wood.expToLevel * 1.25);
+                this._showToast('Woodcutting level up! L' + wood.level, 2200);
+                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+                try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'woodcutting', 1); } catch (e) {}
+            }
         }
 
         this.char.woodcutting = wood;

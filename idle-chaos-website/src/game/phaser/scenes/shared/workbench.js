@@ -669,20 +669,26 @@ function beginCraft(scene, recipe) {
     if (window && window.__shared_ui && window.__shared_ui.updateQuestProgressAndCheckCompletion) {
         window.__shared_ui.updateQuestProgressAndCheckCompletion(scene, 'craft', recipe.id, 1);
     }
-    scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-        scene.char.smithing.exp = (scene.char.smithing.exp || 0) + (recipe.smithingXp || 0);
-        while (scene.char.smithing.exp >= scene.char.smithing.expToLevel) {
-            scene.char.smithing.exp -= scene.char.smithing.expToLevel;
-            scene.char.smithing.level = (scene.char.smithing.level || 1) + 1;
-            scene.char.smithing.expToLevel = Math.floor(scene.char.smithing.expToLevel * 1.25);
-            try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'smithing', 1); } catch (e) { /* ignore */ }
-            scene._showToast?.('Smithing level up! L' + scene.char.smithing.level, 1800);
-        }
-        try {
-            if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) {
-                window.__shared_ui.refreshStatsModal(scene);
+        const smithXp = recipe.smithingXp || 0;
+        if (scene.char.id && smithXp > 0 && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+            window.__cif_persist.queueSkillXp(scene.char.id, 'smithing', smithXp);
+        } else if (smithXp > 0) {
+            // Fallback local progression
+            scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+            scene.char.smithing.exp = (scene.char.smithing.exp || 0) + smithXp;
+            while (scene.char.smithing.exp >= scene.char.smithing.expToLevel) {
+                scene.char.smithing.exp -= scene.char.smithing.expToLevel;
+                scene.char.smithing.level = (scene.char.smithing.level || 1) + 1;
+                scene.char.smithing.expToLevel = Math.floor(scene.char.smithing.expToLevel * 1.25);
+                try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'smithing', 1); } catch (e) { /* ignore */ }
+                scene._showToast?.('Smithing level up! L' + scene.char.smithing.level, 1800);
             }
-        } catch (_) {}
+            try {
+                if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) {
+                    window.__shared_ui.refreshStatsModal(scene);
+                }
+            } catch (_) {}
+        }
         const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
         if (scene._persistCharacter) scene._persistCharacter(username);
         if (scene._inventoryModal) scene._refreshInventoryModal();

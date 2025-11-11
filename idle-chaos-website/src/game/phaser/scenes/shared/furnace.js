@@ -598,17 +598,22 @@ function smeltOnce(scene, recipe) {
         // Failed: don't add the product. Grant a fraction of cooking XP (if defined)
         try {
             if (recipe.cookingXp) {
-                const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
                 const partial = Math.max(1, Math.floor((recipe.cookingXp || 0) * 0.25));
-                cooking.exp = (cooking.exp || 0) + partial;
-                while (cooking.exp >= cooking.expToLevel) {
-                    cooking.exp -= cooking.expToLevel;
-                    cooking.level = (cooking.level || 1) + 1;
-                    cooking.expToLevel = Math.floor(cooking.expToLevel * 1.25);
-                    try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'cooking', 1); } catch (e) {}
-                    scene._showToast && scene._showToast(`Cooking level up! L${cooking.level}`, 1800);
+                if (scene.char.id && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+                    window.__cif_persist.queueSkillXp(scene.char.id, 'cooking', partial);
+                } else {
+                    // Fallback local progression
+                    const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
+                    cooking.exp = (cooking.exp || 0) + partial;
+                    while (cooking.exp >= cooking.expToLevel) {
+                        cooking.exp -= cooking.expToLevel;
+                        cooking.level = (cooking.level || 1) + 1;
+                        cooking.expToLevel = Math.floor(cooking.expToLevel * 1.25);
+                        try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'cooking', 1); } catch (e) {}
+                        scene._showToast && scene._showToast(`Cooking level up! L${cooking.level}`, 1800);
+                    }
+                    try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
                 }
-                try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
             }
         } catch (e) {}
         // On failure, if a burnt item exists (burnt_fish or burnt_meat), give it to player
@@ -634,14 +639,20 @@ function smeltOnce(scene, recipe) {
 
     // Award smithing XP if this is not a food recipe
     if (recipe.category !== 'food') {
-        const smithing = scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-        smithing.exp = (smithing.exp || 0) + (recipe.smithingXp || 0);
-        while (smithing.exp >= smithing.expToLevel) {
-            smithing.exp -= smithing.expToLevel;
-            smithing.level = (smithing.level || 1) + 1;
-            smithing.expToLevel = Math.floor(smithing.expToLevel * 1.25);
-            try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'smithing', 1); } catch (e) {}
-            scene._showToast && scene._showToast(`Smithing level up! L${smithing.level}`, 1800);
+        const smithingXp = recipe.smithingXp || 0;
+        if (scene.char.id && smithingXp > 0 && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+            window.__cif_persist.queueSkillXp(scene.char.id, 'smithing', smithingXp);
+        } else if (smithingXp > 0) {
+            // Fallback local progression
+            const smithing = scene.char.smithing = scene.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+            smithing.exp = (smithing.exp || 0) + smithingXp;
+            while (smithing.exp >= smithing.expToLevel) {
+                smithing.exp -= smithing.expToLevel;
+                smithing.level = (smithing.level || 1) + 1;
+                smithing.expToLevel = Math.floor(smithing.expToLevel * 1.25);
+                try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'smithing', 1); } catch (e) {}
+                scene._showToast && scene._showToast(`Smithing level up! L${smithing.level}`, 1800);
+            }
         }
         // Update quest progress for smelting
         updateQuestProgress(scene.char, 'smelt', prodId, 1);
@@ -650,16 +661,22 @@ function smeltOnce(scene, recipe) {
     // Award cooking XP for food recipes
     try {
         if (recipe.cookingXp) {
-            const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
-            cooking.exp = (cooking.exp || 0) + (recipe.cookingXp || 0);
-            while (cooking.exp >= cooking.expToLevel) {
-                cooking.exp -= cooking.expToLevel;
-                cooking.level = (cooking.level || 1) + 1;
-                cooking.expToLevel = Math.floor(cooking.expToLevel * 1.25);
-                try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'cooking', 1); } catch (e) {}
-                scene._showToast && scene._showToast(`Cooking level up! L${cooking.level}`, 1800);
+            const cookXp = recipe.cookingXp || 0;
+            if (scene.char.id && cookXp > 0 && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+                window.__cif_persist.queueSkillXp(scene.char.id, 'cooking', cookXp);
+            } else if (cookXp > 0) {
+                // Fallback local progression
+                const cooking = scene.char.cooking = scene.char.cooking || { level: 1, exp: 0, expToLevel: 100 };
+                cooking.exp = (cooking.exp || 0) + cookXp;
+                while (cooking.exp >= cooking.expToLevel) {
+                    cooking.exp -= cooking.expToLevel;
+                    cooking.level = (cooking.level || 1) + 1;
+                    cooking.expToLevel = Math.floor(cooking.expToLevel * 1.25);
+                    try { onSkillLevelUp && onSkillLevelUp(scene, scene.char, 'cooking', 1); } catch (e) {}
+                    scene._showToast && scene._showToast(`Cooking level up! L${cooking.level}`, 1800);
+                }
+                try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
             }
-            try { if (scene._statsModal && window && window.__shared_ui && window.__shared_ui.refreshStatsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
             // Update quest progress for cooking
             updateQuestProgress(scene.char, 'cook', prodId, 1);
         }

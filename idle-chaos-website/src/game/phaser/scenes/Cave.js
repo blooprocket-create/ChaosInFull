@@ -1235,19 +1235,28 @@ export class Cave extends Phaser.Scene {
             const newQty = (find(prodId) && find(prodId).qty) || 1;
         this._showToast(`Smelted 1x ${(prodDef && prodDef.name) || recipe.name}! (${newQty} total)`);
     // award smithing XP
-    this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
-    this.char.smithing.exp = (this.char.smithing.exp || 0) + (recipe.smithingXp || 0);
-    // refresh stats modal if open (smithing xp shown in skills)
-    try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) { /* ignore */ }
-        if (this.char.smithing) {
-            while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
-                this.char.smithing.exp -= this.char.smithing.expToLevel;
-                this.char.smithing.level = (this.char.smithing.level || 1) + 1;
-                this.char.smithing.expToLevel = Math.floor(this.char.smithing.expToLevel * 1.25);
-                try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'smithing', 1); } catch (e) {}
-                this._showToast('Smithing level up! L' + this.char.smithing.level, 1800);
+    // Server-authoritative smithing XP grant
+    const smithingXp = recipe.smithingXp || 0;
+    if (this.char.id && smithingXp > 0 && window.__cif_persist && typeof window.__cif_persist.grantSkillXp === 'function') {
+        window.__cif_persist.grantSkillXp(this.char.id, 'smithing', smithingXp).then(progress => {
+            if (progress) {
+                this.char.smithing = progress;
+                try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'smithing', 0); } catch (e) {}
+                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch(e) {}
+            } else {
+                // Fallback local progression if server call failed
+                this.char.smithing = this.char.smithing || { level: 1, exp: 0, expToLevel: 100 };
+                this.char.smithing.exp = (this.char.smithing.exp || 0) + smithingXp;
+                while (this.char.smithing.exp >= this.char.smithing.expToLevel) {
+                    this.char.smithing.exp -= this.char.smithing.expToLevel;
+                    this.char.smithing.level = (this.char.smithing.level || 1) + 1;
+                    this.char.smithing.expToLevel = Math.floor(this.char.smithing.expToLevel * 1.25);
+                    try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'smithing', 1); } catch (e) {}
+                    this._showToast('Smithing level up! L' + this.char.smithing.level, 1800);
+                }
             }
-        }
+        });
+    }
         this._persistCharacter((this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null);
         // Avoid recreating HUD every tick; refresh modal and inventory UI only
         this._refreshCaveFurnaceModal();
@@ -1542,7 +1551,13 @@ export class Cave extends Phaser.Scene {
             }
         } catch (e) {}
         
-        mining.exp = (mining.exp || 0) + xpGain;
+        // Server-authoritative mining XP grant
+        if (this.char.id && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
+            // Batch frequent mining ticks to avoid spamming the server
+            window.__cif_persist.queueSkillXp(this.char.id, 'mining', xpGain);
+        } else {
+            mining.exp = (mining.exp || 0) + xpGain;
+        }
 
         // Deplete node health
         node.currentHealth = (node.currentHealth || node.maxHealth) - 1;
@@ -1564,13 +1579,15 @@ export class Cave extends Phaser.Scene {
         try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
 
         // Check for level ups
-        while (mining.exp >= mining.expToLevel) {
-            mining.exp -= mining.expToLevel;
-            mining.level = (mining.level || 1) + 1;
-            mining.expToLevel = Math.floor(mining.expToLevel * 1.25);
-            this._showToast('Mining level up! L' + mining.level, 2200);
-            try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'mining', 1); } catch (e) {}
-            try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && this._statsModal) window.__shared_ui.refreshStatsModal(this); } catch (e) {}
+        // Level-up handled server-side when queue flushes; fallback only if local progression used above
+        if (!this.char.id || !(window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function')) {
+            while (mining.exp >= mining.expToLevel) {
+                mining.exp -= mining.expToLevel;
+                mining.level = (mining.level || 1) + 1;
+                mining.expToLevel = Math.floor(mining.expToLevel * 1.25);
+                this._showToast('Mining level up! L' + mining.level, 2200);
+                try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'mining', 1); } catch (e) {}
+            }
         }
 
         // Persist and update HUD

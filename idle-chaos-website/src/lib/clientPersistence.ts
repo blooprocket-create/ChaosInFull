@@ -20,12 +20,16 @@ declare global {
       upsertAccountStorage: (items: Record<string, number>) => Promise<void>;
       saveCharacterPatch: (characterId: string, patch: Record<string, unknown>) => Promise<void>;
       saveQuests: (characterId: string, active: Array<{ id: string; progress?: unknown }>, completed: string[]) => Promise<void>;
+      grantSkillXp: (characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) => Promise<{ level: number; exp: number; expToLevel: number } | null>;
+  queueSkillXp: (characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) => Promise<void>;
       migrateLocalStorageBlob: (username: string) => Promise<void>;
       loadCharacterFull: (characterId: string) => Promise<LoadedCharacter | null>;
     };
     __persistFlags?: {
       disableServerWrites?: boolean;
     };
+    __skillXpQueue?: Record<string, number>;
+    __skillXpFlushTimer?: number | null;
   }
 }
 
@@ -103,6 +107,104 @@ function installPersistenceBridge() {
       } catch {
         /* swallow */
       }
+    },
+    async grantSkillXp(characterId, skill, amount) {
+      if (!characterId || !skill || !Number.isFinite(amount) || amount <= 0) return null;
+      // Allow offline play or local-only sessions to skip server writes
+      if (window.__persistFlags?.disableServerWrites) {
+        return null;
+      }
+      try {
+        const res = await fetch('/api/account/characters/xp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ characterId, skill, amount })
+        });
+        if (!res.ok) {
+          emitTelemetry('xp_grant_fail', { characterId, skill, amount, status: res.status });
+          return null;
+        }
+  const data = await res.json().catch(() => null) as { ok?: boolean; progress?: { level: number; exp: number; expToLevel: number } } | null;
+  const progress = data?.progress;
+        if (progress && typeof progress.level === 'number') {
+          emitTelemetry('xp_grant_success', { characterId, skill, amount, level: progress.level, exp: progress.exp, expToLevel: progress.expToLevel });
+          // Side-effect: update any active Phaser scene's local character skill object so HUD & stats modal reflect server state.
+          try {
+            const w: any = window as unknown as Record<string, unknown>;
+            const game = w.GAME as { scene?: { getScenes?: (active: boolean) => any[] } } | undefined;
+            const scenes = game?.scene?.getScenes ? game.scene.getScenes(true) : [];
+            for (const s of scenes) {
+              try {
+                const ch = s?.char;
+                if (!ch || (ch.id && ch.id !== characterId)) continue;
+                // Ensure skill container exists
+                const existing = ch[skill] || { level: 1, exp: 0, expToLevel: 100 };
+                ch[skill] = { ...existing, ...progress };
+                // Fire a custom event for any React/DOM listeners
+                try { window.dispatchEvent(new CustomEvent('skill:progress', { detail: { characterId, skill, progress } })); } catch {}
+                // Refresh HUD & stats modal if helpers exist
+                try { if (typeof s._updateHUD === 'function') s._updateHUD(); else if (typeof s._createHUD === 'function') { try { s._createHUD(); } catch {} } } catch {}
+                try { if (s._statsModal && (window as any).__shared_ui?.refreshStatsModal) (window as any).__shared_ui.refreshStatsModal(s); } catch {}
+              } catch {}
+            }
+          } catch {}
+          return progress;
+        }
+        emitTelemetry('xp_grant_partial', { characterId, skill, amount });
+        return null;
+      } catch {
+        emitTelemetry('xp_grant_fail', { characterId, skill, amount, network: true });
+        return null;
+      }
+    },
+    // Queue/batch frequent skill XP grants to reduce network spam (e.g. continuous actions).
+    // Flush occurs after a short debounce or if queue grows large.
+  async queueSkillXp(characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) {
+      if (!characterId || !skill || !Number.isFinite(amount) || amount <= 0) return;
+      if (window.__persistFlags?.disableServerWrites) return; // offline mode
+      try {
+        window.__skillXpQueue = window.__skillXpQueue || {};
+        const q: Record<string, number> = window.__skillXpQueue;
+        const key = skill;
+        q[key] = (q[key] || 0) + Math.max(1, Math.floor(amount));
+        // If queue big, flush immediately
+        const queuedTotal = Object.values(q).reduce((a,b) => a + b, 0);
+        const skillCount = Object.keys(q).length;
+        const immediate = queuedTotal >= 250 || skillCount >= 3;
+        type Skill = 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
+        const isSkill = (s: string): s is Skill => (
+          s === 'mining' || s === 'woodcutting' || s === 'fishing' || s === 'cooking' || s === 'smithing'
+        );
+        const scheduleFlush = () => {
+          if (window.__skillXpFlushTimer) return;
+          window.__skillXpFlushTimer = window.setTimeout(async () => {
+            window.__skillXpFlushTimer = null;
+            const snapshot: Record<string, number> = { ...q };
+            for (const k of Object.keys(q)) delete q[k];
+            emitTelemetry('xp_batch_flush_begin', { characterId, skills: Object.keys(snapshot), total: Object.values(snapshot).reduce((a,b)=>a+b,0) });
+            for (const [skillName, amt] of Object.entries(snapshot)) {
+              if (isSkill(skillName)) {
+                try { await window.__cif_persist?.grantSkillXp(characterId, skillName, amt); } catch {}
+              }
+            }
+            emitTelemetry('xp_batch_flush_end', { characterId });
+          }, 750);
+        };
+        if (immediate) {
+          // Immediate flush now
+          const snapshot: Record<string, number> = { ...q };
+          for (const k of Object.keys(q)) delete q[k];
+          emitTelemetry('xp_batch_flush_begin', { characterId, skills: Object.keys(snapshot), total: Object.values(snapshot).reduce((a,b)=>a+b,0), immediate: true });
+          for (const [skillName, amt] of Object.entries(snapshot)) {
+            if (isSkill(skillName)) {
+              try { await window.__cif_persist?.grantSkillXp(characterId, skillName, amt); } catch {}
+            }
+          }
+          emitTelemetry('xp_batch_flush_end', { characterId, immediate: true });
+        } else {
+          scheduleFlush();
+        }
+      } catch {}
     },
     async saveInventory(characterId, items) {
       if (!characterId) return items; // no character context yet (login / character select scenes)

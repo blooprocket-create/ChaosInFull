@@ -2312,15 +2312,6 @@ export class BrokenDock extends Phaser.Scene {
     _grantFishingXp(amount) {
         if (!amount) return;
         const fishing = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
-        // No retroactive backfill; points are awarded only on level-up
-        // Ensure expToLevel follows design curve: requiredXP = 100 * level^1.6
-        try {
-            const lvl = Math.max(1, Math.floor(fishing.level || 1));
-            const required = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
-            if (typeof fishing.expToLevel !== 'number' || Math.abs(fishing.expToLevel - required) > 2) {
-                fishing.expToLevel = required;
-            }
-        } catch (e) {}
         // Apply skillXpGain talent modifiers
         let finalAmount = amount;
         try {
@@ -2333,35 +2324,58 @@ export class BrokenDock extends Phaser.Scene {
                 finalAmount = Math.max(1, Math.round((amount + flatBonus) * (1 + (pctBonus / 100))));
             }
         } catch (e) {}
-        fishing.exp = (fishing.exp || 0) + finalAmount;
-        let leveled = false;
-        let masteryAwarded = 0; // fallback awarded points this call
-        const hasGlobalGrant = (typeof window !== 'undefined' && typeof window.grantMasteryPointsIfNeeded === 'function');
-        while (fishing.exp >= fishing.expToLevel) {
-            fishing.exp -= fishing.expToLevel;
-            fishing.level = (fishing.level || 1) + 1;
-            // Recompute next level requirement using curve
-            try {
-                const lvl = Math.max(1, Math.floor(fishing.level || 1));
-                fishing.expToLevel = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
-            } catch (e) { fishing.expToLevel = Math.floor((fishing.expToLevel || 100) * 1.25); }
-            leveled = true;
-            try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
-            // Mastery point awarding: Option A (+1 per level starting at level 2) if global helper absent
-            if (hasGlobalGrant) {
-                try { window.grantMasteryPointsIfNeeded(this.char); } catch (e) {}
-            } else {
+        const oldLevel = fishing.level || 1;
+        if (this.char.id && window.__cif_persist && typeof window.__cif_persist.grantSkillXp === 'function') {
+            window.__cif_persist.grantSkillXp(this.char.id, 'fishing', finalAmount).then(progress => {
+                if (progress) {
+                    this.char.fishing = progress;
+                    const leveled = progress.level > oldLevel;
+                    if (leveled) {
+                        let masteryAwarded = 0;
+                        const hasGlobalGrant = (typeof window !== 'undefined' && typeof window.grantMasteryPointsIfNeeded === 'function');
+                        try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', progress.level - oldLevel); } catch (e) {}
+                        if (hasGlobalGrant) {
+                            try { window.grantMasteryPointsIfNeeded(this.char); } catch (e) {}
+                        } else {
+                            try {
+                                this.char.fishing.masteryPoints = this.char.fishing.masteryPoints || 0;
+                                if (progress.level >= 2) { this.char.fishing.masteryPoints += 1; masteryAwarded += 1; }
+                            } catch (e) {}
+                        }
+                        const bonusText = masteryAwarded > 0 ? ` (+${masteryAwarded} mastery point${masteryAwarded>1?'s':''})` : '';
+                        this._showToast && this._showToast(`Fishing level up! L${progress.level}${bonusText}`, 2200);
+                    }
+                } else {
+                    // Fallback local progression if server call failed
+                    const fish = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
+                    fish.exp = (fish.exp || 0) + finalAmount;
+                    while (fish.exp >= fish.expToLevel) {
+                        fish.exp -= fish.expToLevel;
+                        fish.level = (fish.level || 1) + 1;
+                        try {
+                            const lvl = Math.max(1, Math.floor(fish.level || 1));
+                            fish.expToLevel = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
+                        } catch (e) { fish.expToLevel = Math.floor((fish.expToLevel || 100) * 1.25); }
+                        try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
+                    }
+                }
+                this._persistCharacterState();
+            });
+        } else {
+            // Offline/local fallback
+            const fish = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
+            fish.exp = (fish.exp || 0) + finalAmount;
+            while (fish.exp >= fish.expToLevel) {
+                fish.exp -= fish.expToLevel;
+                fish.level = (fish.level || 1) + 1;
                 try {
-                    fishing.masteryPoints = fishing.masteryPoints || 0;
-                    if (fishing.level >= 2) { fishing.masteryPoints += 1; masteryAwarded += 1; }
-                } catch (e) {}
+                    const lvl = Math.max(1, Math.floor(fish.level || 1));
+                    fish.expToLevel = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
+                } catch (e) { fish.expToLevel = Math.floor((fish.expToLevel || 100) * 1.25); }
+                try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
             }
+            this._persistCharacterState();
         }
-        if (leveled) {
-            const bonusText = masteryAwarded > 0 ? ` (+${masteryAwarded} mastery point${masteryAwarded>1?'s':''})` : '';
-            this._showToast && this._showToast(`Fishing level up! L${fishing.level}${bonusText}`, 2200);
-        }
-        this._persistCharacterState();
     }
 
     _consumeInventoryItem(itemId, qty = 1) {

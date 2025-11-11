@@ -764,10 +764,10 @@ export function completeQuest(character, questId) {
     }
 
     if (quest.rewards.xp) {
-        Object.keys(quest.rewards.xp).forEach(skill => {
-            const amount = quest.rewards.xp[skill] || 0;
+        Object.keys(quest.rewards.xp).forEach(skillKey => {
+            const amount = quest.rewards.xp[skillKey] || 0;
             if (!amount) return;
-            if (skill === 'character') {
+            if (skillKey === 'character') {
                 try {
                     const before = (character && character.level) || 0;
                     applyCharacterExperience(character, amount);
@@ -778,18 +778,51 @@ export function completeQuest(character, questId) {
                 } catch (e) { /* ignore */ }
                 return;
             }
-            character[skill] = character[skill] || { level: 1, exp: 0, expToLevel: 100 };
-            const beforeSkill = character[skill].level || 0;
-            character[skill].exp += amount;
-            while (character[skill].exp >= character[skill].expToLevel) {
-                character[skill].exp -= character[skill].expToLevel;
-                character[skill].level += 1;
-                character[skill].expToLevel = Math.floor(character[skill].expToLevel * 1.25);
-            }
-            const afterSkill = character[skill].level || 0;
-            const gainedSkill = afterSkill - beforeSkill;
-            if (gainedSkill > 0) {
-                try { onSkillLevelUp && onSkillLevelUp(null, character, skill, gainedSkill); } catch (e) {}
+            // Server-backed skill XP grant (mining, woodcutting, fishing, cooking, smithing)
+            const serverSkill = ['mining','woodcutting','fishing','cooking','smithing'].includes(skillKey) ? skillKey : null;
+            if (serverSkill && character.id && typeof window !== 'undefined' && window.__cif_persist) {
+                // Batch quest XP (can be large) immediately if batching helper exists; fall back to single grant
+                try {
+                    if (typeof window.__cif_persist.queueSkillXp === 'function') {
+                        window.__cif_persist.queueSkillXp(character.id, serverSkill, amount);
+                    } else if (typeof window.__cif_persist.grantSkillXp === 'function') {
+                        window.__cif_persist.grantSkillXp(character.id, serverSkill, amount).then(progress => {
+                            if (progress && typeof progress.level === 'number') {
+                                const before = (character[serverSkill] && character[serverSkill].level) || 1;
+                                character[serverSkill] = progress;
+                                const gained = progress.level - before;
+                                if (gained > 0) {
+                                    try { onSkillLevelUp && onSkillLevelUp(null, character, serverSkill, gained); } catch (e) {}
+                                }
+                            }
+                        }).catch(() => {});
+                    }
+                } catch (e) { /* swallow network errors */ }
+                // Optimistic local mutation (kept for immediate UI feedback); server is authoritative
+                character[serverSkill] = character[serverSkill] || { level: 1, exp: 0, expToLevel: 100 };
+                character[serverSkill].exp += amount;
+                while (character[serverSkill].exp >= character[serverSkill].expToLevel) {
+                    character[serverSkill].exp -= character[serverSkill].expToLevel;
+                    character[serverSkill].level += 1;
+                    character[serverSkill].expToLevel = Math.floor(character[serverSkill].expToLevel * 1.25);
+                    try { onSkillLevelUp && onSkillLevelUp(null, character, serverSkill, 1); } catch (e) {}
+                }
+            } else {
+                // Legacy/local skill XP
+                const skill = skillKey;
+                character[skill] = character[skill] || { level: 1, exp: 0, expToLevel: 100 };
+                const beforeSkill = character[skill].level || 0;
+                character[skill].exp += amount;
+                while (character[skill].exp >= character[skill].expToLevel) {
+                    character[skill].exp -= character[skill].expToLevel;
+                    character[skill].level += 1;
+                    character[skill].expToLevel = Math.floor(character[skill].expToLevel * 1.25);
+                }
+                const afterSkill = character[skill].level || 0;
+                const gainedSkill = afterSkill - beforeSkill;
+                if (gainedSkill > 0) {
+                    try { onSkillLevelUp && onSkillLevelUp(null, character, skill, gainedSkill); } catch (e) {}
+                }
             }
         });
     }

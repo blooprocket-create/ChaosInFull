@@ -21,27 +21,57 @@ export async function POST(req: Request) {
 
   // Ownership check and atomic increment
   try {
-    const colMap: Record<string, string> = {
-      mining: 'mining_exp',
-      woodcutting: 'woodcutting_exp',
-      fishing: 'fishing_exp',
-      cooking: 'cooking_exp',
-      smithing: 'smithing_exp',
-    };
-    const col = colMap[String(skill) as keyof typeof colMap];
-    if (!col) return NextResponse.json({ ok: false, error: "unsupported_skill" }, { status: 400 });
-    // Use string interpolation cautiously (column name is validated via colMap above)
-    const updated = await q<{ val: number }>`
-      update "Character"
-      set ${col} = GREATEST(0, COALESCE(${col}, 0) + ${amount})
-      where id = ${characterId} and userid = ${session.userId}
-      returning COALESCE(${col}, 0) as val
-    `;
-    if (!updated.length) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+    let updated: { val: number }[] = [];
+    switch (skill) {
+      case 'mining':
+        updated = await q<{ val: number }>`
+          update "Character"
+          set mining_exp = GREATEST(0, COALESCE(mining_exp, 0) + ${amount})
+          where id = ${characterId} and userid = ${session.userId}
+          returning COALESCE(mining_exp, 0) as val
+        `;
+        break;
+      case 'woodcutting':
+        updated = await q<{ val: number }>`
+          update "Character"
+          set woodcutting_exp = GREATEST(0, COALESCE(woodcutting_exp, 0) + ${amount})
+          where id = ${characterId} and userid = ${session.userId}
+          returning COALESCE(woodcutting_exp, 0) as val
+        `;
+        break;
+      case 'fishing':
+        updated = await q<{ val: number }>`
+          update "Character"
+          set fishing_exp = GREATEST(0, COALESCE(fishing_exp, 0) + ${amount})
+          where id = ${characterId} and userid = ${session.userId}
+          returning COALESCE(fishing_exp, 0) as val
+        `;
+        break;
+      case 'cooking':
+        updated = await q<{ val: number }>`
+          update "Character"
+          set cooking_exp = GREATEST(0, COALESCE(cooking_exp, 0) + ${amount})
+          where id = ${characterId} and userid = ${session.userId}
+          returning COALESCE(cooking_exp, 0) as val
+        `;
+        break;
+      case 'smithing':
+        updated = await q<{ val: number }>`
+          update "Character"
+          set smithing_exp = GREATEST(0, COALESCE(smithing_exp, 0) + ${amount})
+          where id = ${characterId} and userid = ${session.userId}
+          returning COALESCE(smithing_exp, 0) as val
+        `;
+        break;
+      default:
+        return NextResponse.json({ ok: false, error: 'unsupported_skill' }, { status: 400 });
+    }
+    if (!updated.length) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
     const progress = deriveSkillProgressFromExp(updated[0].val);
     return NextResponse.json({ ok: true, skill, progress });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
+    console.error('[xp_route_error]', { characterId, skill, amount, message });
+    return NextResponse.json({ ok: false, error: 'db_error', message }, { status: 500 });
   }
 }
