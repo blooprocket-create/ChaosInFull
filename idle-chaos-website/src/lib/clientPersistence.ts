@@ -12,7 +12,7 @@ type SaveCharacterPayload = {
 };
 
 // Local helper types to avoid any
-type SkillName = 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
+type SkillName = 'character' | 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
 type SkillProgress = { level: number; exp: number; expToLevel: number };
 type CharacterLike = { id?: string; [k: string]: unknown };
 type PhaserSceneLike = {
@@ -32,14 +32,15 @@ declare global {
       saveCharacter: (username: string | null, char: SaveCharacterPayload | null) => Promise<void>;
   saveInventory: (characterId: string | null | undefined, items: Record<string, number>) => Promise<Record<string, number>>;
       loadInventory: (characterId: string | null | undefined) => Promise<Array<{ id: string; qty: number }>>;
+      shopTransaction: (characterId: string, action: 'buy' | 'sell', itemKey: string, quantity: number) => Promise<{ ok: boolean; gold?: number; itemKey?: string; count?: number; error?: string; message?: string }>;
       getAccountStorage: () => Promise<Array<{ itemkey: string; count: number } | null>>;
       upsertAccountStorage: (items: Record<string, number>) => Promise<void>;
       saveCharacterPatch: (characterId: string, patch: Record<string, unknown>) => Promise<void>;
   saveEquipment: (characterId: string, equipment: Record<string, unknown>) => Promise<void>;
     saveTalents: (characterId: string, talents: Record<string, unknown>) => Promise<void>;
       saveQuests: (characterId: string, active: Array<{ id: string; progress?: unknown }>, completed: string[]) => Promise<void>;
-      grantSkillXp: (characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) => Promise<{ level: number; exp: number; expToLevel: number } | null>;
-  queueSkillXp: (characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) => Promise<void>;
+    grantSkillXp: (characterId: string, skill: SkillName, amount: number) => Promise<{ level: number; exp: number; expToLevel: number } | null>;
+  queueSkillXp: (characterId: string, skill: SkillName, amount: number) => Promise<void>;
       migrateLocalStorageBlob: (username: string) => Promise<void>;
       loadCharacterFull: (characterId: string) => Promise<LoadedCharacter | null>;
     };
@@ -157,10 +158,19 @@ function installPersistenceBridge() {
                 const ch = s?.char as CharacterLike | undefined;
                 if (!ch || (ch.id && ch.id !== characterId)) continue;
                 // Ensure skill container exists
-                const existing = (ch[skill as keyof CharacterLike] as SkillProgress | undefined) || { level: 1, exp: 0, expToLevel: 100 };
+                const existing = (skill === 'character')
+                  ? ({ level: Number(ch.level || 1), exp: Number((ch as any).exp || 0), expToLevel: Number((ch as any).expToLevel || 100) } as SkillProgress)
+                  : ((ch[skill as keyof CharacterLike] as SkillProgress | undefined) || { level: 1, exp: 0, expToLevel: 100 });
                 const oldLevel = Number(existing.level || 1);
                 // Merge server progress into local character skill
-                (ch as Record<string, unknown>)[skill] = { ...existing, ...progress } as SkillProgress;
+                if (skill === 'character') {
+                  // For core character XP, update top-level level and exp/expToLevel mirrors
+                  (ch as any).exp = progress.exp;
+                  (ch as any).expToLevel = progress.expToLevel;
+                  (ch as any).level = progress.level;
+                } else {
+                  (ch as Record<string, unknown>)[skill] = { ...existing, ...progress } as SkillProgress;
+                }
                 // If level increased, award talent points and persist talents snapshot
                 try {
                   const newLevel = Number(progress.level || oldLevel);
@@ -206,7 +216,7 @@ function installPersistenceBridge() {
     },
     // Queue/batch frequent skill XP grants to reduce network spam (e.g. continuous actions).
     // Flush occurs after a short debounce or if queue grows large.
-  async queueSkillXp(characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) {
+  async queueSkillXp(characterId: string, skill: SkillName, amount: number) {
       if (!characterId || !skill || !Number.isFinite(amount) || amount <= 0) return;
       if (window.__persistFlags?.disableServerWrites) return; // offline mode
       try {
@@ -218,9 +228,9 @@ function installPersistenceBridge() {
         const queuedTotal = Object.values(q).reduce((a,b) => a + b, 0);
         const skillCount = Object.keys(q).length;
         const immediate = queuedTotal >= 250 || skillCount >= 3;
-        type Skill = 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
+        type Skill = SkillName;
         const isSkill = (s: string): s is Skill => (
-          s === 'mining' || s === 'woodcutting' || s === 'fishing' || s === 'cooking' || s === 'smithing'
+          s === 'character' || s === 'mining' || s === 'woodcutting' || s === 'fishing' || s === 'cooking' || s === 'smithing'
         );
         const scheduleFlush = () => {
           if (window.__skillXpFlushTimer) return;
@@ -280,6 +290,23 @@ function installPersistenceBridge() {
         return slots;
       } catch {
         return [];
+      }
+    },
+    async shopTransaction(characterId, action, itemKey, quantity) {
+      if (!characterId || !action || !itemKey) return { ok: false, error: 'invalid' };
+      try {
+        const res = await fetch('/api/shop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ characterId, action, itemKey, quantity: Math.max(1, Math.floor(quantity || 1)) })
+        });
+        const data = await res.json().catch(() => null) as { ok?: boolean; gold?: number; itemKey?: string; count?: number; error?: string; message?: string } | null;
+        if (!res.ok || !data) return { ok: false, error: data?.error || 'shop_failed', message: data?.message };
+        // Telemetry
+        emitTelemetry('shop_transaction', { characterId, action, itemKey, quantity, gold: data.gold });
+        return { ok: !!data.ok, gold: data.gold, itemKey: data.itemKey, count: data.count };
+      } catch {
+        return { ok: false, error: 'network' };
       }
     },
     async saveCharacterPatch(characterId, patch) {

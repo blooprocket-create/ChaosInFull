@@ -2045,6 +2045,26 @@ export function openQuestLogModal(scene) {
     if (!char.completedQuests) char.completedQuests = [];
     if (scene._questLogModal) return;
     
+    // On open, refresh quests from server so progress reflects DB truth (not just local memory)
+    try {
+        const charId = (scene && scene.char && scene.char.id) || (scene && scene._character && scene._character.id) || null;
+        if (charId && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.loadCharacterFull === 'function') {
+            window.__cif_persist.loadCharacterFull(String(charId)).then((loaded) => {
+                try {
+                    if (!loaded) return;
+                    // Merge quests from DB
+                    if (Array.isArray(loaded.activeQuests)) {
+                        scene.char.activeQuests = loaded.activeQuests.map(q => ({ id: q.id, progress: q.progress || [] }));
+                    }
+                    if (Array.isArray(loaded.completedQuests)) {
+                        scene.char.completedQuests = loaded.completedQuests.slice();
+                    }
+                    // After loading, if modal gets created, it will render with server state
+                } catch (e) { /* ignore */ }
+            }).catch(() => { /* ignore */ });
+        }
+    } catch (e) { /* ignore */ }
+    
     const modal = document.createElement('div');
     modal.id = 'quest-log-modal';
     modal.style.cssText = `

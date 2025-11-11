@@ -256,6 +256,8 @@ export async function ensureCharacterSkillExpColumns() {
     await sql`alter table "Character" add column if not exists fishing_exp int not null default 0`;
     await sql`alter table "Character" add column if not exists cooking_exp int not null default 0`;
     await sql`alter table "Character" add column if not exists smithing_exp int not null default 0`;
+    // Core character experience counter for leveling separate from individual skills
+    await sql`alter table "Character" add column if not exists char_exp bigint not null default 0`;
   } catch {
     // ignore
   } finally {

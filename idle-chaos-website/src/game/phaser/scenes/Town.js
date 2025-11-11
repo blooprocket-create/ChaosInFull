@@ -849,21 +849,40 @@ export class Town extends Phaser.Scene {
         const price = Math.floor(baseValue * 1.1);
         const total = price * qty;
         
-        if ((this.char.gold || 0) < total) { this._showToast('Not enough gold'); return; }
-        this.char.gold -= total;
-        
-        // Add to inventory
-        this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
-        const added = (window && window.__shared_ui && window.__shared_ui.addItemToSlots) ? window.__shared_ui.addItemToSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){ if(!slots[i]){ slots[i]={id:id,name:id,qty:1}; q--; } } return q<=0; })(this.char.inventory,itemId,qty);
-        if (!added) { this._showToast('Not enough inventory space'); this.char.gold += total; return; }
-        
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        this._persistCharacter(username); // This now automatically syncs inventory to database
-        
-        this._showToast('Bought ' + qty + 'x ' + ((def && def.name) || itemId) + ' for ' + total + ' gold');
-        if (this._shopModal) this._refreshShopModal();
-        if (this._inventoryModal) this._refreshInventoryModal();
-        try { this._updateHUD(); } catch(e) {}
+        // Use server-side transaction for atomic gold + inventory update
+        const charId = (this.char && this.char.id) ? this.char.id : null;
+        if (!charId) { this._showToast('No character'); return; }
+        if (!window.__cif_persist || typeof window.__cif_persist.shopTransaction !== 'function') {
+            this._showToast('Shop unavailable'); return;
+        }
+        window.__cif_persist.shopTransaction(String(charId), 'buy', itemId, qty).then((res) => {
+            if (!res || !res.ok) {
+                this._showToast(res?.error === 'insufficient gold' ? 'Not enough gold' : 'Purchase failed');
+                return;
+            }
+            // Update local gold
+            if (typeof res.gold === 'number') this.char.gold = res.gold;
+            // Update local inventory slot counts (merge by id)
+            try {
+                this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
+                // Ensure item present with updated total count (res.count is the total stack count server-side)
+                // Strategy: remove all slots for itemId then add new count
+                const slots = this.char.inventory;
+                for (let i=0;i<slots.length;i++) if (slots[i] && slots[i].id === itemId) slots[i] = null;
+                let remaining = res.count || qty;
+                const stackable = def && def.stackable !== false; // default assume stackable if def.stackable is true or undefined
+                if (stackable) {
+                    // single stack
+                    for (let i=0;i<slots.length;i++) { if (!slots[i]) { slots[i] = { id: itemId, name: (def && def.name) || itemId, qty: remaining }; remaining = 0; break; } }
+                } else {
+                    for (let i=0;i<slots.length && remaining>0;i++) if (!slots[i]) { slots[i] = { id: itemId, name: (def && def.name) || itemId, qty: 1 }; remaining--; }
+                }
+            } catch {}
+            this._showToast('Bought ' + qty + 'x ' + ((def && def.name) || itemId));
+            if (this._shopModal) this._refreshShopModal();
+            if (this._inventoryModal) this._refreshInventoryModal();
+            try { this._updateHUD(); } catch(e) {}
+        }).catch(() => { this._showToast('Network error'); });
     }
     _sellToShop(itemId, qty = 1) {
         qty = Math.max(1, qty || 1);
@@ -874,19 +893,38 @@ export class Town extends Phaser.Scene {
         const price = Math.floor(baseSellValue * 0.8);
         const total = price * qty;
         
-        // Remove from inventory
-        this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
-        const removed = (window && window.__shared_ui && window.__shared_ui.removeItemFromSlots) ? window.__shared_ui.removeItemFromSlots(this.char.inventory, itemId, qty) : (function(slots,id,q){ for(let i=0;i<slots.length&&q>0;i++){const s=slots[i]; if(!s) continue; if(s.id!==id) continue; if(s.qty&&s.qty>q){s.qty-=q; q=0; break;} q-=(s.qty||1); slots[i]=null;} return q<=0;})(this.char.inventory,itemId,qty);
-        if (!removed) { this._showToast('Item not found'); return; }
-        
-        this.char.gold = (this.char.gold || 0) + total;
-        const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-        this._persistCharacter(username); // This now automatically syncs inventory to database
-        
-        this._showToast('Sold ' + qty + 'x ' + ((def && def.name) || itemId) + ' for ' + total + ' gold');
-        if (this._shopModal) this._refreshShopModal();
-        if (this._inventoryModal) this._refreshInventoryModal();
-        try { this._updateHUD(); } catch(e) {}
+        const charId = (this.char && this.char.id) ? this.char.id : null;
+        if (!charId) { this._showToast('No character'); return; }
+        if (!window.__cif_persist || typeof window.__cif_persist.shopTransaction !== 'function') {
+            this._showToast('Shop unavailable'); return;
+        }
+        window.__cif_persist.shopTransaction(String(charId), 'sell', itemId, qty).then((res) => {
+            if (!res || !res.ok) {
+                this._showToast(res?.error === 'insufficient items' ? 'Not enough items' : 'Sell failed');
+                return;
+            }
+            if (typeof res.gold === 'number') this.char.gold = res.gold;
+            // Update local inventory slot counts based on res.count (remaining stack total)
+            try {
+                this.char.inventory = (window && window.__shared_ui && window.__shared_ui.initSlots) ? window.__shared_ui.initSlots(this.char.inventory || []) : Array.from({length:50}).map(_=>null);
+                const slots = this.char.inventory;
+                // Remove existing slots of itemId then re-add with res.count if >0
+                for (let i=0;i<slots.length;i++) if (slots[i] && slots[i].id === itemId) slots[i] = null;
+                let remaining = res.count || 0;
+                if (remaining > 0) {
+                    const stackable = def && def.stackable !== false;
+                    if (stackable) {
+                        for (let i=0;i<slots.length;i++) if (!slots[i]) { slots[i] = { id: itemId, name: (def && def.name) || itemId, qty: remaining }; remaining = 0; break; }
+                    } else {
+                        for (let i=0;i<slots.length && remaining>0;i++) if (!slots[i]) { slots[i] = { id: itemId, name: (def && def.name) || itemId, qty: 1 }; remaining--; }
+                    }
+                }
+            } catch {}
+            this._showToast('Sold ' + qty + 'x ' + ((def && def.name) || itemId));
+            if (this._shopModal) this._refreshShopModal();
+            if (this._inventoryModal) this._refreshInventoryModal();
+            try { this._updateHUD(); } catch(e) {}
+        }).catch(() => { this._showToast('Network error'); });
     }
     async _refreshStorageModal() {
         if (!this._storageModal) return;

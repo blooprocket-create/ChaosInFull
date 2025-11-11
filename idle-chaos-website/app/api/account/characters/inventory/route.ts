@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureItemStackTable, ensureCharacterTable } from "@/src/lib/db";
+import { q, sql, ensureItemStackTable, ensureCharacterTable } from "@/src/lib/db";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -15,20 +15,22 @@ export async function POST(req: Request) {
   if (!owner.length) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   const entries = Object.entries(items);
   try {
-    // IMPORTANT: Full replacement - delete all existing items first, then insert new state
-    // This ensures sold/removed items are actually deleted from the database
-    await q`delete from "ItemStack" where characterid = ${characterId}`;
-    
-    // Insert all items from the current inventory state
-    for (const [itemKey, count] of entries) {
-      const safe = Math.max(0, Math.floor(count));
-      if (safe > 0) {
-        await q`
-          insert into "ItemStack" (characterid, itemkey, count)
-          values (${characterId}, ${itemKey}, ${safe})
-        `;
+    // Use Neon transaction to ensure BEGIN/COMMIT runs on the same connection
+    await (sql as any).begin(async (tx: typeof sql) => {
+      // Lock the character row to serialize inventory writers
+      await tx`select id from "Character" where id = ${characterId} and userid = ${session.userId} for update`;
+      // Full replacement of stacks
+      await tx`delete from "ItemStack" where characterid = ${characterId}`;
+      for (const [itemKey, count] of entries) {
+        const safe = Math.max(0, Math.floor(count));
+        if (safe > 0) {
+          await tx`
+            insert into "ItemStack" (characterid, itemkey, count)
+            values (${characterId}, ${itemKey}, ${safe})
+          `;
+        }
       }
-    }
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });

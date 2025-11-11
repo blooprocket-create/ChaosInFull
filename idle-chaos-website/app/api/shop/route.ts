@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { q } from "@/src/lib/db";
+import { q, sql, ensureCharacterTable, ensureItemStackTable, ensureCharacterGoldColumn } from "@/src/lib/db";
 import { getSession } from "@/src/lib/auth";
-import { itemByKey } from "@/src/data/items";
+import { itemByKey } from "../../../src/data/items";
 
 type Action = "buy" | "sell";
 
@@ -17,7 +17,16 @@ export async function POST(req: Request) {
   const ownerRows = await q<{ id: string; gold: number }>`select id, gold from "Character" where id = ${characterId} and userid = ${session.userId}`;
   const owner = ownerRows[0];
   if (!owner) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
-  const price = action === "buy" ? item.buy : item.sell;
+  // Ensure required tables/columns exist (best-effort)
+  await ensureCharacterTable();
+  await ensureCharacterGoldColumn();
+  await ensureItemStackTable();
+  const rawPrice = action === "buy" ? item.buy : item.sell;
+  // Validate presence of price; guard against undefined leading to NaN math
+  if (typeof rawPrice !== 'number' || !Number.isFinite(rawPrice) || rawPrice < 0) {
+    return NextResponse.json({ ok: false, error: "unpriced item" }, { status: 400 });
+  }
+  const price = Math.floor(rawPrice);
   const deltaGold = price * qty * (action === "buy" ? -1 : 1);
   // Pre-check current counts and gold
   const currentStacks = await q<{ count: number }>`
@@ -28,18 +37,23 @@ export async function POST(req: Request) {
   if (action === "buy" && (owner.gold + deltaGold) < 0) return NextResponse.json({ ok: false, error: "insufficient gold" }, { status: 400 });
   const newGold = owner.gold + deltaGold;
   const nextCount = Math.max(0, currentCount + (action === "buy" ? qty : -qty));
-  // Apply updates
-  await q`
-    update "Character" set gold = ${newGold} where id = ${characterId}
-  `;
-  if (nextCount <= 0) {
-    await q`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
-  } else {
-    await q`
-      insert into "ItemStack" (characterid, itemkey, count)
-      values (${characterId}, ${itemKey}, ${nextCount})
-      on conflict (characterid, itemkey) do update set count = excluded.count
-    `;
+  // Apply updates atomically inside a transaction to avoid partial state on failure
+  try {
+    await (sql as any).begin(async (tx: typeof sql) => {
+      await tx`update "Character" set gold = ${newGold} where id = ${characterId}`;
+      if (nextCount <= 0) {
+        await tx`delete from "ItemStack" where characterid = ${characterId} and itemkey = ${itemKey}`;
+      } else {
+        await tx`
+          insert into "ItemStack" (characterid, itemkey, count)
+          values (${characterId}, ${itemKey}, ${nextCount})
+          on conflict (characterid, itemkey) do update set count = excluded.count
+        `;
+      }
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: "db_error", message }, { status: 500 });
   }
   return NextResponse.json({ ok: true, gold: newGold, itemKey, count: nextCount, qty });
 }

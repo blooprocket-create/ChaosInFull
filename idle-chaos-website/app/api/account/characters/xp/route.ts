@@ -23,6 +23,22 @@ export async function POST(req: Request) {
   try {
     let updated: { val: number }[] = [];
     switch (skill) {
+      case 'character':
+      case 'char': {
+        // Update core character experience and derive new level; write both
+        const rows = await q<{ val: string }>`
+          update "Character"
+          set char_exp = GREATEST(0, COALESCE(char_exp, 0) + ${amount})
+          where id = ${characterId} and userid = ${session.userId}
+          returning char_exp::text as val
+        `;
+        if (!rows.length) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
+        const totalExp = Number(rows[0].val || 0);
+        const prog = deriveSkillProgressFromExp(totalExp);
+        // Persist derived level to the level column
+        await q`update "Character" set level = ${prog.level} where id = ${characterId} and userid = ${session.userId}`;
+        return NextResponse.json({ ok: true, skill: 'character', progress: prog, level: prog.level });
+      }
       case 'mining':
         updated = await q<{ val: number }>`
           update "Character"

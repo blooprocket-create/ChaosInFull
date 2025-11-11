@@ -630,6 +630,28 @@ export function updateQuestProgress(character, type, target, amount = 1) {
         } catch (e) {
             console.warn('[Quest] Failed to refresh quest UI:', e);
         }
+        // Persist quest progress to server with a small debounce to coalesce rapid updates (e.g., smelting/cooking)
+        try {
+            if (typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveQuests === 'function' && character && character.id) {
+                character._questPersistDirty = true;
+                if (!character._questPersistTimer) {
+                    character._questPersistTimer = setTimeout(() => {
+                        try {
+                            character._questPersistTimer = null;
+                            if (!character._questPersistDirty) return;
+                            character._questPersistDirty = false;
+                            const active = Array.isArray(character.activeQuests)
+                                ? character.activeQuests.map(q => ({ id: q && q.id, progress: q && q.progress }))
+                                : [];
+                            const completed = Array.isArray(character.completedQuests)
+                                ? character.completedQuests.slice()
+                                : [];
+                            window.__cif_persist.saveQuests(character.id, active, completed);
+                        } catch (e) { /* ignore */ }
+                    }, 600);
+                }
+            }
+        } catch (e) { /* ignore */ }
     }
     
     return progressMade;
