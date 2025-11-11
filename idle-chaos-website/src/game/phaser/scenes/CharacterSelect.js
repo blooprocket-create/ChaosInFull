@@ -374,10 +374,27 @@ export class CharacterSelect extends Phaser.Scene {
             // Equipment summary line (simple icons or slot counts)
             try {
                 const eq = (char.equipment)||{};
-                // Count items by presence of .id or .itemKey (some sources may shape equipment differently)
-                const equippedCount = Object.values(eq).filter(v=>v && (v.id || v.itemKey)).length;
+                let equippedCount = Object.values(eq).filter(v=>v && (v.id || v.itemKey)).length;
+                // If count is zero but we haven't hydrated full record yet, attempt a lazy full fetch
+                if (equippedCount === 0 && char.id && typeof fetch === 'function' && !char._equipmentHydrated) {
+                    fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`)
+                        .then(r=>r.json()).then(d=>{
+                            if (d && d.ok && d.character && d.character.equipment) {
+                                char.equipment = d.character.equipment || char.equipment;
+                                char._equipmentHydrated = true;
+                                // Re-render equipment count without rebuilding entire preview card
+                                try {
+                                    const freshEq = (char.equipment)||{};
+                                    const newCount = Object.values(freshEq).filter(v=>v && (v.id || v.itemKey)).length;
+                                    const eqPill = statsWrap.querySelector('[data-eq-pill]');
+                                    if (eqPill) eqPill.textContent = `Equipped: ${newCount}`;
+                                } catch (e) {}
+                            }
+                        }).catch(()=>{});
+                }
                 const eqDiv = document.createElement('div');
                 eqDiv.className='stat-pill';
+                eqDiv.setAttribute('data-eq-pill','true');
                 eqDiv.textContent = `Equipped: ${equippedCount}`;
                 statsWrap.appendChild(eqDiv);
             } catch(e){}

@@ -1187,38 +1187,39 @@ function ensureCharTalents(char) {
         // Retro-credit newly unlocked tabs: compute historical points from char level and skill levels
         try {
             const tabsToConsider = getTabsForClass && getTabsForClass(char.class) ? getTabsForClass(char.class) : [];
-            // total points per tab from levels: 3 points per level gained (assume starting at level 1)
             const level = Number(char.level || 1);
-            const levelPoints = Math.max(0, (level - 1)) * 3;
-            // total points per tab from skills: sum of (skill.level - 1) across skills we can find on char
-            let skillPoints = 0;
-            try {
-                for (const k of Object.keys(char || {})) {
-                    try {
-                        const obj = char[k];
-                        if (!obj || typeof obj !== 'object') continue;
-                        if (typeof obj.level === 'number') {
-                            skillPoints += Math.max(0, Number(obj.level || 1) - 1);
-                        }
-                    } catch (e) { /* ignore per-skill */ }
-                }
-            } catch (e) {}
-            const totalHistoric = Number(levelPoints || 0) + Number(skillPoints || 0);
-            // credit each tab that we haven't synced yet (exclude star tabs)
-            for (const tid of tabsToConsider) {
+            const levelPointsPerTab = Math.max(0, (level - 1)) * 3; // 3 per level above 1
+            // Restrict gathering skill contribution strictly to defined gathering skills
+            const GATHERING_SKILLS = ['woodcutting','fishing','mining','smithing','cooking'];
+            let gatherPointsPerTab = 0;
+            for (const sk of GATHERING_SKILLS) {
                 try {
-                    const tdef = TALENT_TABS[tid];
-                    if (!tdef || tdef.type === 'star') continue;
-                    if (char.talents._tabSynced[tid]) continue; // already handled
-                    const existing = Number(char.talents.pointsByTab[tid] || 0);
-                    const need = Math.max(0, totalHistoric - existing);
-                    if (need > 0) {
-                        char.talents.pointsByTab[tid] = existing + need;
-                        char.talents.unspentByTab[tid] = (char.talents.unspentByTab[tid] || 0) + need;
+                    const obj = char[sk];
+                    if (obj && typeof obj === 'object' && typeof obj.level === 'number') {
+                        gatherPointsPerTab += Math.max(0, Number(obj.level || 1) - 1); // 1 per level above 1
                     }
-                    char.talents._tabSynced[tid] = true;
-                } catch (e) { /* ignore per-tab */ }
+                } catch (e) { /* ignore individual skill errors */ }
             }
+            const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+            // credit each non-star tab once (avoid double-sync)
+            for (const tid of tabsToConsider) {
+                const tdef = TALENT_TABS[tid];
+                if (!tdef || tdef.type === 'star') continue;
+                if (char.talents._tabSynced[tid]) continue; // already handled
+                const existing = Number(char.talents.pointsByTab[tid] || 0);
+                const need = Math.max(0, expectedHistoricPerTab - existing);
+                if (need > 0) {
+                    char.talents.pointsByTab[tid] = existing + need;
+                    char.talents.unspentByTab[tid] = (char.talents.unspentByTab[tid] || 0) + need;
+                }
+                char.talents._tabSynced[tid] = true;
+            }
+            // Store diagnostics for UI/inspection (non-persistent; safe)
+            char.talents._diagnostics = Object.assign({}, char.talents._diagnostics, {
+                expectedHistoricPerTab,
+                levelPointsPerTab,
+                gatherPointsPerTab
+            });
         } catch (e) {}
     } catch (e) {}
 }
@@ -1271,6 +1272,9 @@ function onSkillLevelUp(scene, char, skillKey, levelsGained = 1) {
         ensureCharTalents(char);
         const tabs = getTabsForClass(char.class);
         const nonStarTabs = (tabs || []).filter(tid => { const t = TALENT_TABS[tid]; return t && t.type !== 'star'; });
+        // Only gathering skills award talent points
+        const GATHERING_SKILLS = ['woodcutting','fishing','mining','smithing','cooking'];
+        if (GATHERING_SKILLS.indexOf(String(skillKey)) === -1) return;
         const pointsPerTab = 1 * Number(levelsGained || 0);
         awardPointsForTabs(char, nonStarTabs, pointsPerTab);
         // Persist talents if bridge available
