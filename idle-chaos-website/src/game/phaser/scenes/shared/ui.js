@@ -4200,8 +4200,20 @@ export function unequipItem(scene, slot) {
 }
 
 // Expose helpers to operate on slot-based inventory from other scenes
-export function addItemToInventory(scene, itemId, qty=1) { if (!scene || !scene.char) return false; scene.char.inventory = initSlots(scene.char.inventory); return addItemToSlots(scene.char.inventory, itemId, qty); }
-export function removeItemFromInventory(scene, itemId, qty=1) { if (!scene || !scene.char) return false; scene.char.inventory = initSlots(scene.char.inventory); return removeItemFromSlots(scene.char.inventory, itemId, qty); }
+export function addItemToInventory(scene, itemId, qty=1) {
+    if (!scene || !scene.char) return false;
+    scene.char.inventory = initSlots(scene.char.inventory);
+    const ok = addItemToSlots(scene.char.inventory, itemId, qty);
+    if (ok) { try { if (typeof window !== 'undefined' && window.__cif_persist) { if (scene.char.id) { const map = {}; for (const s of scene.char.inventory) { if (s && s.id) map[s.id] = (map[s.id]||0) + (s.qty||1); } window.__cif_persist.saveInventory(scene.char.id, map); } } } catch (e) {} }
+    return ok;
+}
+export function removeItemFromInventory(scene, itemId, qty=1) {
+    if (!scene || !scene.char) return false;
+    scene.char.inventory = initSlots(scene.char.inventory);
+    const ok = removeItemFromSlots(scene.char.inventory, itemId, qty);
+    if (ok) { try { if (typeof window !== 'undefined' && window.__cif_persist) { if (scene.char.id) { const map = {}; for (const s of scene.char.inventory) { if (s && s.id) map[s.id] = (map[s.id]||0) + (s.qty||1); } window.__cif_persist.saveInventory(scene.char.id, map); } } } catch (e) {} }
+    return ok;
+}
 
 export function applyEquipmentBonuses(scene, eq) {
     if (!eq || !eq.id) return; const defs = (window && window.ITEM_DEFS) ? window.ITEM_DEFS : {}; const def = defs[eq.id]; if (!def) return; if (!scene.char._equipBonuses) scene.char._equipBonuses = { str:0,int:0,agi:0,luk:0,defense:0 }; if (def.statBonus) { for (const k of Object.keys(def.statBonus)) scene.char._equipBonuses[k] = (scene.char._equipBonuses[k]||0) + def.statBonus[k]; } if (def.defense) scene.char._equipBonuses.defense = (scene.char._equipBonuses.defense||0) + def.defense;

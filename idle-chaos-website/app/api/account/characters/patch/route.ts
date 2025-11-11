@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterLastSeenColumn, ensureCharacterTalentsColumn } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterLastSeenColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn } from "@/src/lib/db";
 
 // Flexible patch update for character fields
 // Accepts ANY fields from the client and merges them into the JSONB 'data' column
@@ -17,6 +17,7 @@ export async function POST(req: Request) {
   await ensureCharacterExtraColumns();
   await ensureCharacterLastSeenColumn();
   await ensureCharacterTalentsColumn();
+  await ensureCharacterGoldColumn();
 
   // Ownership check
   const owned = await q<{ id: string; data: Record<string, unknown> }>`
@@ -46,6 +47,25 @@ export async function POST(req: Request) {
       // continue to process rest of patch even if talents fails
     }
     delete mergedPatch.talents;
+  }
+
+  // If gold provided in patch, update dedicated gold column and remove from JSONB merge payload
+  const incomingGold = mergedPatch.gold as unknown;
+  const hasGold = typeof incomingGold === 'number' && Number.isFinite(incomingGold as number);
+  if (hasGold) {
+    const safeGold = Math.max(0, Math.floor(incomingGold as number));
+    try {
+      await q`
+        update "Character"
+        set gold = ${safeGold}, lastseenat = now()
+        where id = ${characterId} and userid = ${session.userId}
+      `;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Character gold patch error:', message);
+      // continue even if gold update fails
+    }
+    delete mergedPatch.gold;
   }
 
   // Merge remaining patch fields into current JSONB data (shallow)

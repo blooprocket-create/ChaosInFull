@@ -213,6 +213,20 @@ export async function ensureCharacterEquipmentColumn() {
   }
 }
 
+// Ensure a dedicated gold column for characters (server-authoritative currency)
+let characterGoldColChecked = false;
+export async function ensureCharacterGoldColumn() {
+  if (characterGoldColChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`alter table "Character" add column if not exists gold int not null default 0`;
+  } catch {
+    // ignore
+  } finally {
+    characterGoldColChecked = true;
+  }
+}
+
 // Ensure a dedicated talents JSONB column for characters
 let characterTalentsColChecked = false;
 export async function ensureCharacterTalentsColumn() {

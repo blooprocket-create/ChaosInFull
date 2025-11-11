@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn, ensureCharacterGoldColumn } from "@/src/lib/db";
 import { deriveSkillProgressFromExp } from "@/src/lib/skills";
 
 // Fetch a full hydrated character snapshot (core row + inventory stacks + quests).
@@ -20,17 +20,18 @@ export async function GET(req: Request) {
   await ensureCharacterQuestTable();
   await ensureCharacterSkillExpColumns();
   await ensureCharacterEquipmentColumn();
+  await ensureCharacterGoldColumn();
   await ensureCharacterTalentsColumn();
 
   // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
-    id: string; name: string; class: string; level: number;
+    id: string; name: string; class: string; level: number; gold?: number;
     data: Record<string, unknown>;
     mining_exp?: number; woodcutting_exp?: number; fishing_exp?: number; cooking_exp?: number; smithing_exp?: number;
     equipment?: Record<string, unknown>;
     talents?: Record<string, unknown>;
   }>`
-    select id, name, class, level, data,
+    select id, name, class, level, gold, data,
            coalesce(mining_exp, 0) as mining_exp,
            coalesce(woodcutting_exp, 0) as woodcutting_exp,
            coalesce(fishing_exp, 0) as fishing_exp,
@@ -81,8 +82,9 @@ export async function GET(req: Request) {
       name: c.name,
       class: c.class,
       level: c.level,
-      // Spread ALL data from JSONB column - includes everything your JS sent!
-      ...characterData,
+  // Spread ALL data from JSONB column - includes everything your JS sent (excluding server-authoritative columns)
+  ...characterData,
+  gold: typeof c.gold === 'number' ? c.gold : (typeof (characterData as Record<string,unknown>).gold === 'number' ? (characterData as Record<string,unknown>).gold : 0),
       // Prefer dedicated equipment column if present
       ...(equipment ? { equipment } : {}),
     // Prefer dedicated talents column if present
