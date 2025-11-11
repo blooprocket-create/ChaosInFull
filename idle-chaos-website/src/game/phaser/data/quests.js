@@ -538,6 +538,17 @@ export function startQuest(character, questId) {
     } catch (e) {
         console.warn('[Quest] Failed to refresh quest UI after starting quest:', e);
     }
+
+    // Immediately persist quest state to server so CharacterQuest row appears without waiting
+    try {
+        if (typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveQuests === 'function' && character && character.id) {
+            const active = Array.isArray(character.activeQuests) ? character.activeQuests.map(q => ({ id: q && q.id, progress: q && q.progress })) : [];
+            const completed = Array.isArray(character.completedQuests) ? character.completedQuests.slice() : [];
+            window.__cif_persist.saveQuests(character.id, active, completed);
+        }
+    } catch (e) {
+        console.warn('[Quest] Failed to persist quest start:', e);
+    }
     
     return true;
 }

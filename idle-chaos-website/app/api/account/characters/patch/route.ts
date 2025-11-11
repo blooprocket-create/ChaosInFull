@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterLastSeenColumn } from "@/src/lib/db";
 
 // Flexible patch update for character fields
 // Accepts ANY fields from the client and merges them into the JSONB 'data' column
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
 
   await ensureCharacterTable();
   await ensureCharacterExtraColumns();
+  await ensureCharacterLastSeenColumn();
 
   // Ownership check
   const owned = await q<{ id: string; data: Record<string, unknown> }>`

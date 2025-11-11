@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns } from "@/src/lib/db";
+import { deriveSkillProgressFromExp } from "@/src/lib/skills";
 
 // Fetch a full hydrated character snapshot (core row + inventory stacks + quests).
 // GET /api/account/characters/full?characterId=XYZ
@@ -17,13 +18,20 @@ export async function GET(req: Request) {
   await ensureCharacterExtraColumns();
   await ensureItemStackTable();
   await ensureCharacterQuestTable();
+  await ensureCharacterSkillExpColumns();
 
   // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
     id: string; name: string; class: string; level: number;
     data: Record<string, unknown>;
+    mining_exp?: number; woodcutting_exp?: number; fishing_exp?: number; cooking_exp?: number; smithing_exp?: number;
   }>`
-    select id, name, class, level, data
+    select id, name, class, level, data,
+           coalesce(mining_exp, 0) as mining_exp,
+           coalesce(woodcutting_exp, 0) as woodcutting_exp,
+           coalesce(fishing_exp, 0) as fishing_exp,
+           coalesce(cooking_exp, 0) as cooking_exp,
+           coalesce(smithing_exp, 0) as smithing_exp
     from "Character"
     where id = ${characterId} and userid = ${session.userId}
     limit 1
@@ -33,6 +41,12 @@ export async function GET(req: Request) {
   
   // All character state comes from the flexible JSONB data column
   const characterData = c.data || {};
+  // Derive skill progress from raw exp columns (preferred over any JSONB blocks)
+  const mining = deriveSkillProgressFromExp(Number(c.mining_exp || 0));
+  const woodcutting = deriveSkillProgressFromExp(Number(c.woodcutting_exp || 0));
+  const fishing = deriveSkillProgressFromExp(Number(c.fishing_exp || 0));
+  const cooking = deriveSkillProgressFromExp(Number(c.cooking_exp || 0));
+  const smithing = deriveSkillProgressFromExp(Number(c.smithing_exp || 0));
 
   // Inventory stacks
   const stacks = await q<{ itemkey: string; count: number }>`
@@ -61,6 +75,12 @@ export async function GET(req: Request) {
       level: c.level,
       // Spread ALL data from JSONB column - includes everything your JS sent!
       ...characterData,
+  // Derived skills
+  mining,
+  woodcutting,
+  fishing,
+  cooking,
+  smithing,
       // Add inventory and quests from their dedicated tables
       inventory,
       quests: { active, completed }

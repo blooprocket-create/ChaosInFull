@@ -257,6 +257,12 @@ export class Tutorial extends Phaser.Scene {
         // mark character as having completed the tutorial so we skip it next time
         try {
             if (this._character) this._character.tutorialCompleted = true;
+            // Persist to server immediately so the next Play skips the tutorial without relying on localStorage
+            try {
+                if (typeof window !== 'undefined' && window.__cif_persist && this._character && this._character.id) {
+                    window.__cif_persist.saveCharacterPatch(this._character.id, { tutorialCompleted: true });
+                }
+            } catch (e) { /* ignore network errors; local state still updated */ }
             if (this._username) {
                 const userObj = loadUser(this._username, null);
                 if (userObj && Array.isArray(userObj.characters)) {

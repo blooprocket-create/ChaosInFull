@@ -99,6 +99,8 @@ export function persistCharacter(scene, username, options = {}) {
                 if (char.fishing) patch.fishing = char.fishing;
                 if (char.equipment) patch.equipment = char.equipment;
                 if (char.talents) patch.talents = char.talents;
+                // Include tutorial completion flag so routine saves capture it
+                if (char.tutorialCompleted === true) patch.tutorialCompleted = true;
                 if (char.lastLocation && typeof char.lastLocation === 'object') {
                     patch.lastScene = char.lastLocation.scene || null;
                     if (typeof char.lastLocation.x === 'number') patch.lastX = char.lastLocation.x;

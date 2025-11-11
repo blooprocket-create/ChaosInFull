@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   // Create character with default values
   // Use 'data' JSONB column for flexible storage of any character fields
   type Created = { id: string; name: string; class: string; level: number };
-    const initialData = computeInitialCharacterData({ race, weapon });
+  const initialData = computeInitialCharacterData({ race, weapon });
     
     // Detect presence of legacy columns and insert accordingly to avoid "column does not exist" or NOT NULL violations
     const presentCols = await q<{ column_name: string }>`
@@ -73,9 +73,23 @@ export async function POST(req: Request) {
     const hasDefense = presentCols.some(c => c.column_name === 'defense');
 
     let created: Created;
-    const stats = (initialData as any).stats || { str:1,int:1,agi:1,luk:1 };
-    // Remove stats from JSONB to avoid duplication now that columns exist.
-    delete (initialData as any).stats;
+    type Stats = { str: number; int: number; agi: number; luk: number };
+    const stats: Stats = (() => {
+      const s = (initialData as { stats?: unknown }).stats;
+      if (s && typeof s === 'object' && s !== null
+        && 'str' in s && 'int' in s && 'agi' in s && 'luk' in s
+        && typeof (s as Record<string, unknown>).str === 'number'
+        && typeof (s as Record<string, unknown>).int === 'number'
+        && typeof (s as Record<string, unknown>).agi === 'number'
+        && typeof (s as Record<string, unknown>).luk === 'number') {
+        const ss = s as Record<string, number>;
+        return { str: ss.str, int: ss.int, agi: ss.agi, luk: ss.luk };
+      }
+      return { str: 1, int: 1, agi: 1, luk: 1 };
+    })();
+  // Build JSONB payload (optionally excluding stats if columns exist)
+  const dataWithoutStats: Record<string, unknown> = { ...initialData };
+  delete (dataWithoutStats as { stats?: unknown }).stats;
 
     if (hasRace && hasStats && hasDefense) {
       const createdRows = await q<Created>`
@@ -83,7 +97,7 @@ export async function POST(req: Request) {
           id, userid, name, class, race, str, int, agi, luk, defense, data
         ) values (
           gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0,
-          ${JSON.stringify(initialData)}::jsonb
+          ${JSON.stringify(dataWithoutStats)}::jsonb
         )
         returning id, name, class, level
       `;
@@ -94,7 +108,7 @@ export async function POST(req: Request) {
           id, userid, name, class, str, int, agi, luk, defense, data
         ) values (
           gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${stats.str}, ${stats.int}, ${stats.agi}, ${stats.luk}, 0,
-          ${JSON.stringify(initialData)}::jsonb
+          ${JSON.stringify(dataWithoutStats)}::jsonb
         )
         returning id, name, class, level
       `;
@@ -105,7 +119,7 @@ export async function POST(req: Request) {
           id, userid, name, class, race, data
         ) values (
           gen_random_uuid()::text, ${session.userId}, ${name}, ${klass}, ${race},
-          ${JSON.stringify(initialData)}::jsonb
+          ${JSON.stringify(dataWithoutStats)}::jsonb
         )
         returning id, name, class, level
       `;
@@ -116,7 +130,7 @@ export async function POST(req: Request) {
           id, userid, name, class, data
         ) values (
           gen_random_uuid()::text, ${session.userId}, ${name}, ${klass},
-          ${JSON.stringify(initialData)}::jsonb
+          ${JSON.stringify(dataWithoutStats)}::jsonb
         )
         returning id, name, class, level
       `;
@@ -127,7 +141,7 @@ export async function POST(req: Request) {
     if (weapon) {
       await q`
         insert into "ItemStack" (characterid, itemkey, count)
-        values (${(created as any).id}, ${weapon}, 1)
+  values (${created.id}, ${weapon}, 1)
         on conflict (characterid, itemkey) do update set count = "ItemStack".count + 1
       `;
     }

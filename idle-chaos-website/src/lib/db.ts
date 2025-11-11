@@ -146,6 +146,23 @@ export async function ensureCharacterExtraColumns() {
   }
 }
 
+// Some older databases may be missing lastseenat; ensure it exists for patch updates
+let characterLastSeenChecked = false;
+export async function ensureCharacterLastSeenColumn() {
+  if (characterLastSeenChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`
+      alter table "Character"
+      add column if not exists lastseenat timestamptz default now()
+    `;
+  } catch {
+    // ignore
+  } finally {
+    characterLastSeenChecked = true;
+  }
+}
+
 // Ensure dedicated base stat columns (str,int,agi,luk) for characters.
 // These complement or replace any stats stored in JSONB 'data'.
 let characterStatColsChecked = false;
@@ -176,6 +193,25 @@ export async function ensureCharacterDefenseColumn() {
     // ignore
   } finally {
     characterDefenseColChecked = true;
+  }
+}
+
+// Optional: ensure mining_exp column for raw mining experience accumulation
+// Ensure all skill exp columns exist (mining, woodcutting, fishing, cooking, smithing)
+let characterSkillExpColsChecked = false;
+export async function ensureCharacterSkillExpColumns() {
+  if (characterSkillExpColsChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`alter table "Character" add column if not exists mining_exp int not null default 0`;
+    await sql`alter table "Character" add column if not exists woodcutting_exp int not null default 0`;
+    await sql`alter table "Character" add column if not exists fishing_exp int not null default 0`;
+    await sql`alter table "Character" add column if not exists cooking_exp int not null default 0`;
+    await sql`alter table "Character" add column if not exists smithing_exp int not null default 0`;
+  } catch {
+    // ignore
+  } finally {
+    characterSkillExpColsChecked = true;
   }
 }
 
