@@ -5,7 +5,7 @@ import { ENEMY_DEFS } from "@/src/game/phaser/data/enemies.js";
 import ORE_DEFS from "@/src/game/phaser/data/ores.js";
 import LOG_DEFS from "@/src/game/phaser/data/logs.js";
 import type { EnemyDef, EnemyDrop, EnemyGoldDrop, OreDef, LogDef } from "@/src/types/phaser-data";
-import { itemByKey } from "@/src/data/items";
+import ITEM_DEFS from "@/src/game/phaser/data/items.js";
 // Use dynamic enemy stat formulas from the original scene data (pure math, safe for client)
 import { computeEnemyStats, type ScaledEnemy } from "@/src/lib/statFormulas";
 
@@ -61,7 +61,7 @@ export default function WorldExplorer() {
   const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
   const friendlyItemName = (id?: string) => {
     if (!id) return "?";
-    const fromCatalog = itemByKey[id]?.name;
+    const fromCatalog = (ITEM_DEFS as unknown as Record<string, { name?: string }>)[id]?.name;
     if (fromCatalog) return fromCatalog;
     const alias = ITEM_NAME_ALIASES[id];
     if (alias) return alias;
@@ -69,14 +69,25 @@ export default function WorldExplorer() {
   };
   const itemCategoryBadge = (id?: string) => {
     if (!id) return null;
-    const def = itemByKey[id];
+    const def = (ITEM_DEFS as unknown as Record<string, any>)[id];
     if (!def) return null;
-    const color = def.category === 'ore' ? 'bg-amber-600/20 border-amber-500/30 text-amber-200'
-      : def.category === 'bar' ? 'bg-amber-500/20 border-amber-400/30 text-amber-100'
-      : def.category === 'weapon' ? 'bg-red-600/20 border-red-500/30 text-red-200'
-      : def.category === 'armor' ? 'bg-blue-600/20 border-blue-500/30 text-blue-200'
+    // Derive a category string from Phaser defs
+    const category = def.armor ? 'armor'
+      : def.weapon ? 'weapon'
+      : def.tool ? 'tool'
+      : /_ore$/.test(id) ? 'ore'
+      : /_bar$/.test(id) ? 'bar'
+      : /_potion$/.test(id) ? 'potion'
+      : /_log$/.test(id) ? 'log'
+      : /_essence$/.test(id) ? 'essence'
+      : 'item';
+    const color = category === 'ore' ? 'bg-amber-600/20 border-amber-500/30 text-amber-200'
+      : category === 'bar' ? 'bg-amber-500/20 border-amber-400/30 text-amber-100'
+      : category === 'weapon' ? 'bg-red-600/20 border-red-500/30 text-red-200'
+      : category === 'armor' ? 'bg-blue-600/20 border-blue-500/30 text-blue-200'
+      : category === 'tool' ? 'bg-emerald-600/20 border-emerald-500/30 text-emerald-200'
       : 'bg-white/10 border-white/20 text-gray-200';
-    return <span className={`ml-2 inline-block rounded px-1 py-0.5 text-[10px] border ${color}`}>{def.category}</span>;
+    return <span className={`ml-2 inline-block rounded px-1 py-0.5 text-[10px] border ${color}`}>{category}</span>;
   };
   return (
     <div className="mt-8 grid lg:grid-cols-12 gap-6">

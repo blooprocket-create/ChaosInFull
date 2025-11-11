@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
 import { assertAdmin } from "@/src/lib/authz";
 import { q } from "@/src/lib/db";
-import { items as SHOP_ITEMS } from "@/src/data/items";
+import ITEM_DEFS from "@/src/game/phaser/data/items.js";
 
 const ENEMIES: Array<{ id: string; name: string; level: number; basehp: number; expbase: number; goldmin: number; goldmax: number }> = [
   { id: "slime", name: "Slime", level: 1, basehp: 30, expbase: 5, goldmin: 1, goldmax: 3 },
@@ -21,9 +21,16 @@ export async function POST() {
   await q`delete from "AfkCombatState"`;
 
   // Items
-  for (const it of SHOP_ITEMS) {
+  for (const [id, def] of Object.entries(ITEM_DEFS as Record<string, any>)) {
+    // Derive buy/sell values from base value if present
+    const base = typeof def.value === 'number' && def.value >= 0 ? def.value : (typeof def.buy === 'number' ? def.buy : 0);
+    const buy = Math.floor(base * 1.1);
+    const sell = Math.floor(base * 0.8);
+    const rarity = def.rarity || 'common';
+    const stackable = !!def.stackable;
+    const maxstack = typeof def.maxStack === 'number' ? def.maxStack : (stackable ? 999 : 1);
     await q`insert into "ItemDef" (id, name, description, rarity, stackable, maxstack, buy, sell)
-            values (${it.key}, ${it.name}, '', 'common', true, 999, ${String(it.buy)}, ${String(it.sell)})
+            values (${id}, ${def.name || id}, ${def.description || ''}, ${rarity}, ${stackable}, ${maxstack}, ${buy}, ${sell})
             on conflict (id) do update set name = excluded.name, description = excluded.description, buy = excluded.buy, sell = excluded.sell`;
   }
   // NPCs
@@ -63,7 +70,7 @@ export async function POST() {
           values ('tutorial_craft_copper_dagger', 'Can you craft?', 'Craft one copper dagger at the workbench.', 'CRAFT', 'copper_dagger', 1, 'grimsley', 1, 'tutorial_kill_slimes_5', 150, 150)
           on conflict (id) do update set name = excluded.name, description = excluded.description, objectivetype = excluded.objectivetype, objectivetarget = excluded.objectivetarget, objectivecount = excluded.objectivecount, givernpcid = excluded.givernpcid, minlevel = excluded.minlevel, requiresquestid = excluded.requiresquestid, rewardcraftingexp = excluded.rewardcraftingexp, rewardexp = excluded.rewardexp`;
 
-  return NextResponse.json({ ok: true, seeded: { items: SHOP_ITEMS.length, enemies: ENEMIES.length, npcs: 1, quests: 2, zone: 1 } });
+  return NextResponse.json({ ok: true, seeded: { items: Object.keys(ITEM_DEFS).length, enemies: ENEMIES.length, npcs: 1, quests: 2, zone: 1 } });
 }
 
 export async function GET() {
