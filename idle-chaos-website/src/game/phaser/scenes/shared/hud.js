@@ -254,6 +254,22 @@ export function createHUD(scene) {
                         console.warn('HUD return: save error', saveErr);
                     }
 
+                    // Server-authoritative save of current scene and coordinates before leaving
+                    try {
+                        if (scene && scene.char && scene.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                            const currentSceneKey = (scene.scene && scene.scene.key) || null;
+                            const px = (scene.player && typeof scene.player.x === 'number') ? Math.floor(scene.player.x) : null;
+                            const py = (scene.player && typeof scene.player.y === 'number') ? Math.floor(scene.player.y) : null;
+                            // Update in-memory snapshot too
+                            try { scene.char.lastLocation = { scene: currentSceneKey, x: px, y: py }; } catch (e) {}
+                            window.__cif_persist.saveCharacterPatch(String(scene.char.id), {
+                                currentScene: currentSceneKey,
+                                lastX: px,
+                                lastY: py
+                            });
+                        }
+                    } catch (bridgeErr) { /* ignore patch errors */ }
+
                     // Confirm navigation
                     const proceed = window.confirm && window.confirm('Return to character select? Any unsaved temporary progress will be saved now. Continue?');
                     if (proceed) {

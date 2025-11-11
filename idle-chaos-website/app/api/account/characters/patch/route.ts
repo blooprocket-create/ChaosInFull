@@ -76,9 +76,14 @@ export async function POST(req: Request) {
   const lastY = typeof mergedPatch.lastY === 'number' && Number.isFinite(mergedPatch.lastY as number) ? (mergedPatch.lastY as number) : undefined;
   if (currentScene !== undefined || lastX !== undefined || lastY !== undefined) {
     try {
+      // Only update provided fields; if a value isn't provided, keep the existing DB value.
+      // Using COALESCE(null, column) preserves the current value when undefined/null was sent.
       await q`
         update "Character"
-        set currentscene = ${currentScene ?? null}, lastx = ${lastX ?? null}, lasty = ${lastY ?? null}, lastseenat = now()
+        set currentscene = coalesce(${currentScene ?? null}::text, currentscene),
+            lastx        = coalesce(${lastX ?? null}::double precision, lastx),
+            lasty        = coalesce(${lastY ?? null}::double precision, lasty),
+            lastseenat   = now()
         where id = ${characterId} and userid = ${session.userId}
       `;
     } catch (err: unknown) {
