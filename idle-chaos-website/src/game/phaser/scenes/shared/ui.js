@@ -826,6 +826,8 @@ const SETTINGS_KEY = 'chaosinfull_settings_v1';
 
 function loadSettings() {
     try {
+        // Prefer in-memory global (hydrated from server) if available
+        if (typeof window !== 'undefined' && window.__game_settings) return Object.assign({}, window.__game_settings);
         if (typeof localStorage === 'undefined') return {};
         const raw = localStorage.getItem(SETTINGS_KEY);
         if (!raw) return {};
@@ -836,7 +838,14 @@ function loadSettings() {
 function saveSettings(obj) {
     try {
         if (typeof localStorage === 'undefined') return;
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj || {}));
+        const snap = JSON.stringify(obj || {});
+        localStorage.setItem(SETTINGS_KEY, snap);
+        // Best-effort: persist to server for cross-character settings if available
+        try {
+            if (typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveUserSettingsPatch === 'function') {
+                window.__cif_persist.saveUserSettingsPatch(obj || {});
+            }
+        } catch (e) {}
     } catch (e) {}
 }
 
@@ -1296,6 +1305,29 @@ try { if (typeof window !== 'undefined') { window.__shared_ui = window.__shared_
 
 // Initialize global settings object from storage so other modules (movement.js) can read it
 try { if (typeof window !== 'undefined') { window.__game_settings = Object.assign({}, window.__game_settings || {}, loadSettings()); } } catch (e) {}
+
+// Attempt to hydrate settings from server on boot (no-op if unauthenticated)
+try {
+    if (typeof window !== 'undefined') {
+        const hydrate = async () => {
+            try {
+                if (window.__cif_persist && typeof window.__cif_persist.loadUserSettings === 'function') {
+                    const server = await window.__cif_persist.loadUserSettings();
+                    if (server && typeof server === 'object') {
+                        // Merge server over local and update globals
+                        const merged = Object.assign({}, loadSettings(), server);
+                        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged)); } catch (e) {}
+                        window.__game_settings = Object.assign({}, window.__game_settings || {}, merged);
+                        // Broadcast so active scenes can re-apply if listening
+                        try { window.dispatchEvent(new CustomEvent('settings:changed', { detail: { settings: merged } })); } catch (e) {}
+                    }
+                }
+            } catch (e) {}
+        };
+        // Defer slightly to avoid blocking scene boot
+        setTimeout(hydrate, 0);
+    }
+} catch (e) {}
 
 // Inventory slot constants
 const SLOT_COLS = 5;

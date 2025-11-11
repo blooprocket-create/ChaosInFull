@@ -474,3 +474,16 @@ export async function getUsernamesByIds(userIds: string[]) {
     return new Map<string, string>();
   }
 }
+
+// Ensure a user-level settings JSONB column for global preferences (audio, gameplay, etc.)
+let userSettingsColChecked = false;
+export async function ensureUserSettingsColumn() {
+  if (userSettingsColChecked) return;
+  try {
+    await sql`alter table "User" add column if not exists settings jsonb not null default '{}'::jsonb`;
+  } catch {
+    // ignore
+  } finally {
+    userSettingsColChecked = true;
+  }
+}

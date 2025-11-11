@@ -24,7 +24,7 @@ type PhaserSceneLike = {
 type PhaserGameLike = { scene?: { getScenes?: (active: boolean) => PhaserSceneLike[] } };
 type HudSharedLike = { updateHUD?: (scene: PhaserSceneLike) => void };
 type SharedUiLike = { refreshStatsModal?: (scene: PhaserSceneLike) => void };
-type ExtendedWindow = Window & { GAME?: PhaserGameLike; __hud_shared?: HudSharedLike; __shared_ui?: SharedUiLike };
+type ExtendedWindow = Window & { GAME?: PhaserGameLike; __hud_shared?: HudSharedLike; __shared_ui?: SharedUiLike; __game_settings?: Record<string, unknown> };
 
 declare global {
   interface Window {
@@ -43,6 +43,8 @@ declare global {
   queueSkillXp: (characterId: string, skill: SkillName, amount: number) => Promise<void>;
       migrateLocalStorageBlob: (username: string) => Promise<void>;
       loadCharacterFull: (characterId: string) => Promise<LoadedCharacter | null>;
+      loadUserSettings: () => Promise<Record<string, unknown>>;
+      saveUserSettingsPatch: (patch: Record<string, unknown>) => Promise<Record<string, unknown>>;
     };
     __persistFlags?: {
       disableServerWrites?: boolean;
@@ -50,6 +52,7 @@ declare global {
     __skillXpQueue?: Record<string, number>;
     __skillXpFlushTimer?: number | null;
     __inventorySync?: Record<string, { inflight: Promise<Record<string, number>> | null; pending: Record<string, number> | null }>;
+    __game_settings?: Record<string, unknown>;
   }
 }
 
@@ -191,7 +194,11 @@ function installPersistenceBridge() {
                   if (gained > 0) {
                     const mod = await import("@/src/game/phaser/data/talents.js");
                     const onSkillLevelUp = (mod as unknown as { onSkillLevelUp?: (scene: PhaserSceneLike, char: CharacterLike, skillKey: string, levelsGained?: number) => void }).onSkillLevelUp;
-                    try { onSkillLevelUp && onSkillLevelUp(s as PhaserSceneLike, ch as CharacterLike, skill, gained); } catch {}
+                    try {
+                      if (onSkillLevelUp) {
+                        onSkillLevelUp(s as PhaserSceneLike, ch as CharacterLike, skill, gained);
+                      }
+                    } catch {}
                     try {
                       const t = (ch as { talents?: Record<string, unknown> }).talents;
                       if (t && typeof window.__cif_persist?.saveTalents === 'function' && ch.id) {
@@ -473,6 +480,40 @@ function installPersistenceBridge() {
         completedQuests
       };
     },
+      async loadUserSettings() {
+        try {
+          const data = await fetchJSON<{ ok: boolean; settings?: Record<string, unknown> }>(`/api/account/settings`);
+          return data?.settings || {};
+        } catch {
+          return {};
+        }
+      },
+      async saveUserSettingsPatch(patch: Record<string, unknown>) {
+        try {
+          const res = await fetch('/api/account/settings', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ settings: patch })
+          });
+          const data = await res.json().catch(()=>null) as { ok?: boolean; settings?: Record<string, unknown> } | null;
+          if (res.ok && data?.settings) {
+            // propagate to global window.__game_settings for immediate effect
+            try {
+              const w = window as ExtendedWindow;
+              const merged = { ...(w.__game_settings || {}), ...data.settings };
+              w.__game_settings = merged;
+              window.dispatchEvent(new CustomEvent('settings:changed', { detail: { settings: merged } }));
+              return merged;
+            } catch {}
+            return data.settings;
+          }
+          const w2 = window as ExtendedWindow;
+          return w2.__game_settings || {};
+        } catch {
+          const w3 = window as ExtendedWindow;
+          return w3.__game_settings || {};
+        }
+      },
     async getAccountStorage() {
       const data = await fetchJSON<{ items: Record<string, number> }>('/api/account/storage');
       if (!data || !data.items) return Array.from({ length: 50 }).map(() => null);
