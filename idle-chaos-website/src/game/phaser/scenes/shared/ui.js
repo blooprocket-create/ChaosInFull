@@ -1,4 +1,5 @@
 import { effectiveStats, makeStatPill, formatSkillLine, checkClassLevelUps } from './stats.js';
+import { syncInventoryToServer } from './persistence.js';
 import { getTabsForClass, TALENT_TAB_ORDER, getTalentTab, ensureCharTalents, processTalentAllocation, getTalentDefById } from '../../data/talents.js';
 // Talent / Buff icon resolution helper
 // Attempts to derive an icon file path for a talent (or buff mapped to a talent) based on:
@@ -4172,11 +4173,29 @@ export function equipItemFromInventory(scene, itemId) {
     } catch (e) { /* ignore quest progress errors */ }
     
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
+    // Explicitly sync inventory delta to server (ItemStack table) after equip
+    try { syncInventoryToServer(scene); } catch (e) {}
+    // Persist equipment change to server immediately
+    try {
+        const charId = (scene && scene.char && scene.char.id) || (scene && scene._character && scene._character.id) || null;
+        if (charId && window && window.__cif_persist && typeof window.__cif_persist.saveEquipment === 'function') {
+            window.__cif_persist.saveEquipment(charId, scene.char.equipment || {});
+        }
+    } catch (e) {}
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 
 export function unequipItem(scene, slot) {
     if (!scene || !scene.char || !scene.char.equipment) return; const eq = scene.char.equipment[slot]; if (!eq) return; removeEquipmentBonuses(scene, eq); scene.char.inventory = initSlots(scene.char.inventory); addItemToSlots(scene.char.inventory, eq.id, 1); scene.char.equipment[slot] = null; const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null; if (scene._persistCharacter) scene._persistCharacter(username);
+    // Explicitly sync inventory delta to server (ItemStack table) after unequip
+    try { syncInventoryToServer(scene); } catch (e) {}
+    // Persist equipment change to server immediately
+    try {
+        const charId = (scene && scene.char && scene.char.id) || (scene && scene._character && scene._character.id) || null;
+        if (charId && window && window.__cif_persist && typeof window.__cif_persist.saveEquipment === 'function') {
+            window.__cif_persist.saveEquipment(charId, scene.char.equipment || {});
+        }
+    } catch (e) {}
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}
 }
 

@@ -121,6 +121,30 @@ export function createHUD(scene) {
         }
     } catch (e) {}
 
+    // Listen for centralized skill progress updates and reflect them immediately
+    try {
+        const onSkillProgress = (ev) => {
+            try {
+                const detail = ev && ev.detail ? ev.detail : {};
+                const cid = detail.characterId; const skill = detail.skill; const progress = detail.progress || {};
+                if (!cid || !skill) return;
+                const ch = scene.char || {};
+                if (ch.id && cid !== ch.id) return; // different character
+                const current = ch[skill] || { level:1, exp:0, expToLevel:100 };
+                ch[skill] = Object.assign({}, current, progress);
+                try { updateHUD(scene); } catch (e) {}
+            } catch (e) {}
+        };
+        window.addEventListener('skill:progress', onSkillProgress);
+        // Cleanup on destroy
+        try {
+            if (scene.events && scene.events.once) {
+                scene.events.once('shutdown', () => { try { window.removeEventListener('skill:progress', onSkillProgress); } catch (e) {} });
+                scene.events.once('destroy', () => { try { window.removeEventListener('skill:progress', onSkillProgress); } catch (e) {} });
+            }
+        } catch (e) {}
+    } catch (e) {}
+
     setTimeout(() => {
     const btn = document.getElementById(charBtnId);
         if (btn) {

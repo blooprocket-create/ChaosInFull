@@ -1234,6 +1234,12 @@ function onCharacterLevelUp(scene, char, levelsGained = 1) {
         const nonStarTabs = (tabs || []).filter(tid => { const t = TALENT_TABS[tid]; return t && t.type !== 'star'; });
         const pointsPerTab = 3 * Number(levelsGained || 0);
         awardPointsForTabs(char, nonStarTabs, pointsPerTab);
+        // Persist talents if bridge available
+        try {
+            if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                window.__cif_persist.saveTalents(String(char.id), char.talents || {});
+            }
+        } catch (e) {}
         try {
             if (scene && typeof scene._showToast === 'function') scene._showToast && scene._showToast(`Gained ${pointsPerTab} talent points per unlocked tab.`);
             else if (typeof console !== 'undefined') console.log && console.log('Talent points awarded:', { perTab: pointsPerTab, tabs: nonStarTabs });
@@ -1249,6 +1255,12 @@ function onSkillLevelUp(scene, char, skillKey, levelsGained = 1) {
         const nonStarTabs = (tabs || []).filter(tid => { const t = TALENT_TABS[tid]; return t && t.type !== 'star'; });
         const pointsPerTab = 1 * Number(levelsGained || 0);
         awardPointsForTabs(char, nonStarTabs, pointsPerTab);
+        // Persist talents if bridge available
+        try {
+            if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                window.__cif_persist.saveTalents(String(char.id), char.talents || {});
+            }
+        } catch (e) {}
         try {
             if (scene && typeof scene._showToast === 'function') scene._showToast && scene._showToast(`+${pointsPerTab} talent point(s) per unlocked tab from ${skillKey} level up.`);
             else if (typeof console !== 'undefined') console.log && console.log('Skill talent points awarded', { skill: skillKey, perTab: pointsPerTab, tabs: nonStarTabs });
@@ -1344,6 +1356,12 @@ function processTalentAllocation(scene, char, tabId, talentId, prevAlloc = 0, ne
             // trigger HUD + stats modal refresh if available
             try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch (e) {}
             try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
+            // Persist talents after allocation change
+            try {
+                if (scene.char && scene.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                    window.__cif_persist.saveTalents(String(scene.char.id), scene.char.talents || {});
+                }
+            } catch (e) {}
         }
     } catch (e) { /* ignore */ }
 }

@@ -11,6 +11,21 @@ type SaveCharacterPayload = {
   [k: string]: unknown;
 };
 
+// Local helper types to avoid any
+type SkillName = 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
+type SkillProgress = { level: number; exp: number; expToLevel: number };
+type CharacterLike = { id?: string; [k: string]: unknown };
+type PhaserSceneLike = {
+  char?: CharacterLike;
+  _updateHUD?: () => void;
+  _createHUD?: () => void;
+  _statsModal?: unknown;
+};
+type PhaserGameLike = { scene?: { getScenes?: (active: boolean) => PhaserSceneLike[] } };
+type HudSharedLike = { updateHUD?: (scene: PhaserSceneLike) => void };
+type SharedUiLike = { refreshStatsModal?: (scene: PhaserSceneLike) => void };
+type ExtendedWindow = Window & { GAME?: PhaserGameLike; __hud_shared?: HudSharedLike; __shared_ui?: SharedUiLike };
+
 declare global {
   interface Window {
     __cif_persist?: {
@@ -19,6 +34,8 @@ declare global {
       getAccountStorage: () => Promise<Array<{ itemkey: string; count: number } | null>>;
       upsertAccountStorage: (items: Record<string, number>) => Promise<void>;
       saveCharacterPatch: (characterId: string, patch: Record<string, unknown>) => Promise<void>;
+  saveEquipment: (characterId: string, equipment: Record<string, unknown>) => Promise<void>;
+    saveTalents: (characterId: string, talents: Record<string, unknown>) => Promise<void>;
       saveQuests: (characterId: string, active: Array<{ id: string; progress?: unknown }>, completed: string[]) => Promise<void>;
       grantSkillXp: (characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) => Promise<{ level: number; exp: number; expToLevel: number } | null>;
   queueSkillXp: (characterId: string, skill: 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing', amount: number) => Promise<void>;
@@ -108,7 +125,7 @@ function installPersistenceBridge() {
         /* swallow */
       }
     },
-    async grantSkillXp(characterId, skill, amount) {
+  async grantSkillXp(characterId, skill, amount) {
       if (!characterId || !skill || !Number.isFinite(amount) || amount <= 0) return null;
       // Allow offline play or local-only sessions to skip server writes
       if (window.__persistFlags?.disableServerWrites) {
@@ -130,21 +147,50 @@ function installPersistenceBridge() {
           emitTelemetry('xp_grant_success', { characterId, skill, amount, level: progress.level, exp: progress.exp, expToLevel: progress.expToLevel });
           // Side-effect: update any active Phaser scene's local character skill object so HUD & stats modal reflect server state.
           try {
-            const w: any = window as unknown as Record<string, unknown>;
-            const game = w.GAME as { scene?: { getScenes?: (active: boolean) => any[] } } | undefined;
-            const scenes = game?.scene?.getScenes ? game.scene.getScenes(true) : [];
-            for (const s of scenes) {
+            const w = window as ExtendedWindow;
+            const game = w.GAME;
+            const scenesUnknown: unknown[] = game?.scene?.getScenes ? (game.scene.getScenes(true) as unknown[]) : [];
+            for (const sUnknown of scenesUnknown) {
+              const s = sUnknown as PhaserSceneLike;
               try {
-                const ch = s?.char;
+                const ch = s?.char as CharacterLike | undefined;
                 if (!ch || (ch.id && ch.id !== characterId)) continue;
                 // Ensure skill container exists
-                const existing = ch[skill] || { level: 1, exp: 0, expToLevel: 100 };
-                ch[skill] = { ...existing, ...progress };
+                const existing = (ch[skill as keyof CharacterLike] as SkillProgress | undefined) || { level: 1, exp: 0, expToLevel: 100 };
+                const oldLevel = Number(existing.level || 1);
+                // Merge server progress into local character skill
+                (ch as Record<string, unknown>)[skill] = { ...existing, ...progress } as SkillProgress;
+                // If level increased, award talent points and persist talents snapshot
+                try {
+                  const newLevel = Number(progress.level || oldLevel);
+                  const gained = Math.max(0, newLevel - oldLevel);
+                  if (gained > 0) {
+                    const mod = await import("@/src/game/phaser/data/talents.js");
+                    const onSkillLevelUp = (mod as unknown as { onSkillLevelUp?: (scene: PhaserSceneLike, char: CharacterLike, skillKey: string, levelsGained?: number) => void }).onSkillLevelUp;
+                    try { onSkillLevelUp && onSkillLevelUp(s as PhaserSceneLike, ch as CharacterLike, skill, gained); } catch {}
+                    try {
+                      const t = (ch as { talents?: Record<string, unknown> }).talents;
+                      if (t && typeof window.__cif_persist?.saveTalents === 'function' && ch.id) {
+                        await window.__cif_persist.saveTalents(String(ch.id), t);
+                      }
+                    } catch {}
+                  }
+                } catch {}
                 // Fire a custom event for any React/DOM listeners
                 try { window.dispatchEvent(new CustomEvent('skill:progress', { detail: { characterId, skill, progress } })); } catch {}
                 // Refresh HUD & stats modal if helpers exist
-                try { if (typeof s._updateHUD === 'function') s._updateHUD(); else if (typeof s._createHUD === 'function') { try { s._createHUD(); } catch {} } } catch {}
-                try { if (s._statsModal && (window as any).__shared_ui?.refreshStatsModal) (window as any).__shared_ui.refreshStatsModal(s); } catch {}
+                try {
+                  if (typeof s._updateHUD === 'function') s._updateHUD();
+                  else {
+                    const hudShared: HudSharedLike | undefined = (w.__hud_shared as HudSharedLike | undefined);
+                    if (hudShared?.updateHUD) { try { hudShared.updateHUD(s); } catch {} }
+                    else if (typeof s._createHUD === 'function') { try { s._createHUD(); } catch {} }
+                  }
+                } catch {}
+                try {
+                  const sharedUI: SharedUiLike | undefined = (w.__shared_ui as SharedUiLike | undefined);
+                  if (s._statsModal && sharedUI?.refreshStatsModal) sharedUI.refreshStatsModal(s);
+                } catch {}
               } catch {}
             }
           } catch {}
@@ -231,6 +277,36 @@ function installPersistenceBridge() {
         else emitTelemetry('character_patch_fail', { characterId, status: res.status });
       } catch {
         emitTelemetry('character_patch_fail', { characterId, network: true });
+      }
+    },
+    async saveEquipment(characterId, equipment) {
+      if (!characterId) return;
+      if (window.__persistFlags?.disableServerWrites) return;
+      try {
+        const res = await fetch('/api/account/characters/equipment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ characterId, equipment })
+        });
+        if (res.ok) emitTelemetry('equipment_sync_success', { characterId });
+        else emitTelemetry('equipment_sync_fail', { characterId, status: res.status });
+      } catch {
+        emitTelemetry('equipment_sync_fail', { characterId, network: true });
+      }
+    },
+    async saveTalents(characterId, talents) {
+      if (!characterId) return;
+      if (window.__persistFlags?.disableServerWrites) return;
+      try {
+        const res = await fetch('/api/account/characters/talents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ characterId, talents })
+        });
+        if (res.ok) emitTelemetry('talents_sync_success', { characterId });
+        else emitTelemetry('talents_sync_fail', { characterId, status: res.status });
+      } catch {
+        emitTelemetry('talents_sync_fail', { characterId, network: true });
       }
     },
     async saveQuests(characterId, active, completed) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureItemStackTable, ensureCharacterQuestTable, ensureCharacterSkillExpColumns, ensureCharacterEquipmentColumn, ensureCharacterTalentsColumn } from "@/src/lib/db";
 import { deriveSkillProgressFromExp } from "@/src/lib/skills";
 
 // Fetch a full hydrated character snapshot (core row + inventory stacks + quests).
@@ -19,19 +19,25 @@ export async function GET(req: Request) {
   await ensureItemStackTable();
   await ensureCharacterQuestTable();
   await ensureCharacterSkillExpColumns();
+  await ensureCharacterEquipmentColumn();
+  await ensureCharacterTalentsColumn();
 
   // Ownership & core row (with flexible JSONB data)
   const rows = await q<{
     id: string; name: string; class: string; level: number;
     data: Record<string, unknown>;
     mining_exp?: number; woodcutting_exp?: number; fishing_exp?: number; cooking_exp?: number; smithing_exp?: number;
+    equipment?: Record<string, unknown>;
+    talents?: Record<string, unknown>;
   }>`
     select id, name, class, level, data,
            coalesce(mining_exp, 0) as mining_exp,
            coalesce(woodcutting_exp, 0) as woodcutting_exp,
            coalesce(fishing_exp, 0) as fishing_exp,
            coalesce(cooking_exp, 0) as cooking_exp,
-           coalesce(smithing_exp, 0) as smithing_exp
+           coalesce(smithing_exp, 0) as smithing_exp,
+           equipment,
+           talents
     from "Character"
     where id = ${characterId} and userid = ${session.userId}
     limit 1
@@ -41,6 +47,8 @@ export async function GET(req: Request) {
   
   // All character state comes from the flexible JSONB data column
   const characterData = c.data || {};
+  const equipment = (c.equipment && typeof c.equipment === 'object') ? c.equipment : ((characterData as Record<string, unknown>).equipment || null);
+  const talents = (c.talents && typeof c.talents === 'object') ? c.talents : ((characterData as Record<string, unknown>).talents || null);
   // Derive skill progress from raw exp columns (preferred over any JSONB blocks)
   const mining = deriveSkillProgressFromExp(Number(c.mining_exp || 0));
   const woodcutting = deriveSkillProgressFromExp(Number(c.woodcutting_exp || 0));
@@ -75,6 +83,10 @@ export async function GET(req: Request) {
       level: c.level,
       // Spread ALL data from JSONB column - includes everything your JS sent!
       ...characterData,
+      // Prefer dedicated equipment column if present
+      ...(equipment ? { equipment } : {}),
+    // Prefer dedicated talents column if present
+    ...(talents ? { talents } : {}),
   // Derived skills
   mining,
   woodcutting,

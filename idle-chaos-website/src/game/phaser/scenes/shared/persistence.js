@@ -186,6 +186,19 @@ export function loadCharacter(username, characterId) {
     return null;
 }
 
+// Shared helper: Convert slot array -> map and push to ItemStack API via client bridge.
+// Usage: syncInventoryToServer(scene)
+export function syncInventoryToServer(scene) {
+    try {
+        if (!scene || !scene.char || !scene.char.id) return;
+        if (typeof window === 'undefined' || !window.__cif_persist || typeof window.__cif_persist.saveInventory !== 'function') return;
+        const map = {};
+        const inv = Array.isArray(scene.char.inventory) ? scene.char.inventory : [];
+        for (const s of inv) { if (s && s.id) map[s.id] = (map[s.id] || 0) + (s.qty || 1); }
+        window.__cif_persist.saveInventory(scene.char.id, map);
+    } catch (e) { /* ignore */ }
+}
+
 export default {
     persistCharacter,
     loadCharacter

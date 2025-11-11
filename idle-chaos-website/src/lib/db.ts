@@ -196,6 +196,40 @@ export async function ensureCharacterDefenseColumn() {
   }
 }
 
+// Ensure a dedicated equipment JSONB column for characters
+let characterEquipmentColChecked = false;
+export async function ensureCharacterEquipmentColumn() {
+  if (characterEquipmentColChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`
+      alter table "Character"
+      add column if not exists equipment jsonb not null default '{}'::jsonb
+    `;
+  } catch {
+    // ignore
+  } finally {
+    characterEquipmentColChecked = true;
+  }
+}
+
+// Ensure a dedicated talents JSONB column for characters
+let characterTalentsColChecked = false;
+export async function ensureCharacterTalentsColumn() {
+  if (characterTalentsColChecked) return;
+  try {
+    await ensureCharacterTable();
+    await sql`
+      alter table "Character"
+      add column if not exists talents jsonb not null default '{}'::jsonb
+    `;
+  } catch {
+    // ignore
+  } finally {
+    characterTalentsColChecked = true;
+  }
+}
+
 // Optional: ensure mining_exp column for raw mining experience accumulation
 // Ensure all skill exp columns exist (mining, woodcutting, fishing, cooking, smithing)
 let characterSkillExpColsChecked = false;

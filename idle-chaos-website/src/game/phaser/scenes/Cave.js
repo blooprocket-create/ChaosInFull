@@ -10,6 +10,7 @@ import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState
 import { applyCombatMixin } from './shared/combat.js';
 import { attach as attachCleanup, addTimeEvent } from '../shared/cleanupManager.js';
 import { ensureGameCanvasVisible } from './shared/theme.js';
+import { syncInventoryToServer } from './shared/persistence.js';
 // Cave scene: HUD similar to Town, WASD+E controls, right-side portal, one mining node for testing
 export class Cave extends Phaser.Scene {
     constructor() {
@@ -1309,6 +1310,21 @@ export class Cave extends Phaser.Scene {
                 localStorage.setItem(key, JSON.stringify(userObj));
             }
         } catch (e) { console.warn('Could not persist character', e); }
+
+        // Forward inventory + basic patch to server so ItemStack table stays in sync while mining.
+        try {
+            const charId = (this.char && this.char.id) || null;
+            if (charId && typeof window !== 'undefined' && window.__cif_persist) {
+                try { syncInventoryToServer(this); } catch (e) {}
+                // Minimal patch for mining progress (so server has up-to-date vein timers etc. if stored)
+                try {
+                    if (window.__cif_persist.saveCharacterPatch) {
+                        const miningPatch = this.char.mining ? { mining: this.char.mining } : {};
+                        if (Object.keys(miningPatch).length) window.__cif_persist.saveCharacterPatch(charId, miningPatch);
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        } catch (e) { /* ignore server forward errors */ }
         // Refresh inventory modal if open so changes appear immediately
         try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }

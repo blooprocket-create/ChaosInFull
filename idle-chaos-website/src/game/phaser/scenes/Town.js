@@ -9,6 +9,7 @@ import { applySafeZoneRegen } from './shared/stats.js';
 import { applyCombatMixin } from './shared/combat.js';
 import { attach, addTimeEvent } from '../shared/cleanupManager.js';
 import { ensureGameCanvasVisible } from './shared/theme.js';
+import { syncInventoryToServer } from './shared/persistence.js';
 
 // Clean Town scene implementation
 export class Town extends Phaser.Scene {
@@ -669,24 +670,7 @@ export class Town extends Phaser.Scene {
                 window.__cif_persist.saveCharacter(username, this.char);
                 
                 // IMPORTANT: Also sync inventory to ItemStack table
-                if (this.char.id && window.__cif_persist.saveInventory) {
-                    const invMap = {};
-                    const inv = this.char.inventory || [];
-                    for (const slot of inv) {
-                        // Skip null/undefined slots
-                        if (!slot) continue;
-                        // Use slot.id as the item key
-                        const itemKey = slot.id;
-                        if (!itemKey) continue;
-                        // Accumulate quantities for the same item key
-                        const qty = slot.qty || 1;
-                        invMap[itemKey] = (invMap[itemKey] || 0) + qty;
-                    }
-                    console.log('[Town] Syncing inventory to database:', invMap);
-                    window.__cif_persist.saveInventory(this.char.id, invMap).catch((err) => {
-                        console.warn('[Town] Failed to sync inventory:', err);
-                    });
-                }
+                try { syncInventoryToServer(this); } catch (e) {}
             }
         } catch (e) { /* ignore */ }
         

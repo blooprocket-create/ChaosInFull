@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/src/lib/auth";
-import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterLastSeenColumn } from "@/src/lib/db";
+import { q, ensureCharacterTable, ensureCharacterExtraColumns, ensureCharacterLastSeenColumn, ensureCharacterTalentsColumn } from "@/src/lib/db";
 
 // Flexible patch update for character fields
 // Accepts ANY fields from the client and merges them into the JSONB 'data' column
@@ -16,6 +16,7 @@ export async function POST(req: Request) {
   await ensureCharacterTable();
   await ensureCharacterExtraColumns();
   await ensureCharacterLastSeenColumn();
+  await ensureCharacterTalentsColumn();
 
   // Ownership check
   const owned = await q<{ id: string; data: Record<string, unknown> }>`
@@ -27,9 +28,28 @@ export async function POST(req: Request) {
 
   // Get current data
   const currentData = owned[0].data || {};
-  
-  // Merge patch data into current data (shallow merge)
-  const mergedData = { ...currentData, ...patchData };
+  // If talents provided in patch, update talents column and remove from JSONB merge payload
+  // Use const (object is still mutable if needed but we never reassign the reference)
+  const mergedPatch = { ...patchData } as Record<string, unknown>;
+  const incomingTalents = mergedPatch.talents as unknown;
+  const hasTalents = incomingTalents && typeof incomingTalents === 'object';
+  if (hasTalents) {
+    try {
+      await q`
+        update "Character"
+        set talents = ${JSON.stringify(incomingTalents as Record<string, unknown>)}::jsonb, lastseenat = now()
+        where id = ${characterId} and userid = ${session.userId}
+      `;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Character talents patch error:', message);
+      // continue to process rest of patch even if talents fails
+    }
+    delete mergedPatch.talents;
+  }
+
+  // Merge remaining patch fields into current JSONB data (shallow)
+  const mergedData = { ...currentData, ...mergedPatch };
   
   try {
     // Simple update - just set the data JSONB column and update timestamp
