@@ -1,7 +1,7 @@
 // Phaser is loaded globally from CDN
 
 import { createAtmosphericOverlays } from './shared/overlays.js';
-import { saveUser, iterUsers, saveJson } from './shared/storage.js';
+// Removed localStorage-based persistence utilities; character selection now relies solely on server API
 import { applyDefaultBackground, captureBodyStyle, restoreBodyStyle } from './shared/theme.js';
 import { ensureCharTalents } from '../data/talents.js';
 import { applyCombatMixin } from './shared/combat.js';
@@ -83,37 +83,27 @@ export class CharacterSelect extends Phaser.Scene {
         };
 
 
-                // Load account details
-        const deriveUsername = (key, obj) => {
-            if (obj && obj.username) return obj.username;
-            if (key && key.startsWith('cif_user_')) return key.slice('cif_user_'.length);
-            return (obj && obj.name) || key || '';
-        };
+                // Server-backed character list (no localStorage fallback)
+                let username = '';
+                let characters = [];
+                let _loading = true;
+                let _loadError = null;
 
-        let username = '';
-        let userObj = null;
-
-        iterUsers((key, obj) => {
-            if (userObj || !obj) return;
-            if (obj.loggedIn) {
-                username = deriveUsername(key, obj);
-                userObj = obj;
-            }
-        });
-
-        if (!userObj) {
-            iterUsers((key, obj) => {
-                if (!userObj && obj) {
-                    username = deriveUsername(key, obj);
-                    userObj = obj;
+                async function fetchCharacters() {
+                    _loading = true; _loadError = null;
+                    try {
+                        const res = await fetch('/api/account/characters', { cache: 'no-store' });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to load characters');
+                        characters = Array.isArray(data.characters) ? data.characters : [];
+                        // We don't have username here; can derive from session later via a dedicated endpoint if needed.
+                    } catch (e) {
+                        _loadError = e instanceof Error ? e.message : 'Load error';
+                        characters = [];
+                    } finally {
+                        _loading = false;
+                    }
                 }
-            });
-        }
-
-        if (userObj && !userObj.username && username) {
-            userObj.username = username;
-            try { saveUser(username, userObj); } catch (e) { /* ignore username backfill errors */ }
-        }
 
 // UUID helper (v4) for character ids
         function uuidv4() {
@@ -152,7 +142,8 @@ export class CharacterSelect extends Phaser.Scene {
     // Ensure the panel is below the navbar so top links remain clickable
     container.style.zIndex = '10';
 
-        let characters = (userObj && userObj.characters) ? userObj.characters : [];
+    // Initial empty list; will render loading state until fetch completes
+    characters = [];
 
         // Keep visuals consistent with Login: same fonts, blocky panel, red accent
         container.innerHTML = `
@@ -248,10 +239,27 @@ export class CharacterSelect extends Phaser.Scene {
         // Render characters list (reusable)
         function renderCharacterList() {
             try {
-                characters = (userObj && userObj.characters) ? userObj.characters : [];
+                // characters already populated from server fetch
                 const list = document.getElementById('char-list');
                 if (!list) return;
                 list.innerHTML = '';
+                if (_loading) {
+                    const loadingEl = document.createElement('div');
+                    loadingEl.style.color = '#bbb';
+                    loadingEl.textContent = 'Loading…';
+                    list.appendChild(loadingEl);
+                    return;
+                }
+                if (_loadError) {
+                    const errEl = document.createElement('div');
+                    errEl.style.color = '#ff6b6b';
+                    errEl.style.fontSize = '0.8rem';
+                    errEl.textContent = _loadError + ' (reload)';
+                    errEl.style.cursor = 'pointer';
+                    errEl.onclick = async () => { await fetchCharacters(); renderCharacterList(); };
+                    list.appendChild(errEl);
+                    return;
+                }
                 for (let i = 0; i < 7; i++) {
                     const slot = characters[i];
                     const tile = document.createElement('div');
@@ -289,8 +297,8 @@ export class CharacterSelect extends Phaser.Scene {
             } catch (e) { /* ignore render errors */ }
         }
 
-        // initial render
-        renderCharacterList();
+    // Fetch from server then render
+    fetchCharacters().then(() => { renderCharacterList(); }).catch(() => { renderCharacterList(); });
 
         // Initialize central preview with first available character or placeholder
         try {
@@ -371,151 +379,21 @@ export class CharacterSelect extends Phaser.Scene {
             if (!selectedChar) return;
             const char = selectedChar;
             closeCreateModal();
-            
-            // Sync localStorage character to database on every play
+            // Fetch fresh full character record before entering game
             if (char.id) {
                 try {
-                    // Check if character exists in database
-                    const checkRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`);
-                    const checkData = await checkRes.json();
-                    
-                    let charId = char.id;
-                    
-                    if (!checkData.ok || !checkData.character) {
-                        // Character doesn't exist in DB - create it first
-                        console.log('Creating character in database:', char.name);
-                        const formData = new FormData();
-                        formData.set('name', char.name || 'Unnamed');
-                        formData.set('gender', char.gender || 'Male');
-                        formData.set('hat', char.hat || 'STR');
-                        if (char.race) formData.set('race', char.race);
-                        if (char.weapon) formData.set('weapon', char.weapon);
-                        
-                        const createRes = await fetch('/api/account/characters', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        const createData = await createRes.json();
-                        
-                        if (createData.ok && createData.character) {
-                            charId = createData.character.id;
-                            char.id = charId;
-                            console.log('Character created in database with ID:', charId);
+                    const freshRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(char.id)}`);
+                    const freshData = await freshRes.json();
+                    if (freshData.ok && freshData.character) {
+                        const dbChar = freshData.character;
+                        if (dbChar.quests) {
+                            if (Array.isArray(dbChar.quests.active)) dbChar.activeQuests = dbChar.quests.active;
+                            if (Array.isArray(dbChar.quests.completed)) dbChar.completedQuests = dbChar.quests.completed;
+                            delete dbChar.quests;
                         }
+                        Object.assign(char, dbChar);
                     }
-                    
-                    // ALWAYS sync localStorage data to database on play (even if character already exists)
-                    // This ensures database has the latest state from localStorage
-                    console.log('Syncing localStorage data to database for:', char.name);
-                    
-                    const patchData = {
-                        characterId: charId,
-                        // Core progression
-                        ...(char.gold !== undefined && { gold: char.gold }),
-                        ...(char.level !== undefined && { level: char.level }),
-                        ...(char.exp !== undefined && { exp: char.exp }),
-                        ...(char.expToLevel !== undefined && { expToLevel: char.expToLevel }),
-                        // Character appearance/setup
-                        ...(char.gender && { gender: char.gender }),
-                        ...(char.hat && { hat: char.hat }),
-                        ...(char.race && { race: char.race }),
-                        ...(char.weapon && { weapon: char.weapon }),
-                        // Game state objects
-                        ...(char.flags && { flags: char.flags }),
-                        ...(char.equipment && { equipment: char.equipment }),
-                        ...(char.talents && { talents: char.talents }),
-                        ...(char.stats && { stats: char.stats }),
-                        // Skills - only include if they exist (have been used)
-                        ...(char.mining && { mining: char.mining }),
-                        ...(char.woodcutting && { woodcutting: char.woodcutting }),
-                        ...(char.crafting && { crafting: char.crafting }),
-                        ...(char.fishing && { fishing: char.fishing }),
-                        ...(char.smithing && { smithing: char.smithing }),
-                        ...(char.cooking && { cooking: char.cooking }),
-                        // Other game state
-                        ...(char.lastLocation && { lastLocation: char.lastLocation }),
-                        ...(char.tutorialCompleted !== undefined && { tutorialCompleted: char.tutorialCompleted }),
-                        ...(char.activeQuests && { activeQuests: char.activeQuests }),
-                        ...(char.completedQuests && { completedQuests: char.completedQuests }),
-                        ...(char.lastPlayed && { lastPlayed: char.lastPlayed })
-                    };
-                    
-                    console.log('Patch data includes smithing:', !!char.smithing, char.smithing);
-                    
-                    await fetch('/api/account/characters/patch', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patchData)
-                    });
-                    
-                    // Sync inventory if present
-                    if (Array.isArray(char.inventory) && char.inventory.length > 0) {
-                        const invMap = {};
-                        for (const slot of char.inventory) {
-                            if (slot && slot.id) {
-                                invMap[slot.id] = (invMap[slot.id] || 0) + (slot.qty || 1);
-                            }
-                        }
-                        if (Object.keys(invMap).length > 0) {
-                            await fetch('/api/account/characters/inventory', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ characterId: charId, items: invMap })
-                            });
-                        }
-                    }
-                    
-                    // Sync quests if present
-                    if ((Array.isArray(char.activeQuests) && char.activeQuests.length > 0) || 
-                        (Array.isArray(char.completedQuests) && char.completedQuests.length > 0)) {
-                        await fetch('/api/account/characters/quests', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                characterId: charId,
-                                active: char.activeQuests || [],
-                                completed: char.completedQuests || []
-                            })
-                        });
-                    }
-                    
-                    // Update localStorage
-                    if (userObj && userObj.characters && selectedIdx !== null) {
-                        userObj.characters[selectedIdx] = char;
-                        saveUser(username, userObj);
-                    }
-                    
-                    console.log('Successfully synced character data to database!');
-                    
-                    // IMPORTANT: Reload character from database to get fresh state (including quests from CharacterQuest table)
-                    if (charId) {
-                        try {
-                            const freshRes = await fetch(`/api/account/characters/full?characterId=${encodeURIComponent(charId)}`);
-                            const freshData = await freshRes.json();
-                            if (freshData.ok && freshData.character) {
-                                const dbChar = freshData.character;
-                                // Convert quest format from API ({ quests: { active: [], completed: [] } })
-                                // to Phaser format ({ activeQuests: [], completedQuests: [] })
-                                if (dbChar.quests) {
-                                    if (Array.isArray(dbChar.quests.active)) {
-                                        dbChar.activeQuests = dbChar.quests.active;
-                                    }
-                                    if (Array.isArray(dbChar.quests.completed)) {
-                                        dbChar.completedQuests = dbChar.quests.completed;
-                                    }
-                                    delete dbChar.quests; // Remove nested format
-                                }
-                                // Merge database state into character object
-                                Object.assign(char, dbChar);
-                                console.log('Loaded fresh character state from database (quests, inventory, skills)');
-                            }
-                        } catch (e) {
-                            console.warn('Failed to reload character from database, using localStorage:', e);
-                        }
-                    }
-                } catch (err) {
-                    console.warn('Character sync failed (will use localStorage):', err);
-                }
+                } catch (e) { console.warn('Could not load full character', e); }
             }
             
             // Make sure the game container is visible before switching scenes
@@ -523,19 +401,7 @@ export class CharacterSelect extends Phaser.Scene {
             if (!char.mining) char.mining = { level: 1, exp: 0, expToLevel: 100 };
             try { ensureCharTalents && ensureCharTalents(char); } catch (e) { }
             char.lastPlayed = Date.now();
-            if (userObj && userObj.characters) {
-                let replaced = false;
-                for (let j = 0; j < userObj.characters.length; j++) {
-                    const uc = userObj.characters[j];
-                    if (!uc) continue;
-                    if ((uc.id && char.id && uc.id === char.id) || (!uc.id && uc.name === char.name)) { userObj.characters[j] = char; replaced = true; break; }
-                }
-                if (!replaced) {
-                    for (let j=0;j<7;j++){ if (!userObj.characters[j]){ userObj.characters[j]=char; replaced=true; break; } }
-                    if (!replaced) userObj.characters.push(char);
-                }
-                saveUser(username, userObj);
-            }
+            // No localStorage persistence; server is authoritative.
             const last = (char && char.lastLocation) ? char.lastLocation : null;
             const payload = { character: char, username };
             if (last && last.scene) payload.lastLocation = last;
@@ -560,6 +426,10 @@ export class CharacterSelect extends Phaser.Scene {
                 }).then(res => res.json()).then(data => {
                     if (data.ok) {
                         console.log('Character deleted from database:', charId);
+                        // Remove locally cached entry
+                        characters[selectedIdx] = undefined;
+                        renderCharacterList();
+                        updatePreview(null, null);
                     } else {
                         console.warn('Failed to delete character from database:', data.error);
                     }
@@ -567,15 +437,11 @@ export class CharacterSelect extends Phaser.Scene {
                     console.warn('Error deleting character from database:', err);
                 });
             }
-            
-            // Delete from localStorage
-            if (userObj && Array.isArray(userObj.characters)) {
-                userObj.characters[selectedIdx] = undefined;
-                saveUser(username, userObj);
+            // If no id, just remove from local cache
+            if (!charId) {
+                characters[selectedIdx] = undefined;
+                try { renderCharacterList(); updatePreview(null, null); } catch (e) {}
             }
-            
-            // refresh UI in-place
-            try { renderCharacterList(); updatePreview(null, null); } catch(e) {}
         };
 
         // Create modal helper
@@ -627,8 +493,7 @@ export class CharacterSelect extends Phaser.Scene {
                     if (!weaponVal) { if (err) err.textContent='Select a starting weapon.'; return; }
                     let stats = { str:0,int:0,agi:0,luk:0 };
                     try { const defs=(window&&window.RACE_DEFS)?window.RACE_DEFS:{}; if (defs && defs[raceVal] && defs[raceVal].base) stats = Object.assign({}, defs[raceVal].base); } catch(e){}
-                    if (!userObj.characters) userObj.characters = [];
-                    const newChar = { id: uuidv4(), name, race: raceVal, weapon: weaponVal, stats, level:1, class:'beginner' };
+                    const newChar = { name, race: raceVal, weapon: weaponVal, stats, level:1, class:'beginner' };
                     try { ensureCharTalents && ensureCharTalents(newChar); } catch(e){}
                     if (weaponVal) newChar.startingEquipment = [{ id: weaponVal, qty: 1 }];
                     
@@ -645,31 +510,23 @@ export class CharacterSelect extends Phaser.Scene {
                             body: formData 
                         }).then(res => res.json()).then(data => {
                             if (data.ok && data.character && data.character.id) {
-                                // Update local character with DB-generated ID
                                 newChar.id = data.character.id;
-                                // Re-save to localStorage with the correct ID
-                                if (typeof placedIndex === 'number' && placedIndex >= 0) {
-                                    userObj.characters[placedIndex] = newChar;
-                                    saveUser(username, userObj);
-                                }
+                                // Update local list and re-render
+                                characters.push(newChar);
+                                renderCharacterList();
+                                const idx = characters.findIndex(c=>c && c.id===newChar.id);
+                                updatePreview(newChar, idx);
                                 console.log('Character created in database:', data.character.id);
+                            } else {
+                                console.warn('Character create failed:', data.error);
                             }
                         }).catch(err => {
                             console.warn('Failed to save character to database:', err);
-                            // Continue anyway - character is saved in localStorage
                         });
                     } catch (e) {
                         console.warn('Character DB save error:', e);
                     }
-                    
-                    // place into target slot or first empty
-                    let placedIndex = -1;
-                    if (typeof targetIdx === 'number') { userObj.characters[targetIdx] = newChar; placedIndex = targetIdx; }
-                    else { for (let j=0;j<7;j++){ if (!userObj.characters[j]){ userObj.characters[j]=newChar; placedIndex=j; break; } } if (placedIndex === -1) { userObj.characters.push(newChar); placedIndex = userObj.characters.length-1; } }
-                    saveUser(username, userObj);
-                    closeCreateModal();
-                    // update DOM immediately so user sees the new character in the slot
-                    try { renderCharacterList(); if (placedIndex >= 0) { updatePreview(newChar, placedIndex); const tile = document.querySelector(`.char-tile[data-idx='${placedIndex}']`); if (tile) tile.scrollIntoView({ behavior:'smooth', block:'center' }); } } catch(e) {}
+                    closeCreateModal(); // UI will update when server responds
                 };
             },40);
         }
@@ -679,7 +536,8 @@ export class CharacterSelect extends Phaser.Scene {
         // Logout button event
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) logoutBtn.onclick = () => {
-            iterUsers((key, obj) => { if (obj && obj.loggedIn) { obj.loggedIn = false; saveJson(key, obj); } });
+            // Call server logout endpoint if available, otherwise just redirect
+            try { fetch('/api/account/logout', { method: 'POST' }).catch(()=>{}); } catch (e) {}
             this._cleanupDom();
             this.scene.start('Login');
         };
