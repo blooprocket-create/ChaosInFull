@@ -249,9 +249,11 @@ export async function createPhaserGame(opts: {
     try {
       const installAudioUnlock = () => {
         try {
-          const ctx: any = Phaser && (Phaser as any).Sound && (Phaser as any).Sound.context ? (Phaser as any).Sound.context : null;
+          // Narrow to Phaser's sound context without using any
+          const soundNS = (Phaser as typeof PhaserTypes).Sound as unknown as { context?: AudioContext } | undefined;
+          const ctx: AudioContext | null = (soundNS && soundNS.context) ? soundNS.context : null;
           if (ctx && ctx.state === 'suspended' && typeof ctx.resume === 'function') {
-            ctx.resume().catch(() => {});
+            void ctx.resume().catch(() => {});
           }
           window.removeEventListener('pointerdown', installAudioUnlock);
           window.removeEventListener('keydown', installAudioUnlock);
