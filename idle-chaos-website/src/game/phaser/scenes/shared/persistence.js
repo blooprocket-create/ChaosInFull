@@ -1,5 +1,21 @@
 // Helper for persisting character data in localStorage with consistent semantics across scenes.
 // Usage: persistCharacter(scene, username, { includeLocation: true, assignFields: ['woodcutting'] })
+// Lightweight in-memory tracker for inventory hydration state per character
+// Using WeakMap avoids leaking across character switches
+const __invState = new WeakMap();
+
+function __getInvState(char) {
+    let st = __invState.get(char);
+    if (!st) { st = { hydrated: false, lastCount: 0 }; __invState.set(char, st); }
+    return st;
+}
+
+function __countInventory(inv) {
+    if (!Array.isArray(inv)) return 0;
+    let c = 0; for (const s of inv) { if (s && s.id) c += (s.qty || 1); }
+    return c;
+}
+
 export function persistCharacter(scene, username, options = {}) {
     if (!scene || !username || !scene.char) return;
     if (typeof localStorage === 'undefined') return;
@@ -113,12 +129,32 @@ export function persistCharacter(scene, username, options = {}) {
                     if (scene.player) { patch.lastX = scene.player.x || null; patch.lastY = scene.player.y || null; }
                 }
                 try { if (Object.keys(patch).length) window.__cif_persist.saveCharacterPatch(charId, patch); } catch (e) {}
-                // Inventory snapshot (slots -> map)
+                // Inventory snapshot (slots -> map) with hydration guard to avoid accidental wipes
                 try {
-                    if (Array.isArray(char.inventory)) {
-                        const map = {};
-                        for (const s of char.inventory) { if (s && s.id) { map[s.id] = (map[s.id] || 0) + (s.qty || 1); } }
+                    const invArray = Array.isArray(char.inventory) ? char.inventory : [];
+                    const map = {};
+                    for (const s of invArray) { if (s && s.id) { map[s.id] = (map[s.id] || 0) + (s.qty || 1); } }
+                    const count = __countInventory(invArray);
+                    const st = __getInvState(char);
+                    const isHydrated = !!st.hydrated;
+                    const shouldSend = isHydrated || count > 0; // if not hydrated yet, do not send empty snapshot
+
+                    if (shouldSend) {
+                        try {
+                            if (window.__debug && window.__debug.inventory) {
+                                console.log('[persistCharacter] saveInventory', { id: charId, count, hydrated: isHydrated });
+                            }
+                        } catch (_) {}
                         window.__cif_persist.saveInventory(charId, map);
+                        st.lastCount = count;
+                        if (count > 0) st.hydrated = true; // once we have items we consider inventory initialized
+                        __invState.set(char, st);
+                    } else {
+                        try {
+                            if (window.__debug && window.__debug.inventory) {
+                                console.log('[persistCharacter] skip saveInventory (not hydrated and empty)', { id: charId });
+                            }
+                        } catch (_) {}
                     }
                 } catch (e) {}
                 // Quests snapshot
@@ -163,6 +199,14 @@ export function loadCharacter(username, characterId) {
                                 try {
                                     // Merge shallow fields
                                     Object.assign(char, serverChar);
+                                    // Mark inventory as hydrated so subsequent empty snapshots won't wipe unintentionally
+                                    try {
+                                        const st = __getInvState(char);
+                                        st.hydrated = true;
+                                        st.lastCount = __countInventory(serverChar.inventory);
+                                        __invState.set(char, st);
+                                        char._invHydrated = true;
+                                    } catch (_) {}
                                     // Persist merged snapshot back to localStorage for subsequent synchronous loads
                                     const updatedBlob = JSON.parse(localStorage.getItem(key) || '{}');
                                     if (updatedBlob && Array.isArray(updatedBlob.characters)) {
@@ -194,10 +238,31 @@ export function syncInventoryToServer(scene) {
     try {
         if (!scene || !scene.char || !scene.char.id) return;
         if (typeof window === 'undefined' || !window.__cif_persist || typeof window.__cif_persist.saveInventory !== 'function') return;
-        const map = {};
         const inv = Array.isArray(scene.char.inventory) ? scene.char.inventory : [];
+        const map = {};
         for (const s of inv) { if (s && s.id) map[s.id] = (map[s.id] || 0) + (s.qty || 1); }
-        window.__cif_persist.saveInventory(scene.char.id, map);
+        const count = __countInventory(inv);
+        const st = __getInvState(scene.char);
+        const isHydrated = !!st.hydrated;
+        const shouldSend = isHydrated || count > 0; // prevent empty wipe before hydration
+
+        if (shouldSend) {
+            try {
+                if (window.__debug && window.__debug.inventory) {
+                    console.log('[syncInventoryToServer] saveInventory', { id: scene.char.id, count, hydrated: isHydrated });
+                }
+            } catch (_) {}
+            window.__cif_persist.saveInventory(scene.char.id, map);
+            st.lastCount = count;
+            if (count > 0) st.hydrated = true;
+            __invState.set(scene.char, st);
+        } else {
+            try {
+                if (window.__debug && window.__debug.inventory) {
+                    console.log('[syncInventoryToServer] skip saveInventory (not hydrated and empty)', { id: scene.char.id });
+                }
+            } catch (_) {}
+        }
     } catch (e) { /* ignore */ }
 }
 
