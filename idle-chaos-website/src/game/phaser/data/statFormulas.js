@@ -27,7 +27,7 @@ export function computeEnemyStats(def = {}) {
     const hp = clampInt((baseHp * Math.pow(level, 1.18)) * mult, 1);
 
     // Damage: produce a min/max around a scaled average from level and rarity
-    const dmgBase = Math.max(1, (Math.pow(level, 1.02) * 1.4) * mult);
+    const dmgBase = Math.max(1, (Math.pow(level, 1.02) * 1.75) * mult);
     // variance scales with level too so higher level enemies have wider ranges
     const dmgVariance = Math.max(1, Math.round(dmgBase * 0.45));
     const dmgMin = Math.max(1, Math.round(dmgBase - dmgVariance));

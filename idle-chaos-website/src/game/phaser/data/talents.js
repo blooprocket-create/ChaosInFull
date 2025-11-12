@@ -1154,6 +1154,8 @@ function ensureCharTalents(char) {
             if (!char.talents.unspentByTab[tid]) char.talents.unspentByTab[tid] = 0;
             if (!char.talents.allocations[tid]) char.talents.allocations[tid] = {};
         });
+        // baseline tracker: stores the last known historical base (level+gather) credited per non-star tab
+        if (!char.talents._historicalBasePerTab || typeof char.talents._historicalBasePerTab !== 'object') char.talents._historicalBasePerTab = {};
         // ensure skillBar is an array of length 9 (slots 1..9)
         if (!Array.isArray(char.talents.skillBar)) {
             char.talents.skillBar = new Array(9).fill(null);
@@ -1215,6 +1217,8 @@ function ensureCharTalents(char) {
                     didRetroCredit = true;
                 }
                 char.talents._tabSynced[tid] = true;
+                // record baseline so later level/skill awards only grant the delta beyond this
+                char.talents._historicalBasePerTab[tid] = Math.max(Number(char.talents._historicalBasePerTab[tid] || 0), expectedHistoricPerTab);
             }
             // Store diagnostics for UI/inspection (non-persistent; safe)
             char.talents._diagnostics = Object.assign({}, char.talents._diagnostics, {
@@ -1261,8 +1265,34 @@ function onCharacterLevelUp(scene, char, levelsGained = 1) {
         ensureCharTalents(char);
         const tabs = getTabsForClass(char.class);
         const nonStarTabs = (tabs || []).filter(tid => { const t = TALENT_TABS[tid]; return t && t.type !== 'star'; });
-        const pointsPerTab = 3 * Number(levelsGained || 0);
-        awardPointsForTabs(char, nonStarTabs, pointsPerTab);
+        // Compute new historical base and only award the delta beyond previous base to avoid double credit on reload
+        const level = Number(char.level || 1);
+        const levelPointsPerTab = Math.max(0, (level - 1)) * 3;
+        const GATHERING_SKILLS = ['woodcutting','fishing','mining','smithing','cooking'];
+        let gatherPointsPerTab = 0;
+        for (const sk of GATHERING_SKILLS) {
+            try {
+                const obj = char[sk];
+                if (obj && typeof obj === 'object' && typeof obj.level === 'number') {
+                    gatherPointsPerTab += Math.max(0, Number(obj.level || 1) - 1);
+                }
+            } catch (e) { /* ignore */ }
+        }
+        const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+        // clamp per-tab award to both the intended amount and the remaining delta vs baseline
+        for (const tid of nonStarTabs) {
+            try {
+                const prevBase = Number((char.talents._historicalBasePerTab && char.talents._historicalBasePerTab[tid]) || 0);
+                const intended = 3 * Number(levelsGained || 0);
+                const delta = Math.max(0, expectedHistoricPerTab - prevBase);
+                const toAward = Math.max(0, Math.min(intended, delta));
+                if (toAward > 0) {
+                    awardPointsForTabs(char, [tid], toAward);
+                }
+                // update baseline to the new expected (prevents future duplicate grants)
+                char.talents._historicalBasePerTab[tid] = Math.max(prevBase, prevBase + toAward, expectedHistoricPerTab);
+            } catch (e) { /* ignore per-tab errors */ }
+        }
         // Persist talents if bridge available
         try {
             if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
@@ -1270,8 +1300,8 @@ function onCharacterLevelUp(scene, char, levelsGained = 1) {
             }
         } catch (e) {}
         try {
-            if (scene && typeof scene._showToast === 'function') scene._showToast && scene._showToast(`Gained ${pointsPerTab} talent points per unlocked tab.`);
-            else if (typeof console !== 'undefined') console.log && console.log('Talent points awarded:', { perTab: pointsPerTab, tabs: nonStarTabs });
+            if (scene && typeof scene._showToast === 'function') scene._showToast && scene._showToast(`Gained +3 talent points per unlocked tab.`);
+            else if (typeof console !== 'undefined') console.log && console.log('Talent points awarded (level up):', { tabs: nonStarTabs, baseDelta: expectedHistoricPerTab });
         } catch (e) {}
     } catch (e) { /* swallow */ }
 }
@@ -1285,8 +1315,29 @@ function onSkillLevelUp(scene, char, skillKey, levelsGained = 1) {
         // Only gathering skills award talent points
         const GATHERING_SKILLS = ['woodcutting','fishing','mining','smithing','cooking'];
         if (GATHERING_SKILLS.indexOf(String(skillKey)) === -1) return;
-        const pointsPerTab = 1 * Number(levelsGained || 0);
-        awardPointsForTabs(char, nonStarTabs, pointsPerTab);
+        // Compute new expected base and award only the delta over previous baseline (bounded by intended gain)
+        const level = Number(char.level || 1);
+        const levelPointsPerTab = Math.max(0, (level - 1)) * 3;
+        let gatherPointsPerTab = 0;
+        for (const sk of GATHERING_SKILLS) {
+            try {
+                const obj = char[sk];
+                if (obj && typeof obj === 'object' && typeof obj.level === 'number') {
+                    gatherPointsPerTab += Math.max(0, Number(obj.level || 1) - 1);
+                }
+            } catch (e) { /* ignore */ }
+        }
+        const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+        for (const tid of nonStarTabs) {
+            try {
+                const prevBase = Number((char.talents._historicalBasePerTab && char.talents._historicalBasePerTab[tid]) || 0);
+                const intended = 1 * Number(levelsGained || 0);
+                const delta = Math.max(0, expectedHistoricPerTab - prevBase);
+                const toAward = Math.max(0, Math.min(intended, delta));
+                if (toAward > 0) awardPointsForTabs(char, [tid], toAward);
+                char.talents._historicalBasePerTab[tid] = Math.max(prevBase, prevBase + toAward, expectedHistoricPerTab);
+            } catch (e) { /* ignore per-tab errors */ }
+        }
         // Persist talents if bridge available
         try {
             if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
@@ -1294,8 +1345,8 @@ function onSkillLevelUp(scene, char, skillKey, levelsGained = 1) {
             }
         } catch (e) {}
         try {
-            if (scene && typeof scene._showToast === 'function') scene._showToast && scene._showToast(`+${pointsPerTab} talent point(s) per unlocked tab from ${skillKey} level up.`);
-            else if (typeof console !== 'undefined') console.log && console.log('Skill talent points awarded', { skill: skillKey, perTab: pointsPerTab, tabs: nonStarTabs });
+            if (scene && typeof scene._showToast === 'function') scene._showToast && scene._showToast(`+1 talent point per unlocked tab from ${skillKey} level up.`);
+            else if (typeof console !== 'undefined') console.log && console.log('Skill talent points awarded', { skill: skillKey, tabs: nonStarTabs, baseDelta: expectedHistoricPerTab });
         } catch (e) {}
     } catch (e) { /* swallow */ }
 }

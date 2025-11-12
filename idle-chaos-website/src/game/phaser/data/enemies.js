@@ -173,7 +173,8 @@ export const ENEMY_DEFS = {
             exp: 520,
             drops: [
                 { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.03, luckBonus: 0.0008 },
-                { itemId: 'major_health_potion', minQty: 1, maxQty: 1, baseChance: 0.12, luckBonus: 0.012 }
+                { itemId: 'major_health_potion', minQty: 1, maxQty: 1, baseChance: 0.12, luckBonus: 0.012 },
+                { itemId: 'bag_of_gold', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.001 }
             ],
             gold: { min: 28, max: 60, chance: 0.96, luckBonus: 0.0024 }
         },
@@ -227,8 +228,9 @@ export const ENEMY_DEFS = {
         damage: [150, 250],
         exp: 1500,
         drops: [
-            { itemId: 'bronze_bar', minQty: 2, maxQty: 6, baseChance: 1.0, luckBonus: 0.002 },
-            { itemId: 'bronze_sword', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0012 }
+            { itemId: 'iron_bar', minQty: 2, maxQty: 6, baseChance: 1.0, luckBonus: 0.002 },
+            { itemId: 'steel_sword', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.0012 },
+                { itemId: 'bag_of_gold', minQty: 1, maxQty: 1, baseChance: 0.05, luckBonus: 0.001 }
         ],
         // prefer direct numeric gold instead of bag_of_gold item
         gold: { min: 60, max: 140, chance: 1.0, luckBonus: 0.004 }
