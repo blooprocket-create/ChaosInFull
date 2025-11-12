@@ -3308,13 +3308,25 @@ export class BrokenDock extends Phaser.Scene {
             } catch (e) {}
 
             try {
-                // Ensure event board exists when needed
+                // Ensure event board exists when needed (idempotent, safe on re-entry)
                 const ensureBoard = () => {
                     const ex = dock.x - Math.round((dock.width || 80) / 2) - 80;
                     const groundY = this.scale.height - 60; // ground reference point
                     const wobbleX = ex + Phaser.Math.Between(-2, 2);
                     const boardY = groundY - 72;
 
+                    // Destroy any partial remnants to avoid duplicates after scene reload
+                    const destroyObj = (o) => { try { if (o && o.destroy) o.destroy(); } catch (e) {} };
+                    if (this.eventBoard || this.eventBoardPost || this.eventBoardHeader || this.eventBoardNotice || this.eventBoardNotice2) {
+                        destroyObj(this.eventBoardShadow); destroyObj(this.eventBoardPost); destroyObj(this.eventBoard);
+                        destroyObj(this.eventBoardHeader); destroyObj(this.eventBoardNotice); destroyObj(this.eventBoardNotice2);
+                        if (Array.isArray(this.eventBoardNails)) for (const n of this.eventBoardNails) destroyObj(n);
+                        if (Array.isArray(this.eventBoardSparkles)) for (const s of this.eventBoardSparkles) destroyObj(s);
+                        destroyObj(this.eventBoardGlow); destroyObj(this.eventBoardPrompt);
+                        this.eventBoardShadow = this.eventBoardPost = this.eventBoard = this.eventBoardHeader = null;
+                        this.eventBoardNotice = this.eventBoardNotice2 = null; this.eventBoardNails = null;
+                        this.eventBoardSparkles = null; this.eventBoardGlow = null; this.eventBoardPrompt = null;
+                    }
                     // Shadow/backer
                     this.eventBoardShadow = this.add.rectangle(wobbleX + 3, groundY - 44, 50, 92, 0x000000, 0.14).setDepth(1.26);
                     this.eventBoardShadow.setOrigin(0.5, 0.5);
@@ -3387,7 +3399,13 @@ export class BrokenDock extends Phaser.Scene {
                     } catch (e) {}
                 };
                 const anyMissing = !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2);
-                if (stage >= 4 && anyMissing) ensureBoard();
+                if (stage >= 4) {
+                    if (anyMissing) ensureBoard();
+                    // Safety: schedule a deferred ensure in case create order delayed by async assets
+                    if (anyMissing) {
+                        addTimeEvent(this, { delay: 250, callback: () => { try { const missingLater = !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2); if (missingLater) ensureBoard(); } catch (e) {} } });
+                    }
+                }
                 const boardVisible = stage >= 4;
                 const setVis = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
                 setVis(this.eventBoardShadow, boardVisible);
