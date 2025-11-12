@@ -245,6 +245,22 @@ export async function createPhaserGame(opts: {
       loader: { baseURL: '/phaser-game/', path: '' },
     };
 
+    // Install a lightweight audio unlock handler (browser gesture requirement for Web Audio)
+    try {
+      const installAudioUnlock = () => {
+        try {
+          const ctx: any = Phaser && (Phaser as any).Sound && (Phaser as any).Sound.context ? (Phaser as any).Sound.context : null;
+          if (ctx && ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+            ctx.resume().catch(() => {});
+          }
+          window.removeEventListener('pointerdown', installAudioUnlock);
+          window.removeEventListener('keydown', installAudioUnlock);
+        } catch {}
+      };
+      window.addEventListener('pointerdown', installAudioUnlock, { once: true });
+      window.addEventListener('keydown', installAudioUnlock, { once: true });
+    } catch {}
+
     const game = new Phaser.Game(config);
     // Store character data if supplied
     if (character) {

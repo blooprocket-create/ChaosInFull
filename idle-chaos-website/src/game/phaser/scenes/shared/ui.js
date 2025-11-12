@@ -18,7 +18,11 @@ function resolveTalentIcon(scene, talentLike) {
             plus1str: 'Plus1Str', plus1int: 'Plus1Int', plus1agi: 'Plus1Agi',
             bonecrusher_training: 'BoneCrusher', bloodstaked_guard: 'Bloodstaked', wood_lover: 'StaffMastery', mining_exp_gain: 'MiningExpertise',
             hunter_s_formula: 'HuntersFormula', five_finger_discount: 'FiveFingerDiscount',
-            shadowstep: 'ShadowStep', mana_shield: 'ManaShield', dark_shield: 'DarkShield', blood_ritual_reserve: 'BloodRitualReserve', unholy_frenzy: 'UnholyFrenzy', terror_form: 'TerrorForm'
+            shadowstep: 'ShadowStep', mana_shield: 'ManaShield', dark_shield: 'DarkShield', blood_ritual_reserve: 'BloodRitualReserve', unholy_frenzy: 'UnholyFrenzy', terror_form: 'TerrorForm',
+            // Fix missing/mismatched assets
+            savage_swing: 'HeavyHitter', // reuse existing visual
+            hoarding_instincts: 'HoardingInsticts', // file name typo in assets
+            dark_thorns: 'DarkReaping' // thematically close placeholder
         };
         const explicit = talentLike.icon; if (explicit) return explicit;
         const id = talentLike.id || talentLike.key || '';
@@ -40,6 +44,12 @@ function resolveTalentIcon(scene, talentLike) {
         for (const base of uniq) {
             // public asset path
             const path = `/phaser-game/assets/TalentIcons/${folder}/${base}.png`;
+            // Cache a negative result to avoid re-request spamming if missing earlier (cheap local memory cache)
+            try {
+                window.__talentIconMissCache = window.__talentIconMissCache || {};
+                const missKey = folder + '/' + base;
+                if (window.__talentIconMissCache[missKey]) continue; // previously confirmed missing
+            } catch (e) {}
             return path; // Optimistic: browser onerror will fallback if missing
         }
         return null;
@@ -4012,6 +4022,15 @@ export function refreshSkillBarHUD(scene) {
                     img.alt = assignedDef ? (assignedDef.name || assigned) : assigned || '';
                     img.referrerPolicy = 'no-referrer';
                     img.onerror = () => { 
+                        try { 
+                            // Record missing so future renders skip image fetch
+                            const cls = (scene.char && scene.char.class) ? (scene.char.class.charAt(0).toUpperCase() + scene.char.class.slice(1).toLowerCase()) : '';
+                            const base = (assignedDef && assignedDef.name) ? assignedDef.name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') : '';
+                            if (cls && base) {
+                                window.__talentIconMissCache = window.__talentIconMissCache || {};
+                                window.__talentIconMissCache[cls + '/' + base] = true;
+                            }
+                        } catch(e){}
                         try { 
                             iconDiv.innerHTML = ''; 
                             iconDiv.textContent = assigned ? '•' : ''; 
