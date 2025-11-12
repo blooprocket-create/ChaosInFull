@@ -3644,8 +3644,30 @@ function _talentActivatedHandler(payload) {
                     const dmgPercent = scaledValue || 80;
                     const baseSpell = Math.max(8, ((eff && eff.int) || 0) * 2 + 6);
                     const dmg = baseSpell * (dmgPercent / 100);
-                    let sx = scene.player.x + 48; let sy = scene.player.y;
-                    if (scene.input && scene.input.activePointer) { sx = scene.input.activePointer.worldX || sx; sy = scene.input.activePointer.worldY || sy; }
+                    let sx = scene.player.x + 48;
+                    let sy = scene.player.y;
+                    try {
+                        const pointer = scene.input && scene.input.activePointer;
+                        if (pointer) {
+                            let wx = null;
+                            let wy = null;
+                            if (scene.cameras && scene.cameras.main && typeof pointer.x === 'number' && typeof pointer.y === 'number') {
+                                try {
+                                    const worldPoint = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                                    wx = worldPoint.x;
+                                    wy = worldPoint.y;
+                                } catch (e) {}
+                            }
+                            if ((wx === null || wy === null) && typeof pointer.worldX === 'number' && typeof pointer.worldY === 'number') {
+                                wx = pointer.worldX;
+                                wy = pointer.worldY;
+                            }
+                            if (wx !== null && wy !== null) {
+                                sx = wx;
+                                sy = wy;
+                            }
+                        }
+                    } catch (e) { /* fall back to player offset */ }
                     const sigFx = spawnArcaneSigil(scene, sx, sy, radius, { depth: 7.2, fillColor: 0x4b1a6d });
                     scene.time && scene.time.addEvent({ delay: delayMs, callback: () => {
                         try {
