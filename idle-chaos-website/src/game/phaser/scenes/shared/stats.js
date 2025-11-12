@@ -359,16 +359,30 @@ export function checkClassLevelUps(scene) {
     if (!scene || !scene.char) return;
     const char = scene.char;
     char.exp = char.exp || 0;
-    char.expToLevel = char.expToLevel || 100;
+    // Deterministic XP curve: original incremental model multiplied expToLevel by 1.25 each level.
+    // That caused issues when expToLevel was lost/reset (fell back to 100 at high levels).
+    // Replace with a pure function so required XP derives solely from current level.
+    // Curve: base 100 * 1.25^(level-1). This preserves prior progression shape.
+    function xpRequiredFor(level) {
+        const lvl = Math.max(1, Number(level || 1));
+        // Guard against runaway growth: cap at ~2.5B to avoid overflow in extreme test cases.
+        const raw = 100 * Math.pow(1.25, lvl - 1);
+        return Math.min(2500000000, Math.floor(raw));
+    }
+    // Always recompute next requirement from current level.
+    char.expToLevel = xpRequiredFor(char.level || 1);
     let leveled = false;
     try { __levelDbg('check:start', { charId: char.id, level: char.level, exp: char.exp, expToLevel: char.expToLevel }); } catch (e) {}
+    // Consume XP for as many levels as satisfied by deterministic requirements.
+    // Recompute requirement each loop to avoid exponential drift.
     while (char.exp >= char.expToLevel) {
-        try { __levelDbg('tick:before', { level: char.level, exp: char.exp, expToLevel: char.expToLevel }); } catch (e) {}
-        char.exp -= char.expToLevel;
+        const req = char.expToLevel; // current requirement for this level
+        try { __levelDbg('tick:before', { level: char.level, exp: char.exp, expToLevel: req }); } catch (e) {}
+        char.exp -= req;
         char.level = (char.level || 1) + 1;
-        char.expToLevel = Math.floor(char.expToLevel * 1.25);
+        char.expToLevel = xpRequiredFor(char.level);
     try { onCharacterLevelUp && onCharacterLevelUp(scene, char, 1); } catch (e) { /* ignore talent award errors */ }
-        try { __levelDbg('tick:after', { newLevel: char.level, exp: char.exp, expToLevel: char.expToLevel }); } catch (e) {}
+        try { __levelDbg('tick:after', { newLevel: char.level, exp: char.exp, expToLevel: char.expToLevel, consumed: req }); } catch (e) {}
         // apply race+class per-level growth on level up (use data-driven defs when available)
         const raceKey = (char.race || 'Human');
         const classKey = (char.class || 'beginner');
