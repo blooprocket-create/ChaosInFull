@@ -1,16 +1,3 @@
-/* Design-scale system: keep UI looking like 2560x1440 on smaller 16:9 displays */
-:root {
-  /* Base design size (matches the target look) */
-  --design-w: 2560;
-  --design-h: 1440;
-  /* Scale <= 1 on smaller screens, 1 at or above design size */
-  --ui-scale: min(calc(100vw / var(--design-w)), calc(100vh / var(--design-h)));
-}
-
-@media (min-width: 2560px) and (min-height: 1440px) {
-  :root { --ui-scale: 1; }
-}
-
 @import "tailwindcss";
 
 :root {

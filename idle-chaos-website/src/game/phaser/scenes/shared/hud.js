@@ -48,13 +48,7 @@ export function createHUD(scene) {
     // Lift the HUD slightly to avoid overlapping with bottom elements (moved up by ~32px)
     hud.style.bottom = '182px';
     hud.style.left = '50%';
-    // Apply global design scale (keeps visual proportions consistent between 2560x1440 and 1920x1080)
-    try {
-        const scale = getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim() || '1';
-        hud.style.transform = `translateX(-50%) scale(${scale})`;
-        hud.style.transformOrigin = 'top center';
-    } catch (e) { hud.style.transform = 'translateX(-50%)'; }
-    // width remains authored for design resolution; scale() will reduce visually
+    hud.style.transform = 'translateX(-50%)';
     hud.style.width = '640px';
     hud.style.maxWidth = 'calc(100vw - 32px)';
     hud.style.padding = '10px 16px';
