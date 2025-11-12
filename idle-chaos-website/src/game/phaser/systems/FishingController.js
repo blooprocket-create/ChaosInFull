@@ -195,20 +195,20 @@ export class FishingController {
         // Bounce zone at edges
         if (this.targetMin < 0) { const shift = -this.targetMin; this.targetMin += shift; this.targetMax += shift; this.targetVel *= -1; }
         if (this.targetMax > 1) { const shift = this.targetMax - 1; this.targetMin -= shift; this.targetMax -= shift; this.targetVel *= -1; }
-        // Random slight velocity change
-        if (Math.random() < 0.01) this.targetVel = (Math.random() * 0.6 - 0.3);
+    // Slightly faster zone drift: increase change frequency and velocity range
+    if (Math.random() < 0.015) this.targetVel = (Math.random() * 0.8 - 0.4);
         // Pointer passive drift making player adjust
         const masteryDrift = this._getMastery();
         const driftScale = Math.max(0.25, 1 - 0.08 * (masteryDrift.stability || 0));
         // NERF: gentler pointer movement & input force
         if (this._ptrVel == null) this._ptrVel = 0;
-        const DRIFT_ACCEL = 0.010; // was 0.018
-        const DAMPING_PER_TICK = 0.92; // slightly less damping to keep feel responsive
-        const INTENT_FORCE = this._isHoldActive() ? 0.028 : -0.020; // was 0.055 / -0.040
+    const DRIFT_ACCEL = 0.008; // reduce drift to slow pointer wander
+    const DAMPING_PER_TICK = 0.94; // increase damping so pointer settles a bit more
+    const INTENT_FORCE = this._isHoldActive() ? 0.022 : -0.016; // reduce input force so pointer moves slower
         this._ptrVel += INTENT_FORCE * dt;
         this._ptrVel += (Math.random() - 0.5) * DRIFT_ACCEL * dt * driftScale;
         this._ptrVel *= Math.pow(DAMPING_PER_TICK, dt);
-        const MAX_VEL = 0.020; // was 0.035
+    const MAX_VEL = 0.016; // cap pointer speed a bit lower
     if (this._ptrVel > MAX_VEL) this._ptrVel = MAX_VEL;
     else if (this._ptrVel < -MAX_VEL) this._ptrVel = -MAX_VEL;
     this.tension += this._ptrVel * dt;
@@ -393,7 +393,8 @@ export class FishingController {
         const start = Math.random() * (1 - baseWidth);
         this.targetMin = start;
         this.targetMax = start + baseWidth;
-        this.targetVel = (Math.random() * 0.6 - 0.3);
+    // Slightly faster default zone velocity range
+    this.targetVel = (Math.random() * 0.8 - 0.4);
     }
 
     _eligibleFishForBait(baitId, options = {}) {
