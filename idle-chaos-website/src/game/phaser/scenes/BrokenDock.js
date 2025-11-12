@@ -3398,15 +3398,35 @@ export class BrokenDock extends Phaser.Scene {
                         }
                     } catch (e) {}
                 };
-                const anyMissing = !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2);
+                const allPiecesPresent = () => (this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2);
+                const anyMissing = !allPiecesPresent();
                 if (stage >= 4) {
-                    if (anyMissing) ensureBoard();
-                    // Safety: schedule a deferred ensure in case create order delayed by async assets
-                    if (anyMissing) {
-                        addTimeEvent(this, { delay: 250, callback: () => { try { const missingLater = !(this.eventBoard && this.eventBoardPost && this.eventBoardHeader && this.eventBoardNotice && this.eventBoardNotice2); if (missingLater) ensureBoard(); } catch (e) {} } });
+                    // Always attempt at least once on stage >=4 (idempotent destroy->recreate cycle keeps things clean)
+                    if (anyMissing) ensureBoard(); else {
+                        // Even if everything claims to exist, sometimes Phaser objects can be zombie references after a rapid scene swap.
+                        // Validate one piece still has an active scene; if not, force rebuild.
+                        try {
+                            if (this.eventBoard && this.eventBoard.scene !== this) {
+                                ensureBoard();
+                            }
+                        } catch (e) { /* fall through */ }
                     }
+                    // Multi-attempt safety net: retry a few times in case of async texture/scene init ordering
+                    let attempts = 0;
+                    const maxAttempts = 5;
+                    const scheduleRetry = () => {
+                        if (attempts >= maxAttempts || allPiecesPresent()) return;
+                        attempts++;
+                        addTimeEvent(this, { delay: 220, callback: () => {
+                            try {
+                                if (!allPiecesPresent()) ensureBoard();
+                            } catch (e) {}
+                            scheduleRetry();
+                        }});
+                    };
+                    scheduleRetry();
                 }
-                const boardVisible = stage >= 4;
+                const boardVisible = stage >= 4 && allPiecesPresent();
                 const setVis = (obj, vis) => { try { if (obj) obj.setVisible(vis); } catch (e) {} };
                 setVis(this.eventBoardShadow, boardVisible);
                 setVis(this.eventBoardPost, boardVisible);
