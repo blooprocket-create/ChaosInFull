@@ -4631,6 +4631,10 @@ function _talentActivatedHandler(payload) {
                         try { spawnDustBursts(scene, scene.player.x, scene.player.y, Math.min(80, radius)); } catch (e) {}
                     } catch (e) {}
                     if (scene._showCombatText) scene._showCombatText(scene.player.x, scene.player.y - 40, `Savage Swing (${hits})`, '#ffaacc');
+                    // Mark activation success so cooldown/mana consumption are retained and fizzle toast not shown
+                    try { markActivationSuccess(scene, tid); } catch (e) {}
+                    // Optional feedback toast (small duration to avoid spam)
+                    try { if (scene._showToast) scene._showToast(`Savage Swing hits ${hits} target${hits===1?'':'s'}`, 700); } catch (e) {}
                 } catch (e) {}
                 break;
             }
