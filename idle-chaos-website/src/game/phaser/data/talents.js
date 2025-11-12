@@ -1144,15 +1144,35 @@ export default {
 };
 
 // --- Runtime helpers (award points, initialize talent state) ---
-// Lightweight gated debug helper for this module
+// Lightweight gated debug helper for this module with simple rate limiting for noisy events
+const __talentLogState = { last: {}, intervalMs: 800 };
 function __talentDbg() {
     try {
-        if (typeof window !== 'undefined' && window.__debug && (window.__debug.all || window.__debug.talents)) {
-            const args = Array.prototype.slice.call(arguments);
-            args.unshift('[talents]');
-            // eslint-disable-next-line no-console
-            console.debug.apply(console, args);
+        const w = (typeof window !== 'undefined') ? window : null;
+        const dbg = w && w.__debug;
+        let enabled = false;
+        if (dbg === true || dbg === 'all') enabled = true;
+        else if (dbg && typeof dbg === 'object' && (dbg.all || dbg.talents)) enabled = true;
+        // Allow localStorage toggles as fallback
+        if (!enabled && w && w.localStorage) {
+            try {
+                const v = w.localStorage.getItem('cif_debug') || w.localStorage.getItem('debug') || '';
+                if (v && (v === 'all' || v.indexOf('talents') !== -1)) enabled = true;
+            } catch (e) { /* ignore */ }
         }
+        if (!enabled) return;
+        const args = Array.prototype.slice.call(arguments);
+        const tag = args && args.length ? String(args[0]) : '';
+        // Rate-limit noisy ensureCharTalents logs
+        if (tag === 'ensureCharTalents:init' || tag === 'ensureCharTalents:computedBase') {
+            const now = Date.now();
+            const last = (__talentLogState.last && __talentLogState.last[tag]) || 0;
+            if ((now - last) < (__talentLogState.intervalMs || 800)) return;
+            __talentLogState.last[tag] = now;
+        }
+        args.unshift('[talents]');
+        // eslint-disable-next-line no-console
+        console.debug.apply(console, args);
     } catch (e) { /* ignore */ }
 }
 
