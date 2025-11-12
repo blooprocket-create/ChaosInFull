@@ -173,7 +173,7 @@ export class GloamwaySwamp extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(18, 26);
+        const count = Phaser.Math.Between(26, 36);
         for (let i = 0; i < count; i++) {
             const x = Phaser.Math.Between(x1, x2);
             const y = Phaser.Math.Between(y1, y2);
@@ -189,18 +189,19 @@ export class GloamwaySwamp extends Phaser.Scene {
             else if (roll > 0.5) type = 'zombie';
             else if (roll > 0.46) type = 'goblin_skeleton';
             else if (roll > 0.42) type = 'brute_skeleton';
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(7800, 16000), active: null });
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(6200, 13000), active: null });
         }
         const mireNodes = [
-            { type: 'bog_wraith', count: 2, rect: { x: x1 + 120, y: y1 + 120, w: 200, h: 180 } },
-            { type: 'mire_hag', count: 1, rect: { x: Math.round((x1 + x2) / 2) - 80, y: y2 - 200, w: 160, h: 160 } },
-            { type: 'plague_crawler', count: 3, rect: { x: x2 - 260, y: y1 + 80, w: 220, h: 220 } }
+            { type: 'bog_wraith', count: 3, rect: { x: x1 + 120, y: y1 + 120, w: 240, h: 180 } },
+            { type: 'mire_hag', count: 2, rect: { x: Math.round((x1 + x2) / 2) - 80, y: y2 - 200, w: 200, h: 180 } },
+            { type: 'plague_crawler', count: 4, rect: { x: x2 - 260, y: y1 + 80, w: 260, h: 240 } },
+            { type: 'zombie', count: 3, rect: { x: Math.round(x1 + (x2 - x1) * 0.3), y: y2 - 260, w: 240, h: 200 } }
         ];
         mireNodes.forEach(cfg => {
             for (let i = 0; i < cfg.count; i++) {
                 const sx = Phaser.Math.Between(cfg.rect.x, cfg.rect.x + cfg.rect.w);
                 const sy = Phaser.Math.Between(cfg.rect.y, cfg.rect.y + cfg.rect.h);
-                pts.push({ x: sx, y: sy, type: cfg.type, respawn: Phaser.Math.Between(9000, 17000), active: null });
+                pts.push({ x: sx, y: sy, type: cfg.type, respawn: Phaser.Math.Between(7000, 14000), active: null });
             }
         });
         return pts;

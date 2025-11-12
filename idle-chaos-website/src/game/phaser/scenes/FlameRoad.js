@@ -170,7 +170,7 @@ export class FlameRoad extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(14, 22);
+        const count = Phaser.Math.Between(24, 34);
         for (let i = 0; i < count; i++) {
             const x = Phaser.Math.Between(x1, x2);
             const y = Phaser.Math.Between(y1, y2);
@@ -188,18 +188,19 @@ export class FlameRoad extends Phaser.Scene {
             else if (roll > 0.56) type = 'demon_spawn_uncommon';
             else if (roll > 0.48) type = 'demon_spawn_common';
             else if (roll > 0.36) type = 'ember_hound';
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(9000, 17000), active: null });
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(6500, 14000), active: null });
         }
         const ridgeClusters = [
-            { type: 'ember_hound', count: 3, rect: { x: x1 + 90, y: y1 + 120, w: 240, h: 140 } },
-            { type: 'ash_gargoyle', count: 2, rect: { x: x2 - 260, y: y1 + 80, w: 220, h: 160 } },
+            { type: 'ember_hound', count: 4, rect: { x: x1 + 90, y: y1 + 120, w: 260, h: 180 } },
+            { type: 'ash_gargoyle', count: 3, rect: { x: x2 - 260, y: y1 + 80, w: 240, h: 180 } },
+            { type: 'demon_spawn_epic', count: 3, rect: { x: Math.round((x1 + x2) / 2) - 220, y: y1 + 60, w: 440, h: 160 } },
             { type: 'magma_colossus', count: 1, rect: { x: Math.round((x1 + x2) / 2) - 90, y: y2 - 200, w: 180, h: 140 } }
         ];
         ridgeClusters.forEach(cfg => {
             for (let i = 0; i < cfg.count; i++) {
                 const sx = Phaser.Math.Between(cfg.rect.x, cfg.rect.x + cfg.rect.w);
                 const sy = Phaser.Math.Between(cfg.rect.y, cfg.rect.y + cfg.rect.h);
-                pts.push({ x: sx, y: sy, type: cfg.type, respawn: Phaser.Math.Between(11000, 19000), active: null });
+                pts.push({ x: sx, y: sy, type: cfg.type, respawn: Phaser.Math.Between(8000, 15000), active: null });
             }
         });
         return pts;

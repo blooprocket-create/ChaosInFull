@@ -333,7 +333,7 @@ export class GloamwayBastion extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(16, 24);
+        const count = Phaser.Math.Between(24, 34);
         const pickType = (roll) => {
             if (roll > 0.985) return 'goblin_siegebreaker';
             if (roll > 0.95) return 'goblin_bloodshaman';
@@ -352,18 +352,19 @@ export class GloamwayBastion extends Phaser.Scene {
                 tries++;
             }
             const type = pickType(Math.random());
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(6400, 14000), active: null });
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(5200, 11000), active: null });
         }
         const rallyBands = [
             { type: 'goblin_shadowblade', count: 2, area: { x: x1 + 96, y: y1 + 140, width: 180, height: 160 } },
             { type: 'goblin_bloodshaman', count: 2, area: { x: x2 - 220, y: y1 + 120, width: 180, height: 180 } },
+            { type: 'goblin_flamebinder', count: 3, area: { x: Math.round((x1 + x2) / 2) - 160, y: y1 + 60, width: 320, height: 140 } },
             { type: 'goblin_siegebreaker', count: 1, area: { x: Math.round((x1 + x2) / 2), y: y2 - 140, width: 140, height: 140 } }
         ];
         rallyBands.forEach(cfg => {
             for (let i = 0; i < cfg.count; i++) {
                 const ax = Phaser.Math.Between(cfg.area.x, cfg.area.x + cfg.area.width);
                 const ay = Phaser.Math.Between(cfg.area.y, cfg.area.y + cfg.area.height);
-                pts.push({ x: ax, y: ay, type: cfg.type, respawn: Phaser.Math.Between(9000, 16000), active: null });
+                pts.push({ x: ax, y: ay, type: cfg.type, respawn: Phaser.Math.Between(6500, 12000), active: null });
             }
         });
         return pts;
