@@ -11,6 +11,7 @@ import { attach as attachCleanup, addTimeEvent, registerDisposer } from '../shar
 import { ensureGameCanvasVisible } from './shared/theme.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { getAreaEnemyLevel } from './shared/levelRanges.js';
+import { setupWorldAndCamera, ensureCameraFollow } from './shared/camera.js';
 
 const QUEST_CHAIN = [
     'mother_lumen_slime_cull',
@@ -92,20 +93,20 @@ export class GloamwayBastion extends Phaser.Scene {
         this._recalculateVitals();
         if (!this.char.hp || this.char.hp > this.char.maxhp) this.char.hp = this.char.maxhp;
 
-        const W = this.scale.width;
-        const H = this.scale.height;
-        const centerX = W / 2;
-        const centerY = H / 2;
+    // Enlarge world and set bounds; camera follow enabled after player spawn
+    const { W, H } = setupWorldAndCamera(this, { scale: 3, follow: false });
+    const centerX = W / 2;
+    const centerY = H / 2;
 
         try {
-            this._fieldFloor = buildThemedFloor(this, 'goblin');
+            this._fieldFloor = buildThemedFloor(this, 'goblin', { bounds: { x: 0, y: 0, width: W, height: H }, depth: 0 });
         } catch (e) {
             this.cameras.main.setBackgroundColor('#1b1422');
         }
         applyAmbientFx(this, 'goblin');
 
-        const margin = 64;
-        this._bounds = { x1: margin, x2: W - margin, y1: 96, y2: H - 120 };
+    const margin = 64;
+    this._bounds = { x1: margin, x2: W - margin, y1: 96, y2: H - 120 };
 
         const safeWidth = 220;
         const safeHeight = 180;
@@ -122,7 +123,9 @@ export class GloamwayBastion extends Phaser.Scene {
         const spawnY = (typeof data.spawnY === 'number')
             ? data.spawnY
             : Math.round(this._safeZoneRect.y + safeHeight * 0.45);
-        this.player = createPlayer(this, spawnX, spawnY, 'dude_idle');
+    this.player = createPlayer(this, spawnX, spawnY, 'dude_idle');
+    // Smooth follow camera now that player exists
+    ensureCameraFollow(this, { followLerp: 0.12, deadzoneFactor: 0.35, roundPixels: true });
 
         try {
             if (!this.anims.exists('left')) this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });

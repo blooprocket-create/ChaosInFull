@@ -8,6 +8,7 @@ import { attach as attachCleanup } from '../shared/cleanupManager.js';
 import { ensureGameCanvasVisible } from './shared/theme.js';
 import { ensureEnemyTexture } from './shared/fallbackTextures.js';
 import { getAreaEnemyLevel } from './shared/levelRanges.js';
+import { setupWorldAndCamera, ensureCameraFollow } from './shared/camera.js';
 
 export class GloamwaySwamp extends Phaser.Scene {
     constructor() { super('GloamwaySwamp'); }
@@ -56,24 +57,26 @@ export class GloamwaySwamp extends Phaser.Scene {
             spawnY: Math.round(this.scale.height * 0.38)
         };
 
-        const W = this.scale.width;
-        const H = this.scale.height;
-        const centerX = W / 2;
-        const centerY = H / 2;
+    // Enlarge world and set bounds; camera follow enabled after player spawn
+    const { W, H } = setupWorldAndCamera(this, { scale: 3, follow: false });
+    const centerX = W / 2;
+    const centerY = H / 2;
 
         try {
-            this._floor = buildThemedFloor(this, 'swamp');
+            this._floor = buildThemedFloor(this, 'swamp', { bounds: { x: 0, y: 0, width: W, height: H }, depth: 0 });
         } catch (e) {
             this.cameras.main.setBackgroundColor('#0b1a12');
         }
         applyAmbientFx(this, 'swamp');
 
-        const margin = 64;
-        this._bounds = { x1: margin, x2: W - margin, y1: 96, y2: H - 120 };
+    const margin = 64;
+    this._bounds = { x1: margin, x2: W - margin, y1: 96, y2: H - 120 };
 
         const spawnX = (typeof data.spawnX === 'number') ? data.spawnX : Math.round(centerX);
         const spawnY = (typeof data.spawnY === 'number') ? data.spawnY : Math.round(centerY * 1.1);
-        this.player = createPlayer(this, spawnX, spawnY, 'dude_idle');
+    this.player = createPlayer(this, spawnX, spawnY, 'dude_idle');
+    // Smooth follow camera now that player exists
+    ensureCameraFollow(this, { followLerp: 0.12, deadzoneFactor: 0.35, roundPixels: true });
 
         try {
             if (!this.anims.exists('left')) this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
