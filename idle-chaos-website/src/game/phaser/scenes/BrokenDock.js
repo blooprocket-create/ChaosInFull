@@ -279,11 +279,26 @@ export class BrokenDock extends Phaser.Scene {
             if (!this.char.flags.rustyRodTaken) {
                 const rodX = Math.max(120, dockX - dockWidth/2 + 60);
                 const rodY = platformY - 18;
-                const r = 12;
-                this.rustyRod = this.add.circle(rodX, rodY, r, 0x887744, 1).setDepth(1.15);
-                this.rustyRodPrompt = this.add.text(rodX, rodY - 28, '[E] Pick up Rusty Rod', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
-                // interactive hit area
-                try { this.rustyRod.setInteractive(new Phaser.Geom.Circle(0,0,r), Phaser.Geom.Circle.Contains); } catch(e) { this.rustyRod.setInteractive(); }
+                // Build a simple rod-on-floor representation using graphics (thin rotated rectangle + small bobber)
+                const rodContainer = this.add.container(rodX, rodY).setDepth(1.15);
+                const g = this.add.graphics();
+                g.fillStyle(0x7a5a38, 1); // rod body color
+                const rodLength = 42; const rodThickness = 5;
+                // draw rectangle centered at 0,0 then rotate
+                g.fillRect(-rodThickness/2, -rodLength/2, rodThickness, rodLength);
+                // simple handle wrap
+                g.fillStyle(0x5a3c24, 1); g.fillRect(-rodThickness/2 - 1, -rodLength/2 + 4, rodThickness + 2, 10);
+                // bobber near tip
+                g.fillStyle(0xd43c2c, 1); g.fillCircle(0, rodLength/2 - 6, 5);
+                rodContainer.add(g);
+                rodContainer.setScale(0.9);
+                rodContainer.setRotation(Phaser.Math.DegToRad(22));
+                // subtle breathing tween for visibility
+                try { this.tweens.add({ targets: rodContainer, scale: { from: 0.88, to: 0.94 }, yoyo: true, repeat: -1, duration: 1400, ease: 'Sine.easeInOut' }); } catch(e) {}
+                this.rustyRod = rodContainer;
+                this.rustyRodPrompt = this.add.text(rodX, rodY - 34, '[E] Pick up Rusty Rod', { fontSize: '12px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', padding: { x: 6, y: 4 } }).setOrigin(0.5).setDepth(2);
+                // interactive hit area (approx ellipse along rod)
+                try { rodContainer.setSize(rodThickness + 14, rodLength + 20); rodContainer.setInteractive(new Phaser.Geom.Rectangle(-(rodThickness+14)/2, -(rodLength+20)/2, rodThickness+14, rodLength+20), Phaser.Geom.Rectangle.Contains); } catch(e) { rodContainer.setInteractive(); }
                 const pickup = () => {
                     if (this.char.flags.rustyRodTaken) return;
                     const id = 'rusty_rod';
@@ -305,7 +320,7 @@ export class BrokenDock extends Phaser.Scene {
                     try { const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null; if (this._persistCharacter) this._persistCharacter(username); } catch (e) {}
                     try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) {}
                     try { if (this._updateHUD) this._updateHUD(); } catch (e) {}
-                    try { if (this.rustyRod) this.rustyRod.destroy(); } catch (e) {}
+                    try { if (this.rustyRod) this.rustyRod.destroy(true); } catch (e) {}
                     try { if (this.rustyRodPrompt) this.rustyRodPrompt.destroy(); } catch (e) {}
                 };
                 // expose pickup for interact key handling in update()
