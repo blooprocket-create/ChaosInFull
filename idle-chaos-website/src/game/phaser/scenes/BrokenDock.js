@@ -810,6 +810,16 @@ export class BrokenDock extends Phaser.Scene {
                     if (pts < (node.cost || 1)) return false;
                     char.fishing.masteryPoints = pts - (node.cost || 1);
                     taken.push(id);
+                    // Mark fishing data dirty and persist immediately (mastery point spend + node unlock)
+                    try { char._dirtyFishing = true; } catch (e) {}
+                    try {
+                        if (char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                            window.__cif_persist.saveCharacterPatch(String(char.id), { fishing: char.fishing });
+                            if (window.__shared_ui && window.__shared_ui.reconcileEquipmentBonuses) {
+                                try { window.__shared_ui.reconcileEquipmentBonuses({ char }); } catch (e) {}
+                            }
+                        }
+                    } catch (e) { /* ignore persistence errors */ }
                     return true;
                 };
             }
@@ -830,6 +840,26 @@ export class BrokenDock extends Phaser.Scene {
     }
 
     _openFishingModal() { // retained for transition; may be removed later
+        if (typeof document === 'undefined') return;
+        // Refresh fishing mastery from server before opening (ensure latest masteryPoints/masteryNodes)
+        try {
+            if (this.char && this.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.fetchCharacter === 'function') {
+                // Lightweight fetch: only fishing column
+                window.__cif_persist.fetchCharacter(String(this.char.id), { fields: ['fishing'] }).then(data => {
+                    if (data && data.fishing) {
+                        this.char.fishing = { ...this.char.fishing, ...data.fishing };
+                        try { this.char._dirtyFishing = false; } catch (e) {}
+                    }
+                    // Continue opening modal after hydration
+                    this._openFishingModal_internal();
+                }).catch(() => { this._openFishingModal_internal(); });
+                return; // defer until promise resolves
+            }
+        } catch (e) { /* ignore; fallback to local */ }
+        this._openFishingModal_internal();
+    }
+
+    _openFishingModal_internal() {
         if (typeof document === 'undefined') return;
         this._ensureFishingUiStyles();
         if (this._fishingUi && typeof this._fishingUi.close === 'function') {
