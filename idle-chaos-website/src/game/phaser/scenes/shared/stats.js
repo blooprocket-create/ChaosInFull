@@ -5,26 +5,36 @@ export function effectiveStats(char) {
     // Ensure equipment bonuses are reconciled; if not present, derive basic bonuses from equipped item definitions.
     let equip = char._equipBonuses || { str:0, int:0, agi:0, luk:0, defense:0 };
     try {
-        if ((!char._equipBonuses || typeof char._equipBonuses.defense !== 'number') && char.equipment) {
-            const defs = (typeof window !== 'undefined' && window.ITEM_DEFS) ? window.ITEM_DEFS : {};
-            let derived = { str:0,int:0,agi:0,luk:0,defense:0, movementSpeed:0 };
-            for (const slot of Object.keys(char.equipment)) {
-                const item = char.equipment[slot];
-                if (!item || !item.id) continue;
-                const idef = defs[item.id];
-                if (!idef) continue;
-                if (idef.statBonus) {
-                    for (const k of Object.keys(idef.statBonus)) {
-                        derived[k] = (derived[k] || 0) + (idef.statBonus[k] || 0);
+        const needsEquipHydration = !char._equipBonuses || char._equipBonuses.__derivedFromDefs !== true;
+        if (needsEquipHydration && char.equipment) {
+            const defs = (typeof window !== 'undefined' && window.ITEM_DEFS) ? window.ITEM_DEFS : null;
+            if (defs && Object.keys(defs).length) {
+                const derived = { str:0,int:0,agi:0,luk:0,defense:0, movementSpeed:0 };
+                let touched = false;
+                for (const slot of Object.keys(char.equipment)) {
+                    const item = char.equipment[slot];
+                    if (!item || !item.id) continue;
+                    const idef = defs[item.id];
+                    if (!idef) continue;
+                    touched = true;
+                    if (idef.statBonus) {
+                        for (const k of Object.keys(idef.statBonus)) {
+                            derived[k] = (derived[k] || 0) + (idef.statBonus[k] || 0);
+                        }
                     }
+                    const defVal = (typeof idef.defense === 'number') ? idef.defense : (typeof idef.def === 'number' ? idef.def : null);
+                    if (typeof defVal === 'number') derived.defense += defVal;
+                    if (typeof idef.movementSpeed === 'number') derived.movementSpeed += idef.movementSpeed;
                 }
-                const defVal = (typeof idef.defense === 'number') ? idef.defense : (typeof idef.def === 'number' ? idef.def : null);
-                if (typeof defVal === 'number') derived.defense += defVal;
-                if (typeof idef.movementSpeed === 'number') derived.movementSpeed += idef.movementSpeed;
+                if (touched) {
+                    const merged = Object.assign({}, char._equipBonuses || {}, derived);
+                    merged.__derivedFromDefs = true;
+                    equip = merged;
+                    char._equipBonuses = merged; // cache for subsequent calls
+                }
             }
-            // Merge with existing equip bonuses (prefer existing if already set)
-            equip = Object.assign({}, derived, equip);
-            char._equipBonuses = equip; // cache for subsequent calls
+        } else if (char._equipBonuses && char._equipBonuses.__derivedFromDefs) {
+            equip = char._equipBonuses;
         }
     } catch (e) { /* ignore equipment derivation errors */ }
     // Temporary buffs (from consumables) may add stat bonuses or defense
