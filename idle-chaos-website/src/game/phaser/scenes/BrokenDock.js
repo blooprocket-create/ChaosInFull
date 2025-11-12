@@ -964,6 +964,9 @@ export class BrokenDock extends Phaser.Scene {
                 color: #e9f4ff;
                 font-family: 'Inter', 'Segoe UI', sans-serif;
                 overflow: hidden;
+                /* Scale to design baseline (2560x1440) for consistency at 1920x1080 */
+                transform: scale(var(--ui-scale, 1));
+                transform-origin: center center;
             }
             .bdock-header {
                 display: flex;
