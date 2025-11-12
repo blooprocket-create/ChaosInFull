@@ -810,6 +810,15 @@ export const RECIPE_DEFS = {
         reqLevel: 10,
         smithingXp: 1000 // Maple bow crafting experience
     },
+    'pine_bow': {
+        id: 'pine_bow',
+        name: 'Pine Bow',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'pine_log', qty: 5 }, { id: 'string', qty: 2 } ],
+        reqLevel: 15,
+        smithingXp: 1500 // Pine bow crafting experience
+    },
     'birch_bow': {
         id: 'birch_bow',
         name: 'Birch Bow',
@@ -855,4 +864,24 @@ export const RECIPE_DEFS = {
         reqLevel: 20,
         smithingXp: 2500 // Golden polearm crafting experience
     },
+    'dragon_polearm': {
+        id: 'dragon_polearm',
+        name: 'Dragon Polearm',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'dragon_scale', qty: 5 }, { id: 'mythril_bar', qty: 5 }, { id: 'maple_log', qty: 2 }, { id: 'string', qty: 3 } ],
+        reqLevel: 50,
+        smithingXp: 6500 // Dragon polearm crafting experience
+    },
+    'lurker_staff': {
+        id: 'lurker_staff',
+        name: 'Lurker Staff',
+        tool: 'workbench',
+        category: 'weapon',
+        requires: [ { id: 'lurker_eye', qty: 3 }, { id: 'mythril_bar', qty: 3 }, { id: 'normal_log', qty: 3 } ],
+        reqLevel: 45,
+        smithingXp: 6000 // Lurker staff crafting experience
+    },
+    
+
 };

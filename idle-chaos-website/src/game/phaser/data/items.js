@@ -2848,8 +2848,34 @@ const ITEM_DEFS = {
         },
         "value": 600,
         "description": "A finely crafted golden polearm favored by elite warriors."
+    },
+    "string": {
+        "id": "string",
+        "name": "String",
+        "rarity": "common",
+        "stackable": true,
+        "maxStack": 99999,
+        "value": 1,
+        "description": "A simple piece of string, useful for crafting and repairs."
+    },
+    "lurker_staff": {
+        "id": "lurker_staff",
+        "name": "Lurker Staff",
+        "rarity": "legendary",
+        "stackable": false,
+        "maxStack": 1,
+        "weapon": true,
+        "slot": "weapon",
+        "damage": [
+            90,
+            120
+        ],
+        "statBonus": {
+            "int": 25
+        },
+        "value": 1500,
+        "description": "A mystical staff imbued with the power of the lurker, favored by legendary mages."
     }
-    
 };
 
 if (typeof window !== 'undefined') window.ITEM_DEFS = ITEM_DEFS;
