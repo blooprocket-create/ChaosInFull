@@ -113,21 +113,6 @@ export class CharacterSelect extends Phaser.Scene {
             });
         }
 
-        // Migrate existing characters: ensure each has an id
-        try {
-            if (userObj && userObj.characters && Array.isArray(userObj.characters)) {
-                let changed = false;
-                for (let i = 0; i < userObj.characters.length; i++) {
-                    const c = userObj.characters[i];
-                    if (c && !c.id) {
-                        c.id = uuidv4();
-                        changed = true;
-                    }
-                }
-                if (changed) saveUser(userObj.username || username, userObj);
-            }
-        } catch (e) { /* ignore migration errors */ }
-
         // Create a new, themed character select panel that matches the Login scene styling
         const container = document.createElement('div');
         container.id = 'character-select-root';

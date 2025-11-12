@@ -1,4 +1,4 @@
-// Lightweight client-side persistence bridge to migrate from localStorage -> server DB.
+// Lightweight client-side persistence bridge that proxies Phaser scenes to the server DB.
 // Exposes window.__cif_persist with helpers used by legacy Phaser scenes.
 // Safe to call even before auth; methods will no-op if unauthorized.
 
@@ -12,7 +12,7 @@ type SaveCharacterPayload = {
 };
 
 // Local helper types to avoid any
-type SkillName = 'character' | 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
+type SkillName = 'character' | 'char' | 'mining' | 'woodcutting' | 'fishing' | 'cooking' | 'smithing';
 type SkillProgress = { level: number; exp: number; expToLevel: number };
 type CharacterLike = { id?: string; [k: string]: unknown };
 type PhaserSceneLike = {
@@ -41,7 +41,6 @@ declare global {
       saveQuests: (characterId: string, active: Array<{ id: string; progress?: unknown }>, completed: string[]) => Promise<void>;
     grantSkillXp: (characterId: string, skill: SkillName, amount: number) => Promise<{ level: number; exp: number; expToLevel: number } | null>;
   queueSkillXp: (characterId: string, skill: SkillName, amount: number) => Promise<void>;
-      migrateLocalStorageBlob: (username: string) => Promise<void>;
       loadCharacterFull: (characterId: string) => Promise<LoadedCharacter | null>;
       loadUserSettings: () => Promise<Record<string, unknown>>;
       saveUserSettingsPatch: (patch: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -85,6 +84,53 @@ function emitTelemetry(name: string, props?: Record<string, unknown>) {
   } catch {}
 }
 
+function buildCharacterPatchFromSnapshot(char: SaveCharacterPayload | CharacterLike): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  const gold = (char as { gold?: number }).gold;
+  if (typeof gold === 'number' && Number.isFinite(gold)) {
+    patch.gold = Math.max(0, Math.floor(gold));
+  }
+  const flags = (char as { flags?: unknown }).flags;
+  if (flags && typeof flags === 'object') patch.flags = flags;
+  const fishing = (char as { fishing?: unknown }).fishing;
+  if (fishing) patch.fishing = fishing;
+  const equipment = (char as { equipment?: unknown }).equipment;
+  if (equipment) patch.equipment = equipment;
+  const talents = (char as { talents?: unknown }).talents;
+  if (talents) patch.talents = talents;
+  const currentScene = (char as { currentScene?: string }).currentScene;
+  if (typeof currentScene === 'string') patch.currentScene = currentScene;
+  const lastX = (char as { lastX?: number }).lastX;
+  if (typeof lastX === 'number' && Number.isFinite(lastX)) patch.lastX = lastX;
+  const lastY = (char as { lastY?: number }).lastY;
+  if (typeof lastY === 'number' && Number.isFinite(lastY)) patch.lastY = lastY;
+  const lastLocation = (char as { lastLocation?: { scene?: string; x?: number | null; y?: number | null } | null }).lastLocation;
+  if (lastLocation && typeof lastLocation === 'object') {
+    if (typeof lastLocation.scene === 'string') patch.currentScene = lastLocation.scene;
+    if (typeof lastLocation.x === 'number' && Number.isFinite(lastLocation.x)) patch.lastX = lastLocation.x;
+    if (typeof lastLocation.y === 'number' && Number.isFinite(lastLocation.y)) patch.lastY = lastLocation.y;
+  }
+  return patch;
+}
+
+async function postCharacterPatch(characterId: string | null | undefined, patch: Record<string, unknown>) {
+  if (!characterId) return;
+  if (!patch || !Object.keys(patch).length) return;
+  if (typeof window === 'undefined') return;
+  if (window.__persistFlags?.disableServerWrites) return;
+  try {
+    const res = await fetch('/api/account/characters/patch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterId, ...patch })
+    });
+    if (res.ok) emitTelemetry('character_patch_success', { characterId });
+    else emitTelemetry('character_patch_fail', { characterId, status: res.status });
+  } catch {
+    emitTelemetry('character_patch_fail', { characterId, network: true });
+  }
+}
+
 export type LoadedQuest = { id: string; progress: unknown | null };
 export type LoadedCharacter = {
   id: string;
@@ -107,29 +153,11 @@ function installPersistenceBridge() {
   if (window.__cif_persist) return; // already installed
   window.__cif_persist = {
     async saveCharacter(username, char) {
-      if (!char) return;
-      // Character core state (scene/afk) handled via /api/account/characters/state.
-      // Inventory persists separately; here we only ensure we keep localStorage compatibility for name/class/etc.
-      try {
-        if (!username) return;
-        const key = 'cif_user_' + username;
-        const blob = JSON.parse(localStorage.getItem(key) || '{"characters":[]}');
-        if (!blob.characters) blob.characters = [];
-        let replaced = false;
-        for (let i = 0; i < blob.characters.length; i++) {
-          const c = blob.characters[i];
-          if (!c) continue;
-          if ((c.id && char.id && c.id === char.id) || (!c.id && c.name === char.name)) {
-            blob.characters[i] = char;
-            replaced = true;
-            break;
-          }
-        }
-        if (!replaced) blob.characters.push(char);
-        localStorage.setItem(key, JSON.stringify(blob));
-      } catch {
-        /* swallow */
-      }
+      void username;
+      if (!char || !(char as { id?: string | number }).id) return;
+      const charId = String((char as { id?: string | number }).id);
+      const patch = buildCharacterPatchFromSnapshot(char);
+      await postCharacterPatch(charId, patch);
     },
   async grantSkillXp(characterId, skill, amount) {
       if (!characterId || !skill || !Number.isFinite(amount) || amount <= 0) return null;
@@ -256,7 +284,7 @@ function installPersistenceBridge() {
         const immediate = queuedTotal >= 250 || skillCount >= 3;
         type Skill = SkillName;
         const isSkill = (s: string): s is Skill => (
-          s === 'character' || s === 'mining' || s === 'woodcutting' || s === 'fishing' || s === 'cooking' || s === 'smithing'
+          s === 'character' || s === 'char' || s === 'mining' || s === 'woodcutting' || s === 'fishing' || s === 'cooking' || s === 'smithing'
         );
         const scheduleFlush = () => {
           if (window.__skillXpFlushTimer) return;
@@ -390,19 +418,7 @@ function installPersistenceBridge() {
       }
     },
     async saveCharacterPatch(characterId, patch) {
-      if (!characterId) return; // ignore until a real character id is known
-      if (window.__persistFlags?.disableServerWrites) return;
-      try {
-        const res = await fetch('/api/account/characters/patch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ characterId, ...patch })
-        });
-        if (res.ok) emitTelemetry('character_patch_success', { characterId });
-        else emitTelemetry('character_patch_fail', { characterId, status: res.status });
-      } catch {
-        emitTelemetry('character_patch_fail', { characterId, network: true });
-      }
+      await postCharacterPatch(characterId, patch || {});
     },
     async saveEquipment(characterId, equipment) {
       if (!characterId) return;
@@ -537,75 +553,6 @@ function installPersistenceBridge() {
         else emitTelemetry('storage_upsert_fail', { status: res.status });
       } catch {
         emitTelemetry('storage_upsert_fail', { network: true });
-      }
-    },
-    async migrateLocalStorageBlob(username) {
-      if (!username) return;
-      const key = 'cif_user_' + username;
-      try {
-        const blob = JSON.parse(localStorage.getItem(key) || 'null');
-        if (!blob) return;
-        // Migrate storage array -> AccountItemStack map (merge counts)
-        if (Array.isArray(blob.storage)) {
-          const map: Record<string, number> = {};
-            for (const slot of blob.storage) {
-              if (!slot) continue;
-              const { itemkey, count } = slot as { itemkey?: string; count?: number };
-              if (!itemkey || typeof count !== 'number') continue;
-              map[itemkey] = (map[itemkey] || 0) + count;
-            }
-          await window.__cif_persist?.upsertAccountStorage(map);
-        }
-        // Attempt to migrate any characters present in the local blob
-        if (Array.isArray(blob.characters)) {
-          for (const ch of blob.characters as Array<Record<string, unknown>>) {
-            try {
-              const chId = ch?.id as string | undefined;
-              if (!chId) continue;
-              // Inventory migration: slots -> stacks map
-              if (Array.isArray(ch.inventory)) {
-                const map: Record<string, number> = {};
-                for (const slot of ch.inventory) {
-                  if (!slot) continue;
-                  const id = (slot as { id?: string }).id as string | undefined; const qty = Number((slot as { qty?: number }).qty || 1);
-                  if (!id || !qty) continue;
-                  map[id] = (map[id] || 0) + qty;
-                }
-                await window.__cif_persist?.saveInventory(chId, map);
-              }
-              // Character patch: gold/flags/fishing/equipment/talents/last location
-              const patch: Record<string, unknown> = {};
-              const gold = (ch as { gold?: number }).gold; if (typeof gold === 'number') patch.gold = Math.max(0, Math.floor(gold));
-              const flags = (ch as { flags?: unknown }).flags; if (flags) patch.flags = flags;
-              const fishing = (ch as { fishing?: unknown }).fishing; if (fishing) patch.fishing = fishing;
-              const equipment = (ch as { equipment?: unknown }).equipment; if (equipment) patch.equipment = equipment;
-              const talents = (ch as { talents?: unknown }).talents; if (talents) patch.talents = talents;
-              const lastLocation = (ch as { lastLocation?: { scene?: string; x?: number; y?: number } }).lastLocation;
-              if (lastLocation) {
-                patch.currentScene = lastLocation.scene || null;
-                if (typeof lastLocation.x === 'number') patch.lastX = lastLocation.x;
-                if (typeof lastLocation.y === 'number') patch.lastY = lastLocation.y;
-              }
-              if (Object.keys(patch).length) await window.__cif_persist?.saveCharacterPatch(chId, patch);
-              // Quests
-              const active = Array.isArray((ch as { activeQuests?: Array<{ id: string; progress?: unknown }> }).activeQuests)
-                ? ((ch as { activeQuests?: Array<{ id: string; progress?: unknown }> }).activeQuests!).map(q => ({ id: q.id, progress: q.progress ?? null }))
-                : [];
-              const completed = Array.isArray((ch as { completedQuests?: string[] }).completedQuests)
-                ? ((ch as { completedQuests?: string[] }).completedQuests!).slice()
-                : [];
-              if (active.length || completed.length) {
-                await window.__cif_persist?.saveQuests(chId, active, completed);
-              }
-            } catch {}
-          }
-        }
-        // Mark migrated
-        blob.migratedAt = Date.now();
-        localStorage.setItem(key, JSON.stringify(blob));
-        emitTelemetry('migration_success', { username });
-      } catch {
-        emitTelemetry('migration_error', { username });
       }
     }
   };

@@ -9,7 +9,7 @@ import { applySafeZoneRegen } from './shared/stats.js';
 import { applyCombatMixin } from './shared/combat.js';
 import { attach, addTimeEvent } from '../shared/cleanupManager.js';
 import { ensureGameCanvasVisible } from './shared/theme.js';
-import { syncInventoryToServer } from './shared/persistence.js';
+import { persistCharacter, syncInventoryToServer } from './shared/persistence.js';
 
 // Clean Town scene implementation
 export class Town extends Phaser.Scene {
@@ -640,44 +640,14 @@ export class Town extends Phaser.Scene {
         } catch (e) { /* ignore furnace modal errors */ }
     }
     _persistCharacter(username) {
-        if (!username || !this.char) return;
-        try {
-            const key = 'cif_user_' + username;
-            const userObj = JSON.parse(localStorage.getItem(key));
-            if (userObj && userObj.characters) {
-                let found = false;
-                for (let i = 0; i < userObj.characters.length; i++) {
-                    const uc = userObj.characters[i];
-                    if (!uc) continue;
-                    if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                        // Replace the stored character object with the full current character state
-                        userObj.characters[i] = this.char;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    for (let i = 0; i < userObj.characters.length; i++) {
-                        if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
-                    }
-                    if (!found) userObj.characters.push(this.char);
-                }
-                localStorage.setItem(key, JSON.stringify(userObj));
+        if (!this.char) return;
+        persistCharacter(this, username, {
+            includeLocation: true,
+            logErrors: false,
+            onAfterSave: (scene) => {
+                try { if (scene._refreshInventoryModal) scene._refreshInventoryModal(); } catch (e) { /* ignore */ }
             }
-        } catch (e) { console.warn('Could not persist character', e); }
-        
-        // Async remote persistence - save character AND inventory to database
-        try { 
-            if (window.__cif_persist) {
-                window.__cif_persist.saveCharacter(username, this.char);
-                
-                // IMPORTANT: Also sync inventory to ItemStack table
-                try { syncInventoryToServer(this); } catch (e) {}
-            }
-        } catch (e) { /* ignore */ }
-        
-        // If the inventory modal is open, refresh it so UI updates live after changes
-        try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
+        });
     }
     // --- Shared account storage helpers (database-backed) ---
     async _getAccountStorage() {
@@ -1127,24 +1097,6 @@ export class Town extends Phaser.Scene {
                     }
                 }
                 
-                // Update localStorage to keep it in sync (without triggering another database save)
-                const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                if (username) {
-                    try {
-                        const key = 'cif_user_' + username;
-                        const userObj = JSON.parse(localStorage.getItem(key) || '{}');
-                        if (userObj && userObj.characters) {
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                const uc = userObj.characters[i];
-                                if (uc && uc.id === this.char.id) {
-                                    userObj.characters[i] = this.char;
-                                    localStorage.setItem(key, JSON.stringify(userObj));
-                                    break;
-                                }
-                            }
-                        }
-                    } catch (e) { /* ignore */ }
-                }
             }
             
             this._showToast('Deposited ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));
@@ -1186,24 +1138,6 @@ export class Town extends Phaser.Scene {
                     }
                 }
                 
-                // Update localStorage to keep it in sync (without triggering another database save)
-                const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                if (username) {
-                    try {
-                        const key = 'cif_user_' + username;
-                        const userObj = JSON.parse(localStorage.getItem(key) || '{}');
-                        if (userObj && userObj.characters) {
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                const uc = userObj.characters[i];
-                                if (uc && uc.id === this.char.id) {
-                                    userObj.characters[i] = this.char;
-                                    localStorage.setItem(key, JSON.stringify(userObj));
-                                    break;
-                                }
-                            }
-                        }
-                    } catch (e) { /* ignore */ }
-                }
             }
             
             this._showToast('Withdrew ' + qty + 'x ' + ((window && window.ITEM_DEFS && window.ITEM_DEFS[itemId] && window.ITEM_DEFS[itemId].name) || itemId));

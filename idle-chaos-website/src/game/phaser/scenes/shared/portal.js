@@ -100,32 +100,6 @@ export function createPortal(scene, x, y, opts = {}) {
                         } else if (opts.targetScene) {
                             try {
                                 const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
-                                // persist character generically (replace stored character object)
-                                try {
-                                    const key = 'cif_user_' + username;
-                                    const userObj = JSON.parse(localStorage.getItem(key));
-                                    if (userObj && userObj.characters) {
-                                        let found = false;
-                                        for (let i = 0; i < userObj.characters.length; i++) {
-                                            const uc = userObj.characters[i];
-                                            if (!uc) continue;
-                                            if ((uc.id && scene.char && scene.char.id && uc.id === scene.char.id) || (!uc.id && uc.name === (scene.char && scene.char.name))) {
-                                                userObj.characters[i] = scene.char;
-                                                userObj.characters[i].lastLocation = { scene: opts.targetScene, x: scene.player.x, y: py };
-                                                found = true;
-                                                break;
-                                            }
-                                        }
-                                        if (!found) {
-                                            for (let i = 0; i < userObj.characters.length; i++) {
-                                                if (!userObj.characters[i]) { userObj.characters[i] = scene.char; found = true; break; }
-                                            }
-                                            if (!found) userObj.characters.push(scene.char);
-                                        }
-                                        localStorage.setItem(key, JSON.stringify(userObj));
-                                    }
-                                } catch (e) { /* ignore persist errors */ }
-
                                 // Server-authoritative scene/position persistence: update currentscene, lastX, lastY.
                                 try {
                                     if (scene.char && scene.char.id && typeof window !== 'undefined' && window.__cif_persist && window.__cif_persist.saveCharacterPatch) {

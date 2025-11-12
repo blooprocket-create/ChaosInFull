@@ -1,6 +1,5 @@
 import { createPlayer } from '../shared/playerFactory.js';
 import { attachCommonKeys } from './shared/keys.js';
-import { loadUser, saveUser } from './shared/storage.js';
 import { attach, addTimeEvent, registerDisposer } from '../shared/cleanupManager.js';
 import { ensureGameCanvasVisible } from './shared/theme.js';
 
@@ -271,23 +270,6 @@ export class Tutorial extends Phaser.Scene {
                     window.__cif_persist.saveCharacterPatch(this._character.id, { flags: { tutorialCompleted: true } });
                 }
             } catch (e) { /* ignore network errors; local state still updated */ }
-            if (this._username) {
-                const userObj = loadUser(this._username, null);
-                if (userObj && Array.isArray(userObj.characters)) {
-                    let found = false;
-                    for (let i = 0; i < userObj.characters.length; i++) {
-                        const uc = userObj.characters[i];
-                        if (!uc) continue;
-                        if ((uc.id && this._character && this._character.id && uc.id === this._character.id) || (!uc.id && uc.name === (this._character && this._character.name))) {
-                            userObj.characters[i] = this._character;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found && this._character) userObj.characters.push(this._character);
-                    try { saveUser(this._username, userObj); } catch (e) { /* ignore save errors */ }
-                }
-            }
         } catch (e) { /* ignore persistence errors */ }
 
         if (last && last.scene) {

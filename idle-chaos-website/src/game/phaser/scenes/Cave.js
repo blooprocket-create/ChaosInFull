@@ -10,7 +10,7 @@ import { setSceneKey, setSceneActivity, clearActivity } from '../state/gameState
 import { applyCombatMixin } from './shared/combat.js';
 import { attach as attachCleanup, addTimeEvent } from '../shared/cleanupManager.js';
 import { ensureGameCanvasVisible } from './shared/theme.js';
-import { syncInventoryToServer } from './shared/persistence.js';
+import { persistCharacter, syncInventoryToServer } from './shared/persistence.js';
 // Cave scene: HUD similar to Town, WASD+E controls, right-side portal, one mining node for testing
 export class Cave extends Phaser.Scene {
     constructor() {
@@ -1286,51 +1286,24 @@ export class Cave extends Phaser.Scene {
         }
     }
 
-    // Persist mining and inventory changes to localStorage (by name match)
+    // Persist mining/inventory changes to the database
     _persistCharacter(username) {
-        if (!username || !this.char) return;
-        try {
-            const key = 'cif_user_' + username;
-            const userObj = JSON.parse(localStorage.getItem(key));
-            if (userObj && userObj.characters) {
-                let found = false;
-                for (let i = 0; i < userObj.characters.length; i++) {
-                    const uc = userObj.characters[i];
-                    if (!uc) continue;
-                    if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                        userObj.characters[i].mining = this.char.mining;
-                        userObj.characters[i].inventory = this.char.inventory;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    // fallback: try to add/update by name if no id match
-                    for (let i = 0; i < userObj.characters.length; i++) {
-                        if (!userObj.characters[i]) { userObj.characters[i] = this.char; found = true; break; }
-                    }
-                    if (!found) userObj.characters.push(this.char);
-                }
-                localStorage.setItem(key, JSON.stringify(userObj));
+        if (!this.char) return;
+        persistCharacter(this, username, {
+            includeLocation: false,
+            logErrors: false,
+            onAfterSave: (scene) => {
+                try { if (scene._refreshInventoryModal) scene._refreshInventoryModal(); } catch (e) { /* ignore */ }
             }
-        } catch (e) { console.warn('Could not persist character', e); }
+        });
 
-        // Forward inventory + basic patch to server so ItemStack table stays in sync while mining.
         try {
             const charId = (this.char && this.char.id) || null;
-            if (charId && typeof window !== 'undefined' && window.__cif_persist) {
-                try { syncInventoryToServer(this); } catch (e) {}
-                // Minimal patch for mining progress (so server has up-to-date vein timers etc. if stored)
-                try {
-                    if (window.__cif_persist.saveCharacterPatch) {
-                        const miningPatch = this.char.mining ? { mining: this.char.mining } : {};
-                        if (Object.keys(miningPatch).length) window.__cif_persist.saveCharacterPatch(charId, miningPatch);
-                    }
-                } catch (e) { /* ignore */ }
+            if (charId && typeof window !== 'undefined' && window.__cif_persist && window.__cif_persist.saveCharacterPatch) {
+                const miningPatch = this.char.mining ? { mining: this.char.mining } : {};
+                if (Object.keys(miningPatch).length) window.__cif_persist.saveCharacterPatch(charId, miningPatch);
             }
         } catch (e) { /* ignore server forward errors */ }
-        // Refresh inventory modal if open so changes appear immediately
-        try { if (this._refreshInventoryModal) this._refreshInventoryModal(); } catch (e) { /* ignore */ }
     }
 
     update(time, delta) {
@@ -1349,23 +1322,14 @@ export class Cave extends Phaser.Scene {
                 this.portalPrompt.setVisible(true);
                 if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
                     const username = (this.sys && this.sys.settings && this.sys.settings.data && this.sys.settings.data.username) || null;
-                    // persist inventory/mining and set lastLocation to Town with current position
                     try {
-                        const key = 'cif_user_' + username;
-                        const userObj = JSON.parse(localStorage.getItem(key));
-                        if (userObj && userObj.characters) {
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                const uc = userObj.characters[i];
-                                if (!uc) continue;
-                                // match by id if available, fallback to name
-                                if ((uc.id && this.char.id && uc.id === this.char.id) || (!uc.id && uc.name === this.char.name)) {
-                                    userObj.characters[i].mining = this.char.mining;
-                                    userObj.characters[i].inventory = this.char.inventory;
-                                    userObj.characters[i].lastLocation = { scene: 'Town', x: this.player.x, y: this.player.y };
-                                    localStorage.setItem(key, JSON.stringify(userObj));
-                                    break;
-                                }
-                            }
+                        if (this.char && this.char.id && typeof window !== 'undefined' && window.__cif_persist?.saveCharacterPatch) {
+                            window.__cif_persist.saveCharacterPatch(String(this.char.id), {
+                                mining: this.char.mining || null,
+                                currentScene: 'Town',
+                                lastX: Math.floor(this.player.x || 0),
+                                lastY: Math.floor(this.player.y || 0)
+                            });
                         }
                     } catch (e) { console.warn('Could not persist lastLocation', e); }
                     this.scene.start('Town', { character: this.char, username: username, spawnX: 120, spawnY: this.portal ? this.portal.y : (this.scale.height - 120) });

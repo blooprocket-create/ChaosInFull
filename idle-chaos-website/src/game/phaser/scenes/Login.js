@@ -1,7 +1,6 @@
 // Phaser is loaded globally from CDN
 
 import { createAtmosphericOverlays } from './shared/overlays.js';
-import { iterUsers } from './shared/storage.js';
 import { applyDefaultBackground, captureBodyStyle, restoreBodyStyle } from './shared/theme.js';
 import { applyCombatMixin } from './shared/combat.js';
 
@@ -253,21 +252,6 @@ export class Login extends Phaser.Scene {
         } catch (e) { /* ignore */ }
     }
 
-    }
-
-    _findLastLoggedInUser() {
-        let found = null;
-        iterUsers((key, user) => {
-            if (found || !user) return;
-            if (user.loggedIn) {
-                found = user;
-            }
-        });
-        if (found) return found;
-        iterUsers((key, user) => {
-            if (!found && user) found = user;
-        });
-        return found;
     }
 
     _cleanupDom() {

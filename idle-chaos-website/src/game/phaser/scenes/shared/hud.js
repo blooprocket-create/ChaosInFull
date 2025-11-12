@@ -183,45 +183,6 @@ export function createHUD(scene) {
             if (returnBtn) {
                 returnBtn.onclick = async (ev) => {
                     ev.stopPropagation();
-                    try {
-                        // Save current character first (reuse same logic as save button)
-                        const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
-                        if (username && scene.char) {
-                            const key = 'cif_user_' + username;
-                            const userObj = JSON.parse(localStorage.getItem(key)) || { characters: [] };
-                            if (!Array.isArray(userObj.characters)) userObj.characters = [];
-                            let found = false;
-                            for (let i = 0; i < userObj.characters.length; i++) {
-                                const uc = userObj.characters[i];
-                                if (!uc) continue;
-                                if ((uc.id && scene.char.id && uc.id === scene.char.id) || (!uc.id && uc.name === scene.char.name)) {
-                                    userObj.characters[i] = scene.char;
-                                    userObj.characters[i].lastLocation = {
-                                        scene: (scene.scene && scene.scene.key) || null,
-                                        x: (scene.player && scene.player.x) || null,
-                                        y: (scene.player && scene.player.y) || null
-                                    };
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                for (let i = 0; i < userObj.characters.length; i++) {
-                                    if (!userObj.characters[i]) {
-                                        userObj.characters[i] = scene.char;
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!found) userObj.characters.push(scene.char);
-                            localStorage.setItem(key, JSON.stringify(userObj));
-                            scene._showToast && scene._showToast('Character saved.');
-                        }
-                    } catch (saveErr) {
-                        console.warn('HUD return: save error', saveErr);
-                    }
-
                     // Server-authoritative save of current scene and coordinates before leaving
                     try {
                         if (scene && scene.char && scene.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
@@ -470,12 +431,11 @@ export default { createHUD, updateHUD, destroyHUD };
 
 // --- Snapshot Helper ---
 // Performs a comprehensive persistence operation for the current character:
-// 1. LocalStorage mirror (legacy compatibility)
-// 2. Inventory (saveInventory) – converts slot array to stacks map
-// 3. Equipment (saveEquipment)
-// 4. Talents (saveTalents)
-// 5. Quests (saveQuests)
-// 6. Character patch (saveCharacterPatch) – gold, flags, fishing, equipment, talents, scene+location
+// - Inventory (saveInventory) - converts slot array to stacks map
+// - Equipment (saveEquipment)
+// - Talents (saveTalents)
+// - Quests (saveQuests)
+// - Character patch (saveCharacterPatch) - gold, flags, fishing, equipment, talents, scene+location
 // Options: { silentToast, skipLocation }
 async function performFullSnapshot(scene, options = {}) {
     if (!scene || !scene.char) return;
@@ -486,24 +446,7 @@ async function performFullSnapshot(scene, options = {}) {
     const username = (scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null;
     const toast = (msg, dur=1400) => { if (!silent && scene._showToast) try { scene._showToast(msg, dur); } catch (e) {} };
 
-    // 1) LocalStorage mirror for offline resilience
-    try {
-        if (username) {
-            const key = 'cif_user_' + username;
-            const blob = JSON.parse(localStorage.getItem(key) || '{"characters":[]}');
-            if (!Array.isArray(blob.characters)) blob.characters = [];
-            let replaced = false;
-            for (let i=0;i<blob.characters.length;i++) {
-                const c = blob.characters[i];
-                if (!c) continue;
-                if ((c.id && char.id && c.id === char.id) || (!c.id && c.name === char.name)) { blob.characters[i] = char; replaced = true; break; }
-            }
-            if (!replaced) blob.characters.push(char);
-            localStorage.setItem(key, JSON.stringify(blob));
-        }
-    } catch (e) { console.warn('[snapshot] localStorage mirror failed', e); }
-
-    if (!charId || typeof window === 'undefined' || !window.__cif_persist) { toast('Saved locally (offline).'); return; }
+    if (!charId || typeof window === 'undefined' || !window.__cif_persist) { toast('Offline – unable to reach server.'); return; }
 
     const persist = window.__cif_persist;
     const flags = (char.flags && typeof char.flags === 'object') ? { ...char.flags } : {};
