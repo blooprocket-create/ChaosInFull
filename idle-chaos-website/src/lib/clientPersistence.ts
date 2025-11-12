@@ -193,10 +193,16 @@ function installPersistenceBridge() {
                   const gained = Math.max(0, newLevel - oldLevel);
                   if (gained > 0) {
                     const mod = await import("@/src/game/phaser/data/talents.js");
-                    const onSkillLevelUp = (mod as unknown as { onSkillLevelUp?: (scene: PhaserSceneLike, char: CharacterLike, skillKey: string, levelsGained?: number) => void }).onSkillLevelUp;
+                    const talentFns = mod as unknown as {
+                      onSkillLevelUp?: (scene: PhaserSceneLike, char: CharacterLike, skillKey: string, levelsGained?: number) => void;
+                      onCharacterLevelUp?: (scene: PhaserSceneLike | null, char: CharacterLike, levelsGained?: number) => void;
+                    };
                     try {
-                      if (onSkillLevelUp) {
-                        onSkillLevelUp(s as PhaserSceneLike, ch as CharacterLike, skill, gained);
+                      const isCharacterSkill = (skill === 'character' || skill === 'char');
+                      if (isCharacterSkill && talentFns.onCharacterLevelUp) {
+                        talentFns.onCharacterLevelUp(s as PhaserSceneLike, ch as CharacterLike, gained);
+                      } else if (talentFns.onSkillLevelUp) {
+                        talentFns.onSkillLevelUp(s as PhaserSceneLike, ch as CharacterLike, skill, gained);
                       }
                     } catch {}
                     try {

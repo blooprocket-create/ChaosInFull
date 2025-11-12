@@ -35,9 +35,17 @@ export function persistCharacter(scene, username, options = {}) {
     try {
         const key = 'cif_user_' + username;
         const stored = localStorage.getItem(key);
-        if (!stored) return;
-        const userObj = JSON.parse(stored);
-        if (!userObj || !Array.isArray(userObj.characters)) return;
+        let userObj = null;
+        try {
+            userObj = stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            if (cfg.logErrors && typeof console !== 'undefined' && console.warn) {
+                console.warn('persistCharacter: corrupt blob detected, rebuilding', e);
+            }
+        }
+        if (!userObj || typeof userObj !== 'object') userObj = {};
+        if (!Array.isArray(userObj.characters)) userObj.characters = [];
+        userObj.username = userObj.username || username;
 
         const char = scene.char;
 
