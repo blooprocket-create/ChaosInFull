@@ -24,6 +24,9 @@ const FISHING_RARITY_COLORS = {
     legendary: '#ffce6f'
 };
 
+// Global balance knob for fishing XP outside the active controller (legacy/overlay flows)
+const FISHING_XP_GLOBAL_MULT = 2.25;
+
 export class BrokenDock extends Phaser.Scene {
     constructor() {
         super('BrokenDock');
@@ -2279,7 +2282,8 @@ export class BrokenDock extends Phaser.Scene {
                 return;
             }
 
-            const xpGain = Math.max(1, Math.round(((chosen.difficulty || 0) + (chosen.baseValue || chosen.value || 0)) * 1.5));
+            // Apply global XP buff and raise minimum floor to better reward successful catches
+            const xpGain = Math.max(10, Math.round((((chosen.difficulty || 0) + (chosen.baseValue || chosen.value || 0)) * 1.5) * FISHING_XP_GLOBAL_MULT));
             this._grantFishingXp(xpGain);
             this._addItemToInventory(chosen.id, 1);
             this._refreshSharedUi();

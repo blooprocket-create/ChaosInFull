@@ -8,6 +8,25 @@ export type PatchNote = {
 
 export const patchNotes: PatchNote[] = [
   {
+    date: "2025-11-12",
+    version: "0.0.23",
+    title: "Fishing XP Revamp (2.25x Base, Higher Floor)",
+    highlights: [
+      "Active fishing catch XP globally increased (~2.25x baseline multiplier)",
+      "Minimum XP per successful catch raised from 4 → 10",
+      "Legacy (auto/overlay) catch path updated to match new multiplier",
+      "Balance knob introduced: FISHING_XP_GLOBAL_MULT for quick future tuning",
+      "No-bite +1 XP unchanged (still a consolation without trivial leveling)"
+    ],
+    notes: [
+      "Added _xpGlobalMult (2.25) in FishingController; applied to performance-adjusted formula before rounding.",
+      "Raised minimum floor to 10 XP to better reflect time/interaction cost of tension mini-game.",
+      "BrokenDock legacy xpGain now applies same multiplier & floor for consistency while that path remains.",
+      "Mastery & gear percentage bonuses still stack after the base buff; no change to relative scaling.",
+      "Telemetry still reports raw awarded XP; analytics can compare pre/post patch by version tag 0.0.23." 
+    ]
+  },
+  {
     date: "2025-11-11",
     version: "0.0.22",
     title: "Global User Settings: server-backed preferences, client hydration, and API",

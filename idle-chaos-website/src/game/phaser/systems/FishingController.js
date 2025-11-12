@@ -39,6 +39,9 @@ export class FishingController {
         this.perfectSegments = 0; // subset counted as "perfect" (pointer centered)
         // Rarity multipliers (tunable): Common 1, Uncommon 1.25, Rare 1.7, Epic 3.4, Legendary 6.5
         this._rarityXpMult = { common: 1, uncommon: 1.25, rare: 1.7, epic: 3.4, legendary: 6.5 };
+    // Global XP multiplier (balance knob): scales fishing XP from catches across all rarities/difficulties
+    // 2.25x chosen to reflect higher effort of active fishing minigame
+    this._xpGlobalMult = 2.25;
         // Center tolerance ratio for a perfect segment (portion of zone width allowed from center)
         this._perfectToleranceRatio = 0.30;
         // Focus pulse (anti-bot micro-check)
@@ -307,8 +310,9 @@ export class FishingController {
         const masteryPrecisionBonus = 0.02 * (mastery.precision || 0); // tunable
         const rod = this._getRodStats();
         const gearSkillBonus = 0.01 * (rod.skillBonus || 0); // each skill point +1%
-        const xpRaw = baseXP * performanceMultiplier * (1 + masteryPrecisionBonus + gearSkillBonus);
-        const xp = Math.max(4, Math.round(xpRaw));
+    const xpRaw = baseXP * performanceMultiplier * (1 + masteryPrecisionBonus + gearSkillBonus) * (this._xpGlobalMult || 1);
+    // Raise minimum catch XP floor to better reward successful catches
+    const xp = Math.max(10, Math.round(xpRaw));
         // Consume one bait on successful catch
         if (this.baitId) {
             const m = this._getMastery();
