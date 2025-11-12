@@ -511,7 +511,11 @@ export class BrokenDock extends Phaser.Scene {
         try {
             this._persistCharacter = (username) => {
                 try {
-                        persistCharacter(this, username, {
+                    const changed = !!(this.char && this.char._dirtyFishing);
+                    if (changed && this.char && this.char.id && window.__cif_persist && typeof window.__cif_persist.saveCharacterPatch === 'function') {
+                        try { window.__cif_persist.saveCharacterPatch(String(this.char.id), { fishing: this.char.fishing }); this.char._dirtyFishing = false; } catch (e) {}
+                    }
+                    persistCharacter(this, username, {
                         includeLocation: true,
                         assignFields: ['fishing', 'inventory', 'flags', 'gold', 'lastLocation'],
                         onAfterSave: (scene) => {
@@ -2360,6 +2364,7 @@ export class BrokenDock extends Phaser.Scene {
                             } catch (e) {}
                         }
                         masteryAwarded = ((this.char.fishing && this.char.fishing.masteryPoints) || 0) - prevMastery;
+                        try { this.char._dirtyFishing = true; } catch (e) {}
                         const bonusText = masteryAwarded > 0 ? ` (+${masteryAwarded} mastery point${masteryAwarded>1?'s':''})` : '';
                         this._showToast && this._showToast(`Fishing level up! L${progress.level}${bonusText}`, 2200);
                     }
@@ -2389,6 +2394,7 @@ export class BrokenDock extends Phaser.Scene {
                         const awarded = (fish.masteryPoints || 0) - prevMastery;
                         const bonusText = awarded > 0 ? ` (+${awarded} mastery point${awarded>1?'s':''})` : '';
                         this._showToast && this._showToast(`Fishing level up! L${fish.level}${bonusText}`, 2200);
+                        try { this.char._dirtyFishing = true; } catch (e) {}
                     }
                 }
                 this._persistCharacterState();
@@ -2419,6 +2425,7 @@ export class BrokenDock extends Phaser.Scene {
                 const awarded = (fish.masteryPoints || 0) - prevMastery;
                 const bonusText = awarded > 0 ? ` (+${awarded} mastery point${awarded>1?'s':''})` : '';
                 this._showToast && this._showToast(`Fishing level up! L${fish.level}${bonusText}`, 2200);
+                try { this.char._dirtyFishing = true; } catch (e) {}
             }
             this._persistCharacterState();
         }

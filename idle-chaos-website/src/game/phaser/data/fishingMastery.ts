@@ -220,6 +220,7 @@ export function unlockMasteryNode(char: any, nodeId: string): boolean {
   const node = fishingMasteryById[nodeId];
   char.fishing.masteryNodes.push(nodeId);
   char.fishing.masteryPoints -= node.cost;
+  try { (char as any)._dirtyFishing = true; } catch {}
   return true;
 }
 
