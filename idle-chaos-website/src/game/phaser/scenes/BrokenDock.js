@@ -2331,17 +2331,20 @@ export class BrokenDock extends Phaser.Scene {
                     this.char.fishing = progress;
                     const leveled = progress.level > oldLevel;
                     if (leveled) {
+                        const levelsGained = progress.level - oldLevel;
+                        const prevMastery = (this.char.fishing && this.char.fishing.masteryPoints) || 0;
                         let masteryAwarded = 0;
                         const hasGlobalGrant = (typeof window !== 'undefined' && typeof window.grantMasteryPointsIfNeeded === 'function');
-                        try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', progress.level - oldLevel); } catch (e) {}
+                        try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', levelsGained); } catch (e) {}
                         if (hasGlobalGrant) {
-                            try { window.grantMasteryPointsIfNeeded(this.char); } catch (e) {}
+                            try { window.grantMasteryPointsIfNeeded(this.char, levelsGained); } catch (e) {}
                         } else {
                             try {
                                 this.char.fishing.masteryPoints = this.char.fishing.masteryPoints || 0;
-                                if (progress.level >= 2) { this.char.fishing.masteryPoints += 1; masteryAwarded += 1; }
+                                this.char.fishing.masteryPoints += levelsGained;
                             } catch (e) {}
                         }
+                        masteryAwarded = ((this.char.fishing && this.char.fishing.masteryPoints) || 0) - prevMastery;
                         const bonusText = masteryAwarded > 0 ? ` (+${masteryAwarded} mastery point${masteryAwarded>1?'s':''})` : '';
                         this._showToast && this._showToast(`Fishing level up! L${progress.level}${bonusText}`, 2200);
                     }
@@ -2349,6 +2352,7 @@ export class BrokenDock extends Phaser.Scene {
                     // Fallback local progression if server call failed
                     const fish = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
                     fish.exp = (fish.exp || 0) + finalAmount;
+                    let totalLevelsGained = 0;
                     while (fish.exp >= fish.expToLevel) {
                         fish.exp -= fish.expToLevel;
                         fish.level = (fish.level || 1) + 1;
@@ -2356,7 +2360,20 @@ export class BrokenDock extends Phaser.Scene {
                             const lvl = Math.max(1, Math.floor(fish.level || 1));
                             fish.expToLevel = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
                         } catch (e) { fish.expToLevel = Math.floor((fish.expToLevel || 100) * 1.25); }
+                        totalLevelsGained += 1;
                         try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
+                    }
+                    if (totalLevelsGained > 0) {
+                        const prevMastery = (fish.masteryPoints || 0);
+                        const hasGlobalGrant = (typeof window !== 'undefined' && typeof window.grantMasteryPointsIfNeeded === 'function');
+                        if (hasGlobalGrant) {
+                            try { window.grantMasteryPointsIfNeeded(this.char, totalLevelsGained); } catch (e) {}
+                        } else {
+                            fish.masteryPoints = (fish.masteryPoints || 0) + totalLevelsGained;
+                        }
+                        const awarded = (fish.masteryPoints || 0) - prevMastery;
+                        const bonusText = awarded > 0 ? ` (+${awarded} mastery point${awarded>1?'s':''})` : '';
+                        this._showToast && this._showToast(`Fishing level up! L${fish.level}${bonusText}`, 2200);
                     }
                 }
                 this._persistCharacterState();
@@ -2365,6 +2382,7 @@ export class BrokenDock extends Phaser.Scene {
             // Offline/local fallback
             const fish = this.char.fishing = this.char.fishing || { level: 1, exp: 0, expToLevel: 100 };
             fish.exp = (fish.exp || 0) + finalAmount;
+            let totalLevelsGained = 0;
             while (fish.exp >= fish.expToLevel) {
                 fish.exp -= fish.expToLevel;
                 fish.level = (fish.level || 1) + 1;
@@ -2372,7 +2390,20 @@ export class BrokenDock extends Phaser.Scene {
                     const lvl = Math.max(1, Math.floor(fish.level || 1));
                     fish.expToLevel = Math.max(50, Math.floor(100 * Math.pow(lvl, 1.6)));
                 } catch (e) { fish.expToLevel = Math.floor((fish.expToLevel || 100) * 1.25); }
+                totalLevelsGained += 1;
                 try { onSkillLevelUp && onSkillLevelUp(this, this.char, 'fishing', 1); } catch (e) {}
+            }
+            if (totalLevelsGained > 0) {
+                const prevMastery = (fish.masteryPoints || 0);
+                const hasGlobalGrant = (typeof window !== 'undefined' && typeof window.grantMasteryPointsIfNeeded === 'function');
+                if (hasGlobalGrant) {
+                    try { window.grantMasteryPointsIfNeeded(this.char, totalLevelsGained); } catch (e) {}
+                } else {
+                    fish.masteryPoints = (fish.masteryPoints || 0) + totalLevelsGained;
+                }
+                const awarded = (fish.masteryPoints || 0) - prevMastery;
+                const bonusText = awarded > 0 ? ` (+${awarded} mastery point${awarded>1?'s':''})` : '';
+                this._showToast && this._showToast(`Fishing level up! L${fish.level}${bonusText}`, 2200);
             }
             this._persistCharacterState();
         }

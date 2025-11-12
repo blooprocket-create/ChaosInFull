@@ -178,14 +178,28 @@ export function ensureFishingMastery(char: any) {
   if (typeof char.fishing.masteryPoints !== 'number') char.fishing.masteryPoints = 0;
 }
 
-// Simple leveling rule (hook XP already tracked): one mastery point every 5 fishing levels.
-export function grantMasteryPointsIfNeeded(char: any) {
+// Mastery awarding rule: grant 1 mastery point per fishing level gained.
+// Optional levelsGained param allows callers that know the delta to award precisely.
+// If levelsGained is omitted we infer it from an internal _masteryAccountedLevel tracker.
+// No retroactive credit is issued for pre-existing levels (the first call seeds the tracker).
+export function grantMasteryPointsIfNeeded(char: any, levelsGained?: number) {
   try {
     ensureFishingMastery(char);
-    const lvl = char.fishing.level || 1;
-    const shouldHave = Math.floor(lvl / 5);
-    if ((char.fishing.masteryPoints || 0) < shouldHave) {
-      char.fishing.masteryPoints = shouldHave;
+    const fishing = char.fishing;
+    const lvl = fishing.level || 1;
+    if (typeof fishing._masteryAccountedLevel !== 'number') {
+      // Seed tracker without retro-award
+      fishing._masteryAccountedLevel = lvl;
+    }
+    let gained = 0;
+    if (levelsGained && levelsGained > 0) {
+      gained = levelsGained;
+    } else if (lvl > fishing._masteryAccountedLevel) {
+      gained = lvl - fishing._masteryAccountedLevel;
+    }
+    if (gained > 0) {
+      fishing.masteryPoints = (fishing.masteryPoints || 0) + gained;
+      fishing._masteryAccountedLevel = lvl;
     }
   } catch {}
 }

@@ -1774,7 +1774,8 @@ export function openInventoryModal(scene) {
                                 return initSlots(slots);
                             };
                             const invOrder = loaded.flags && Array.isArray(loaded.flags.invOrder) ? loaded.flags.invOrder : null;
-                            scene.char.flags = loaded.flags || scene.char.flags || {};
+                            // Merge flags rather than replace so we don't lose transient scene-only or lazily-hydrated flags like dockStage
+                            scene.char.flags = { ...(scene.char.flags || {}), ...(loaded.flags || {}) };
                             scene.char.inventory = applyOrder(invOrder);
                         }
                         refreshInventoryModal(scene);
