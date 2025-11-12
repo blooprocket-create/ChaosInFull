@@ -343,17 +343,32 @@ export function applySafeZoneRegen(scene) {
 }
 
 // Check and apply class level ups (char.exp -> char.level) and apply race-based stat growth
+// Lightweight gated debug helper for level checks
+function __levelDbg() {
+    try {
+        if (typeof window !== 'undefined' && window.__debug && (window.__debug.all || window.__debug.level)) {
+            const args = Array.prototype.slice.call(arguments);
+            args.unshift('[level]');
+            // eslint-disable-next-line no-console
+            console.debug.apply(console, args);
+        }
+    } catch (e) { /* ignore */ }
+}
+
 export function checkClassLevelUps(scene) {
     if (!scene || !scene.char) return;
     const char = scene.char;
     char.exp = char.exp || 0;
     char.expToLevel = char.expToLevel || 100;
     let leveled = false;
+    try { __levelDbg('check:start', { charId: char.id, level: char.level, exp: char.exp, expToLevel: char.expToLevel }); } catch (e) {}
     while (char.exp >= char.expToLevel) {
+        try { __levelDbg('tick:before', { level: char.level, exp: char.exp, expToLevel: char.expToLevel }); } catch (e) {}
         char.exp -= char.expToLevel;
         char.level = (char.level || 1) + 1;
         char.expToLevel = Math.floor(char.expToLevel * 1.25);
     try { onCharacterLevelUp && onCharacterLevelUp(scene, char, 1); } catch (e) { /* ignore talent award errors */ }
+        try { __levelDbg('tick:after', { newLevel: char.level, exp: char.exp, expToLevel: char.expToLevel }); } catch (e) {}
         // apply race+class per-level growth on level up (use data-driven defs when available)
         const raceKey = (char.race || 'Human');
         const classKey = (char.class || 'beginner');
@@ -380,6 +395,7 @@ export function checkClassLevelUps(scene) {
         leveled = true;
     }
     if (leveled) {
+    try { __levelDbg('check:leveled', { level: char.level, stats: char.stats }); } catch (e) {}
         // when leveled, persist and refresh HUD + stats modal
     try { if (scene._persistCharacter) scene._persistCharacter((scene.sys && scene.sys.settings && scene.sys.settings.data && scene.sys.settings.data.username) || null); } catch(e) { /* ignore */ }
     try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch(e) {}

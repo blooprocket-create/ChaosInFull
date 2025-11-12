@@ -1500,6 +1500,12 @@ function sharedGainExperience(amount) {
             finalAmount = amount * (1 + bonusPct / 100) + bonusFlat;
         }
     } catch (e) {}
+    try {
+        if (typeof window !== 'undefined' && window.__debug && (window.__debug.all || window.__debug.xp)) {
+            // eslint-disable-next-line no-console
+            console.debug('[xp] gain:start', { raw: amount, final: finalAmount, charId: this.char.id, level: this.char.level, exp: this.char.exp, expToLevel: this.char.expToLevel });
+        }
+    } catch (e) {}
     // Send to server (authoritative). We'll also bump local exp for responsiveness; server sync will correct if needed.
     try {
         if (this.char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.queueSkillXp === 'function') {
@@ -1510,6 +1516,12 @@ function sharedGainExperience(amount) {
         this.char.exp = (this.char.exp || 0) + finalAmount;
     } catch (e) {}
     const leveled = checkClassLevelUps(this);
+    try {
+        if (typeof window !== 'undefined' && window.__debug && (window.__debug.all || window.__debug.xp)) {
+            // eslint-disable-next-line no-console
+            console.debug('[xp] gain:after', { leveled, newLevel: this.char.level, exp: this.char.exp, expToLevel: this.char.expToLevel });
+        }
+    } catch (e) {}
     if (leveled && this._showToast) this._showToast('Level up!', 1800);
 }
 

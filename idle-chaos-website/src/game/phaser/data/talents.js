@@ -1144,11 +1144,24 @@ export default {
 };
 
 // --- Runtime helpers (award points, initialize talent state) ---
+// Lightweight gated debug helper for this module
+function __talentDbg() {
+    try {
+        if (typeof window !== 'undefined' && window.__debug && (window.__debug.all || window.__debug.talents)) {
+            const args = Array.prototype.slice.call(arguments);
+            args.unshift('[talents]');
+            // eslint-disable-next-line no-console
+            console.debug.apply(console, args);
+        }
+    } catch (e) { /* ignore */ }
+}
+
 function ensureCharTalents(char) {
     if (!char) return;
     if (!char.talents) char.talents = { pointsByTab: {}, unspentByTab: {}, starPoints: 0, allocations: {}, skillBar: [] };
     // ensure keys for tabs exist
     try {
+        try { __talentDbg('ensureCharTalents:init', { id: char.id, name: char.name, class: char.class, level: char.level }); } catch (e) {}
         Object.keys(TALENT_TABS).forEach(tid => {
             if (!char.talents.pointsByTab[tid]) char.talents.pointsByTab[tid] = 0;
             if (!char.talents.unspentByTab[tid]) char.talents.unspentByTab[tid] = 0;
@@ -1203,6 +1216,7 @@ function ensureCharTalents(char) {
                 } catch (e) { /* ignore individual skill errors */ }
             }
             const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+            try { __talentDbg('ensureCharTalents:computedBase', { levelPointsPerTab, gatherPointsPerTab, expectedHistoricPerTab, tabs: tabsToConsider }); } catch (e) {}
             // credit each non-star tab once (avoid double-sync). Track if we actually changed anything so we can persist immediately.
             let didRetroCredit = false;
             for (const tid of tabsToConsider) {
@@ -1219,6 +1233,7 @@ function ensureCharTalents(char) {
                 char.talents._tabSynced[tid] = true;
                 // record baseline so later level/skill awards only grant the delta beyond this
                 char.talents._historicalBasePerTab[tid] = Math.max(Number(char.talents._historicalBasePerTab[tid] || 0), expectedHistoricPerTab);
+                try { __talentDbg('ensureCharTalents:tabSync', { tab: tid, existing, need, pointsAfter: char.talents.pointsByTab[tid], unspentAfter: char.talents.unspentByTab[tid], baseline: char.talents._historicalBasePerTab[tid] }); } catch (e) {}
             }
             // Store diagnostics for UI/inspection (non-persistent; safe)
             char.talents._diagnostics = Object.assign({}, char.talents._diagnostics, {
@@ -1231,6 +1246,7 @@ function ensureCharTalents(char) {
                 try {
                     if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
                         window.__cif_persist.saveTalents(String(char.id), char.talents || {});
+                        try { __talentDbg('ensureCharTalents:persistedRetroCredit', { id: char.id }); } catch (e) {}
                     }
                 } catch (e) { /* best-effort */ }
             }
@@ -1241,6 +1257,7 @@ function ensureCharTalents(char) {
 function awardPointsForTabs(char, tabIds = [], points = 0) {
     if (!char || !tabIds || !points) return;
     ensureCharTalents(char);
+    try { __talentDbg('awardPointsForTabs', { id: char.id, tabs: tabIds, points }); } catch (e) {}
     for (const tid of tabIds) {
         try {
             const tab = TALENT_TABS[tid];
@@ -1279,6 +1296,7 @@ function onCharacterLevelUp(scene, char, levelsGained = 1) {
             } catch (e) { /* ignore */ }
         }
         const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+        try { __talentDbg('levelUp:start', { id: char.id, name: char.name, levelsGained, level: char.level, expectedHistoricPerTab, tabs: nonStarTabs }); } catch (e) {}
         // clamp per-tab award to both the intended amount and the remaining delta vs baseline
         for (const tid of nonStarTabs) {
             try {
@@ -1291,6 +1309,7 @@ function onCharacterLevelUp(scene, char, levelsGained = 1) {
                 }
                 // update baseline to the new expected (prevents future duplicate grants)
                 char.talents._historicalBasePerTab[tid] = Math.max(prevBase, prevBase + toAward, expectedHistoricPerTab);
+                try { __talentDbg('levelUp:tab', { tab: tid, prevBase, intended, delta, toAward, pointsByTab: char.talents.pointsByTab[tid], unspentByTab: char.talents.unspentByTab[tid], newBase: char.talents._historicalBasePerTab[tid] }); } catch (e) {}
             } catch (e) { /* ignore per-tab errors */ }
         }
         // Persist talents if bridge available
@@ -1328,6 +1347,7 @@ function onSkillLevelUp(scene, char, skillKey, levelsGained = 1) {
             } catch (e) { /* ignore */ }
         }
         const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+        try { __talentDbg('skillUp:start', { id: char.id, name: char.name, skillKey, levelsGained, expectedHistoricPerTab, tabs: nonStarTabs }); } catch (e) {}
         for (const tid of nonStarTabs) {
             try {
                 const prevBase = Number((char.talents._historicalBasePerTab && char.talents._historicalBasePerTab[tid]) || 0);
@@ -1336,6 +1356,7 @@ function onSkillLevelUp(scene, char, skillKey, levelsGained = 1) {
                 const toAward = Math.max(0, Math.min(intended, delta));
                 if (toAward > 0) awardPointsForTabs(char, [tid], toAward);
                 char.talents._historicalBasePerTab[tid] = Math.max(prevBase, prevBase + toAward, expectedHistoricPerTab);
+                try { __talentDbg('skillUp:tab', { tab: tid, prevBase, intended, delta, toAward, pointsByTab: char.talents.pointsByTab[tid], unspentByTab: char.talents.unspentByTab[tid], newBase: char.talents._historicalBasePerTab[tid] }); } catch (e) {}
             } catch (e) { /* ignore per-tab errors */ }
         }
         // Persist talents if bridge available
