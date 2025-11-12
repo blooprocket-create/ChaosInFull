@@ -1201,7 +1201,8 @@ function ensureCharTalents(char) {
                 } catch (e) { /* ignore individual skill errors */ }
             }
             const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
-            // credit each non-star tab once (avoid double-sync)
+            // credit each non-star tab once (avoid double-sync). Track if we actually changed anything so we can persist immediately.
+            let didRetroCredit = false;
             for (const tid of tabsToConsider) {
                 const tdef = TALENT_TABS[tid];
                 if (!tdef || tdef.type === 'star') continue;
@@ -1211,6 +1212,7 @@ function ensureCharTalents(char) {
                 if (need > 0) {
                     char.talents.pointsByTab[tid] = existing + need;
                     char.talents.unspentByTab[tid] = (char.talents.unspentByTab[tid] || 0) + need;
+                    didRetroCredit = true;
                 }
                 char.talents._tabSynced[tid] = true;
             }
@@ -1220,6 +1222,14 @@ function ensureCharTalents(char) {
                 levelPointsPerTab,
                 gatherPointsPerTab
             });
+            // If we retro-credited anything, persist talents immediately so guards (_tabSynced) and updated totals are durable across reloads.
+            if (didRetroCredit) {
+                try {
+                    if (char && char.id && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                        window.__cif_persist.saveTalents(String(char.id), char.talents || {});
+                    }
+                } catch (e) { /* best-effort */ }
+            }
         } catch (e) {}
     } catch (e) {}
 }

@@ -2460,7 +2460,8 @@ function sharedSetAutoTarget(enemy) {
             try { if (this.autoTargetIndicator && this.autoTargetIndicator.destroy) { if (this.autoTargetIndicator._pulseTween) { try{ this.autoTargetIndicator._pulseTween.stop(); }catch(e){} } this.autoTargetIndicator.destroy(); } } catch (e) {}
 
             const color = (this._targetIndicatorColor != null) ? this._targetIndicatorColor : 0xff66aa;
-            const scroll = (this._targetIndicatorScroll != null) ? this._targetIndicatorScroll : 0;
+            // Scroll factor should default to 1 so the indicator moves with the camera/world
+            const scroll = (this._targetIndicatorScroll != null) ? this._targetIndicatorScroll : 1;
             // radius: based on enemy display size
             const ew = Math.max(1, (enemy.displayWidth || enemy.width || 32));
             const eh = Math.max(1, (enemy.displayHeight || enemy.height || 32));

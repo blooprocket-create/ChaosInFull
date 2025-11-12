@@ -3582,12 +3582,73 @@ export function refreshTalentModal(scene) {
         respecBtn.onclick = () => {
             try {
                 const allocs = (char.talents && char.talents.allocations && char.talents.allocations[activeTabId]) || {};
+
+                // Sum ranks to refund for informational purposes (used for STAR tab behavior)
                 let refunded = 0; for (const k of Object.keys(allocs)) refunded += (allocs[k]||0);
-                if (activeTabDef.type === 'star') char.talents.starPoints = (char.talents.starPoints||0) + refunded; else { char.talents.unspentByTab = char.talents.unspentByTab||{}; char.talents.unspentByTab[activeTabId] = (char.talents.unspentByTab[activeTabId]||0) + refunded; }
-                // process de-allocation
-                try { for (const k of Object.keys(allocs)) { const prev = allocs[k]||0; if (prev>0) processTalentAllocation(scene,char,activeTabId,k,prev,0); } } catch(e){}
+
+                // De-allocate every talent in the tab to trigger proper unlearn + skill bar cleanup
+                try {
+                    for (const k of Object.keys(allocs)) {
+                        const prev = allocs[k] || 0;
+                        if (prev > 0) processTalentAllocation(scene, char, activeTabId, k, prev, 0);
+                    }
+                } catch (e) { /* ignore per-talent errors */ }
+
+                // Clear allocations map for this tab after de-allocation side effects
                 if (char.talents && char.talents.allocations) char.talents.allocations[activeTabId] = {};
-                if (scene._persistCharacter) scene._persistCharacter((scene.sys?.settings?.data && scene.sys.settings.data.username)||null);
+
+                if (activeTabDef.type === 'star') {
+                    // STAR tab: simple refund of ranks back into starPoints
+                    char.talents.starPoints = (char.talents.starPoints || 0) + refunded;
+                } else {
+                    // Non-star tabs: Recalculate how many points we SHOULD have historically for this tab
+                    const level = Number(char.level || 1);
+                    const levelPointsPerTab = Math.max(0, (level - 1)) * 3;
+                    const GATHERING_SKILLS = ['woodcutting','fishing','mining','smithing','cooking'];
+                    let gatherPointsPerTab = 0;
+                    for (const sk of GATHERING_SKILLS) {
+                        try {
+                            const obj = char[sk];
+                            if (obj && typeof obj === 'object' && typeof obj.level === 'number') {
+                                gatherPointsPerTab += Math.max(0, Number(obj.level || 1) - 1);
+                            }
+                        } catch (e) { /* ignore individual skill errors */ }
+                    }
+                    const expectedHistoricPerTab = levelPointsPerTab + gatherPointsPerTab;
+                    // Set totals and unspent to the recalculated amount for this tab
+                    char.talents.pointsByTab = char.talents.pointsByTab || {};
+                    char.talents.unspentByTab = char.talents.unspentByTab || {};
+                    char.talents._tabSynced = char.talents._tabSynced || {};
+                    char.talents.pointsByTab[activeTabId] = expectedHistoricPerTab;
+                    char.talents.unspentByTab[activeTabId] = expectedHistoricPerTab;
+                    // Mark this tab as synced so initialization won't retro-credit again
+                    char.talents._tabSynced[activeTabId] = true;
+                    // Store diagnostics for inspection
+                    try {
+                        char.talents._diagnostics = Object.assign({}, char.talents._diagnostics, {
+                            expectedHistoricPerTab,
+                            levelPointsPerTab,
+                            gatherPointsPerTab
+                        });
+                    } catch (e) {}
+                }
+
+                // Recompute talent modifiers after wipe so HUD/Stats reflect changes
+                try { if (typeof computeTalentModifiers === 'function') computeTalentModifiers(char); } catch (e) {}
+
+                // Persist via talents bridge (server) when available, and snapshot locally
+                try {
+                    const cid = (char && char.id) ? String(char.id) : null;
+                    if (cid && typeof window !== 'undefined' && window.__cif_persist && typeof window.__cif_persist.saveTalents === 'function') {
+                        window.__cif_persist.saveTalents(cid, char.talents || {});
+                    }
+                } catch (e) { /* best-effort */ }
+                if (scene._persistCharacter) scene._persistCharacter((scene.sys?.settings?.data && scene.sys.settings.data.username) || null);
+
+                // Refresh UI/HUD
+                try { if (scene._updateHUD) scene._updateHUD(); else { if (scene._destroyHUD) scene._destroyHUD(); if (scene._createHUD) scene._createHUD(); } } catch (e) {}
+                try { if (window && window.__shared_ui && window.__shared_ui.refreshStatsModal && scene._statsModal) window.__shared_ui.refreshStatsModal(scene); } catch (e) {}
+                try { if (typeof scene._showToast === 'function') scene._showToast('Respec complete. Points recalculated for current tab.'); } catch (e) {}
                 refreshTalentModal(scene);
             } catch(e){ console.warn('respec error',e); }
         };
