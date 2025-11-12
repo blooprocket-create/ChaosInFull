@@ -33,7 +33,10 @@ export class GloamwaySwamp extends Phaser.Scene {
             zombie: { maxhp: 38, moveSpeed: 60, attackRange: 58, damage: [7, 12], attackCooldown: 1100, detectionRadius: 220, patrolRadius: 140, separationRadius: 30 },
             goblin_skeleton: { maxhp: 34, moveSpeed: 86, attackRange: 64, damage: [6, 12], attackCooldown: 940, detectionRadius: 270, patrolRadius: 170, separationRadius: 32 },
             goblin_skeleteon: { maxhp: 34, moveSpeed: 86, attackRange: 64, damage: [6, 12], attackCooldown: 940, detectionRadius: 270, patrolRadius: 170, separationRadius: 32 },
-            brute_skeleton: { maxhp: 48, moveSpeed: 82, attackRange: 72, damage: [9, 16], attackCooldown: 900, detectionRadius: 280, patrolRadius: 180, separationRadius: 34, attackWindupMs: 140 }
+            brute_skeleton: { maxhp: 48, moveSpeed: 82, attackRange: 72, damage: [9, 16], attackCooldown: 900, detectionRadius: 280, patrolRadius: 180, separationRadius: 34, attackWindupMs: 140 },
+            plague_crawler: { maxhp: 44, moveSpeed: 62, attackRange: 40, damage: [8, 13], attackCooldown: 1100, detectionRadius: 240, patrolRadius: 150, separationRadius: 28 },
+            bog_wraith: { maxhp: 60, moveSpeed: 110, attackRange: 88, damage: [11, 18], attackCooldown: 960, detectionRadius: 300, patrolRadius: 200, separationRadius: 32 },
+            mire_hag: { maxhp: 78, moveSpeed: 80, attackRange: 100, damage: [14, 22], attackCooldown: 930, detectionRadius: 320, patrolRadius: 210, separationRadius: 34 }
         };
         this.enemyDefs = { ...fallbackEnemyDefs, ...baseEnemyDefs };
         this._enemyAIConfig = { detectionRadius: 260, separationRadius: 32, patrolIdleMin: 420, patrolIdleMax: 1600, attackBuffer: 14 };
@@ -170,23 +173,36 @@ export class GloamwaySwamp extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(12, 16);
+        const count = Phaser.Math.Between(18, 26);
         for (let i = 0; i < count; i++) {
             const x = Phaser.Math.Between(x1, x2);
             const y = Phaser.Math.Between(y1, y2);
             const roll = Math.random();
             // Weighted ladder for skeleton family with some themed guests
-            let type = 'skeleton';
-            if (roll > 0.98) type = 'skeleton_legendary';
-            else if (roll > 0.92) type = 'skeleton_epic';
-            else if (roll > 0.78) type = 'skeleton_rare';
-            else if (roll > 0.62) type = 'skeleton_uncommon';
-            // sprinkle in themed variants
-            if (roll > 0.84 && roll <= 0.88) type = 'goblin_skeleton';
-            if (roll > 0.88 && roll <= 0.92) type = 'brute_skeleton';
-            if (roll > 0.56 && roll <= 0.62) type = 'zombie';
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(8000, 15000), active: null });
+            let type = 'plague_crawler';
+            if (roll > 0.99) type = 'mire_hag';
+            else if (roll > 0.95) type = 'skeleton_legendary';
+            else if (roll > 0.9) type = 'bog_wraith';
+            else if (roll > 0.82) type = 'skeleton_epic';
+            else if (roll > 0.72) type = 'skeleton_rare';
+            else if (roll > 0.6) type = 'skeleton_uncommon';
+            else if (roll > 0.5) type = 'zombie';
+            else if (roll > 0.46) type = 'goblin_skeleton';
+            else if (roll > 0.42) type = 'brute_skeleton';
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(7800, 16000), active: null });
         }
+        const mireNodes = [
+            { type: 'bog_wraith', count: 2, rect: { x: x1 + 120, y: y1 + 120, w: 200, h: 180 } },
+            { type: 'mire_hag', count: 1, rect: { x: Math.round((x1 + x2) / 2) - 80, y: y2 - 200, w: 160, h: 160 } },
+            { type: 'plague_crawler', count: 3, rect: { x: x2 - 260, y: y1 + 80, w: 220, h: 220 } }
+        ];
+        mireNodes.forEach(cfg => {
+            for (let i = 0; i < cfg.count; i++) {
+                const sx = Phaser.Math.Between(cfg.rect.x, cfg.rect.x + cfg.rect.w);
+                const sy = Phaser.Math.Between(cfg.rect.y, cfg.rect.y + cfg.rect.h);
+                pts.push({ x: sx, y: sy, type: cfg.type, respawn: Phaser.Math.Between(9000, 17000), active: null });
+            }
+        });
         return pts;
     }
 

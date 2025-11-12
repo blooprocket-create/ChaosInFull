@@ -312,6 +312,64 @@ export const ENEMY_DEFS = {
         ],
         gold: { min: 26, max: 58, chance: 0.97, luckBonus: 0.0026 }
     },
+    goblin_shadowblade: {
+        id: 'goblin_shadowblade',
+        name: 'Goblin Shadowblade',
+        tier: 'rare',
+        dynamicStats: true,
+        level: 12,
+        maxhp: 340,
+        moveSpeed: 135,
+        attackRange: 72,
+        attackCooldown: 780,
+        damage: [44, 70],
+        exp: 420,
+        drops: [
+            { itemId: 'bronze_dagger', minQty: 1, maxQty: 1, baseChance: 0.035, luckBonus: 0.0008 },
+            { itemId: 'poison_essence', minQty: 1, maxQty: 2, baseChance: 0.18, luckBonus: 0.0012 },
+            { itemId: 'minor_health_potion', minQty: 1, maxQty: 1, baseChance: 0.12, luckBonus: 0.01 }
+        ],
+        gold: { min: 18, max: 40, chance: 0.95, luckBonus: 0.0024 }
+    },
+    goblin_bloodshaman: {
+        id: 'goblin_bloodshaman',
+        name: 'Goblin Bloodshaman',
+        tier: 'epic',
+        dynamicStats: true,
+        level: 13,
+        maxhp: 420,
+        moveSpeed: 90,
+        attackRange: 86,
+        attackCooldown: 760,
+        damage: [36, 64],
+        exp: 520,
+        drops: [
+            { itemId: 'healing_essence', minQty: 1, maxQty: 2, baseChance: 0.32, luckBonus: 0.0015 },
+            { itemId: 'minor_mana_potion', minQty: 1, maxQty: 2, baseChance: 0.18, luckBonus: 0.012 },
+            { itemId: 'major_health_potion', minQty: 1, maxQty: 1, baseChance: 0.08, luckBonus: 0.01 }
+        ],
+        gold: { min: 28, max: 64, chance: 0.96, luckBonus: 0.0028 }
+    },
+    goblin_siegebreaker: {
+        id: 'goblin_siegebreaker',
+        name: 'Goblin Siegebreaker',
+        tier: 'legendary',
+        dynamicStats: true,
+        level: 15,
+        maxhp: 640,
+        moveSpeed: 70,
+        attackRange: 68,
+        attackCooldown: 820,
+        damage: [70, 110],
+        exp: 820,
+        drops: [
+            { itemId: 'iron_bar', minQty: 2, maxQty: 4, baseChance: 0.94, luckBonus: 0.0016 },
+            { itemId: 'iron_dagger', minQty: 1, maxQty: 1, baseChance: 0.04, luckBonus: 0.0008 },
+            { itemId: 'major_health_potion', minQty: 1, maxQty: 2, baseChance: 0.12, luckBonus: 0.012 },
+            { itemId: 'bag_of_gold', minQty: 1, maxQty: 1, baseChance: 0.08, luckBonus: 0.0012 }
+        ],
+        gold: { min: 42, max: 92, chance: 0.97, luckBonus: 0.0032 }
+    },
 
     // ---------------- Rats ----------------
         rat_uncommon: {
@@ -620,6 +678,62 @@ export const ENEMY_DEFS = {
         ],
         gold: { min: 40, max: 80, chance: 0.95, luckBonus: 0.003 }
     },
+    plague_crawler: {
+        id: 'plague_crawler',
+        name: 'Plague Crawler',
+        tier: 'common',
+        dynamicStats: true,
+        level: 15,
+        maxhp: 520,
+        moveSpeed: 62,
+        attackRange: 44,
+        attackCooldown: 1240,
+        damage: [32, 48],
+        exp: 360,
+        drops: [
+            { itemId: 'rotting_flesh', minQty: 1, maxQty: 3, baseChance: 0.92, luckBonus: 0.0016 },
+            { itemId: 'poison_essence', minQty: 1, maxQty: 1, baseChance: 0.18, luckBonus: 0.001 }
+        ],
+        gold: { min: 26, max: 48, chance: 0.9, luckBonus: 0.002 }
+    },
+    bog_wraith: {
+        id: 'bog_wraith',
+        name: 'Bog Wraith',
+        tier: 'rare',
+        dynamicStats: true,
+        level: 18,
+        maxhp: 660,
+        moveSpeed: 110,
+        attackRange: 92,
+        attackCooldown: 980,
+        damage: [44, 70],
+        exp: 540,
+        drops: [
+            { itemId: 'bone', minQty: 2, maxQty: 4, baseChance: 0.9, luckBonus: 0.0022 },
+            { itemId: 'poison_essence', minQty: 1, maxQty: 2, baseChance: 0.26, luckBonus: 0.0014 },
+            { itemId: 'minor_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.14, luckBonus: 0.012 }
+        ],
+        gold: { min: 34, max: 66, chance: 0.94, luckBonus: 0.0026 }
+    },
+    mire_hag: {
+        id: 'mire_hag',
+        name: 'Mire Hag',
+        tier: 'epic',
+        dynamicStats: true,
+        level: 20,
+        maxhp: 940,
+        moveSpeed: 82,
+        attackRange: 110,
+        attackCooldown: 920,
+        damage: [60, 96],
+        exp: 780,
+        drops: [
+            { itemId: 'healing_essence', minQty: 1, maxQty: 2, baseChance: 0.22, luckBonus: 0.0016 },
+            { itemId: 'poison_essence', minQty: 1, maxQty: 2, baseChance: 0.3, luckBonus: 0.0016 },
+            { itemId: 'major_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.12, luckBonus: 0.012 }
+        ],
+        gold: { min: 42, max: 90, chance: 0.95, luckBonus: 0.003 }
+    },
     big_flaming_slime: {
         id: 'big_flaming_slime',
         name: 'Big Flaming Slime',
@@ -637,6 +751,62 @@ export const ENEMY_DEFS = {
             { itemId: 'major_mana_potion', minQty: 1, maxQty: 2, baseChance: 0.2, luckBonus: 0.02 }
         ],
         gold: { min: 50, max: 100, chance: 0.95, luckBonus: 0.004 }
+    },
+    ember_hound: {
+        id: 'ember_hound',
+        name: 'Ember Hound',
+        tier: 'uncommon',
+        dynamicStats: true,
+        level: 21,
+        maxhp: 680,
+        moveSpeed: 125,
+        attackRange: 68,
+        attackCooldown: 960,
+        damage: [52, 80],
+        exp: 560,
+        drops: [
+            { itemId: 'flame_essence', minQty: 1, maxQty: 3, baseChance: 0.88, luckBonus: 0.0024 },
+            { itemId: 'minor_health_potion', minQty: 1, maxQty: 1, baseChance: 0.16, luckBonus: 0.012 }
+        ],
+        gold: { min: 36, max: 70, chance: 0.93, luckBonus: 0.0026 }
+    },
+    ash_gargoyle: {
+        id: 'ash_gargoyle',
+        name: 'Ash Gargoyle',
+        tier: 'epic',
+        dynamicStats: true,
+        level: 24,
+        maxhp: 980,
+        moveSpeed: 78,
+        attackRange: 104,
+        attackCooldown: 900,
+        damage: [72, 110],
+        exp: 860,
+        drops: [
+            { itemId: 'iron_bar', minQty: 1, maxQty: 3, baseChance: 0.7, luckBonus: 0.0018 },
+            { itemId: 'flame_essence', minQty: 2, maxQty: 4, baseChance: 0.4, luckBonus: 0.002 },
+            { itemId: 'major_mana_potion', minQty: 1, maxQty: 1, baseChance: 0.14, luckBonus: 0.014 }
+        ],
+        gold: { min: 60, max: 120, chance: 0.95, luckBonus: 0.0032 }
+    },
+    magma_colossus: {
+        id: 'magma_colossus',
+        name: 'Magma Colossus',
+        tier: 'legendary',
+        dynamicStats: true,
+        level: 28,
+        maxhp: 2200,
+        moveSpeed: 60,
+        attackRange: 96,
+        attackCooldown: 880,
+        damage: [110, 170],
+        exp: 1600,
+        drops: [
+            { itemId: 'demonic_essence', minQty: 3, maxQty: 6, baseChance: 0.92, luckBonus: 0.0035 },
+            { itemId: 'flame_essence', minQty: 3, maxQty: 5, baseChance: 0.7, luckBonus: 0.0026 },
+            { itemId: 'major_health_potion', minQty: 1, maxQty: 2, baseChance: 0.2, luckBonus: 0.02 }
+        ],
+        gold: { min: 120, max: 220, chance: 0.97, luckBonus: 0.005 }
     },
         devil_spawn: {
         id: 'devil_spawn',

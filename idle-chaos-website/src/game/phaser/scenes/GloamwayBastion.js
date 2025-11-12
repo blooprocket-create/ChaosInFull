@@ -77,6 +77,41 @@ export class GloamwayBastion extends Phaser.Scene {
                 separationRadius: 36,
                 attackWindupMs: 130,
                 attackRecoveryMs: 360
+            },
+            goblin_shadowblade: {
+                maxhp: 66,
+                moveSpeed: 120,
+                attackRange: 86,
+                damage: [12, 22],
+                attackCooldown: 780,
+                detectionRadius: 320,
+                patrolRadius: 210,
+                separationRadius: 34,
+                attackWindupMs: 120
+            },
+            goblin_bloodshaman: {
+                maxhp: 72,
+                moveSpeed: 80,
+                attackRange: 96,
+                damage: [10, 18],
+                attackCooldown: 760,
+                detectionRadius: 320,
+                patrolRadius: 200,
+                separationRadius: 36,
+                attackWindupMs: 110,
+                attackRecoveryMs: 320
+            },
+            goblin_siegebreaker: {
+                maxhp: 120,
+                moveSpeed: 70,
+                attackRange: 72,
+                damage: [18, 28],
+                attackCooldown: 860,
+                detectionRadius: 340,
+                patrolRadius: 220,
+                separationRadius: 38,
+                attackWindupMs: 140,
+                attackRecoveryMs: 380
             }
         };
         this.enemyDefs = { ...fallbackEnemyDefs, ...baseEnemyDefs };
@@ -298,7 +333,15 @@ export class GloamwayBastion extends Phaser.Scene {
         const pts = [];
         if (!this._bounds) return pts;
         const { x1, x2, y1, y2 } = this._bounds;
-        const count = Phaser.Math.Between(10, 14);
+        const count = Phaser.Math.Between(16, 24);
+        const pickType = (roll) => {
+            if (roll > 0.985) return 'goblin_siegebreaker';
+            if (roll > 0.95) return 'goblin_bloodshaman';
+            if (roll > 0.88) return 'goblin_shadowblade';
+            if (roll > 0.72) return 'goblin_ironhowl';
+            if (roll > 0.48) return 'goblin_flamebinder';
+            return 'goblin_slicer';
+        };
         for (let i = 0; i < count; i++) {
             let x = Phaser.Math.Between(x1, x2);
             let y = Phaser.Math.Between(y1, y2);
@@ -308,12 +351,21 @@ export class GloamwayBastion extends Phaser.Scene {
                 y = Phaser.Math.Between(y1, y2);
                 tries++;
             }
-            const roll = Math.random();
-            let type = 'goblin_slicer';
-            if (roll > 0.75) type = 'goblin_flamebinder';
-            if (roll > 0.92) type = 'goblin_ironhowl';
-            pts.push({ x, y, type, respawn: Phaser.Math.Between(7000, 14000), active: null });
+            const type = pickType(Math.random());
+            pts.push({ x, y, type, respawn: Phaser.Math.Between(6400, 14000), active: null });
         }
+        const rallyBands = [
+            { type: 'goblin_shadowblade', count: 2, area: { x: x1 + 96, y: y1 + 140, width: 180, height: 160 } },
+            { type: 'goblin_bloodshaman', count: 2, area: { x: x2 - 220, y: y1 + 120, width: 180, height: 180 } },
+            { type: 'goblin_siegebreaker', count: 1, area: { x: Math.round((x1 + x2) / 2), y: y2 - 140, width: 140, height: 140 } }
+        ];
+        rallyBands.forEach(cfg => {
+            for (let i = 0; i < cfg.count; i++) {
+                const ax = Phaser.Math.Between(cfg.area.x, cfg.area.x + cfg.area.width);
+                const ay = Phaser.Math.Between(cfg.area.y, cfg.area.y + cfg.area.height);
+                pts.push({ x: ax, y: ay, type: cfg.type, respawn: Phaser.Math.Between(9000, 16000), active: null });
+            }
+        });
         return pts;
     }
 
