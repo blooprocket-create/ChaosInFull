@@ -143,8 +143,9 @@ export class GloamwayBastion extends Phaser.Scene {
     const margin = 64;
     this._bounds = { x1: margin, x2: W - margin, y1: 96, y2: H - 120 };
 
-        const safeWidth = 220;
-        const safeHeight = 180;
+        // Enlarge Mother Lumen's sanctuary (roughly 2x in each dimension)
+        const safeWidth = 440;
+        const safeHeight = 360;
         const safeCenter = { x: Math.round(W * 0.74), y: Math.round(H * 0.38) };
         this._safeZoneRect = new Phaser.Geom.Rectangle(
             safeCenter.x - safeWidth / 2,

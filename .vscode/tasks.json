@@ -582,6 +582,18 @@
 				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Typecheck+Lint (quick)",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"cd \"c:\\Users\\arame\\OneDrive\\Desktop\\ChaosInFull\\idle-chaos-website\"; if (Test-Path node_modules\\\\.bin\\\\tsc) { node_modules\\\\.bin\\\\tsc -p tsconfig.json --noEmit } else { npx tsc -p tsconfig.json --noEmit }; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (Test-Path node_modules\\\\.bin\\\\eslint) { node_modules\\\\.bin\\\\eslint . --max-warnings=0 } else { npx eslint . --max-warnings=0 }"
+			],
+			"group": "build"
 		}
 	]
 }
