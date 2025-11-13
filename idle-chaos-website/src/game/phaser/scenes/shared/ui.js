@@ -286,15 +286,16 @@ if (typeof document !== 'undefined' && !document.getElementById('shared-ui-style
     .mana-badge{position:absolute;right:8px;top:6px;background:rgba(120,20,20,0.9);color:#fff;padding:4px 6px;border-radius:6px;font-size:11px;font-weight:800}
     .cooldown-overlay{position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(180deg,rgba(0,0,0,0.6),rgba(0,0,0,0.6));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;border-radius:6px}
     .cooldown-active{filter:grayscale(30%);opacity:0.95}
-    /* Buffs panel inside the global skill bar */
+    /* Buffs + slot layout */
     #global-skill-bar .skillbar-inner { display:flex; align-items:center; gap:12px; }
     #global-skill-bar .skill-slots { display:flex; align-items:center; gap:8px; }
     #global-skill-bar .buffs-panel { display:flex; align-items:center; gap:8px; margin-left:6px; padding-left:10px; border-left: 2px dashed rgba(255,255,255,0.08); }
-    #global-skill-bar .buff-chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:58px; height:58px; padding:6px 8px; border-radius:6px; background:linear-gradient(180deg,rgba(20,20,22,0.96),rgba(12,12,14,0.96)); border:1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 18px rgba(0,0,0,0.45) inset; color:#eee; font-size:12px; }
-    #global-skill-bar .buff-chip .buff-name { font-weight:800; color:#ffd27a; text-shadow:0 1px 0 rgba(0,0,0,0.5); max-width:80px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #global-skill-bar .buff-chip .buff-eta { font-size:11px; color:#cfd; opacity:0.9; }
-    #global-skill-bar .buff-chip.temporary { border-color: rgba(255,210,122,0.35); }
-    #global-skill-bar .buff-chip.permanent { border-color: rgba(120,220,160,0.28); }
+    #global-skill-bar .skill-buffs-row { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:6px; }
+    #global-skill-bar .skill-buffs-row .buff-icon { position:relative; width:32px; height:32px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 2px 8px rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; overflow:hidden; background:rgba(255,255,255,0.04); }
+    #global-skill-bar .skill-buffs-row .buff-icon img { width:100%; height:100%; object-fit:cover; }
+    #global-skill-bar .skill-buffs-row .buff-icon .buff-eta { position:absolute; right:2px; bottom:1px; font-size:10px; font-weight:800; padding:0 2px; border-radius:3px; color:#fff; background:rgba(0,0,0,0.35); pointer-events:none; }
+    #global-skill-bar .skill-buffs-row .buff-icon.temporary { border-color: rgba(255,210,122,0.35); background: rgba(255,210,122,0.08); }
+    #global-skill-bar .skill-buffs-row .buff-icon.permanent { border-color: rgba(120,220,160,0.28); background: rgba(120,220,160,0.06); }
     `;
     document.head.appendChild(s);
 }
@@ -3830,30 +3831,25 @@ export function refreshSkillBarHUD(scene) {
     if (typeof document === 'undefined') return;
     if (!scene || !scene.char) return;
     try {
-        // Ensure we don't render stale buffs from a previous scene: drop any expired entries first
         try { pruneExpiredBuffs(scene); } catch (e) {}
         ensureCharTalents && ensureCharTalents(scene.char);
-        const containerId = 'global-skill-bar';
-        let el = document.getElementById(containerId);
-        if (!el) {
-            el = document.createElement('div'); el.id = containerId;
-            el.style.position = 'fixed';
-            el.style.left = '50%';
-            el.style.bottom = '12px';
-            el.style.transform = 'translateX(-50%)';
-            el.style.zIndex = '9999';
-            el.style.display = 'flex';
-            el.style.flexDirection = 'column';
-            el.style.alignItems = 'center';
-            el.style.gap = '6px';
-            el.style.padding = '6px 8px';
-            el.style.background = 'rgba(0,0,0,0.35)';
-            el.style.border = '1px solid rgba(255,255,255,0.06)';
-            el.style.borderRadius = '10px';
-            el.style.boxShadow = '0 8px 20px rgba(0,0,0,0.6)';
-            document.body.appendChild(el);
+        const bar = ensureSkillBar();
+        if (!bar) return;
+        let buffsRow = bar.querySelector('.skill-buffs-row');
+        if (!buffsRow) {
+            buffsRow = document.createElement('div');
+            buffsRow.className = 'skill-buffs-row';
+            bar.insertBefore(buffsRow, bar.firstChild);
         }
-        el.innerHTML = ''; // rebuild
+        buffsRow.innerHTML = '';
+        const inner = bar.querySelector('.skillbar-inner') || bar;
+        let slotsWrap = inner.querySelector('.skill-slots');
+        if (!slotsWrap) {
+            slotsWrap = document.createElement('div');
+            slotsWrap.className = 'skill-slots';
+            inner.insertBefore(slotsWrap, inner.firstChild);
+        }
+        slotsWrap.innerHTML = '';
         const char = scene.char;
         const defs = (char.learnedActives || []).reduce((m, a) => { if (a && a.id) m[a.id] = a; return m; }, {});
         const now = Date.now();
@@ -3892,13 +3888,8 @@ export function refreshSkillBarHUD(scene) {
         const showTip = (html, ev) => {
             try { tip.innerHTML = html || ''; moveTip(ev); } catch (e) {}
         };
-        const buffsRow = document.createElement('div');
         buffsRow.id = 'skill-buffs';
         buffsRow.style.display = (buffs.length > 0) ? 'flex' : 'none';
-        buffsRow.style.alignItems = 'center';
-        buffsRow.style.justifyContent = 'center';
-        buffsRow.style.gap = '6px';
-        buffsRow.style.width = '100%';
         // Render buff icons (32x32) with small ETA overlay
         for (const b of buffs) {
             try {
@@ -3989,13 +3980,7 @@ export function refreshSkillBarHUD(scene) {
                 buffsRow.appendChild(icon);
             } catch (e) {}
         }
-        el.appendChild(buffsRow);
-
-        // Slots wrapper (nine slots) BELOW the buffs row
-        const slotsWrap = document.createElement('div');
-        slotsWrap.style.display = 'flex';
-        slotsWrap.style.gap = '8px';
-        el.appendChild(slotsWrap);
+        // Slots wrapper (nine slots)
         for (let i = 0; i < 9; i++) {
             const slot = document.createElement('div'); slot.className = 'skill-slot';
             // base visuals are handled via CSS; keep minimal inline fallbacks
